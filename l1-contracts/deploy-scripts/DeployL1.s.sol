@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
@@ -20,7 +21,7 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -32,15 +33,20 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
@@ -99,6 +105,10 @@ contract DeployL1Script is Script {
         address erc20BridgeProxy;
         address sharedBridgeImplementation;
         address sharedBridgeProxy;
+        address l1NullifierImplementation;
+        address l1NullifierProxy;
+        address bridgedStandardERC20Implementation;
+        address bridgedTokenBeacon;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -168,7 +178,10 @@ contract DeployL1Script is Script {
         deployBridgehubContract();
         deployMessageRootContract();
 
+        deployL1NullifierContracts();
         deploySharedBridgeContracts();
+        deployBridgedStandardERC20Implementation();
+        deployBridgedTokenBeacon();
         deployL1NativeTokenVaultImplementation();
         deployL1NativeTokenVaultProxy();
         deployErc20BridgeImplementation();
@@ -194,6 +207,14 @@ contract DeployL1Script is Script {
 
     function getSharedBridgeProxyAddress() public view returns (address) {
         return addresses.bridges.sharedBridgeProxy;
+    }
+
+    function getNativeTokenVaultProxyAddress() public view returns (address) {
+        return addresses.vaults.l1NativeTokenVaultProxy;
+    }
+
+    function getL1NullifierProxyAddress() public view returns (address) {
+        return addresses.bridges.l1NullifierProxy;
     }
 
     function getOwnerAddress() public view returns (address) {
@@ -643,6 +664,33 @@ contract DeployL1Script is Script {
         deploySharedBridgeProxy();
     }
 
+    function deployL1NullifierContracts() internal {
+        deployL1NullifierImplementation();
+        deployL1NullifierProxy();
+    }
+
+    function deployL1NullifierImplementation() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(L1Nullifier).creationCode,
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.stateTransition.diamondProxy)
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("L1NullifierImplementation deployed at:", contractAddress);
+        addresses.bridges.l1NullifierImplementation = contractAddress;
+    }
+
+    function deployL1NullifierProxy() internal {
+        bytes memory initCalldata = abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+        bytes memory bytecode = abi.encodePacked(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(addresses.bridges.l1NullifierImplementation, addresses.transparentProxyAdmin, initCalldata)
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("L1NullifierProxy deployed at:", contractAddress);
+        addresses.bridges.l1NullifierProxy = contractAddress;
+    }
+
     function deploySharedBridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1AssetRouter).creationCode,
@@ -650,6 +698,7 @@ contract DeployL1Script is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridgehub.bridgehubProxy,
+                addresses.bridges.l1NullifierProxy,
                 config.eraChainId,
                 addresses.stateTransition.diamondProxy
             )
@@ -660,7 +709,7 @@ contract DeployL1Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress, 1, 1, 1, 0));
+        bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
@@ -687,7 +736,12 @@ contract DeployL1Script is Script {
     function deployErc20BridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1ERC20Bridge).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy, config.eraChainId)
+            abi.encode(
+                addresses.bridges.l1NullifierProxy,
+                addresses.bridges.sharedBridgeProxy,
+                addresses.vaults.l1NativeTokenVaultProxy,
+                config.eraChainId
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Erc20BridgeImplementation deployed at:", contractAddress);
@@ -712,10 +766,40 @@ contract DeployL1Script is Script {
         console.log("SharedBridge updated with ERC20Bridge address");
     }
 
+    function deployBridgedStandardERC20Implementation() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(BridgedStandardERC20).creationCode,
+            // solhint-disable-next-line func-named-parameters
+            abi.encode()
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("BridgedStandardERC20Implementation deployed at:", contractAddress);
+        addresses.bridges.bridgedStandardERC20Implementation = contractAddress;
+    }
+
+    function deployBridgedTokenBeacon() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(UpgradeableBeacon).creationCode,
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        );
+        UpgradeableBeacon beacon = new UpgradeableBeacon(addresses.bridges.bridgedStandardERC20Implementation);
+        address contractAddress = address(beacon);
+        beacon.transferOwnership(config.ownerAddress);
+        console.log("BridgedTokenBeacon deployed at:", contractAddress);
+        addresses.bridges.bridgedTokenBeacon = contractAddress;
+    }
+
     function deployL1NativeTokenVaultImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1NativeTokenVault).creationCode,
-            abi.encode(config.tokens.tokenWethAddress, addresses.bridges.sharedBridgeProxy, config.eraChainId)
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(
+                config.tokens.tokenWethAddress,
+                addresses.bridges.sharedBridgeProxy,
+                config.eraChainId,
+                addresses.bridges.l1NullifierProxy
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("L1NativeTokenVaultImplementation deployed at:", contractAddress);
@@ -723,7 +807,10 @@ contract DeployL1Script is Script {
     }
 
     function deployL1NativeTokenVaultProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1NativeTokenVault.initialize, config.ownerAddress);
+        bytes memory initCalldata = abi.encodeCall(
+            L1NativeTokenVault.initialize,
+            (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+        );
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.vaults.l1NativeTokenVaultImplementation, addresses.transparentProxyAdmin, initCalldata)
@@ -733,10 +820,16 @@ contract DeployL1Script is Script {
         addresses.vaults.l1NativeTokenVaultProxy = contractAddress;
 
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
         // Ownable ownable = Ownable(addresses.bridges.sharedBridgeProxy);
 
         vm.broadcast(msg.sender);
-        sharedBridge.setNativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        vm.broadcast(msg.sender);
+        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        vm.broadcast(msg.sender);
+        l1Nullifier.setL1AssetRouter(addresses.bridges.sharedBridgeProxy);
+
         // bytes memory data = abi.encodeCall(sharedBridge.setNativeTokenVault, (IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy)));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),

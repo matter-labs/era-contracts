@@ -122,6 +122,8 @@ export interface DeployedAddresses {
     DiamondProxy: string;
   };
   Bridges: {
+    L1NullifierImplementation: string;
+    L1NullifierProxy: string;
     ERC20BridgeImplementation: string;
     ERC20BridgeProxy: string;
     SharedBridgeImplementation: string;
@@ -132,6 +134,8 @@ export interface DeployedAddresses {
     L2NativeTokenVaultProxy: string;
     NativeTokenVaultImplementation: string;
     NativeTokenVaultProxy: string;
+    BridgedStandardERC20Implementation: string;
+    BridgedTokenBeacon: string;
   };
   BaseTokenAssetId: string;
   BaseToken: string;
@@ -181,6 +185,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
     },
     Bridges: {
+      L1NullifierImplementation: getAddressFromEnv("CONTRACTS_L1_NULLIFIER_IMPL_ADDR"),
+      L1NullifierProxy: getAddressFromEnv("CONTRACTS_L1_NULLIFIER_PROXY_ADDR"),
       ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
       ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
       SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR"),
@@ -191,6 +197,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
       NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
+      BridgedStandardERC20Implementation: getAddressFromEnv("CONTRACTS_L1_BRIDGED_STANDARD_ERC20_IMPL_ADDR"),
+      BridgedTokenBeacon: getAddressFromEnv("CONTRACTS_L1_BRIDGED_TOKEN_BEACON_ADDR"),
     },
     RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
     ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),

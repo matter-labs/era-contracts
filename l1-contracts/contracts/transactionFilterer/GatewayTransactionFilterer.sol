@@ -9,6 +9,7 @@ import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IL2Bridge} from "../bridge/interfaces/IL2Bridge.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -81,11 +82,14 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
     ) external view returns (bool) {
         if (sender == L1_ASSET_ROUTER) {
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
-            if (IL2Bridge.finalizeDeposit.selector != l2TxSelector) {
+            if (
+                (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) &&
+                (IL2Bridge.finalizeDeposit.selector != l2TxSelector)
+            ) {
                 revert InvalidSelector(l2TxSelector);
             }
 
-            (bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (bytes32, bytes));
+            (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
             address stmAddress = BRIDGE_HUB.ctmAssetIdToAddress(decodedAssetId);
             return (stmAddress != address(0));
         }
