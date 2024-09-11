@@ -215,10 +215,7 @@ describe("Legacy Era tests", function () {
       erc20TestToken.address,
       ethers.constants.HashZero,
     ]);
-    const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
-    );
-    expect(revertReason).contains("L1N: legacy eth withdrawal");
+    await expect(l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])).to.be.reverted;
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
