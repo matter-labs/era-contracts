@@ -104,11 +104,12 @@ contract SetupLegacyBridge is Script {
     function setParamsForDummyBridge() internal {
         (address l2TokenBeacon, bytes32 l2TokenBeaconHash) = calculateTokenBeaconAddress();
         DummyL1ERC20Bridge bridge = DummyL1ERC20Bridge(addresses.erc20BridgeProxy);
+        vm.broadcast();
         bridge.setValues(config.l2SharedBridgeAddress, l2TokenBeacon, l2TokenBeaconHash);
     }
 
     function calculateTokenBeaconAddress()
-        internal
+        public
         returns (address tokenBeaconAddress, bytes32 tokenBeaconBytecodeHash)
     {
         bytes memory l2StandardTokenCode = Utils.readHardhatBytecode(
@@ -122,12 +123,17 @@ contract SetupLegacyBridge is Script {
         );
 
         bytes memory beaconProxy = Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+        );
+        tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(beaconProxy);
+
+        bytes memory upgradableBeacon = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
 
-        (tokenBeaconAddress, tokenBeaconBytecodeHash) = calculateL2Create2Address(
+        (tokenBeaconAddress, ) = calculateL2Create2Address(
             config.l2SharedBridgeAddress,
-            beaconProxy,
+            upgradableBeacon,
             bytes32(0),
             abi.encode(l2StandardToken)
         );
