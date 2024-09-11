@@ -89,7 +89,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
             chainId: eraChainId,
             l2BatchNumber: l2BatchNumber,
             l2MessageIndex: l2MessageIndex,
-            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2Sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             l2TxNumberInBatch: l2TxNumberInBatch,
             message: message,
             merkleProof: merkleProof
@@ -135,7 +135,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         );
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, false, false, address(sharedBridge));
-        emit DepositFinalizedAssetRouter(eraChainId, tokenAssetId, new bytes(0)); // kl todo
+        emit DepositFinalizedAssetRouter(eraChainId, tokenAssetId, new bytes(0));
         vm.prank(l1ERC20BridgeAddress);
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: eraChainId,

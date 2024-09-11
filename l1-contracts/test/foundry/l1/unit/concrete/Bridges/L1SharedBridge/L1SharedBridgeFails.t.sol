@@ -31,7 +31,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
-            admin,
+            proxyAdmin,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 L1AssetRouter.initialize.selector,

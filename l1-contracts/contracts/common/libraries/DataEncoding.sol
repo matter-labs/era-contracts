@@ -14,21 +14,21 @@ import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
  */
 library DataEncoding {
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
-    /// @param _account The address which initiated the transfer.
+    /// @param _originalCaller The address which initiated the transfer.
     /// @param _l2Receiver The address which to receive tokens on remote chain.
     /// @param _l1Token The transferred token address.
     /// @param _amount The amount of token to be transferred.
     /// @param _erc20Metadata The transferred token metadata.
     /// @return The encoded bridgeMint data
     function encodeBridgeMintData(
-        address _account,
+        address _originalCaller,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
         bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encode(_account, _l2Receiver, _l1Token, _amount, _erc20Metadata);
+        return abi.encode(_originalCaller, _l2Receiver, _l1Token, _amount, _erc20Metadata);
     }
 
     /// @notice Function decoding transfer data previously encoded with this library.
@@ -112,9 +112,41 @@ library DataEncoding {
         } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.
             // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
-            txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_originalCaller, _assetId, _transferData)));
+            txDataHash = keccak256(
+                bytes.concat(_encodingVersion, abi.encode(_originalCaller, _assetId, _transferData))
+            );
         } else {
             revert UnsupportedEncodingVersion();
         }
+    }
+
+    /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
+    function decodeTokenData(
+        bytes calldata _tokenData
+    ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
+        bytes1 encodingVersion = _tokenData[0];
+        // kl todo check correct
+        if (encodingVersion == LEGACY_ENCODING_VERSION) {
+            (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
+        } else if (encodingVersion == NEW_ENCODING_VERSION) {
+            return abi.decode(_tokenData[1:], (uint256, bytes, bytes, bytes));
+        } else {
+            revert UnsupportedEncodingVersion();
+        }
+    }
+
+    /// @notice Encodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @param _chainId The id of the chain token is native to.
+    /// @param _name The name of the token.
+    /// @param _symbol The symbol of the token.
+    /// @param _decimals The decimals of the token.
+    /// @return The encoded token data.
+    function encodeTokenData(
+        uint256 _chainId,
+        bytes memory _name,
+        bytes memory _symbol,
+        bytes memory _decimals
+    ) internal pure returns (bytes memory) {
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
     }
 }

@@ -565,7 +565,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // slither-disable-next-line unused-return
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
-            transferData = abi.encode(amount, l1Receiver);
+            address baseToken = BRIDGE_HUB.baseToken(_chainId);
+            transferData = DataEncoding.encodeBridgeMintData({
+                _originalCaller: address(0),
+                _l2Receiver: l1Receiver,
+                _l1Token: baseToken,
+                _amount: amount,
+                _erc20Metadata: new bytes(0)
+            });
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
 
@@ -583,7 +590,13 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
-            transferData = abi.encode(amount, l1Receiver);
+            transferData = DataEncoding.encodeBridgeMintData({
+                _originalCaller: address(0),
+                _l2Receiver: l1Receiver,
+                _l1Token: l1Token,
+                _amount: amount,
+                _erc20Metadata: new bytes(0)
+            });
         } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
             require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length

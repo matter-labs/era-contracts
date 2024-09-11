@@ -76,6 +76,7 @@ contract L1AssetRouterTest is Test {
 
     address owner;
     address admin;
+    address proxyAdmin;
     address zkSync;
     address alice;
     address bob;
@@ -102,6 +103,7 @@ contract L1AssetRouterTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         admin = makeAddr("admin");
+        proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
@@ -131,7 +133,7 @@ contract L1AssetRouterTest is Test {
         });
         TransparentUpgradeableProxy l1NullifierProxy = new TransparentUpgradeableProxy(
             address(l1NullifierImpl),
-            admin,
+            proxyAdmin,
             abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
         );
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
@@ -144,7 +146,7 @@ contract L1AssetRouterTest is Test {
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
-            admin,
+            proxyAdmin,
             abi.encodeWithSelector(L1AssetRouter.initialize.selector, owner)
         );
         sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
@@ -157,7 +159,7 @@ contract L1AssetRouterTest is Test {
         address tokenBeacon = makeAddr("tokenBeacon");
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
-            admin,
+            proxyAdmin,
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
@@ -176,6 +178,7 @@ contract L1AssetRouterTest is Test {
         vm.prank(address(nativeTokenVault));
         nativeTokenVault.registerToken(address(token));
         nativeTokenVault.registerEthToken();
+        vm.prank(owner);
 
         vm.store(
             address(sharedBridge),
@@ -247,6 +250,12 @@ contract L1AssetRouterTest is Test {
             address(nativeTokenVault),
             abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
             abi.encode(address(ETH_TOKEN_ADDRESS))
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encode(ETH_TOKEN_ADDRESS)
         );
     }
 

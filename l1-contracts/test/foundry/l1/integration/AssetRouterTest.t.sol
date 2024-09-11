@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "forge-std/console.sol";
-
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
@@ -88,11 +86,11 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         uint256 chainId = eraZKChainId;
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
-            _account: ETH_TOKEN_ADDRESS,
+            _originalCaller: ETH_TOKEN_ADDRESS,
             _l2Receiver: address(this),
             _l1Token: ETH_TOKEN_ADDRESS,
             _amount: 100,
-            _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress)
+            _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });
         l1Nullifier.finalizeDeposit(
             FinalizeL1DepositParams({
@@ -166,8 +164,6 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-        console.log("kl todo 6", tokenL1Address);
-        console.logBytes32(l2TokenAssetId);
         bridgeHub.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,

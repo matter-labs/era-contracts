@@ -89,6 +89,27 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(protocolVersion, 0);
     }
 
+    function test_bridgehubSetter() public {
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        uint256 chainId = zkChainIds[0];
+        IChainTypeManager chainTypeManager = IChainTypeManager(bridgehub.chainTypeManager(chainId));
+        uint256 randomChainId = 123456;
+
+        vm.mockCall(
+            address(chainTypeManager),
+            abi.encodeWithSelector(IChainTypeManager.getZKChainLegacy.selector, randomChainId),
+            abi.encode(address(0x01))
+        );
+        vm.store(address(bridgehub), keccak256(abi.encode(randomChainId, 205)), bytes32(uint256(uint160(1))));
+        vm.store(
+            address(bridgehub),
+            keccak256(abi.encode(randomChainId, 204)),
+            bytes32(uint256(uint160(address(chainTypeManager))))
+        );
+        bridgehub.setLegacyBaseTokenAssetId(randomChainId);
+        bridgehub.setLegacyChainAddress(randomChainId);
+    }
+
     // add this to be excluded from coverage report
     function test() internal override {}
 }

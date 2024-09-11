@@ -31,9 +31,6 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSup
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    /// @dev Chain ID of L1 for bridging reasons.
-    uint256 public immutable L1_CHAIN_ID;
-
     IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
@@ -56,8 +53,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
-    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId) {
-        L1_CHAIN_ID = _l1ChainId;
+    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId) {
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
@@ -91,6 +87,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
         tokenAddress[assetId] = _l2TokenAddress;
+        originChainId[assetId] = L1_CHAIN_ID;
     }
 
     /// @notice Ensures that the token is deployed.
@@ -199,6 +196,24 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         salt = _originChainId == L1_CHAIN_ID
             ? bytes32(uint256(uint160(_l1Token)))
             : keccak256(abi.encode(_originChainId, _l1Token));
+    }
+
+    function _handleChainBalanceIncrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        // on L2s we don't track the balance
+    }
+
+    function _handleChainBalanceDecrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        // on L2s we don't track the balance
     }
 
     /*//////////////////////////////////////////////////////////////

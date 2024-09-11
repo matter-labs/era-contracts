@@ -37,6 +37,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
 
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
+    /// This serves as a security measure until hyperbridging is implemented.
+    /// NOTE: this function may be removed in the future, don't rely on it!
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _l1WethAddress Address of WETH on deployed chain
@@ -52,7 +57,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         NativeTokenVault(
             _l1WethAddress,
             _l1AssetRouter,
-            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS)
+            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
+            block.chainid
         )
     {
         ERA_CHAIN_ID = _eraChainId;
@@ -113,17 +119,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 nullifierChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
+        originChainId[assetId] = block.chainid;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
     /*//////////////////////////////////////////////////////////////
-                            L1 SPECIFIC FUNCTIONS
+                            Start transaction Functions
     //////////////////////////////////////////////////////////////*/
 
     function _bridgeBurnNativeToken(
         uint256 _chainId,
         bytes32 _assetId,
-        address _account,
+        address _originalCaller,
         // solhint-disable-next-line no-unused-vars
         bool _depositChecked,
         bytes calldata _data
@@ -133,16 +140,20 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
             _assetId,
             _depositAmount,
-            _account
+            _originalCaller
         );
         _bridgeMintData = super._bridgeBurnNativeToken({
             _chainId: _chainId,
             _assetId: _assetId,
-            _account: _account,
+            _originalCaller: _originalCaller,
             _depositChecked: depositChecked,
             _data: _data
         });
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            L1 SPECIFIC FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
@@ -157,11 +168,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             revert NoFundsTransferred();
         }
 
-        // check that the chain has sufficient balance
-        if (chainBalance[_chainId][_assetId] < _amount) {
-            revert InsufficientChainBalance();
-        }
-        chainBalance[_chainId][_assetId] -= _amount;
+        _handleChainBalanceDecrease(_chainId, _assetId, _amount, false);
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -229,12 +236,37 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
-
         address proxyAddress = Create2.deploy(
             0,
             _salt,
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
         );
         return BeaconProxy(payable(proxyAddress));
+    }
+
+    function _handleChainBalanceIncrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+            chainBalance[_chainId][_assetId] += _amount;
+        }
+    }
+
+    function _handleChainBalanceDecrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+            // Check that the chain has sufficient balance
+            if (chainBalance[_chainId][_assetId] < _amount) {
+                revert InsufficientChainBalance();
+            }
+            chainBalance[_chainId][_assetId] -= _amount;
+        }
     }
 }
