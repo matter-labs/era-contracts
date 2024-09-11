@@ -94,7 +94,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
             message: message,
             merkleProof: merkleProof
         });
-        l1Nullifier.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        l1Nullifier.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
@@ -146,6 +146,6 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
             message: message,
             merkleProof: merkleProof
         });
-        l1Nullifier.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        l1Nullifier.finalizeDeposit(finalizeWithdrawalParams);
     }
 }

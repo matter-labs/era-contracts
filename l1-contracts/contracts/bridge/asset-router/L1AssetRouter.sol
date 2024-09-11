@@ -547,7 +547,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             message: _message,
             merkleProof: _merkleProof
         });
-        L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.

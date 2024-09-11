@@ -650,13 +650,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                     ERA ERC20 LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.
-    function finalizeWithdrawalLegacyContracts(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) external override onlyAssetRouterOrErc20Bridge {
-        _finalizeDeposit(_finalizeWithdrawalParams);
-    }
-
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.
     /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit`
     /// method in `L1ERC20Bridge`.

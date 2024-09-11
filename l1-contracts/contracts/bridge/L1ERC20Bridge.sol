@@ -145,7 +145,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             message: _message,
             merkleProof: _merkleProof
         });
-        L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
