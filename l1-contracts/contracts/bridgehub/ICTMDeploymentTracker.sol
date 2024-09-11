@@ -11,7 +11,7 @@ import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeployment
 interface ICTMDeploymentTracker is IL1AssetDeploymentTracker {
     function bridgehubDeposit(
         uint256 _chainId,
-        address _prevMsgSender,
+        address _originalCaller,
         uint256 _l2Value,
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);

@@ -86,7 +86,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         uint256 chainId = eraZKChainId;
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
-            _prevMsgSender: ETH_TOKEN_ADDRESS,
+            _originalCaller: ETH_TOKEN_ADDRESS,
             _l2Receiver: address(this),
             _l1Token: ETH_TOKEN_ADDRESS,
             _amount: 100,

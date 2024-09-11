@@ -57,7 +57,7 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
         });
         vm.mockCall(
             l1NullifierAddress,
-            abi.encodeWithSelector(IL1Nullifier.finalizeWithdrawalLegacyContracts.selector, finalizeWithdrawalParams),
+            abi.encodeWithSelector(IL1Nullifier.finalizeDeposit.selector, finalizeWithdrawalParams),
             abi.encode(alice, address(token), amount)
         );
 

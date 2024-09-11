@@ -145,7 +145,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             message: _message,
             merkleProof: _merkleProof
         });
-        L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
@@ -195,7 +195,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         }
 
         l2TxHash = L1_ASSET_ROUTER.depositLegacyErc20Bridge{value: msg.value}({
-            _prevMsgSender: msg.sender,
+            _originalCaller: msg.sender,
             _l2Receiver: _l2Receiver,
             _l1Token: _l1Token,
             _amount: _amount,

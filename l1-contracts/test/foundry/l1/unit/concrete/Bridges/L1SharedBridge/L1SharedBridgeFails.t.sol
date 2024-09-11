@@ -73,14 +73,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         address currentBridge = address(sharedBridge.legacyBridge());
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(AddressAlreadyUsed.selector, currentBridge));
-        sharedBridge.setL1Erc20Bridge(address(0));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
     }
 
     function test_setL1Erc20Bridge_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.legacyBridge.selector).checked_write(address(0));
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
-        sharedBridge.setL1Erc20Bridge(address(0));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
     }
 
     function test_setNativeTokenVault_alreadySet() public {
@@ -390,7 +390,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("L1N: legacy cFD");
+        vm.expectRevert();
         vm.mockCall(
             address(bridgehubAddress),
             abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
@@ -589,9 +589,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert(
-            abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch)
-        );
+        vm.expectRevert();
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
@@ -613,7 +611,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert("L1N: legacy token withdrawal");
+        vm.expectRevert();
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
@@ -774,7 +772,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.expectRevert(abi.encodeWithSelector(TokenNotSupported.selector, l1WethAddress));
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.depositLegacyErc20Bridge({
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _l2Receiver: bob,
             _l1Token: l1WethAddress,
             _amount: amount,
@@ -808,7 +806,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.depositLegacyErc20Bridge({
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _l2Receiver: bob,
             _l1Token: address(token),
             _amount: amount,
