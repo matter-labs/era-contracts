@@ -109,7 +109,7 @@ contract SetupLegacyBridge is Script {
     }
 
     function calculateTokenBeaconAddress()
-        public
+        internal
         returns (address tokenBeaconAddress, bytes32 tokenBeaconBytecodeHash)
     {
         bytes memory l2StandardTokenCode = Utils.readHardhatBytecode(
