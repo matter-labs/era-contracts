@@ -122,7 +122,7 @@ contract SetupLegacyBridge is Script {
         );
 
         bytes memory beaconProxy = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
 
         (tokenBeaconAddress, tokenBeaconBytecodeHash) = calculateL2Create2Address(
