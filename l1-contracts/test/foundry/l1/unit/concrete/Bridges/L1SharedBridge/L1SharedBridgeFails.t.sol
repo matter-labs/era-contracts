@@ -68,7 +68,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_registerToken_noCode() public {
-        vm.expectRevert(abi.encodeWithSelector(EmptyToken.selector, address(0), ETH_TOKEN_ADDRESS));
+        vm.expectRevert("NTV: empty token");
         nativeTokenVault.registerToken(address(0));
     }
 
@@ -88,14 +88,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_setNativeTokenVault_alreadySet() public {
         vm.prank(owner);
-        vm.expectRevert(NativeTokenVaultAlreadySet.selector);
+        vm.expectRevert("AR: native token v already set");
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(0)));
     }
 
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
-        vm.expectRevert(NativeTokenVaultZeroAddress.selector);
+        vm.expectRevert("AR: native token vault 0");
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(0)));
     }
 
@@ -128,14 +128,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(address(l1Nullifier));
         token.transfer(address(1), amount);
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert(ZeroAmountToTransfer.selector);
+        vm.expectRevert("NTV: 0 amount to transfer");
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
     function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
         vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 0, 10));
+        vm.expectRevert("NTV: wrong amount transferred");
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
@@ -301,7 +301,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(ClaimDepositFailed.selector);
+        vm.expectRevert("NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
         l1Nullifier.bridgeRecoverFailedTransfer({
             _chainId: chainId,
             _depositSender: alice,

@@ -14,3 +14,5 @@ error OverheadForTransactionMustBeEqualToTxSlotOverhead(uint256 overheadForTrans
 error InvalidBlobCommitmentsLength();
 
 error InvalidBlobHashesLength();
+
+error TokenNotInitialized();

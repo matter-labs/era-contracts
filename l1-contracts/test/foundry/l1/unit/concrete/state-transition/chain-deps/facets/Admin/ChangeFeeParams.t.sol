@@ -6,7 +6,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Unauthorized, PriorityTxPubdataExceedsMaxPubDataPerBatch} from "contracts/common/L1ContractErrors.sol";
-import {FeeParamsWereNotChangedCorrectly} from "../../../../../../L1TestsErrors.sol";
+import {FeeParamsWereNotChangedCorrectly} from "test/foundry/L1TestsErrors.sol";
 
 contract ChangeFeeParamsTest is AdminTest {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
