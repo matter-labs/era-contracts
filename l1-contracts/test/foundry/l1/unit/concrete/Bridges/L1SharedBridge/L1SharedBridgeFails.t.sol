@@ -772,7 +772,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.expectRevert(abi.encodeWithSelector(TokenNotSupported.selector, l1WethAddress));
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.depositLegacyErc20Bridge({
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _l2Receiver: bob,
             _l1Token: l1WethAddress,
             _amount: amount,
@@ -806,7 +806,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.depositLegacyErc20Bridge({
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _l2Receiver: bob,
             _l1Token: address(token),
             _amount: amount,

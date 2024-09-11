@@ -154,7 +154,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             _chainId: L1_CHAIN_ID,
             _msgValue: 0,
             _assetId: _assetId,
-            _prevMsgSender: _sender,
+            _originalCaller: _sender,
             _data: _assetData
         });
 

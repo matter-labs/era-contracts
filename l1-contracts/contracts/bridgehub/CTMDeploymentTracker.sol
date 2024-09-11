@@ -36,9 +36,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyOwnerViaRouter(address _prevMsgSender) {
+    modifier onlyOwnerViaRouter(address _originalCaller) {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(L1_ASSET_ROUTER) && _prevMsgSender == owner(), "CTM DT: not owner via router");
+        require(msg.sender == address(L1_ASSET_ROUTER) && _originalCaller == owner(), "CTM DT: not owner via router");
         _;
     }
 
@@ -77,12 +77,12 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
     /// @param _chainId the chainId of the chain
-    /// @param _prevMsgSender the previous message sender
+    /// @param _originalCaller the previous message sender
     /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 _chainId,
-        address _prevMsgSender,
+        address _originalCaller,
         uint256,
         bytes calldata _data
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
@@ -91,7 +91,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         require(msg.value == 0, "CTMDT: no eth allowed");
         // solhint-disable-next-line gas-custom-errors
 
-        require(_prevMsgSender == owner(), "CTMDT: not owner");
+        require(_originalCaller == owner(), "CTMDT: not owner");
         bytes1 encodingVersion = _data[0];
         require(encodingVersion == ENCODING_VERSION, "CTMDT: wrong encoding version");
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
@@ -104,14 +104,14 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
-    /// @param _prevMsgSender the address that called the Router
+    /// @param _originalCaller the address that called the Router
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
     function bridgeCheckCounterpartAddress(
         uint256,
         bytes32,
-        address _prevMsgSender,
+        address _originalCaller,
         address _assetHandlerAddressOnCounterpart
-    ) external view override onlyOwnerViaRouter(_prevMsgSender) {
+    ) external view override onlyOwnerViaRouter(_originalCaller) {
         require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "CTMDT: wrong counter part");
     }
 

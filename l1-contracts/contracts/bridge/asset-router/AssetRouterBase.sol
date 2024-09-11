@@ -122,7 +122,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
     /// @param _nextMsgValue The L2 `msg.value` from the L1 -> L2 deposit transaction.
     /// @param _assetId The deposited asset ID.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
     /// @param _passValue Boolean indicating whether to pass msg.value in the call.
     /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
@@ -130,7 +130,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _chainId,
         uint256 _nextMsgValue,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes memory _transferData,
         bool _passValue
     ) internal returns (bytes memory bridgeMintCalldata) {
@@ -144,7 +144,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             _chainId: _chainId,
             _msgValue: _nextMsgValue,
             _assetId: _assetId,
-            _prevMsgSender: _prevMsgSender,
+            _originalCaller: _originalCaller,
             _data: _transferData
         });
     }

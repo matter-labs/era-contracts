@@ -40,7 +40,7 @@ interface IL1AssetRouter is IAssetRouterBase {
     /// of processing an L2 transaction where tokens would be minted.
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _l2Receiver The account address that should receive funds on L2.
     /// @param _l1Token The L1 token address which is deposited.
     /// @param _amount The total amount of tokens to be bridged.
@@ -62,7 +62,7 @@ interface IL1AssetRouter is IAssetRouterBase {
     /// the funds would be lost.
     /// @return txHash The L2 transaction hash of deposit finalization.
     function depositLegacyErc20Bridge(
-        address _prevMsgSender,
+        address _originalCaller,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
@@ -97,8 +97,8 @@ interface IL1AssetRouter is IAssetRouterBase {
     /// @notice Transfers funds to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
     /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
     /// @param _amount The asset amount to be transferred to native token vault.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function transferFundsToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external returns (bool);
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
+    function transferFundsToNTV(bytes32 _assetId, uint256 _amount, address _originalCaller) external returns (bool);
 
     /// @notice Finalize the withdrawal and release funds
     /// @param _chainId The chain ID of the transaction to check
@@ -118,7 +118,7 @@ interface IL1AssetRouter is IAssetRouterBase {
 
     /// @notice Initiates a transfer transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _value The `msg.value` on the target chain tx.
     /// @param _data The calldata for the second bridge deposit.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
@@ -131,7 +131,7 @@ interface IL1AssetRouter is IAssetRouterBase {
     /// bytes _transferData
     function bridgehubDeposit(
         uint256 _chainId,
-        address _prevMsgSender,
+        address _originalCaller,
         uint256 _value,
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
@@ -152,12 +152,12 @@ interface IL1AssetRouter is IAssetRouterBase {
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _assetId The deposited asset ID.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _amount The total amount of tokens to be bridged.
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         uint256 _amount
     ) external payable;
 

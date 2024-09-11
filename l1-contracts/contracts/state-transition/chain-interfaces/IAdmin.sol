@@ -135,7 +135,7 @@ interface IAdmin is IZKChainBase {
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
         address _settlementLayer,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
@@ -143,7 +143,7 @@ interface IAdmin is IZKChainBase {
     function forwardedBridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetInfo,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _chainData
     ) external payable;
 

@@ -39,7 +39,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.prank(l1ERC20BridgeAddress);
 
         sharedBridge.depositLegacyErc20Bridge({
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _l2Receiver: bob,
             _l1Token: address(token),
             _amount: amount,

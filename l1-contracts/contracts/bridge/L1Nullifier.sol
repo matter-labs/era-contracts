@@ -80,7 +80,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev A mapping chainId => L2 deposit transaction hash => dataHash
     // keccak256(abi.encode(account, tokenAddress, amount)) for legacy transfers
-    // keccak256(abi.encode(_prevMsgSender, assetId, transferData)) for new transfers
+    // keccak256(abi.encode(_originalCaller, assetId, transferData)) for new transfers
     /// @dev Tracks deposit transactions to L2 to enable users to claim their funds if a deposit fails.
     mapping(uint256 chainId => mapping(bytes32 l2DepositTxHash => bytes32 depositDataHash))
         public
@@ -270,19 +270,19 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Calls the internal `_encodeTxDataHash`. Used as a wrapped for try / catch case.
     /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
     /// @param _encodingVersion EncodingVersion.
-    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _originalCaller The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
     /// @return txDataHash The resulting encoded transaction data hash.
     function encodeTxDataHash(
         bytes1 _encodingVersion,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes32 _assetId,
         bytes calldata _transferData
     ) external view returns (bytes32 txDataHash) {
         txDataHash = DataEncoding.encodeTxDataHash({
             _encodingVersion: _encodingVersion,
-            _prevMsgSender: _prevMsgSender,
+            _originalCaller: _originalCaller,
             _assetId: _assetId,
             _nativeTokenVault: address(l1NativeTokenVault),
             _transferData: _transferData
@@ -374,7 +374,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             if (!isLegacyTxDataHash) {
                 bytes32 txDataHash = DataEncoding.encodeTxDataHash({
                     _encodingVersion: NEW_ENCODING_VERSION,
-                    _prevMsgSender: _depositSender,
+                    _originalCaller: _depositSender,
                     _assetId: _assetId,
                     _nativeTokenVault: address(l1NativeTokenVault),
                     _transferData: _assetData

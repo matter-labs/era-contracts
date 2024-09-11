@@ -146,7 +146,7 @@ contract DummySharedBridge is PausableUpgradeable {
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         uint256 _amount
     ) external payable whenNotPaused {
         // Dummy bridge supports only working with ETH for simplicity.
@@ -155,7 +155,7 @@ contract DummySharedBridge is PausableUpgradeable {
         chainBalance[_chainId][address(1)] += _amount;
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
-        emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
+        emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
     }
 
     function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
@@ -168,7 +168,7 @@ contract DummySharedBridge is PausableUpgradeable {
 
     function bridgehubDeposit(
         uint256,
-        address _prevMsgSender,
+        address _originalCaller,
         uint256,
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request) {
@@ -185,15 +185,15 @@ contract DummySharedBridge is PausableUpgradeable {
             require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
             amount = _depositAmount;
 
-            uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
+            uint256 withdrawAmount = _depositFunds(_originalCaller, IERC20(_l1Token), _depositAmount);
             require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
         }
 
         bytes memory l2TxCalldata = abi.encodeCall(
             IL2SharedBridgeLegacyFunctions.finalizeDeposit,
-            (_prevMsgSender, _l2Receiver, _l1Token, amount, new bytes(0))
+            (_originalCaller, _l2Receiver, _l1Token, amount, new bytes(0))
         );
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
+        bytes32 txDataHash = keccak256(abi.encode(_originalCaller, _l1Token, amount));
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,

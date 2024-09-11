@@ -675,13 +675,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
     /// @param _assetId the assetId of the migrating chain's CTM
-    /// @param _prevMsgSender the previous message sender
+    /// @param _originalCaller the message sender initiated a set of calls that leads to bridge burn
     /// @param _data the data for the migration
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256, // msgValue
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
@@ -693,7 +693,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         address zkChain = zkChainMap.get(bridgehubData.chainId);
         require(zkChain != address(0), "BH: zkChain not registered");
-        require(_prevMsgSender == IZKChain(zkChain).getAdmin(), "BH: incorrect sender");
+        require(_originalCaller == IZKChain(zkChain).getAdmin(), "BH: incorrect sender");
 
         bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeBurn(
             bridgehubData.chainId,
@@ -701,7 +701,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             zkChainMap.get(_settlementChainId),
-            _prevMsgSender,
+            _originalCaller,
             bridgehubData.chainData
         );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
@@ -774,7 +774,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IZKChain(getZKChain(bridgehubData.chainId)).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubData.chainId,
             _assetInfo: _assetId,
-            _prevMsgSender: _depositSender,
+            _originalCaller: _depositSender,
             _chainData: bridgehubData.chainData
         });
     }
