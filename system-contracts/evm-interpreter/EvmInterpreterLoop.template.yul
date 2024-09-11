@@ -480,7 +480,9 @@ for { } true { } {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
-        sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr))
+        switch _isEVM(addr) 
+            case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
+            default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
         ip := add(ip, 1)
     }
     case 0x3C { // OP_EXTCODECOPY

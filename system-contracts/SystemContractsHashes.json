@@ -129,8 +129,8 @@
     "contractName": "EvmInterpreter",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmInterpreter.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmInterpreter.yul",
-    "bytecodeHash": "0x01000ccb740e2345754450eda583f59b31a346920a22f968dfcfc63feae303ee",
-    "sourceCodeHash": "0xfc91734d4d37538b19c94be0da51364edd4f6664f0fee383cc2e3b5eeb95336a"
+    "bytecodeHash": "0x01000cef160515b2631803991c1d49b6b44492406197fb6dc22a8cf05cebd5d5",
+    "sourceCodeHash": "0x6c1e3d4c2f94342792df4fc671a0929fbb2d5aba1b5e388c70f4dc1ee96cfa74"
   },
   {
     "contractName": "CodeOracle",
