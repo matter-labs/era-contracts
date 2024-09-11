@@ -126,25 +126,32 @@
     "sourceCodeHash": "0x55692fab0ef8b5bab3f6fb77aec84f3d1f1cdf97c0640b327d10594ea61218d2"
   },
   {
+    "contractName": "Modexp",
+    "bytecodePath": "contracts-preprocessed/precompiles/artifacts/Modexp.yul.zbin",
+    "sourceCodePath": "contracts-preprocessed/precompiles/Modexp.yul",
+    "bytecodeHash": "0x010000256ad1144a358b198908db757d778826c181e6e55629319ad2d342fc53",
+    "sourceCodeHash": "0xfb4399a7f9c73fb29a3e6319af8edfe330e28fd72e1a35224fcd42d520c26193"
+  },
+  {
     "contractName": "EcAdd",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcAdd.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/EcAdd.yul",
-    "bytecodeHash": "0x010000872dd7e2dc1b34416c174086aa84fd80c78acc7b670214da955bd55728",
-    "sourceCodeHash": "0xc04879ed27207cd276997a856b6507d6d003801a2ee4c4bb4491f0032370895f"
+    "bytecodeHash": "0x0100000dd1416886208f7b9875ed636c2c31c852ebaff9cdbc7eecf75982920c",
+    "sourceCodeHash": "0xc7a36904e602e746b30c4628e9dd404b1839af93f6a558e15dad18f65715dd27"
   },
   {
     "contractName": "EcMul",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcMul.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/EcMul.yul",
-    "bytecodeHash": "0x010000bd8bd7ab008f76e359dc296ff5fe0e8a95fedce1d570943e90143acdfd",
-    "sourceCodeHash": "0xb142465167a02139087fda7640ff859489b33081dcc7c2a8089da5b480bcb58c"
+    "bytecodeHash": "0x0100000dc0cef8d9fdf9cebf00974ce88d421ad40d36178fe6663a4b666b4c99",
+    "sourceCodeHash": "0x2942280fcaf438f516e3fb08b3d4f23901ce8106c277d26ed420a0eefe9158d7"
   },
   {
     "contractName": "EcPairing",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcPairing.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/EcPairing.yul",
-    "bytecodeHash": "0x01000f1b3432a32f9fba2115f5dd3b0ee8127e7bf2c609d57d3e231f19119c43",
-    "sourceCodeHash": "0x149f025b222369ab65b9995a6d61df8b557b23f8b52a05f21dc2164839befb18"
+    "bytecodeHash": "0x010000199c68861f3e2ea6ed63e95b12568a928240a5daec7f407e348a917c17",
+    "sourceCodeHash": "0x8cb78fbeb89ed47ca44ad46bd445c82232544abe8f24a16a6800e85543245266"
   },
   {
     "contractName": "Ecrecover",
