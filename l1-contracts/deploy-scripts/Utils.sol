@@ -14,6 +14,30 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
+/// @dev The offset from which the built-in, but user space contracts are located.
+uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
+
+// address constant 
+address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
+address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03);
+address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
+address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
+
+struct L2ContractsBytecodes {
+    bytes bridgehub;
+    bytes l2NativeTokenVault;
+    bytes l2AssetRouter;
+    bytes messageRoot;
+    bytes upgradableBeacon;
+    bytes beaconProxy;
+    bytes standardErc20;
+}
+
+struct DAContractBytecodes {
+    bytes rollupL1DAValidator;
+    bytes validiumL1DAValidator;
+}
+
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -333,6 +357,48 @@ library Utils {
             governance.execute{value: _value}(operation);
         }
         vm.stopBroadcast();
+    }
+
+    /// @notice A helper function that reads all L2 bytecodes at once.
+    function readL2ContractsBytecodes() internal view returns (L2ContractsBytecodes memory bytecodes) { 
+        //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
+
+        // One liner creation is preferrable to creating in separate lines
+        // to ensure that all contracts' bytecodes were filled up
+        bytecodes = L2ContractsBytecodes({
+            bridgehub: Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/bridgehub/Bridgehub.sol/Bridgehub.json"
+            ),
+            l2NativeTokenVault: readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/bridge/L2NativeTokenVault.sol/L2NativeTokenVault.json"
+            ),
+            l2AssetRouter: readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/bridge/L2AssetRouter.sol/L2AssetRouter.json"
+            ),
+            messageRoot: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/bridgehub/MessageRoot.sol/MessageRoot.json"
+            ),
+            upgradableBeacon: readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+            ),
+            beaconProxy: readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+            ),
+            standardErc20: readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+            )
+        });
+    }
+
+    function readDAContractBytecodes() internal view returns (DAContractBytecodes memory bytecodes) {
+        bytecodes = DAContractBytecodes({
+            rollupL1DAValidator: readHardhatBytecode(
+                "/../da-contracts/artifacts/contracts/RollupL1DAValidator.sol/RollupL1DAValidator.json"
+            ),
+            validiumL1DAValidator: readHardhatBytecode(
+                "/../da-contracts/artifacts/contracts/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json"
+            )
+        });
     }
 
     // add this to be excluded from coverage report
