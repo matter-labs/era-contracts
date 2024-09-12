@@ -22,7 +22,6 @@ import {
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
-import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IDiamondInitFactory } from "../typechain/IDiamondInitFactory";
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 import { BOOTLOADER_FORMAL_ADDRESS } from "zksync-ethers/build/utils";
@@ -64,20 +63,17 @@ async function main() {
       deployer.addresses.StateTransition.GettersFacet = getAddressFromEnv("GATEWAY_GETTERS_FACET_ADDR");
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("GATEWAY_DIAMOND_INIT_ADDR");
       deployer.addresses.StateTransition.Verifier = getAddressFromEnv("GATEWAY_VERIFIER_ADDR");
-      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv(
-        "GATEWAY_STATE_TRANSITION_PROXY_ADDR"
-      );
       deployer.addresses.BlobVersionedHashRetriever = getAddressFromEnv("GATEWAY_BLOB_VERSIONED_HASH_RETRIEVER_ADDR");
       deployer.addresses.ValidatorTimeLock = getAddressFromEnv("GATEWAY_VALIDATOR_TIMELOCK_ADDR");
       deployer.addresses.Bridges.SharedBridgeProxy = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
-
-      const stm = IStateTransitionManagerFactory.connect(
-        deployer.addresses.StateTransition.StateTransitionProxy,
-        provider
+      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv(
+        "GATEWAY_STATE_TRANSITION_PROXY_ADDR"
       );
-      const bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, ethProvider);
+
+      const stm = deployer.stateTransitionManagerContract(provider);
+      const bridgehub = deployer.bridgehubContract(ethProvider);
       const diamondInit = IDiamondInitFactory.connect(deployer.addresses.StateTransition.DiamondInit, provider);
-      const bytes32 = (x: any) => ethers.utils.hexZeroPad(ethers.utils.hexlify(x), 32);
+      const bytes32 = (x: ethers.BigNumberish) => ethers.utils.hexZeroPad(ethers.utils.hexlify(x), 32);
 
       const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([], true);
       const mandatoryInitData = [
