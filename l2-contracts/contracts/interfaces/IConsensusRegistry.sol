@@ -6,6 +6,12 @@ pragma solidity 0.8.20;
 /// @custom:security-contact security@matterlabs.dev
 /// @title ConsensusRegistry contract interface
 interface IConsensusRegistry {
+    /// @dev Node and its owner.
+    struct NodeWithOwner {
+        address owner;
+        Node node;
+    }
+
     /// @dev Represents a consensus node.
     /// @param attesterLastUpdateCommit The latest `attestersCommit` where the node's attester attributes were updated.
     /// @param attesterLatest Attester attributes to read if `node.attesterLastUpdateCommit` < `attestersCommit`.
@@ -159,7 +165,5 @@ interface IConsensusRegistry {
 
     function getValidatorCommittee() external view returns (CommitteeValidator[] memory);
 
-    function getNodeOwners() external view returns (address[] memory);
-
-    function getNode(address _nodeOwner) external view returns (Node memory);
+    function getNodes() external view returns (NodeWithOwner[] memory);
 }
