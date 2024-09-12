@@ -13,7 +13,7 @@ import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZk
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Utils} from "./Utils.sol";
+import {Utils, L2ContractsBytecodes} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -73,7 +73,7 @@ contract RegisterHyperchainScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-hyperchain.toml");
+        string memory path = string.concat(root, "/script-config/register-hyperchain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -91,25 +91,23 @@ contract RegisterHyperchainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
-        path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
-        toml = vm.readFile(path);
 
         config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.chainChainId = toml.readUint("$.chain.chain_chain_id");
-        config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
-        config.baseToken = toml.readAddress("$.chain.base_token_addr");
-        config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
-        config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
         config.baseTokenGasPriceMultiplierNominator = uint128(
             toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
         );
         config.baseTokenGasPriceMultiplierDenominator = uint128(
             toml.readUint("$.chain.base_token_gas_price_multiplier_denominator")
         );
-        config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
+        config.baseToken = toml.readAddress("$.chain.base_token_addr");
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+        config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
+        config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
+        config.validiumMode = toml.readBool("$.chain.validium_mode");
+        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
     }
 
     function checkTokenAddress() internal view {
@@ -196,7 +194,7 @@ contract RegisterHyperchainScript is Script {
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
                 abi.encode(config.diamondCutData, config.forceDeployments),
-                new bytes[](0)
+                getFactoryDeps()
             )
         );
         Utils.executeUpgrade({
@@ -261,6 +259,16 @@ contract RegisterHyperchainScript is Script {
         hyperchain.setPendingAdmin(config.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", config.newDiamondProxy, "set to", config.chainAdmin);
+    }
+
+    function getFactoryDeps() internal view returns (bytes[] memory) {
+        L2ContractsBytecodes memory contracts = Utils.readL2ContractsBytecodes();
+
+        bytes[] memory factoryDeps = new bytes[](3);
+        factoryDeps[0] = contracts.beaconProxy;
+        factoryDeps[1] = contracts.standardErc20;
+        factoryDeps[2] = contracts.upgradableBeacon;
+        return factoryDeps;
     }
 
     function saveOutput() internal {

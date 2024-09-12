@@ -31,6 +31,10 @@ struct L2ContractsBytecodes {
     bytes upgradableBeacon;
     bytes beaconProxy;
     bytes standardErc20;
+    bytes transparentUpgradeableProxy;
+    bytes forceDeployUpgrader;
+    bytes rollupL2DAValidator;
+    bytes validiumL2DAValidator;
 }
 
 struct DAContractBytecodes {
@@ -386,6 +390,18 @@ library Utils {
             ),
             standardErc20: readHardhatBytecode(
                 "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+            ),
+            transparentUpgradeableProxy: readHardhatBytecode(
+               "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+            ),
+            forceDeployUpgrader: readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+            ),
+            rollupL2DAValidator: readHardhatBytecode(
+                "/../da-contracts/artifacts-zk/contracts/data-availability/RollupL2DAValidator.sol/RollupL2DAValidator.json"
+            ),
+            validiumL2DAValidator: readHardhatBytecode(
+                "/../da-contracts/artifacts-zk/contracts/data-availability/ValidiumL2DAValidator.sol/ValidiumL2DAValidator.json"
             )
         });
     }

@@ -74,4 +74,15 @@ contract AcceptAdmin is Script {
         admin.setTokenMultiplierSetter(target);
         vm.stopBroadcast();
     }
+
+    function setDAValidatorPair(ChainAdmin chainAdmin, address target, address l1DaValidator, address l2DaValidator) public {
+        IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
+
+        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
+        calls[0] = IChainAdmin.Call({target: target, value: 0, data: abi.encodeCall(adminContract.setDAValidatorPair, (l1DaValidator, l2DaValidator))});
+
+        vm.startBroadcast();
+        chainAdmin.multicall(calls, true);
+        vm.stopBroadcast();
+    }
 }
