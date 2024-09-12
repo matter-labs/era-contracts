@@ -64,43 +64,48 @@ async function main() {
       deployer.addresses.StateTransition.GettersFacet = getAddressFromEnv("GATEWAY_GETTERS_FACET_ADDR");
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("GATEWAY_DIAMOND_INIT_ADDR");
       deployer.addresses.StateTransition.Verifier = getAddressFromEnv("GATEWAY_VERIFIER_ADDR");
-      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv("GATEWAY_STATE_TRANSITION_PROXY_ADDR");
+      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv(
+        "GATEWAY_STATE_TRANSITION_PROXY_ADDR"
+      );
       deployer.addresses.BlobVersionedHashRetriever = getAddressFromEnv("GATEWAY_BLOB_VERSIONED_HASH_RETRIEVER_ADDR");
       deployer.addresses.ValidatorTimeLock = getAddressFromEnv("GATEWAY_VALIDATOR_TIMELOCK_ADDR");
       deployer.addresses.Bridges.SharedBridgeProxy = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
 
-      let stm = IStateTransitionManagerFactory.connect(deployer.addresses.StateTransition.StateTransitionProxy, provider);
-      let bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, ethProvider);
-      let diamondInit = IDiamondInitFactory.connect(deployer.addresses.StateTransition.DiamondInit, provider);
-      let bytes32 = (x: any) => ethers.utils.hexZeroPad(ethers.utils.hexlify(x), 32);
+      const stm = IStateTransitionManagerFactory.connect(
+        deployer.addresses.StateTransition.StateTransitionProxy,
+        provider
+      );
+      const bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, ethProvider);
+      const diamondInit = IDiamondInitFactory.connect(deployer.addresses.StateTransition.DiamondInit, provider);
+      const bytes32 = (x: any) => ethers.utils.hexZeroPad(ethers.utils.hexlify(x), 32);
 
       const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([], true);
-      let mandatoryInitData = [
-          diamondInit.interface.getSighash('initialize'),
-          bytes32(parseInt(cmd.chainId)),
-          bytes32(getAddressFromEnv("GATEWAY_BRIDGEHUB_PROXY_ADDR")),
-          bytes32(deployer.addresses.StateTransition.StateTransitionProxy),
-          bytes32(await stm.protocolVersion()),
-          bytes32(deployer.deployWallet.address),
-          bytes32(deployer.addresses.ValidatorTimeLock),
-          await bridgehub.baseTokenAssetId(cmd.chainId),
-          bytes32(deployer.addresses.Bridges.SharedBridgeProxy),
-          await stm.storedBatchZero()
+      const mandatoryInitData = [
+        diamondInit.interface.getSighash("initialize"),
+        bytes32(parseInt(cmd.chainId)),
+        bytes32(getAddressFromEnv("GATEWAY_BRIDGEHUB_PROXY_ADDR")),
+        bytes32(deployer.addresses.StateTransition.StateTransitionProxy),
+        bytes32(await stm.protocolVersion()),
+        bytes32(deployer.deployWallet.address),
+        bytes32(deployer.addresses.ValidatorTimeLock),
+        await bridgehub.baseTokenAssetId(cmd.chainId),
+        bytes32(deployer.addresses.Bridges.SharedBridgeProxy),
+        await stm.storedBatchZero(),
       ];
 
       diamondCut.initCalldata = ethers.utils.hexConcat([...mandatoryInitData, diamondCut.initCalldata]);
-      let bytecode = hardhat.artifacts.readArtifactSync("DiamondProxy").bytecode;
-      let gatewayChainId = (await provider.getNetwork()).chainId;
-      let constructorData = new ethers.utils.AbiCoder().encode(
-          ["uint256", DIAMOND_CUT_DATA_ABI_STRING],
-          [gatewayChainId, diamondCut]
+      const bytecode = hardhat.artifacts.readArtifactSync("DiamondProxy").bytecode;
+      const gatewayChainId = (await provider.getNetwork()).chainId;
+      const constructorData = new ethers.utils.AbiCoder().encode(
+        ["uint256", DIAMOND_CUT_DATA_ABI_STRING],
+        [gatewayChainId, diamondCut]
       );
 
-      let address = computeL2Create2Address(
-          deployer.addresses.StateTransition.StateTransitionProxy,
-          bytecode,
-          constructorData,
-          ethers.constants.HashZero
+      const address = computeL2Create2Address(
+        deployer.addresses.StateTransition.StateTransitionProxy,
+        bytecode,
+        constructorData,
+        ethers.constants.HashZero
       );
 
       console.log(address);
