@@ -7,8 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -118,8 +117,7 @@ contract RegisterHyperchainScript is Script {
     }
 
     function registerTokenOnBridgehub() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         if (bridgehub.tokenIsRegistered(config.baseToken)) {
             console.log("Token already registered on Bridgehub");
@@ -154,7 +152,7 @@ contract RegisterHyperchainScript is Script {
     }
 
     function registerHyperchain() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
