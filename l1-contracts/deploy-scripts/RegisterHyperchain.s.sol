@@ -125,13 +125,11 @@ contract RegisterHyperchainScript is Script {
             console.log("Token already registered on Bridgehub");
         } else {
             bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
-            Utils.executeUpgrade({
-                _governor: ownable.owner(),
-                _salt: bytes32(config.bridgehubCreateNewChainSalt),
+            Utils.chainAdminMulticall({
+                _chainAdmin: bridgehub.admin(),
                 _target: config.bridgehub,
                 _data: data,
-                _value: 0,
-                _delay: 0
+                _value: 0
             });
             console.log("Token registered on Bridgehub");
         }
@@ -157,7 +155,6 @@ contract RegisterHyperchainScript is Script {
 
     function registerHyperchain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
 
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
@@ -172,14 +169,7 @@ contract RegisterHyperchainScript is Script {
             )
         );
 
-        Utils.executeUpgrade({
-            _governor: ownable.owner(),
-            _salt: bytes32(config.bridgehubCreateNewChainSalt),
-            _target: config.bridgehub,
-            _data: data,
-            _value: 0,
-            _delay: 0
-        });
+        Utils.chainAdminMulticall({_chainAdmin: bridgehub.admin(), _target: config.bridgehub, _data: data, _value: 0});
         console.log("Hyperchain registered");
 
         // Get new diamond proxy address from emitted events

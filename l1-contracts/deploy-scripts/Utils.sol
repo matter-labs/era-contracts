@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {console2 as console} from "forge-std/Script.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -10,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import "../contracts/governance/IChainAdmin.sol";
 
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
@@ -286,6 +288,15 @@ library Utils {
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
         return bytecode;
+    }
+
+    function chainAdminMulticall(address _chainAdmin, address _target, bytes memory _data, uint256 _value) internal {
+        IChainAdmin chainAdmin = IChainAdmin(_chainAdmin);
+
+        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
+        calls[0] = IChainAdmin.Call({target: _target, value: _value, data: _data});
+        vm.broadcast()();
+        chainAdmin.multicall(calls, true);
     }
 
     function executeUpgrade(

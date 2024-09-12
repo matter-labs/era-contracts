@@ -586,12 +586,15 @@ contract DeployL1Script is Script {
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         bridgehub.transferOwnership(addresses.governance);
+        bridgehub.setPendingAdmin(addresses.chainAdmin);
 
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
+        sharedBridge.setPendingAdmin(addresses.chainAdmin);
 
         StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         stm.transferOwnership(addresses.governance);
+        stm.setPendingAdmin(addresses.chainAdmin);
 
         vm.stopBroadcast();
         console.log("Owners updated");
