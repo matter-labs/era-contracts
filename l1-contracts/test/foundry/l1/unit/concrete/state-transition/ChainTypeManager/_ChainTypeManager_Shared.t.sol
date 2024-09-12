@@ -16,7 +16,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {L1GenesisUpgrade as GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
@@ -24,11 +24,12 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {ERA_CHAIN_ID, MAX_NUMBER_OF_ZK_CHAINS} from "contracts/common/Config.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
-    GenesisUpgrade internal genesisUpgradeContract;
+    L1GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
@@ -50,7 +51,7 @@ contract ChainTypeManagerTest is Test {
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
-        genesisUpgradeContract = new GenesisUpgrade();
+        genesisUpgradeContract = new L1GenesisUpgrade(ERA_CHAIN_ID, MAX_NUMBER_OF_ZK_CHAINS);
 
         facetCuts.push(
             Diamond.FacetCut({
