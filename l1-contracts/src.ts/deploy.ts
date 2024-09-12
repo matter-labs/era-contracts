@@ -174,7 +174,7 @@ export class Deployer {
 
       const hashFromSTM = await stm.initialCutHash();
       if (hash != hashFromSTM) {
-        throw new Error(`Has from STM ${hashFromSTM} does not match the computed hash ${hash}`);
+        throw new Error(`Hash from STM ${hashFromSTM} does not match the computed hash ${hash}`);
       }
     }
 
@@ -909,7 +909,7 @@ export class Deployer {
     this.addresses.Bridges.NativeTokenVaultProxy = contractAddress;
 
     const sharedBridge = this.defaultSharedBridge(this.deployWallet);
-    const data = await sharedBridge.interface.encodeFunctionData("setNativeTokenVault", [
+    const data = sharedBridge.interface.encodeFunctionData("setNativeTokenVault", [
       this.addresses.Bridges.NativeTokenVaultProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data);
