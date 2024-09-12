@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
-import { ADDRESS_ONE, encodeNTVAssetId } from "../src.ts/utils";
+import { ADDRESS_ONE, encodeNTVAssetId, getAddressFromEnv } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const ETH_TOKEN_ADDRESS = ADDRESS_ONE;
@@ -103,7 +103,9 @@ async function main() {
       if (!(await deployer.bridgehubContract(deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
-      await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
+      if (baseTokenAddress != ETH_TOKEN_ADDRESS) {
+        await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
+      }
       await deployer.registerZKChain(
         baseTokenAssetId,
         cmd.validiumMode,
@@ -112,7 +114,8 @@ async function main() {
         true,
         null,
         null,
-        cmd.useGovernance
+        cmd.useGovernance,
+        true
       );
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";

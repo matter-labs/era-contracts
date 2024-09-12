@@ -21,4 +21,7 @@ interface IL2AssetRouter {
     /// @dev Used to set the assedAddress for a given assetId.
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetAddress) external;
+
+    /// @dev Used to set the L2 legacy shared bridge address.
+    function setL2LegacySharedBridge(address _l2LegacySharedBridge) external;
 }

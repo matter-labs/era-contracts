@@ -24,4 +24,6 @@ interface IL2NativeTokenVault is INativeTokenVault {
     event L2TokenBeaconUpdated(address indexed l2TokenBeacon, bytes32 indexed l2TokenProxyBytecodeHash);
 
     function l2TokenAddress(address _l1Token) external view returns (address);
+
+    function setL2LegacySharedBridge(address _l2LegacySharedBridge) external;
 }

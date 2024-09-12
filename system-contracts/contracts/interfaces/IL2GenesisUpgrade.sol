@@ -2,12 +2,31 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+struct AdditionalForceDeploymentsData {
+    bytes32 baseTokenAssetId;
+    address l2Weth;
+}
+
+struct FixedForceDeploymentsData {
+    uint256 l1ChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedL1Governance;
+    uint256 maxNumberOfZKChains;
+    bytes32 bridgehubBytecodeHash;
+    bytes32 l2AssetRouterBytecodeHash;
+    bytes32 l2NtvBytecodeHash;
+    bytes32 messageRootBytecodeHash;
+}
+
 interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 
     function genesisUpgrade(
         uint256 _chainId,
         address _ctmDeployer,
-        bytes calldata _forceDeploymentsData
+        bytes calldata _fixedForceDeploymentsData,
+        bytes calldata _additionalForceDeploymentsData
     ) external payable;
 }

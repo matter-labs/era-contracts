@@ -3,13 +3,16 @@
 pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgradeGenesis} from "./BaseZkSyncUpgradeGenesis.sol";
 import {ProposedUpgrade} from "./IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IL2GenesisUpgrade, AdditionalForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
@@ -17,17 +20,31 @@ import {SemVer} from "../common/libraries/SemVer.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
+    /// @dev The chainId of Era
+    uint256 public immutable ERA_CHAIN_ID;
+
+    /// @dev The maximum number of ZK chains.
+    uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
+
+    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Initialize the implementation to prevent Parity hack.
+    constructor(uint256 _eraChainId, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
+        ERA_CHAIN_ID = _eraChainId;
+        MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
+    }
+
     /// @notice The main function that will be called by the upgrade proxy.
     function genesisUpgrade(
         address _l1GenesisUpgrade,
         uint256 _chainId,
         uint256 _protocolVersion,
         address _l1CtmDeployerAddress,
-        bytes calldata _forceDeploymentsData,
+        bytes calldata _fixedForceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
         L2CanonicalTransaction memory l2ProtocolUpgradeTx;
@@ -35,9 +52,10 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         {
             bytes memory complexUpgraderCalldata;
             {
+                bytes memory additionalForceDeploymentsData = _getAdditionalForceDeploymentsData();
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _l1CtmDeployerAddress, _forceDeploymentsData)
+                    (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -100,5 +118,13 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
+    }
+
+    function _getAdditionalForceDeploymentsData() internal view returns (bytes memory) {
+        AdditionalForceDeploymentsData memory additionalForceDeploymentsData = AdditionalForceDeploymentsData({
+            baseTokenAssetId: s.baseTokenAssetId,
+            l2Weth: address(0) // kl todo
+        });
+        return abi.encode(additionalForceDeploymentsData);
     }
 }
