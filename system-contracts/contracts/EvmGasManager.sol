@@ -4,84 +4,45 @@
 
 pragma solidity ^0.8.0;
 
+import "./libraries/Utils.sol";
+
 import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 
 // We consider all the contracts (including system ones) as warm.
 uint160 constant PRECOMPILES_END = 0xffff;
 
-// Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
+// Transient storage prefixes
+uint256 constant IS_ACCOUNT_EVM_PREFIX = 1 << 255;
+uint256 constant IS_ACCOUNT_WARM_PREFIX = 1 << 254;
+uint256 constant IS_SLOT_WARM_PREFIX = 1 << 253;
+uint256 constant EVM_STACK_SLOT = 2;
+
 contract EvmGasManager {
-    // We need trust to use `storage` pointers
-    struct WarmAccountInfo {
-        bool isWarm;
-    }
-
-    struct SlotInfo {
-        bool warm;
-        uint256 originalValue;
-    }
-
-    // We dont care about the size, since none of it will be stored/published anyway.
-    struct EVMStackFrameInfo {
-        bool isStatic;
-        uint256 passGas;
-    }
-
-    // The following storage variables are not used anywhere explicitly and are just used to obtain the storage pointers
-    // to use the transient storage with.
-    mapping(address => WarmAccountInfo) private warmAccounts;
-    mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
-    EVMStackFrameInfo[] private evmStackFrames;
-
-    function tstoreWarmAccount(address account, bool isWarm) internal {
-        WarmAccountInfo storage ptr = warmAccounts[account];
-
-        assembly {
-            tstore(ptr.slot, isWarm)
-        }
-    }
-
-    function tloadWarmAccount(address account) internal returns (bool isWarm) {
-        WarmAccountInfo storage ptr = warmAccounts[account];
-
-        assembly {
-            isWarm := tload(ptr.slot)
-        }
-    }
-
-    function tstoreWarmSlot(address _account, uint256 _key, SlotInfo memory info) internal {
-        SlotInfo storage ptr = warmSlots[_account][_key];
-
-        bool warm = info.warm;
-        uint256 originalValue = info.originalValue;
-
-        assembly {
-            tstore(ptr.slot, warm)
-            tstore(add(ptr.slot, 1), originalValue)
-        }
-    }
-
-    function tloadWarmSlot(address _account, uint256 _key) internal view returns (SlotInfo memory info) {
-        SlotInfo storage ptr = warmSlots[_account][_key];
-
-        bool isWarm;
-        uint256 originalValue;
-
-        assembly {
-            isWarm := tload(ptr.slot)
-            originalValue := tload(add(ptr.slot, 1))
-        }
-
-        info.warm = isWarm;
-        info.originalValue = originalValue;
-    }
-
     modifier onlySystemEvm() {
-        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
-        require(SystemContractHelper.isSystemCall(), "This method require system call flag");
+        // cache use is safe since we do not support SELFDESTRUCT
+        uint256 transient_slot = IS_ACCOUNT_EVM_PREFIX | uint256(uint160(msg.sender));
+        bool isEVM;
+        assembly {
+            isEVM := tload(transient_slot)
+        }
+
+        if (!isEVM) {
+            bytes32 bytecodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(msg.sender);
+            isEVM = Utils.isCodeHashEVM(bytecodeHash);
+            if (isEVM) {
+                if (!Utils.isContractConstructing(bytecodeHash)) {
+                    assembly {
+                        tstore(transient_slot, isEVM)
+                    }
+                }
+            }
+        }
+
+        require(isEVM, "only system evm");
+        require(SystemContractHelper.isSystemCall(), "This method requires system call flag");
         _;
     }
 
@@ -91,64 +52,105 @@ contract EvmGasManager {
     function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
-        wasWarm = tloadWarmAccount(account);
-        if (!wasWarm) tstoreWarmAccount(account, true);
-    }
-
-    function isSlotWarm(uint256 _slot) external view returns (bool) {
-        SlotInfo storage ptr = warmSlots[msg.sender][_slot];
-        bool isWarm;
+        uint256 transient_slot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(account));
 
         assembly {
-            isWarm := tload(ptr.slot)
+            wasWarm := tload(transient_slot)
         }
 
-        return isWarm;
+        if (!wasWarm) {
+            assembly {
+                tstore(transient_slot, 1)
+            }
+        }
     }
 
-    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
-        SlotInfo memory info = tloadWarmSlot(msg.sender, _slot);
-
-        if (info.warm) {
-            return (true, info.originalValue);
+    function isSlotWarm(uint256 _slot) external view returns (bool isWarm) {
+        uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        uint256 transient_slot;
+        assembly {
+            mstore(0, prefix)
+            mstore(0x20, _slot)
+            transient_slot := keccak256(0, 64)
         }
 
-        info.warm = true;
-        info.originalValue = _currentValue;
+        assembly {
+            isWarm := tload(transient_slot)
+        }
+    }
 
-        tstoreWarmSlot(msg.sender, _slot, info);
+    function warmSlot(
+        uint256 _slot,
+        uint256 _currentValue
+    ) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
+        uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        uint256 transient_slot;
+        assembly {
+            mstore(0, prefix)
+            mstore(0x20, _slot)
+            transient_slot := keccak256(0, 64)
+        }
 
-        return (false, _currentValue);
+        assembly {
+            isWarm := tload(transient_slot)
+        }
+
+        if (isWarm) {
+            assembly {
+                originalValue := tload(add(transient_slot, 1))
+            }
+        } else {
+            originalValue = _currentValue;
+
+            assembly {
+                tstore(transient_slot, 1)
+                tstore(add(transient_slot, 1), originalValue)
+            }
+        }
     }
 
     /*
+
     The flow is the following:
+
     When conducting call:
         1. caller calls to an EVM contract pushEVMFrame with the corresponding gas
-        2. callee calls consumeEvmFrame to get the gas & make sure that subsequent callee won't be able to read it.
-        3. callee sets the return gas
-        4. callee calls popEVMFrame to return the gas to the caller & remove the frame
+        2. callee calls consumeEvmFrame to get the gas and determine if a call is static
+        3. calleer calls popEVMFrame to remove the frame
     */
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) external onlySystemEvm {
-        EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
-
-        evmStackFrames.push(frame);
+    function pushEVMFrame(uint256 passGas, bool isStatic) external onlySystemEvm {
+        assembly {
+            let stackDepth := add(tload(EVM_STACK_SLOT), 1)
+            tstore(EVM_STACK_SLOT, stackDepth)
+            let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
+            tstore(stackPointer, passGas)
+            tstore(add(stackPointer, 1), isStatic)
+        }
     }
 
-    function consumeEvmFrame() external onlySystemEvm returns (uint256 passGas, bool isStatic) {
-        if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
+    function consumeEvmFrame() external view returns (uint256 passGas, bool isStatic) {
+        uint256 stackDepth;
+        assembly {
+            stackDepth := tload(EVM_STACK_SLOT)
+        }
+        if (stackDepth == 0) return (INF_PASS_GAS, false);
 
-        EVMStackFrameInfo memory frameInfo = evmStackFrames[evmStackFrames.length - 1];
-
-        passGas = frameInfo.passGas;
-        isStatic = frameInfo.isStatic;
-
-        // Mark as used
-        evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
+        assembly {
+            let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
+            passGas := tload(stackPointer)
+            isStatic := tload(add(stackPointer, 1))
+        }
     }
 
     function popEVMFrame() external onlySystemEvm {
-        evmStackFrames.pop();
+        uint256 stackDepth;
+        assembly {
+            stackDepth := tload(EVM_STACK_SLOT)
+        }
+        require(stackDepth != 0);
+        assembly {
+            tstore(EVM_STACK_SLOT, sub(stackDepth, 1))
+        }
     }
 }
