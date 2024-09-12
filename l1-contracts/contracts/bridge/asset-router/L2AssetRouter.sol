@@ -168,7 +168,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             // slither-disable-next-line unused-return
             L2ContractHelper.sendMessageToL1(message);
         } else {
-            address l1Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId);
+            address l1Token = IBridgedStandardToken(
+                IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
+            ).originToken();
             require(l1Token != address(0), "Unsupported asset Id by NTV");
             (uint256 amount, address l1Receiver) = abi.decode(_assetData, (uint256, address));
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
