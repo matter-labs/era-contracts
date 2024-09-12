@@ -20,7 +20,6 @@ import {
   L2_STANDARD_ERC20_PROXY_FACTORY,
   L2_STANDARD_ERC20_IMPLEMENTATION,
   L2_STANDARD_TOKEN_PROXY,
-  L2_DEV_SHARED_BRIDGE_IMPLEMENTATION,
   L2_SHARED_BRIDGE_IMPLEMENTATION,
   L2_SHARED_BRIDGE_PROXY,
   // deployBytecodeViaCreate2OnPath,
@@ -1489,8 +1488,8 @@ export class Deployer {
     const l2AssetRouter = IL2AssetRouterFactory.connect(L2_ASSET_ROUTER_ADDRESS, this.deployWallet);
     const l2NTV = IL2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, this.deployWallet);
     const l1Nullifier = L1NullifierDevFactory.connect(this.addresses.Bridges.L1NullifierProxy, this.deployWallet);
-    await this.deploySharedBridgeImplOnL2ThroughL1(inputChainId, gasPrice, false);
-    await this.deploySharedBridgeProxyOnL2ThroughL1(inputChainId, gasPrice, false);
+    await this.deploySharedBridgeImplOnL2ThroughL1(inputChainId, gasPrice);
+    await this.deploySharedBridgeProxyOnL2ThroughL1(inputChainId, gasPrice);
 
     const receipt6 = await this.executeUpgradeOnL2(
       inputChainId,
@@ -1526,11 +1525,7 @@ export class Deployer {
     }
   }
 
-  public async deploySharedBridgeImplOnL2ThroughL1(
-    chainId: string,
-    gasPrice: BigNumberish,
-    localLegacyBridgeTesting: boolean = false
-  ) {
+  public async deploySharedBridgeImplOnL2ThroughL1(chainId: string, gasPrice: BigNumberish) {
     if (this.verbose) {
       console.log("Deploying L2SharedBridge Implementation");
     }
@@ -1584,11 +1579,7 @@ export class Deployer {
     }
   }
 
-  public async deploySharedBridgeProxyOnL2ThroughL1(
-    chainId: string,
-    gasPrice: BigNumberish,
-    localLegacyBridgeTesting: boolean = false
-  ) {
+  public async deploySharedBridgeProxyOnL2ThroughL1(chainId: string, gasPrice: BigNumberish) {
     const l1SharedBridge = this.defaultSharedBridge(this.deployWallet);
     if (this.verbose) {
       console.log("Deploying L2SharedBridge Proxy");
@@ -1596,7 +1587,6 @@ export class Deployer {
     /// prepare proxyInitializationParams
     const l2GovernorAddress = applyL1ToL2Alias(this.addresses.Governance);
 
-    let proxyInitializationParams;
     // if (localLegacyBridgeTesting) {
     //   const l2SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("DevL2SharedBridge").abi);
     //   proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initializeDevBridge", [
@@ -1607,7 +1597,7 @@ export class Deployer {
     //   ]);
     // } else {
     const l2SharedBridgeInterface = new Interface(L2_SHARED_BRIDGE_IMPLEMENTATION.abi);
-    proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
+    const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
       l1SharedBridge.address,
       this.addresses.Bridges.ERC20BridgeProxy,
       hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
