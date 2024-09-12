@@ -293,7 +293,18 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorsCommitted(validatorsCommit);
     }
 
-    /// @notice Returns an array of `AttesterAttr` structs representing the current attester committee.
+    /// @notice Returns the current list of node owners.
+    function getNodeOwners() public view returns (address[] memory) {
+        return nodeOwners;
+    }
+
+    /// @notice Returns the current state of the node.
+    function getNode(address _nodeOwner) public view returns (Node memory) {
+        _verifyNodeOwnerExists(_nodeOwner);
+        return nodes[_nodeOwner];
+    }
+
+    /// @notice Returns an array of `CommitteeAttester` structs representing the current attester committee.
     /// @dev Collects active and non-removed attesters based on the latest commit to the committee.
     function getAttesterCommittee() public view returns (CommitteeAttester[] memory) {
         uint256 len = nodeOwners.length;
