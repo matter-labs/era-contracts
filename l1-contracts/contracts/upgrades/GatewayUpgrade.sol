@@ -41,10 +41,10 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
         s.baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.__DEPRECATED_baseToken);
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        s.baseTokenBridge = bridgehub.sharedBridge(); // we change the assetRouter
         bridgehub.setLegacyBaseTokenAssetId(s.chainId);
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         address l2LegacyBridge = IL1SharedBridgeLegacy(s.baseTokenBridge).l2BridgeAddress(s.chainId);
-        s.baseTokenBridge = bridgehub.sharedBridge(); // we change the assetRouter
         proposedUpgrade.l2ProtocolUpgradeTx.data = bytes.concat(
             l2TxDataStart,
             bytes32(uint256(uint160(l2LegacyBridge))),
