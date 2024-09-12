@@ -1584,18 +1584,8 @@ export class Deployer {
     if (this.verbose) {
       console.log("Deploying L2SharedBridge Proxy");
     }
-    /// prepare proxyInitializationParams
     const l2GovernorAddress = applyL1ToL2Alias(this.addresses.Governance);
 
-    // if (localLegacyBridgeTesting) {
-    //   const l2SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("DevL2SharedBridge").abi);
-    //   proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initializeDevBridge", [
-    //     l1SharedBridge.address,
-    //     this.addresses.Bridges.ERC20BridgeProxy,
-    //     hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
-    //     l2GovernorAddress,
-    //   ]);
-    // } else {
     const l2SharedBridgeInterface = new Interface(L2_SHARED_BRIDGE_IMPLEMENTATION.abi);
     const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
       l1SharedBridge.address,
@@ -1603,7 +1593,6 @@ export class Deployer {
       hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
       l2GovernorAddress,
     ]);
-    // }
 
     /// prepare constructor data
     const l2SharedBridgeProxyConstructorData = ethers.utils.arrayify(

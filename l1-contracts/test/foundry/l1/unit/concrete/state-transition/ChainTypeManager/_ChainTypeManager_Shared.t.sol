@@ -24,7 +24,6 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {ERA_CHAIN_ID, MAX_NUMBER_OF_ZK_CHAINS} from "contracts/common/Config.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
@@ -41,6 +40,7 @@ contract ChainTypeManagerTest is Test {
     uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
     bytes internal forceDeploymentsData = hex"";
+    uint256 eraChainId = 9;
 
     Diamond.FacetCut[] internal facetCuts;
 
@@ -51,7 +51,7 @@ contract ChainTypeManagerTest is Test {
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
-        genesisUpgradeContract = new L1GenesisUpgrade(ERA_CHAIN_ID, MAX_NUMBER_OF_ZK_CHAINS);
+        genesisUpgradeContract = new L1GenesisUpgrade(eraChainId, type(uint256).max);
 
         facetCuts.push(
             Diamond.FacetCut({

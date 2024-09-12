@@ -60,6 +60,12 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
             abi.encodeWithSelector(IL1Nullifier.finalizeDeposit.selector, finalizeWithdrawalParams),
             abi.encode(alice, address(token), amount)
         );
+        address l2BridgeAddress = address(12);
+        vm.mockCall(
+            l1NullifierAddress,
+            abi.encodeWithSelector(IL1Nullifier.__DEPRECATED_l2BridgeAddress.selector, eraChainId),
+            abi.encode(l2BridgeAddress)
+        );
 
         vm.prank(alice);
         // solhint-disable-next-line func-named-parameters

@@ -23,10 +23,7 @@ const L2_SHARED_BRIDGE_PATH = contractArtifactsPath + "contracts/bridge";
 export const L2_STANDARD_ERC20_PROXY_FACTORY = readContract(openzeppelinBeaconProxyArtifactsPath, "UpgradeableBeacon");
 export const L2_STANDARD_ERC20_IMPLEMENTATION = readContract(L2_SHARED_BRIDGE_PATH, "BridgedStandardERC20");
 export const L2_STANDARD_TOKEN_PROXY = readContract(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
-// export const L2_DEV_SHARED_BRIDGE_IMPLEMENTATION = readContract(
-//   contractArtifactsPath + "contracts/dev-contracts",
-//   "DevL2SharedBridge"
-// );
+
 export const L2_SHARED_BRIDGE_IMPLEMENTATION = readContract(L2_SHARED_BRIDGE_PATH, "L2SharedBridgeLegacy");
 export const L2_SHARED_BRIDGE_PROXY = readContract(
   contractArtifactsPath + "@openzeppelin/contracts-v4/proxy/transparent",

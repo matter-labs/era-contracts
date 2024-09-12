@@ -60,7 +60,7 @@ contract L2Erc20BridgeTest is Test {
         }
 
         L2Utils.initSystemContracts();
-        L2Utils.forceDeployAssetRouter(L1_CHAIN_ID, ERA_CHAIN_ID, l1BridgeWallet, address(0));
+        L2Utils.forceDeployAssetRouter(L1_CHAIN_ID, ERA_CHAIN_ID, ownerWallet, l1BridgeWallet, address(0));
         L2Utils.forceDeployNativeTokenVault({
             _l1ChainId: L1_CHAIN_ID,
             _aliasedOwner: ownerWallet,

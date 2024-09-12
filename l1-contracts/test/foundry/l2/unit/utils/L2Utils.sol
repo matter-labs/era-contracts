@@ -66,13 +66,14 @@ library L2Utils {
     function forceDeployAssetRouter(
         uint256 _l1ChainId,
         uint256 _eraChainId,
+        address _aliasedOwner,
         address _l1AssetRouter,
         address _legacySharedBridge
     ) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId);
+            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, ethAssetId, _aliasedOwner);
         }
 
         bytes memory bytecode = readEraBytecode("L2AssetRouter");
@@ -114,7 +115,6 @@ library L2Utils {
                 _l1ChainId: _l1ChainId,
                 _aliasedOwner: _aliasedOwner,
                 _l2TokenProxyBytecodeHash: _l2TokenProxyBytecodeHash,
-                _legacySharedBridge: _legacySharedBridge,
                 _bridgedTokenBeacon: _l2TokenBeacon,
                 _contractsDeployedAlready: _contractsDeployedAlready,
                 _wethToken: address(0),
