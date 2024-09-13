@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
+import "forge-std/console.sol";
 
 import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -86,7 +87,7 @@ library L2Utils {
             newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: true,
             value: 0,
-            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId)
+            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, ethAssetId, _aliasedOwner)
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
@@ -137,7 +138,6 @@ library L2Utils {
                 _l1ChainId,
                 _aliasedOwner,
                 _l2TokenProxyBytecodeHash,
-                _legacySharedBridge,
                 _l2TokenBeacon,
                 _contractsDeployedAlready,
                 address(0),
