@@ -408,11 +408,11 @@ library Utils {
 
     function readDAContractBytecodes() internal view returns (DAContractBytecodes memory bytecodes) {
         bytecodes = DAContractBytecodes({
-            rollupL1DAValidator: readHardhatBytecode(
-                "/../da-contracts/artifacts/contracts/RollupL1DAValidator.sol/RollupL1DAValidator.json"
+            rollupL1DAValidator: readFoundryBytecode(
+                "/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json"
             ),
-            validiumL1DAValidator: readHardhatBytecode(
-                "/../da-contracts/artifacts/contracts/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json"
+            validiumL1DAValidator: readFoundryBytecode(
+                "/../da-contracts/out/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json"
             )
         });
     }
