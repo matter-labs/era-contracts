@@ -206,8 +206,16 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), new MessageRoot(bridgehub));
         address l1Nullifier = makeAddr("l1Nullifier");
         address l2LegacySharedBridge = makeAddr("l2LegacySharedBridge");
-        vm.mockCall(address(sharedBridge), abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector), abi.encode(l1Nullifier));
-        vm.mockCall(address(l1Nullifier), abi.encodeWithSelector(IL1Nullifier.__DEPRECATED_l2BridgeAddress.selector), abi.encode(l2LegacySharedBridge));
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
+            abi.encode(l1Nullifier)
+        );
+        vm.mockCall(
+            address(l1Nullifier),
+            abi.encodeWithSelector(IL1Nullifier.__DEPRECATED_l2BridgeAddress.selector),
+            abi.encode(l2LegacySharedBridge)
+        );
         bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(chainContractAddress),
