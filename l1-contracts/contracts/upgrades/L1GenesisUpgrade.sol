@@ -21,16 +21,12 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
-    /// @dev The chainId of Era
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev The maximum number of ZK chains.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _eraChainId, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
-        ERA_CHAIN_ID = _eraChainId;
+    constructor(uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
     }
 

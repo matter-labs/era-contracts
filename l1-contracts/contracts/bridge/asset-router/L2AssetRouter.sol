@@ -85,6 +85,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _transferOwnership(_aliasedOwner);
     }
 
+    /// @notice Sets the address of the legacy L2 shared bridge.
+    /// @param _legacySharedBridge The address of the legacy L2 shared bridge.
     function setL2LegacySharedBridge(address _legacySharedBridge) external onlyOwner {
         l2LegacySharedBridge = _legacySharedBridge;
     }

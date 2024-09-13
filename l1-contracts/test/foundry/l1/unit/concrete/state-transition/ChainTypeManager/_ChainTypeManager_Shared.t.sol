@@ -51,7 +51,7 @@ contract ChainTypeManagerTest is Test {
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
-        genesisUpgradeContract = new L1GenesisUpgrade(eraChainId, type(uint256).max);
+        genesisUpgradeContract = new L1GenesisUpgrade(type(uint256).max);
 
         facetCuts.push(
             Diamond.FacetCut({
