@@ -28,6 +28,7 @@ contract DeployL2Script is Script {
         address l2SharedBridgeProxy;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
+        address multicall3;
         address forceDeployUpgraderAddress;
     }
 
@@ -39,6 +40,7 @@ contract DeployL2Script is Script {
         bytes l2SharedBridgeProxyBytecode;
         bytes consensusRegistryBytecode;
         bytes consensusRegistryProxyBytecode;
+        bytes multicall3Bytecode;
         bytes forceDeployUpgrader;
     }
 
@@ -61,6 +63,7 @@ contract DeployL2Script is Script {
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
+        deployMulticall3();
 
         saveOutput();
     }
@@ -137,6 +140,10 @@ contract DeployL2Script is Script {
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
 
+        contracts.multicall3Bytecode = Utils.readHardhatBytecode(
+            "/../l2-contracts/argificats-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
+        );
+
         contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
@@ -160,6 +167,7 @@ contract DeployL2Script is Script {
         vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
         vm.serializeAddress("root", "consensus_registry_implementation", config.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", config.consensusRegistryProxy);
+        vm.serializeAddress("root", "multicall3", config.multicall3);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
@@ -251,6 +259,22 @@ contract DeployL2Script is Script {
 
         config.consensusRegistryImplementation = Utils.deployThroughL1({
             bytecode: contracts.consensusRegistryBytecode,
+            constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deployMulticall3() internal {
+        // Multicall3 doesn't have a constructor.
+        bytes memory constructorData = "";
+
+        config.multicall3 = Utils.deployThroughL1({
+            bytecode: contracts.multicall3,
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
