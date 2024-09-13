@@ -63,7 +63,7 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
         address l2BridgeAddress = address(12);
         vm.mockCall(
             l1NullifierAddress,
-            abi.encodeWithSelector(IL1Nullifier.__DEPRECATED_l2BridgeAddress.selector, eraChainId),
+            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector, eraChainId),
             abi.encode(l2BridgeAddress)
         );
 

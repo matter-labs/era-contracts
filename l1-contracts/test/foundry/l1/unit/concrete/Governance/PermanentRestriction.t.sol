@@ -213,7 +213,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         vm.mockCall(
             address(l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.__DEPRECATED_l2BridgeAddress.selector),
+            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
             abi.encode(l2LegacySharedBridge)
         );
         bridgehub.createNewChain({

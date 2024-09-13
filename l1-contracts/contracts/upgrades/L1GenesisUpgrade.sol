@@ -116,7 +116,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
 
     function _getAdditionalForceDeploymentsData() internal view returns (bytes memory) {
         IL1Nullifier l1Nullifier = IL1AssetRouter(s.baseTokenBridge).L1_NULLIFIER();
-        address legacySharedBridge = l1Nullifier.__DEPRECATED_l2BridgeAddress(s.chainId);
+        address legacySharedBridge = l1Nullifier.l2BridgeAddress(s.chainId);
         AdditionalForceDeploymentsData memory additionalForceDeploymentsData = AdditionalForceDeploymentsData({
             baseTokenAssetId: s.baseTokenAssetId,
             l2LegacySharedBridge: legacySharedBridge,
