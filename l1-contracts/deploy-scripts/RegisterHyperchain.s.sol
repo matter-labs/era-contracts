@@ -157,6 +157,7 @@ contract RegisterHyperchainScript is Script {
             console.log("Token already registered on NTV");
         } else {
             // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));
+            vm.broadcast();
             ntv.registerToken(config.baseToken);
             console.log("Token registered on NTV");
         }

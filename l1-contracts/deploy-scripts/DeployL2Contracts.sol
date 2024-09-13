@@ -94,11 +94,11 @@ contract DeployL2Script is Script {
         }
 
         deployed.l2DaValidatorAddress = Utils.deployThroughL1({
-            bytecode: contracts.l2SharedBridgeBytecode,
-            constructorargs: constructorData,
+            bytecode: bytecode,
+            constructorargs: bytes(""),
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: factoryDeps,
+            factoryDeps: new bytes[](0),
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
@@ -107,7 +107,7 @@ contract DeployL2Script is Script {
 
     function deployForceDeployer() internal {
         bytes[] memory factoryDeps = new bytes[](0);
-        config.forceDeployUpgraderAddress = Utils.deployThroughL1({
+        deployed.forceDeployUpgraderAddress = Utils.deployThroughL1({
             bytecode: contracts.forceDeployUpgrader,
             constructorargs: "",
             create2salt: "",

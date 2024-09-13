@@ -183,8 +183,6 @@ contract DeployL1Script is Script {
         deployBridgehubContract();
         deployMessageRootContract();
 
-        initializeGeneratedData();
-
         deploySharedBridgeContracts();
         deployL1NativeTokenVaultImplementation();
         deployL1NativeTokenVaultProxy();
@@ -193,6 +191,8 @@ contract DeployL1Script is Script {
         updateSharedBridge();
         deploySTMDeploymentTracker();
         setBridgehubParams();
+
+        initializeGeneratedData();
 
         deployBlobVersionedHashRetriever();
         deployStateTransitionManagerContract();
