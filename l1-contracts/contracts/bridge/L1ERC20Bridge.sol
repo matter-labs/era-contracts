@@ -140,7 +140,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             chainId: ERA_CHAIN_ID,
             l2BatchNumber: _l2BatchNumber,
             l2MessageIndex: _l2MessageIndex,
-            l2Sender: L1_NULLIFIER.__DEPRECATED_l2BridgeAddress(ERA_CHAIN_ID),
+            l2Sender: L1_NULLIFIER.l2BridgeAddress(ERA_CHAIN_ID),
             l2TxNumberInBatch: _l2TxNumberInBatch,
             message: _message,
             merkleProof: _merkleProof
