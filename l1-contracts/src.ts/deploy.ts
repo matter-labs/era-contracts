@@ -1263,6 +1263,7 @@ export class Deployer {
     const chainAssetId = await bridgehub.ctmAssetIdFromChainId(this.chainId);
     if (this.verbose) {
       console.log("Chain asset id is: ", chainAssetId);
+      console.log(`CONTRACTS_CTM_ASSET_INFO=${chainAssetId}`);
     }
 
     let sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
@@ -1409,7 +1410,9 @@ export class Deployer {
       console.log(`ZK chain registration tx hash: ${receipt.transactionHash}`);
 
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
-
+      console.log(
+        `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+      );
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
     }
 

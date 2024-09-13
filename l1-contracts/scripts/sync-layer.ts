@@ -70,12 +70,12 @@ async function main() {
         "GATEWAY_STATE_TRANSITION_PROXY_ADDR"
       );
 
-      const stm = deployer.stateTransitionManagerContract(provider);
+      const stm = deployer.chainTypeManagerContract(provider);
       const bridgehub = deployer.bridgehubContract(ethProvider);
       const diamondInit = IDiamondInitFactory.connect(deployer.addresses.StateTransition.DiamondInit, provider);
       const bytes32 = (x: ethers.BigNumberish) => ethers.utils.hexZeroPad(ethers.utils.hexlify(x), 32);
 
-      const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([], true);
+      const diamondCut = await deployer.initialZkSyncZKChainDiamondCut([], true);
       const mandatoryInitData = [
         diamondInit.interface.getSighash("initialize"),
         bytes32(parseInt(cmd.chainId)),
