@@ -410,13 +410,8 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
-        checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
-
-        // TODO invalid?
-        if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
-            $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
-        }
+        checkOverflow(destOffset, size, evmGasLeft)
+        checkMemOverflowByOffset(add(destOffset,size), evmGasLeft)
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
@@ -454,6 +449,7 @@ for { } true { } {
         offset := add(add(offset, BYTECODE_OFFSET()), 32)
 
         checkOverflow(dst,len, evmGasLeft)
+        checkOverflow(offset,len, evmGasLeft)
         checkMemOverflow(add(dst, len), evmGasLeft)
         // Check bytecode overflow
         if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
@@ -812,7 +808,8 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        // TODO overflow checks
+        checkOverflow(offset, size, evmGasLeft)
+        checkOverflow(destOffset, size, evmGasLeft)
         checkMemOverflowByOffset(add(offset, size), evmGasLeft)
         checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
 
@@ -1405,10 +1402,12 @@ for { } true { } {
         size, sp := popStackItemWithoutCheck(sp)
 
         checkOverflow(offset,size, evmGasLeft)
+        checkMemOverflowByOffset(add(offset,size), evmGasLeft)
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
         returnLen := size
-        checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
+        
+        // Don't check overflow here since previous checks are enough to ensure this is safe
         returnOffset := add(MEM_OFFSET_INNER(), offset)
         break
     }
@@ -1444,11 +1443,12 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        // TODO invalid?
-        ensureAcceptableMemLocation(offset)
-        ensureAcceptableMemLocation(size)
+        checkOverflow(offset,size, evmGasLeft)
+        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
+
+        // Don't check overflow here since previous checks are enough to ensure this is safe
         offset := add(offset, MEM_OFFSET_INNER())
         offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
 
