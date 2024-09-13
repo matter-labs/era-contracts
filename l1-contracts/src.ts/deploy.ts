@@ -50,10 +50,8 @@ import {
   applyL1ToL2Alias,
   BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING,
   encodeNTVAssetId,
-  L2_ASSET_ROUTER_ADDRESS,
   computeL2Create2Address,
   priorityTxMaxGasLimit,
-  L2_NATIVE_TOKEN_VAULT_ADDRESS,
   isCurrentNetworkLocal,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
@@ -81,8 +79,6 @@ import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory"
 
 import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
 import { ValidiumL1DAValidatorFactory } from "../../da-contracts/typechain/ValidiumL1DAValidatorFactory";
-import { IL2AssetRouterFactory } from "../typechain/IL2AssetRouterFactory";
-import { IL2NativeTokenVaultFactory } from "../typechain/IL2NativeTokenVaultFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
