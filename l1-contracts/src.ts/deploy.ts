@@ -1221,6 +1221,8 @@ export class Deployer {
             `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
           );
         }
+      } else {
+        console.log(`CONTRACTS_CTM_ASSET_INFO=${getHashFromEnv("CONTRACTS_CTM_ASSET_INFO")}`);
       }
     }
   }
