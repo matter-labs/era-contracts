@@ -7,7 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Utils, DAContractBytecodes, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS } from "./Utils.sol";
+import {Utils, DAContractBytecodes, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
@@ -42,8 +42,7 @@ import {ISTMDeploymentTracker} from "contracts/bridgehub/ISTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import { AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol"; 
-
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
@@ -278,7 +277,7 @@ contract DeployL1Script is Script {
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
 
-    function initializeGeneratedData() internal  {
+    function initializeGeneratedData() internal {
         generatedData.forceDeploymentsData = prepareForceDeploymentsData();
     }
 
@@ -793,11 +792,7 @@ contract DeployL1Script is Script {
 
     function saveOutput() internal {
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
-        vm.serializeAddress(
-            "bridgehub",
-            "bridgehub_implementation_addr",
-            addresses.bridgehub.bridgehubImplementation
-        );
+        vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
         vm.serializeAddress(
             "bridgehub",
             "stm_deployment_tracker_proxy_addr",
@@ -898,13 +893,13 @@ contract DeployL1Script is Script {
             "recursion_node_level_vk_hash",
             config.contracts.recursionNodeLevelVkHash
         );
-        vm.serializeBytes(
+        vm.serializeBytes("contracts_config", "diamond_cut_data", config.contracts.diamondCutData);
+
+        string memory contractsConfig = vm.serializeBytes(
             "contracts_config",
-            "diamond_cut_data",
-            config.contracts.diamondCutData
+            "force_deployments_data",
+            generatedData.forceDeploymentsData
         );
-        
-        string memory contractsConfig = vm.serializeBytes("contracts_config", "force_deployments_data", generatedData.forceDeploymentsData);
 
         vm.serializeAddress(
             "deployed_addresses",
@@ -919,10 +914,22 @@ contract DeployL1Script is Script {
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
 
-        vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", addresses.daAddresses.l1RollupDAValidator);
-        vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", addresses.daAddresses.l1RollupDAValidator);
-        
-        string memory deployedAddresses = vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "rollup_l1_da_validator_addr",
+            addresses.daAddresses.l1RollupDAValidator
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "validium_l1_da_validator_addr",
+            addresses.daAddresses.l1RollupDAValidator
+        );
+
+        string memory deployedAddresses = vm.serializeAddress(
+            "deployed_addresses",
+            "native_token_vault_addr",
+            addresses.vaults.l1NativeTokenVaultProxy
+        );
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
@@ -964,12 +971,7 @@ contract DeployL1Script is Script {
             newAddress: L2_ASSET_ROUTER_ADDRESS,
             callConstructor: true,
             value: 0,
-            input: abi.encode(
-                config.l1ChainId,
-                config.eraChainId,
-                addresses.bridges.sharedBridgeProxy,
-                ADDRESS_ONE
-            )
+            input: abi.encode(config.l1ChainId, config.eraChainId, addresses.bridges.sharedBridgeProxy, ADDRESS_ONE)
         });
         forceDeployments[2] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(l2ContractBytecodes.l2NativeTokenVault),

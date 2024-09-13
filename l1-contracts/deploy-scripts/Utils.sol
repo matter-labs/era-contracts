@@ -17,7 +17,7 @@ import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol"
 /// @dev The offset from which the built-in, but user space contracts are located.
 uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 
-// address constant 
+// address constant
 address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03);
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
@@ -364,7 +364,7 @@ library Utils {
     }
 
     /// @notice A helper function that reads all L2 bytecodes at once.
-    function readL2ContractsBytecodes() internal view returns (L2ContractsBytecodes memory bytecodes) { 
+    function readL2ContractsBytecodes() internal view returns (L2ContractsBytecodes memory bytecodes) {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
 
         // One liner creation is preferrable to creating in separate lines
@@ -392,7 +392,7 @@ library Utils {
                 "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
             ),
             transparentUpgradeableProxy: readHardhatBytecode(
-               "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+                "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
             ),
             forceDeployUpgrader: readHardhatBytecode(
                 "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
