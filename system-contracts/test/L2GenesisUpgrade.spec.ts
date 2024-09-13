@@ -35,8 +35,14 @@ describe("L2GenesisUpgrade tests", function () {
   let fixedForceDeploymentsData: string;
 
   const additionalForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
-    ["tuple(bytes32 baseTokenAssetId, address l2Weth)"],
-    [{ baseTokenAssetId: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70", l2Weth: ADDRESS_ONE }]
+    ["tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, _address l2Weth)"],
+    [
+      {
+        baseTokenAssetId: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
+        l2LegacySharedBridge: ADDRESS_ONE,
+        l2Weth: ADDRESS_ONE,
+      },
+    ]
   );
 
   before(async () => {
