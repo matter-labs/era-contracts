@@ -100,6 +100,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
                 fixedForceDeploymentsData.l1AssetRouter,
+                additionalForceDeploymentsData.l2LegacySharedBridge,
                 additionalForceDeploymentsData.baseTokenAssetId,
                 fixedForceDeploymentsData.aliasedL1Governance
             )
@@ -115,7 +116,8 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
                 fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-                address(0),
+                additionalForceDeploymentsData.l2LegacySharedBridge,
+                address(0), // this is used if the contract were already deployed, so for the migration of Era.
                 false,
                 additionalForceDeploymentsData.l2Weth,
                 additionalForceDeploymentsData.baseTokenAssetId

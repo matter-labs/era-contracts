@@ -17,6 +17,7 @@ struct ForceDeployment {
 
 struct AdditionalForceDeploymentsData {
     bytes32 baseTokenAssetId;
+    address l2LegacySharedBridge;
     address l2Weth;
 }
 

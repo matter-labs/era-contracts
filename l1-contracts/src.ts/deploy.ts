@@ -1357,6 +1357,12 @@ export class Deployer {
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const alreadyRegisteredInCTM = (await chainTypeManager.getZKChain(inputChainId)) != ethers.constants.AddressZero;
 
+    if (l2LegacySharedBridge) {
+      console.log("Setting L2 legacy shared bridge in L1Nullifier");
+      await this.setL2LegacySharedBridgeInL1Nullifier(inputChainId);
+      nonce++;
+    }
+
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncZKChainDiamondCut(extraFacets, compareDiamondCutHash);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
@@ -1480,43 +1486,48 @@ export class Deployer {
     }
   }
 
-  public async deployL2LegacySharedBridge(inputChainId: string, gasPrice: BigNumberish) {
-    if (this.verbose) {
-      console.log("Deploying L2 legacy shared bridge");
-    }
-    const l2AssetRouter = IL2AssetRouterFactory.connect(L2_ASSET_ROUTER_ADDRESS, this.deployWallet);
-    const l2NTV = IL2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, this.deployWallet);
+  public async setL2LegacySharedBridgeInL1Nullifier(inputChainId: string) {
     const l1Nullifier = L1NullifierDevFactory.connect(this.addresses.Bridges.L1NullifierProxy, this.deployWallet);
-    await this.deploySharedBridgeImplOnL2ThroughL1(inputChainId, gasPrice);
-    await this.deploySharedBridgeProxyOnL2ThroughL1(inputChainId, gasPrice);
+    const l1SharedBridge = this.defaultSharedBridge(this.deployWallet);
 
-    const receipt6 = await this.executeUpgradeOnL2(
-      inputChainId,
-      L2_ASSET_ROUTER_ADDRESS,
-      gasPrice,
-      l2AssetRouter.interface.encodeFunctionData("setL2LegacySharedBridge", [
-        this.addresses.Bridges.L2LegacySharedBridgeProxy,
-      ]),
-      priorityTxMaxGasLimit
-    );
-    if (this.verbose) {
-      console.log(`L2 legacy shared bridge set in L2 AR, gas used: ${receipt6.gasUsed.toString()}`);
-    }
-    const receipt7 = await this.executeUpgradeOnL2(
-      inputChainId,
-      L2_NATIVE_TOKEN_VAULT_ADDRESS,
-      gasPrice,
-      l2NTV.interface.encodeFunctionData("setL2LegacySharedBridge", [this.addresses.Bridges.L2LegacySharedBridgeProxy]),
-      priorityTxMaxGasLimit
-    );
-    if (this.verbose) {
-      console.log(`L2 legacy shared bridge set in l2 NTV, gas used: ${receipt7.gasUsed.toString()}`);
-    }
     if (isCurrentNetworkLocal()) {
-      const tx = await l1Nullifier.setL2LegacySharedBridge(
-        inputChainId,
-        this.addresses.Bridges.L2LegacySharedBridgeProxy
+      const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+
+      const l2SharedBridgeImplementationBytecode = L2_SHARED_BRIDGE_IMPLEMENTATION.bytecode;
+
+      const l2SharedBridgeImplAddress = computeL2Create2Address(
+        this.deployWallet.address,
+        l2SharedBridgeImplementationBytecode,
+        ethers.utils.defaultAbiCoder.encode(["uint256"], [eraChainId]),
+        ethers.constants.HashZero
       );
+
+      const l2GovernorAddress = applyL1ToL2Alias(this.addresses.Governance);
+
+      const l2SharedBridgeInterface = new Interface(L2_SHARED_BRIDGE_IMPLEMENTATION.abi);
+      const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
+        l1SharedBridge.address,
+        this.addresses.Bridges.ERC20BridgeProxy,
+        hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
+        l2GovernorAddress,
+      ]);
+
+      const l2SharedBridgeProxyConstructorData = ethers.utils.arrayify(
+        new ethers.utils.AbiCoder().encode(
+          ["address", "address", "bytes"],
+          [l2SharedBridgeImplAddress, l2GovernorAddress, proxyInitializationParams]
+        )
+      );
+
+      /// compute L2SharedBridgeProxy address
+      const l2SharedBridgeProxyAddress = computeL2Create2Address(
+        this.deployWallet.address,
+        L2_SHARED_BRIDGE_PROXY.bytecode,
+        l2SharedBridgeProxyConstructorData,
+        ethers.constants.HashZero
+      );
+
+      const tx = await l1Nullifier.setL2LegacySharedBridge(inputChainId, l2SharedBridgeProxyAddress);
       const receipt8 = await tx.wait();
       if (this.verbose) {
         console.log(`L2 legacy shared bridge set in L1 Nullifier, gas used: ${receipt8.gasUsed.toString()}`);
@@ -1524,11 +1535,19 @@ export class Deployer {
     }
   }
 
+  public async deployL2LegacySharedBridge(inputChainId: string, gasPrice: BigNumberish) {
+    if (this.verbose) {
+      console.log("Deploying L2 legacy shared bridge");
+    }
+    await this.deploySharedBridgeImplOnL2ThroughL1(inputChainId, gasPrice);
+    await this.deploySharedBridgeProxyOnL2ThroughL1(inputChainId, gasPrice);
+  }
+
   public async deploySharedBridgeImplOnL2ThroughL1(chainId: string, gasPrice: BigNumberish) {
     if (this.verbose) {
       console.log("Deploying L2SharedBridge Implementation");
     }
-    const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID;
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
 
     const l2SharedBridgeImplementationBytecode = L2_SHARED_BRIDGE_IMPLEMENTATION.bytecode;
     // localLegacyBridgeTesting

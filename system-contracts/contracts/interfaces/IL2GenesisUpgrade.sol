@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 struct AdditionalForceDeploymentsData {
     bytes32 baseTokenAssetId;
+    address l2LegacySharedBridge;
     address l2Weth;
 }
 

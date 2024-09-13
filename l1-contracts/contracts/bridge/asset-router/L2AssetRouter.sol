@@ -25,14 +25,14 @@ import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupp
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
+    /// @dev The address of the L2 legacy shared bridge.
+    address public immutable L2_LEGACY_SHARED_BRIDGE;
+
     /// @dev The asset id of the base token.
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
     /// @dev The address of the L1 asset router counterpart.
     address public override l1AssetRouter;
-
-    /// @dev The address of the L2 legacy shared bridge.
-    address public l2LegacySharedBridge;
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
@@ -60,7 +60,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
-        if (msg.sender != l2LegacySharedBridge) {
+        if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
             revert InvalidCaller(msg.sender);
         }
         _;
@@ -72,9 +72,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _l1ChainId,
         uint256 _eraChainId,
         address _l1AssetRouter,
+        address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) {
+        L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
@@ -83,12 +85,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
         _transferOwnership(_aliasedOwner);
-    }
-
-    /// @notice Sets the address of the legacy L2 shared bridge.
-    /// @param _legacySharedBridge The address of the legacy L2 shared bridge.
-    function setL2LegacySharedBridge(address _legacySharedBridge) external onlyOwner {
-        l2LegacySharedBridge = _legacySharedBridge;
     }
 
     /// @inheritdoc IL2AssetRouter
@@ -165,7 +161,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         });
 
         bytes memory message;
-        if (_alwaysNewMessageFormat || l2LegacySharedBridge == address(0)) {
+        if (_alwaysNewMessageFormat || L2_LEGACY_SHARED_BRIDGE == address(0)) {
             message = _getAssetRouterWithdrawMessage(_assetId, _l1bridgeMintData);
             // slither-disable-next-line unused-return
             L2ContractHelper.sendMessageToL1(message);
@@ -178,7 +174,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             }
             (uint256 amount, address l1Receiver) = abi.decode(_assetData, (uint256, address));
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
-            IL2SharedBridgeLegacy(l2LegacySharedBridge).sendMessageToL1(message);
+            IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
         }
 
         emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);

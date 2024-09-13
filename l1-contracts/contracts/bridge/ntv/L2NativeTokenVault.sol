@@ -31,7 +31,7 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSup
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    IL2SharedBridgeLegacy public l2LegacySharedBridge;
+    IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
@@ -40,6 +40,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
+    /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     /// @param _wethToken Address of WETH on deployed chain
@@ -47,11 +48,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         uint256 _l1ChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
+        address _legacySharedBridge,
         address _bridgedTokenBeacon,
         bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId) {
+        L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
+
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
         }
@@ -78,14 +82,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
-    /// @param _l2LegacySharedBridge The address of the L2 legacy shared bridge.
-    function setL2LegacySharedBridge(address _l2LegacySharedBridge) public onlyOwner {
-        l2LegacySharedBridge = IL2SharedBridgeLegacy(_l2LegacySharedBridge);
-    }
-
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
-        address l1TokenAddress = l2LegacySharedBridge.l1TokenAddress(_l2TokenAddress);
+        address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
         tokenAddress[assetId] = _l2TokenAddress;
         originChainId[assetId] = L1_CHAIN_ID;
@@ -105,8 +104,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     ) internal override returns (address expectedToken) {
         expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
         address l1LegacyToken;
-        if (address(l2LegacySharedBridge) != address(0)) {
-            l1LegacyToken = l2LegacySharedBridge.l1TokenAddress(expectedToken);
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+            l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
         }
 
         if (l1LegacyToken != address(0)) {
@@ -132,7 +131,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
-        if (address(l2LegacySharedBridge) == address(0)) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
             // Deploy the beacon proxy for the L2 token
 
             (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
@@ -152,7 +151,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             proxy = BeaconProxy(abi.decode(returndata, (address)));
         } else {
             // Deploy the beacon proxy for the L2 token
-            address l2TokenAddr = l2LegacySharedBridge.deployBeaconProxy(_salt);
+            address l2TokenAddr = L2_LEGACY_SHARED_BRIDGE.deployBeaconProxy(_salt);
             proxy = BeaconProxy(payable(l2TokenAddr));
         }
     }
@@ -179,8 +178,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
-        if (address(l2LegacySharedBridge) != address(0)) {
-            return l2LegacySharedBridge.l2TokenAddress(_l1Token);
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
         } else {
             return
                 L2ContractHelper.computeCreate2Address(
