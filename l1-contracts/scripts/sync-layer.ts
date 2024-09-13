@@ -16,10 +16,13 @@ import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   priorityTxMaxGasLimit,
   L2_BRIDGEHUB_ADDRESS,
+  computeL2Create2Address,
+  DIAMOND_CUT_DATA_ABI_STRING,
 } from "../src.ts/utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
+import { IDiamondInitFactory } from "../typechain/IDiamondInitFactory";
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 import { BOOTLOADER_FORMAL_ADDRESS } from "zksync-ethers/build/utils";
 
@@ -29,6 +32,80 @@ async function main() {
   const program = new Command();
 
   program.version("0.1.0").name("deploy").description("deploy L1 contracts");
+
+  program
+    .command("compute-migrated-chain-address")
+    .requiredOption("--chain-id <chain-id>")
+    .option("--private-key <private-key>")
+    .action(async (cmd) => {
+      if (process.env.CONTRACTS_BASE_NETWORK_ZKSYNC !== "true") {
+        throw new Error("This script is only for zkSync network");
+      }
+
+      const provider = new ZkProvider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
+      const ethProvider = new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL);
+      const deployWallet = cmd.privateKey
+        ? new ZkWallet(cmd.privateKey, provider)
+        : (ZkWallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(provider) as ethers.Wallet | ZkWallet);
+
+      const deployer = new Deployer({
+        deployWallet,
+        addresses: deployedAddressesFromEnv(),
+        verbose: true,
+      });
+
+      deployer.addresses.StateTransition.AdminFacet = getAddressFromEnv("GATEWAY_ADMIN_FACET_ADDR");
+      deployer.addresses.StateTransition.MailboxFacet = getAddressFromEnv("GATEWAY_MAILBOX_FACET_ADDR");
+      deployer.addresses.StateTransition.ExecutorFacet = getAddressFromEnv("GATEWAY_EXECUTOR_FACET_ADDR");
+      deployer.addresses.StateTransition.GettersFacet = getAddressFromEnv("GATEWAY_GETTERS_FACET_ADDR");
+      deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("GATEWAY_DIAMOND_INIT_ADDR");
+      deployer.addresses.StateTransition.Verifier = getAddressFromEnv("GATEWAY_VERIFIER_ADDR");
+      deployer.addresses.BlobVersionedHashRetriever = getAddressFromEnv("GATEWAY_BLOB_VERSIONED_HASH_RETRIEVER_ADDR");
+      deployer.addresses.ValidatorTimeLock = getAddressFromEnv("GATEWAY_VALIDATOR_TIMELOCK_ADDR");
+      deployer.addresses.Bridges.SharedBridgeProxy = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
+      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv(
+        "GATEWAY_STATE_TRANSITION_PROXY_ADDR"
+      );
+
+      const stm = deployer.stateTransitionManagerContract(provider);
+      const bridgehub = deployer.bridgehubContract(ethProvider);
+      const diamondInit = IDiamondInitFactory.connect(deployer.addresses.StateTransition.DiamondInit, provider);
+      const bytes32 = (x: ethers.BigNumberish) => ethers.utils.hexZeroPad(ethers.utils.hexlify(x), 32);
+
+      const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([], true);
+      const mandatoryInitData = [
+        diamondInit.interface.getSighash("initialize"),
+        bytes32(parseInt(cmd.chainId)),
+        bytes32(getAddressFromEnv("GATEWAY_BRIDGEHUB_PROXY_ADDR")),
+        bytes32(deployer.addresses.StateTransition.StateTransitionProxy),
+        bytes32(await stm.protocolVersion()),
+        bytes32(deployer.deployWallet.address),
+        bytes32(deployer.addresses.ValidatorTimeLock),
+        await bridgehub.baseTokenAssetId(cmd.chainId),
+        bytes32(deployer.addresses.Bridges.SharedBridgeProxy),
+        await stm.storedBatchZero(),
+      ];
+
+      diamondCut.initCalldata = ethers.utils.hexConcat([...mandatoryInitData, diamondCut.initCalldata]);
+      const bytecode = hardhat.artifacts.readArtifactSync("DiamondProxy").bytecode;
+      const gatewayChainId = (await provider.getNetwork()).chainId;
+      const constructorData = new ethers.utils.AbiCoder().encode(
+        ["uint256", DIAMOND_CUT_DATA_ABI_STRING],
+        [gatewayChainId, diamondCut]
+      );
+
+      const address = computeL2Create2Address(
+        deployer.addresses.StateTransition.StateTransitionProxy,
+        bytecode,
+        constructorData,
+        ethers.constants.HashZero
+      );
+
+      console.log(address);
+    });
 
   program
     .command("deploy-sync-layer-contracts")
@@ -62,7 +139,7 @@ async function main() {
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
       const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
