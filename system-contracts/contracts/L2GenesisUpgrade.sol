@@ -23,30 +23,30 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         ForceDeployment[] memory forceDeployments = abi.decode(_forceDeploymentsData, (ForceDeployment[]));
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(forceDeployments);
 
-        // // It is expected that either via to the force deployments above
-        // // or upon init both the L2 deployment of Bridgehub, AssetRouter and MessageRoot are deployed.
-        // // (The comment does not mention the exact order in case it changes)
-        // // However, there is still some follow up finalization that needs to be done.
+        // It is expected that either via to the force deployments above
+        // or upon init both the L2 deployment of Bridgehub, AssetRouter and MessageRoot are deployed.
+        // (The comment does not mention the exact order in case it changes)
+        // However, there is still some follow up finalization that needs to be done.
 
-        // address bridgehubOwner = L2_BRIDDGE_HUB.owner();
+        address bridgehubOwner = L2_BRIDDGE_HUB.owner();
 
-        // bytes memory data = abi.encodeCall(
-        //     L2_BRIDDGE_HUB.setAddresses,
-        //     (L2_ASSET_ROUTER, _stmDeployer, address(L2_MESSAGE_ROOT))
-        // );
+        bytes memory data = abi.encodeCall(
+            L2_BRIDDGE_HUB.setAddresses,
+            (L2_ASSET_ROUTER, _stmDeployer, address(L2_MESSAGE_ROOT))
+        );
 
-        // (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
-        //     address(L2_BRIDDGE_HUB),
-        //     bridgehubOwner,
-        //     data
-        // );
-        // if (!success) {
-        //     // Progapatate revert reason
-        //     assembly {
-        //         revert(add(returnData, 0x20), returndatasize())
-        //     }
-        // }
+        (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
+            address(L2_BRIDDGE_HUB),
+            bridgehubOwner,
+            data
+        );
+        if (!success) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData, 0x20), returndatasize())
+            }
+        }
 
-        // emit UpgradeComplete(_chainId);
+        emit UpgradeComplete(_chainId);
     }
 }
