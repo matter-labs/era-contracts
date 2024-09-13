@@ -70,17 +70,17 @@ describe("L2GenesisUpgrade tests", function () {
       returnData: "0x",
     });
 
-    let msgRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
-    let messageRootBytecodeHash = zksync.utils.hashBytecode(msgRootBytecode);
+    const msgRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
+    const messageRootBytecodeHash = zksync.utils.hashBytecode(msgRootBytecode);
 
-    let ntvBytecode = (await loadArtifact("DummyL2NativeTokenVault")).bytecode;
-    let ntvBytecodeHash = zksync.utils.hashBytecode(ntvBytecode);
+    const ntvBytecode = (await loadArtifact("DummyL2NativeTokenVault")).bytecode;
+    const ntvBytecodeHash = zksync.utils.hashBytecode(ntvBytecode);
 
-    let l2AssetRouterBytecode = (await loadArtifact("DummyL2AssetRouter")).bytecode;
-    let l2AssetRouterBytecodeHash = zksync.utils.hashBytecode(l2AssetRouterBytecode);
+    const l2AssetRouterBytecode = (await loadArtifact("DummyL2AssetRouter")).bytecode;
+    const l2AssetRouterBytecodeHash = zksync.utils.hashBytecode(l2AssetRouterBytecode);
 
-    let bridgehubBytecode = (await loadArtifact("DummyBridgehub")).bytecode;
-    let bridgehubBytecodeHash = zksync.utils.hashBytecode(bridgehubBytecode);
+    const bridgehubBytecode = (await loadArtifact("DummyBridgehub")).bytecode;
+    const bridgehubBytecodeHash = zksync.utils.hashBytecode(bridgehubBytecode);
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
