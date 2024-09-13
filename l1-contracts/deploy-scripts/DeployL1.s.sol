@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-// solhint-disable no-console
+// solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -983,6 +983,7 @@ contract DeployL1Script is Script {
             newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
             callConstructor: true,
             value: 0,
+        // solhint-disable-next-line func-named-parameters
             input: abi.encode(
                 config.l1ChainId,
                 AddressAliasHelper.applyL1ToL2Alias(addresses.governance),

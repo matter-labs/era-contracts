@@ -4,9 +4,6 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils, L2ContractsBytecodes} from "./Utils.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-// import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
