@@ -119,7 +119,7 @@ export async function registerHyperchain(
   }
   await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
   await deployer.registerHyperchain(
-    encodeNTVAssetId(deployer.l1ChainId, ethers.utils.hexZeroPad(baseTokenAddress, 32)),
+    baseTokenAssetId,
     validiumMode,
     extraFacets,
     gasPrice,
