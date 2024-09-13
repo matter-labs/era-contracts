@@ -141,7 +141,7 @@ contract DeployL2Script is Script {
         );
 
         contracts.multicall3Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/argificats-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
+            "/../l2-contracts/artifacts-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
         );
 
         contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
@@ -274,7 +274,7 @@ contract DeployL2Script is Script {
         bytes memory constructorData = "";
 
         config.multicall3 = Utils.deployThroughL1({
-            bytecode: contracts.multicall3,
+            bytecode: contracts.multicall3Bytecode,
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
