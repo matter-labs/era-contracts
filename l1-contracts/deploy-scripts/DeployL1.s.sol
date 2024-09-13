@@ -781,7 +781,6 @@ contract DeployL1Script is Script {
         bridgehub.transferOwnership(addresses.governance);
         bridgehub.setPendingAdmin(addresses.chainAdmin);
 
-
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
         // sharedBridge.setPendingAdmin(addresses.chainAdmin);
@@ -983,7 +982,7 @@ contract DeployL1Script is Script {
             newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
             callConstructor: true,
             value: 0,
-        // solhint-disable-next-line func-named-parameters
+            // solhint-disable-next-line func-named-parameters
             input: abi.encode(
                 config.l1ChainId,
                 AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
