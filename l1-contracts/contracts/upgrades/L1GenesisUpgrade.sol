@@ -8,7 +8,7 @@ import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgradeGenesis} from "./BaseZkSyncUpgradeGenesis.sol";
 import {ProposedUpgrade} from "./IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {IL2GenesisUpgrade, AdditionalForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IL2GenesisUpgrade, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -23,15 +23,6 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
-    /// @dev The maximum number of ZK chains.
-    uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
-
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
-        MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
-    }
-
     /// @notice The main function that will be called by the upgrade proxy.
     function genesisUpgrade(
         address _l1GenesisUpgrade,
@@ -46,7 +37,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         {
             bytes memory complexUpgraderCalldata;
             {
-                bytes memory additionalForceDeploymentsData = _getAdditionalForceDeploymentsData();
+                bytes memory additionalForceDeploymentsData = _getZKChainSpecificForceDeploymentsData();
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
                     (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
@@ -114,14 +105,15 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
-    function _getAdditionalForceDeploymentsData() internal view returns (bytes memory) {
+    function _getZKChainSpecificForceDeploymentsData() internal view returns (bytes memory) {
         IL1Nullifier l1Nullifier = IL1AssetRouter(s.baseTokenBridge).L1_NULLIFIER();
         address legacySharedBridge = l1Nullifier.l2BridgeAddress(s.chainId);
-        AdditionalForceDeploymentsData memory additionalForceDeploymentsData = AdditionalForceDeploymentsData({
-            baseTokenAssetId: s.baseTokenAssetId,
-            l2LegacySharedBridge: legacySharedBridge,
-            l2Weth: address(0) // kl todo
-        });
+        ZKChainSpecificForceDeploymentsData
+            memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
+                baseTokenAssetId: s.baseTokenAssetId,
+                l2LegacySharedBridge: legacySharedBridge,
+                l2Weth: address(0) // kl todo
+            });
         return abi.encode(additionalForceDeploymentsData);
     }
 }

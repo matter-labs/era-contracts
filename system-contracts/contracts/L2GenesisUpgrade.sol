@@ -6,7 +6,7 @@ import {DEPLOYER_SYSTEM_CONTRACT, SYSTEM_CONTEXT_CONTRACT, L2_BRIDGE_HUB, L2_ASS
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
-import {IL2GenesisUpgrade, FixedForceDeploymentsData, AdditionalForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
+import {IL2GenesisUpgrade, FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -62,9 +62,9 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             _fixedForceDeploymentsData,
             (FixedForceDeploymentsData)
         );
-        AdditionalForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
             _additionalForceDeploymentsData,
-            (AdditionalForceDeploymentsData)
+            (ZKChainSpecificForceDeploymentsData)
         );
 
         forceDeployments = new ForceDeployment[](4);

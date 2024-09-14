@@ -1131,13 +1131,7 @@ export class Deployer {
   }
 
   public async deployGenesisUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const maxNumberOfZKChains = getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_ZK_CHAINS");
-    const contractAddress = await this.deployViaCreate2(
-      "L1GenesisUpgrade",
-      [maxNumberOfZKChains],
-      create2Salt,
-      ethTxOptions
-    );
+    const contractAddress = await this.deployViaCreate2("L1GenesisUpgrade", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_GENESIS_UPGRADE_ADDR=${contractAddress}`);

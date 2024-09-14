@@ -15,7 +15,7 @@ struct ForceDeployment {
     bytes input;
 }
 
-struct AdditionalForceDeploymentsData {
+struct ZKChainSpecificForceDeploymentsData {
     bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;
     address l2Weth;
