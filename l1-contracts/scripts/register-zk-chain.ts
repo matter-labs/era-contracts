@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
-import { ADDRESS_ONE, encodeNTVAssetId } from "../src.ts/utils";
+import { ADDRESS_ONE, encodeNTVAssetId, isCurrentNetworkLocal } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const ETH_TOKEN_ADDRESS = ADDRESS_ONE;
@@ -115,7 +115,7 @@ async function main() {
         null,
         null,
         cmd.useGovernance,
-        true
+        isCurrentNetworkLocal() || cmd.localLegacyBridgeTesting
       );
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
