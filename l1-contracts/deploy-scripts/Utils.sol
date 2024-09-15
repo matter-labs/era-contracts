@@ -52,7 +52,6 @@ struct DAContractBytecodes {
     bytes validiumL1DAValidator;
 }
 
-
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
     address stateTransitionProxy;
@@ -65,7 +64,6 @@ struct StateTransitionDeployedAddresses {
     address diamondInit;
     address genesisUpgrade;
     address defaultUpgrade;
-
     // TODO: delete the last field it is never really used
     address diamondProxy;
 }
@@ -135,13 +133,7 @@ library Utils {
 
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
         // FIXME: use forge to read the bytecode
-        string memory path = string.concat(
-            "../l1-contracts/artifacts/",
-            facetName,
-            ".sol/",
-            facetName,
-            "Facet.json"
-        );
+        string memory path = string.concat("../l1-contracts/artifacts/", facetName, ".sol/", facetName, "Facet.json");
         bytes memory bytecode = readHardhatBytecode(path);
         return getAllSelectors(bytecode);
     }
@@ -311,12 +303,9 @@ library Utils {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
         uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
-        requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
-            chainId,
-            gasPrice,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        ) * 2;
+        requiredValueToDeploy =
+            bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            2;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
@@ -331,7 +320,6 @@ library Utils {
         });
     }
 
-
     function prepareL1L2TransactionTwoBridges(
         uint256 l2GasLimit,
         uint256 chainId,
@@ -339,30 +327,29 @@ library Utils {
         address secondBridgeAddress,
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
-    ) internal returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy) {
+    )
+        internal
+        returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
+    {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
         uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
-        requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
-            chainId,
-            gasPrice,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        ) * 2;
+        requiredValueToDeploy =
+            bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            2;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
             mintValue: requiredValueToDeploy,
             l2Value: 0,
             l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA, 
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             refundRecipient: msg.sender,
             secondBridgeAddress: secondBridgeAddress,
             secondBridgeValue: secondBridgeValue,
             secondBridgeCalldata: secondBridgeCalldata
         });
     }
-
 
     /**
      * @dev Run the l2 l1 transaction
@@ -377,15 +364,18 @@ library Utils {
         address l1SharedBridgeProxy
     ) internal {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
-        (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Transaction(
-            l2Calldata,
-            l2GasLimit,
-            factoryDeps,
-            dstAddress,
-            chainId,
-            bridgehubAddress,
-            l1SharedBridgeProxy
-        );
+        (
+            L2TransactionRequestDirect memory l2TransactionRequestDirect,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2Transaction(
+                l2Calldata,
+                l2GasLimit,
+                factoryDeps,
+                dstAddress,
+                chainId,
+                bridgehubAddress,
+                l1SharedBridgeProxy
+            );
 
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
@@ -411,19 +401,29 @@ library Utils {
         address l1SharedBridgeProxy
     ) internal returns (bytes32 txHash) {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
-        (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Transaction(
-            l2Calldata,
-            l2GasLimit,
-            factoryDeps,
-            dstAddress,
-            chainId,
-            bridgehubAddress,
-            l1SharedBridgeProxy
-        );
+        (
+            L2TransactionRequestDirect memory l2TransactionRequestDirect,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2Transaction(
+                l2Calldata,
+                l2GasLimit,
+                factoryDeps,
+                dstAddress,
+                chainId,
+                bridgehubAddress,
+                l1SharedBridgeProxy
+            );
 
         IGovernance governance = IGovernance(governor);
 
-        requiredValueToDeploy = approveBaseTokenGovernance(bridgehub, l1SharedBridgeProxy, governor, salt, chainId, requiredValueToDeploy);
+        requiredValueToDeploy = approveBaseTokenGovernance(
+            bridgehub,
+            l1SharedBridgeProxy,
+            governor,
+            salt,
+            chainId,
+            requiredValueToDeploy
+        );
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
             bridgehub.requestL2TransactionDirect,
@@ -456,24 +456,34 @@ library Utils {
         bytes memory secondBridgeCalldata
     ) internal returns (bytes32 txHash) {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
-        (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy) = prepareL1L2TransactionTwoBridges(
-            l2GasLimit,
-            chainId,
-            bridgehubAddress,
-            secondBridgeAddress,
-            secondBridgeValue,
-            secondBridgeCalldata
-        );
+        (
+            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2TransactionTwoBridges(
+                l2GasLimit,
+                chainId,
+                bridgehubAddress,
+                secondBridgeAddress,
+                secondBridgeValue,
+                secondBridgeCalldata
+            );
 
         IGovernance governance = IGovernance(governor);
 
-        requiredValueToDeploy = approveBaseTokenGovernance(bridgehub, l1SharedBridgeProxy, governor, salt, chainId, requiredValueToDeploy);
+        requiredValueToDeploy = approveBaseTokenGovernance(
+            bridgehub,
+            l1SharedBridgeProxy,
+            governor,
+            salt,
+            chainId,
+            requiredValueToDeploy
+        );
 
         bytes memory l2TransactionRequesCalldata = abi.encodeCall(
             bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
-        
+
         console.log("Executing transaction");
         vm.recordLogs();
         executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequesCalldata, requiredValueToDeploy, 0);
@@ -485,13 +495,12 @@ library Utils {
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
-        console.logBytes32(txHash);    
+        console.logBytes32(txHash);
     }
-
 
     function approveBaseTokenGovernance(
         Bridgehub bridgehub,
-        address l1SharedBridgeProxy, 
+        address l1SharedBridgeProxy,
         address governor,
         bytes32 salt,
         uint256 chainId,
@@ -502,10 +511,7 @@ library Utils {
             console.log("Base token not ETH, approving");
             IERC20 baseToken = IERC20(baseTokenAddress);
 
-            bytes memory approvalCalldata = abi.encodeCall(
-                baseToken.approve,
-                (l1SharedBridgeProxy, amountToApprove)
-            );
+            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
 
             executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
 
@@ -537,10 +543,9 @@ library Utils {
             }
         }
 
-        if(txHash == bytes32(0)) {
+        if (txHash == bytes32(0)) {
             revert("No priority op found");
         }
-
     }
 
     /**
@@ -669,7 +674,6 @@ library Utils {
             diamondInit: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/DiamondInit.sol/DiamondInit.json"
             )
-
         });
     }
 

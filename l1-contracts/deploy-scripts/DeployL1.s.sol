@@ -86,7 +86,6 @@ contract DeployL1Script is Script {
         address messageRootProxy;
     }
 
-
     // solhint-disable-next-line gas-struct-packing
     struct BridgesDeployedAddresses {
         address erc20BridgeImplementation;

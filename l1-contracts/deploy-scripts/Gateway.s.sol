@@ -38,9 +38,7 @@ contract GatewayScript is Script {
         address nativeTokenVault;
         address stateTransitionProxy;
         address sharedBridgeProxy;
-
         uint256 chainChainId;
-        
         bytes diamondCutData;
         bytes forceDeployments;
         address governance;
@@ -67,7 +65,6 @@ contract GatewayScript is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-hyperchain.toml");
         string memory toml = vm.readFile(path);
-
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
