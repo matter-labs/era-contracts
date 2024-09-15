@@ -4,9 +4,10 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {Vm} from "forge-std/Vm.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -35,11 +36,38 @@ struct L2ContractsBytecodes {
     bytes forceDeployUpgrader;
     bytes rollupL2DAValidator;
     bytes validiumL2DAValidator;
+    bytes stateTransitionManager;
+    bytes adminFacet;
+    bytes mailboxFacet;
+    bytes executorFacet;
+    bytes gettersFacet;
+    bytes diamondInit;
+    bytes verifier;
+    bytes testnetVerifier;
+    bytes validatorTimelock;
 }
 
 struct DAContractBytecodes {
     bytes rollupL1DAValidator;
     bytes validiumL1DAValidator;
+}
+
+
+// solhint-disable-next-line gas-struct-packing
+struct StateTransitionDeployedAddresses {
+    address stateTransitionProxy;
+    address stateTransitionImplementation;
+    address verifier;
+    address adminFacet;
+    address mailboxFacet;
+    address executorFacet;
+    address gettersFacet;
+    address diamondInit;
+    address genesisUpgrade;
+    address defaultUpgrade;
+
+    // TODO: delete the last field it is never really used
+    address diamondProxy;
 }
 
 library Utils {
@@ -103,6 +131,19 @@ library Utils {
         }
 
         return selectors;
+    }
+
+    function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
+        // FIXME: use forge to read the bytecode
+        string memory path = string.concat(
+            "../l1-contracts/artifacts/",
+            facetName,
+            ".sol/",
+            facetName,
+            "Facet.json"
+        );
+        bytes memory bytecode = readHardhatBytecode(path);
+        return getAllSelectors(bytecode);
     }
 
     /**
@@ -258,6 +299,71 @@ library Utils {
         return contractAddress;
     }
 
+    function prepareL1L2Transaction(
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
+
+        requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
+            chainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        ) * 2;
+
+        l2TransactionRequestDirect = L2TransactionRequestDirect({
+            chainId: chainId,
+            mintValue: requiredValueToDeploy,
+            l2Contract: dstAddress,
+            l2Value: 0,
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: factoryDeps,
+            refundRecipient: msg.sender
+        });
+    }
+
+
+    function prepareL1L2TransactionTwoBridges(
+        uint256 l2GasLimit,
+        uint256 chainId,
+        address bridgehubAddress,
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) internal returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy) {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
+
+        requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
+            chainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        ) * 2;
+
+        l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
+            chainId: chainId,
+            mintValue: requiredValueToDeploy,
+            l2Value: 0,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA, 
+            refundRecipient: msg.sender,
+            secondBridgeAddress: secondBridgeAddress,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata
+        });
+    }
+
+
     /**
      * @dev Run the l2 l1 transaction
      */
@@ -271,26 +377,15 @@ library Utils {
         address l1SharedBridgeProxy
     ) internal {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
-        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
-
-        uint256 requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
-            chainId,
-            gasPrice,
+        (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Transaction(
+            l2Calldata,
             l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        ) * 2;
-
-        L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
-            chainId: chainId,
-            mintValue: requiredValueToDeploy,
-            l2Contract: dstAddress,
-            l2Value: 0,
-            l2Calldata: l2Calldata,
-            l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps: factoryDeps,
-            refundRecipient: msg.sender
-        });
+            factoryDeps,
+            dstAddress,
+            chainId,
+            bridgehubAddress,
+            l1SharedBridgeProxy
+        );
 
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
@@ -302,6 +397,150 @@ library Utils {
 
         vm.broadcast();
         bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+    }
+
+    function runGovernanceL1L2DirectTransaction(
+        address governor,
+        bytes32 salt,
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (bytes32 txHash) {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Transaction(
+            l2Calldata,
+            l2GasLimit,
+            factoryDeps,
+            dstAddress,
+            chainId,
+            bridgehubAddress,
+            l1SharedBridgeProxy
+        );
+
+        IGovernance governance = IGovernance(governor);
+
+        requiredValueToDeploy = approveBaseTokenGovernance(bridgehub, l1SharedBridgeProxy, governor, salt, chainId, requiredValueToDeploy);
+
+        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
+            bridgehub.requestL2TransactionDirect,
+            (l2TransactionRequestDirect)
+        );
+
+        console.log("Executing transaction");
+        vm.recordLogs();
+        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = bridgehub.getHyperchain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
+    }
+
+    function runGovernanceL1L2TwoBridgesTransaction(
+        address governor,
+        bytes32 salt,
+        uint256 l2GasLimit,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy,
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) internal returns (bytes32 txHash) {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy) = prepareL1L2TransactionTwoBridges(
+            l2GasLimit,
+            chainId,
+            bridgehubAddress,
+            secondBridgeAddress,
+            secondBridgeValue,
+            secondBridgeCalldata
+        );
+
+        IGovernance governance = IGovernance(governor);
+
+        requiredValueToDeploy = approveBaseTokenGovernance(bridgehub, l1SharedBridgeProxy, governor, salt, chainId, requiredValueToDeploy);
+
+        bytes memory l2TransactionRequesCalldata = abi.encodeCall(
+            bridgehub.requestL2TransactionTwoBridges,
+            (l2TransactionRequest)
+        );
+        
+        console.log("Executing transaction");
+        vm.recordLogs();
+        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequesCalldata, requiredValueToDeploy, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = bridgehub.getHyperchain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);    
+    }
+
+
+    function approveBaseTokenGovernance(
+        Bridgehub bridgehub,
+        address l1SharedBridgeProxy, 
+        address governor,
+        bytes32 salt,
+        uint256 chainId,
+        uint256 amountToApprove
+    ) internal returns (uint256 ethAmountToPass) {
+        address baseTokenAddress = bridgehub.baseToken(chainId);
+        if (ADDRESS_ONE != baseTokenAddress) {
+            console.log("Base token not ETH, approving");
+            IERC20 baseToken = IERC20(baseTokenAddress);
+
+            bytes memory approvalCalldata = abi.encodeCall(
+                baseToken.approve,
+                (l1SharedBridgeProxy, amountToApprove)
+            );
+
+            executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
+
+            ethAmountToPass = 0;
+        } else {
+            console.log("Base token is ETH, no need to approve");
+            ethAmountToPass = amountToApprove;
+        }
+    }
+
+    function extractPriorityOpFromLogs(
+        address expectedDiamondProxyAddress,
+        Vm.Log[] memory logs
+    ) internal pure returns (bytes32 txHash) {
+        // FIXME: maybe make it less magial
+        bytes32 topic0 = bytes32(uint256(0x4531cd5795773d7101c17bdeb9f5ab7f47d7056017506f937083be5d6e77a38));
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter == expectedDiamondProxyAddress && logs[i].topics[0] == topic0) {
+                if (txHash != bytes32(0)) {
+                    revert("Multiple priority ops");
+                }
+
+                bytes memory data = logs[i].data;
+                assembly {
+                    // Skip length + tx id
+                    txHash := mload(add(data, 0x40))
+                }
+            }
+        }
+
+        if(txHash == bytes32(0)) {
+            revert("No priority op found");
+        }
+
     }
 
     /**
@@ -402,7 +641,35 @@ library Utils {
             ),
             validiumL2DAValidator: readHardhatBytecode(
                 "/../l2-contracts/artifacts-zk/contracts/data-availability/ValidiumL2DAValidator.sol/ValidiumL2DAValidator.json"
+            ),
+            stateTransitionManager: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/StateTransitionManager.sol/StateTransitionManager.json"
+            ),
+            adminFacet: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Admin.sol/Admin.json"
+            ),
+            mailboxFacet: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Mailbox.sol/Mailbox.json"
+            ),
+            executorFacet: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Executor.sol/Executor.json"
+            ),
+            gettersFacet: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Getters.sol/Getters.json"
+            ),
+            verifier: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/Verifier.sol/Verifier.json"
+            ),
+            testnetVerifier: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/TestnetVerifier.sol/TestnetVerifier.json"
+            ),
+            validatorTimelock: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/ValidatorTimelock.sol/ValidatorTimelock.json"
+            ),
+            diamondInit: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/DiamondInit.sol/DiamondInit.json"
             )
+
         });
     }
 

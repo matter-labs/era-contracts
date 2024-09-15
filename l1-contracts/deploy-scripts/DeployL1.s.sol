@@ -7,7 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Utils, DAContractBytecodes, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, DAContractBytecodes, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
@@ -86,20 +86,6 @@ contract DeployL1Script is Script {
         address messageRootProxy;
     }
 
-    // solhint-disable-next-line gas-struct-packing
-    struct StateTransitionDeployedAddresses {
-        address stateTransitionProxy;
-        address stateTransitionImplementation;
-        address verifier;
-        address adminFacet;
-        address mailboxFacet;
-        address executorFacet;
-        address gettersFacet;
-        address diamondInit;
-        address genesisUpgrade;
-        address defaultUpgrade;
-        address diamondProxy;
-    }
 
     // solhint-disable-next-line gas-struct-packing
     struct BridgesDeployedAddresses {
