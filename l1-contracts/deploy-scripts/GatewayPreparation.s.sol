@@ -16,6 +16,8 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {StateTransitionDeployedAddresses, Utils, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
@@ -198,6 +200,13 @@ contract GatewayPreparation is Script {
 
         bytes32 chainAssetId = IBridgehub(config.bridgehub).stmAssetIdFromChainId(chainId);
 
+        uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
+        if (currentSettlementLayer == config.chainChainId) {
+            console.log("Chain already whitelisted as settlement layer");
+            saveOutput(bytes32(0));
+            return;
+        }
+
         bytes memory bridgehubData = abi.encode(BridgehubBurnSTMAssetData({
             chainId: chainId,
             stmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
@@ -220,6 +229,81 @@ contract GatewayPreparation is Script {
 
         saveOutput(l2TxHash);
     }
+
+    // TODO: maybe move into a separate script
+    /// @dev Calling this function requires private key to the admin of the chain
+    function setDAValidatorPair(
+        address chainAdmin,
+        uint256 chainId,
+        address l1DAValidator,
+        address l2DAValidator,
+        address chainDiamondProxyOnGateway
+    ) public {
+        initializeConfig();
+
+        bytes memory data = abi.encodeCall(IAdmin.setDAValidatorPair, (l1DAValidator, l2DAValidator));
+
+        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+            chainAdmin,
+            data,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            chainDiamondProxyOnGateway,
+            config.chainChainId,
+            config.bridgehub,
+            config.sharedBridgeProxy
+        );
+
+        saveOutput(l2TxHash);
+    }
+
+    function enableValidator(
+        address chainAdmin,
+        uint256 chainId,
+        address validatorAddress,
+        address gatewayValidatorTimelock
+    ) public {
+        initializeConfig();
+
+        bytes memory data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
+
+        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+            chainAdmin,
+            data,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            gatewayValidatorTimelock,
+            config.chainChainId,
+            config.bridgehub,
+            config.sharedBridgeProxy
+        );
+
+        saveOutput(l2TxHash);
+    }
+    
+
+    /// FIXME: make that function support non-ETH based chains   
+    function supplyGatewayWallet(
+        address addr,
+        uint256 amount
+    ) public {
+        initializeConfig();
+
+        // TODO: maybe provide hash here too
+        Utils.runL1L2Transaction(
+            hex"",
+            Utils.MAX_PRIORITY_TX_GAS,
+            amount,
+            new bytes[](0),
+            addr,
+            config.chainChainId,
+            config.bridgehub,
+            config.sharedBridgeProxy
+        );
+
+        saveOutput(bytes32(0));
+    }
+
 
     // /// @dev The sender may not have any privileges
     // function deployGatewayContracts() public {

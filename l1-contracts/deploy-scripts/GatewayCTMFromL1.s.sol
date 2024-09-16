@@ -87,6 +87,9 @@ contract GatewaySTM is Script {
         StateTransitionDeployedAddresses gatewayStateTransition;
         address multicall3;
         bytes diamondCutData;
+        address relayedSLDAValidator;
+        // FIXME: for now zero, since the contract structure is not adapted to it
+        address validiumDAValidator;
     }
 
     struct GatewayFacets {
@@ -179,6 +182,7 @@ contract GatewaySTM is Script {
         vm.serializeAddress("gateway_state_transition", "diamond_init_addr", output.gatewayStateTransition.diamondInit);
         vm.serializeAddress("gateway_state_transition", "genesis_upgrade_addr", output.gatewayStateTransition.genesisUpgrade);
         vm.serializeAddress("gateway_state_transition", "default_upgrade_addr", output.gatewayStateTransition.defaultUpgrade);
+        vm.serializeAddress("gateway_state_transition", "validator_timelock_addr", output.gatewayStateTransition.validatorTimelock);
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",
@@ -186,6 +190,9 @@ contract GatewaySTM is Script {
         );
         vm.serializeString("root", "gateway_state_transition", gatewayStateTransition);
         vm.serializeAddress("root", "multicall3_addr", output.multicall3);
+        vm.serializeAddress("root", "relayed_sl_da_validator", output.relayedSLDAValidator);
+        vm.serializeAddress("root", "validium_da_validator", output.validiumDAValidator);
+
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-gateway-ctm.toml");
         vm.writeToml(toml, path);
@@ -210,6 +217,8 @@ contract GatewaySTM is Script {
 
         deployGatewayStateTransitionManager(bytecodes);
         setStateTransitionManagerInValidatorTimelock();
+
+        output.relayedSLDAValidator = _deployInternal(bytecodes.relayedSLDAValidator, hex"");
     }
 
     function _deployInternal(bytes memory bytecode, bytes memory constructorargs) internal returns (address) {
@@ -375,6 +384,7 @@ contract GatewaySTM is Script {
         Utils.runL1L2Transaction({
             l2Calldata: data, 
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            l2Value: 0,
             factoryDeps: new bytes[](0), 
             dstAddress: output.gatewayStateTransition.validatorTimelock, 
             chainId: config.chainChainId, 
@@ -384,5 +394,4 @@ contract GatewaySTM is Script {
 
         console.log("StateTransitionManager set in ValidatorTimelock");
     }
-
 }

@@ -50,6 +50,7 @@ struct L2ContractsBytecodes {
     bytes l1Genesis;
     bytes defaultUpgrade;
     bytes multicall3;
+    bytes relayedSLDAValidator;
 }
 
 struct DAContractBytecodes {
@@ -288,6 +289,7 @@ library Utils {
         runL1L2Transaction({
             l2Calldata: deployData,
             l2GasLimit: l2GasLimit,
+            l2Value: 0,
             factoryDeps: _factoryDeps,
             dstAddress: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             chainId: chainId,
@@ -300,6 +302,7 @@ library Utils {
     function prepareL1L2Transaction(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
+        uint256 l2Value,
         bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
@@ -311,13 +314,13 @@ library Utils {
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
-            2;
+            2 + l2Value;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
             mintValue: requiredValueToDeploy,
             l2Contract: dstAddress,
-            l2Value: 0,
+            l2Value: l2Value,
             l2Calldata: l2Calldata,
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -363,6 +366,7 @@ library Utils {
     function runL1L2Transaction(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
+        uint256 l2Value,
         bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
@@ -376,6 +380,7 @@ library Utils {
         ) = prepareL1L2Transaction(
                 l2Calldata,
                 l2GasLimit,
+                l2Value,
                 factoryDeps,
                 dstAddress,
                 chainId,
@@ -412,6 +417,7 @@ library Utils {
         ) = prepareL1L2Transaction(
                 l2Calldata,
                 l2GasLimit,
+                0,
                 factoryDeps,
                 dstAddress,
                 chainId,
@@ -520,6 +526,51 @@ library Utils {
             console.log("Base token is ETH, no need to approve");
             ethAmountToPass = amountToApprove;
         }
+    }
+
+    function runAdminL1L2DirectTransaction(
+        address admin,
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (bytes32 txHash) {
+        (
+            L2TransactionRequestDirect memory l2TransactionRequestDirect,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2Transaction(
+                l2Calldata,
+                l2GasLimit,
+                0,
+                factoryDeps,
+                dstAddress,
+                chainId,
+                bridgehubAddress,
+                l1SharedBridgeProxy
+            );
+
+        requiredValueToDeploy = approveBaseTokenAdmin(Bridgehub(bridgehubAddress), l1SharedBridgeProxy, admin, chainId, requiredValueToDeploy);
+
+        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
+            Bridgehub.requestL2TransactionDirect,
+            (l2TransactionRequestDirect)
+        );
+
+        console.log("Executing transaction");
+        vm.recordLogs();
+        adminExecute(admin, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
     }
 
 
@@ -634,6 +685,7 @@ library Utils {
         runL1L2Transaction({
             l2Calldata: "",
             l2GasLimit: MAX_PRIORITY_TX_GAS,
+            l2Value: 0,
             factoryDeps: factoryDeps,
             dstAddress: 0x0000000000000000000000000000000000000000,
             chainId: chainId,
@@ -785,6 +837,9 @@ library Utils {
             ),
             multicall3: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
+            ),
+            relayedSLDAValidator: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/RelayedSLDAValidator.sol/RelayedSLDAValidator.json"
             )
         });
     }
