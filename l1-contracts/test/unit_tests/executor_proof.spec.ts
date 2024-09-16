@@ -15,9 +15,11 @@ describe("Executor test", function () {
 
   /// This test is based on a block generated in a local system.
   it("Test hashes (Rollup)", async () => {
-    const bootloaderHash = "0x010009416e909e0819593a9806bbc841d25c5cdfed3f4a1523497c6814e5194a";
-    const aaHash = "0x0100065d134a862a777e50059f5e0fbe68b583f3617a67820f7edda0d7f253a0";
-    const setResult = await executor.setHashes(aaHash, bootloaderHash);
+    const bootloaderHash = "0x010008bbde6fc402ea3a3d6cb15cb97e70245d3d4e48fb74362d4961b74c16b1";
+    const aaHash = "0x0100058d9eee51f4b9e9a9ecb7fd7e8301e90bef018c2bd913ed36e583fec8c2";
+    const evmSimulatorHash = "0x01000ccb740e2345754450eda583f59b31a346920a22f968dfcfc63feae303ee";
+
+    const setResult = await executor.setHashes(aaHash, bootloaderHash, evmSimulatorHash);
     const finish = await setResult.wait();
     expect(finish.status == 1);
 
