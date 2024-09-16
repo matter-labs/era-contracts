@@ -32,13 +32,10 @@ contract GatewayPreparation is Script {
     struct Config {
         address bridgehub;
         address stmDeploymentTracker;
-        address nativeTokenVault;
         address stateTransitionProxy;
         address sharedBridgeProxy;
         address governance;
         uint256 chainChainId;
-        uint256 eraChainId;
-        bool testnetVerifier;
     }
 
     // struct Output {
@@ -81,19 +78,16 @@ contract GatewayPreparation is Script {
             stmDeploymentTracker: toml.readAddress(
                 "$.stm_deployment_tracker_proxy_addr"
             ),
-            nativeTokenVault: toml.readAddress("$.native_token_vault_addr"),
             stateTransitionProxy: toml.readAddress(
                 "$.state_transition_proxy_addr"
-            );
+            ),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
-            chainChainId: toml.readAddress("$.chain_chain_id"),
-            governance: toml.readAddress("$.governance"),
-            eraChainId: toml.readAddress("$.era_chain_id"),
-            testnetVerifier: toml.readBool("$.testnet_verifier")
-        })
+            chainChainId: toml.readUint("$.chain_chain_id"),
+            governance: toml.readAddress("$.governance")
+        });
     }
 
-    function saveOutput(bytes32 l2TxHash) internal view {
+    function saveOutput(bytes32 l2TxHash) internal {
         string memory toml = vm.serializeBytes32("root", "governance_l2_tx_hash", l2TxHash);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-preparation-l1.toml");
         vm.writeToml(toml, path);
@@ -101,30 +95,40 @@ contract GatewayPreparation is Script {
 
     /// @dev Requires the sender to be the owner of the contract
     function governanceRegisterGateway() public {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        bytes memory data = abi.encodeCall(bridgehub.registerSettlementLayer, (config.chainChainId, true));
-        Utils.executeUpgrade({
-            _governor: config.governance,
-            _salt: bytes32(0),
-            _target: address(bridgehub),
-            _data: data,
-            _value: 0,
-            _delay: 0
-        });
-        console.log("Gateway registered on STM");
+        initializeConfig();
 
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+
+        if(bridgehub.whitelistedSettlementLayers(config.chainChainId)) {
+            console.log("Chain already whitelisted as settlement layer");
+        } else {
+
+            bytes memory data = abi.encodeCall(bridgehub.registerSettlementLayer, (config.chainChainId, true));
+            Utils.executeUpgrade({
+                _governor: config.governance,
+                _salt: bytes32(0),
+                _target: address(bridgehub),
+                _data: data,
+                _value: 0,
+                _delay: 0
+            });
+            console.log("Gateway whitelisted as settlement layer");
+
+        }
         // No tx has been executed, so we save an empty hash
         saveOutput(bytes32(0));
     }
 
     /// @dev Requires the sender to be the owner of the contract
     function governanceWhitelistGatewaySTM(address gatewaySTMAddress, bytes32 governanoceOperationSalt) public {
+        initializeConfig();
+
         bytes memory data = abi.encodeCall(
-            Bridgehub.addStateTransitionManager,
+            IBridgehub.addStateTransitionManager,
             (gatewaySTMAddress)
         );
 
-        bytes32 l2TxHash = runGovernanceL1L2Transaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
             config.governance,
             governanoceOperationSalt,
             data,
@@ -140,18 +144,20 @@ contract GatewayPreparation is Script {
     }
 
     function governanceSetSTMAssetHandler(bytes32 governanoceOperationSalt) public {
-        bytes32 assetId = Bridgehub(config.bridgehub).stmAssetId(config.stateTransitionProxy);
+        initializeConfig();
+
+        bytes32 assetId = IBridgehub(config.bridgehub).stmAssetId(config.stateTransitionProxy);
         
         // This should be equivalent to `config.stateTransitionProxy`, but we just double checking to ensure that
         // bridgehub was initialized correctly
-        address stmAddress = Bridgehub(config.bridgehub).stmAssetIdToAddress(assetId);
+        address stmAddress = IBridgehub(config.bridgehub).stmAssetIdToAddress(assetId);
         require(stmAddress == config.stateTransitionProxy, "STM asset id does not match the expected STM address");
 
 
         // TODO; refactor to use a constant
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDRESS));
 
-        bytes32 l2TxHash = runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
             config.governance,
             governanoceOperationSalt,
             Utils.MAX_PRIORITY_TX_GAS,
@@ -167,10 +173,12 @@ contract GatewayPreparation is Script {
     }
 
     function registerAssetIdInBridgehub(address gatewaySTMAddress, bytes32 governanoceOperationSalt) public {
+        initializeConfig();
+
         // TODO; refactor to use 0x02
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(config.stateTransitionProxy, gatewaySTMAddress));
 
-        bytes32 l2TxHash = runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
             config.governance,
             governanoceOperationSalt,
             Utils.MAX_PRIORITY_TX_GAS,

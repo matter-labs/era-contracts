@@ -774,6 +774,9 @@ contract DeployL1Script is Script {
         stm.transferOwnership(addresses.governance);
         stm.setPendingAdmin(addresses.chainAdmin);
 
+        STMDeploymentTracker stmDeploymentTracker = STMDeploymentTracker(addresses.bridgehub.stmDeploymentTrackerProxy);
+        stmDeploymentTracker.transferOwnership(addresses.governance);
+
         vm.stopBroadcast();
         console.log("Owners updated");
     }

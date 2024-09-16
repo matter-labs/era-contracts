@@ -46,6 +46,9 @@ struct L2ContractsBytecodes {
     bytes testnetVerifier;
     bytes validatorTimelock;
     bytes diamondProxy;
+    bytes l1Genesis;
+    bytes defaultUpgrade;
+    bytes multicall3;
 }
 
 struct DAContractBytecodes {
@@ -402,7 +405,6 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal returns (bytes32 txHash) {
-        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
@@ -416,10 +418,8 @@ library Utils {
                 l1SharedBridgeProxy
             );
 
-        IGovernance governance = IGovernance(governor);
-
         requiredValueToDeploy = approveBaseTokenGovernance(
-            bridgehub,
+            Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             governor,
             salt,
@@ -428,7 +428,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            bridgehub.requestL2TransactionDirect,
+            Bridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -438,7 +438,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = bridgehub.getHyperchain(chainId);
+        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -457,7 +457,6 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
     ) internal returns (bytes32 txHash) {
-        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
@@ -470,10 +469,8 @@ library Utils {
                 secondBridgeCalldata
             );
 
-        IGovernance governance = IGovernance(governor);
-
         requiredValueToDeploy = approveBaseTokenGovernance(
-            bridgehub,
+            Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             governor,
             salt,
@@ -482,7 +479,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequesCalldata = abi.encodeCall(
-            bridgehub.requestL2TransactionTwoBridges,
+            Bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -492,7 +489,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = bridgehub.getHyperchain(chainId);
+        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -529,7 +526,7 @@ library Utils {
         Vm.Log[] memory logs
     ) internal pure returns (bytes32 txHash) {
         // FIXME: maybe make it less magial
-        bytes32 topic0 = bytes32(uint256(0x4531cd5795773d7101c17bdeb9f5ab7f47d7056017506f937083be5d6e77a38));
+        bytes32 topic0 = bytes32(uint256(0x4531cd5795773d7101c17bdeb9f5ab7f47d7056017506f937083be5d6e77a382));
 
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].emitter == expectedDiamondProxyAddress && logs[i].topics[0] == topic0) {
@@ -690,6 +687,15 @@ library Utils {
             ),
             diamondProxy: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/DiamondProxy.sol/DiamondProxy.json"
+            ),
+            l1Genesis: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/upgrades/L1GenesisUpgrade.sol/L1GenesisUpgrade.json"
+            ),
+            defaultUpgrade: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/upgrades/DefaultUpgrade.sol/DefaultUpgrade.json"
+            ),
+            multicall3: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
             )
         });
     }

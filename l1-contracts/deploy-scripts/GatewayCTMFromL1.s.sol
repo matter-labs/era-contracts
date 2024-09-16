@@ -85,6 +85,7 @@ contract GatewaySTM is Script {
 
     struct Output {
         StateTransitionDeployedAddresses gatewayStateTransition;
+        address multicall3;
         bytes diamondCutData;
     }
 
@@ -184,6 +185,7 @@ contract GatewaySTM is Script {
             output.gatewayStateTransition.diamondProxy
         );
         vm.serializeString("root", "gateway_state_transition", gatewayStateTransition);
+        vm.serializeAddress("root", "multicall3_addr", output.multicall3);
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-gateway-ctm.toml");
         vm.writeToml(toml, path);
@@ -193,16 +195,17 @@ contract GatewaySTM is Script {
     function deployGatewayContracts() public {
         L2ContractsBytecodes memory bytecodes = Utils.readL2ContractsBytecodes();
 
+        output.multicall3 = _deployInternal(bytecodes.multicall3, hex"");
         
         deployGatewayFacets(bytecodes);
 
         output.gatewayStateTransition.verifier = deployGatewayVerifier(bytecodes);
         output.gatewayStateTransition.validatorTimelock = deployValidatorTimelock(bytecodes);
-        output.gatewayStateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
+        output.gatewayStateTransition.genesisUpgrade = address(_deployInternal(bytecodes.l1Genesis, hex""));
         console.log("Genesis upgrade deployed at", output.gatewayStateTransition.genesisUpgrade);
-        output.gatewayStateTransition.defaultUpgrade = address(new DefaultUpgrade());
+        output.gatewayStateTransition.defaultUpgrade = address(_deployInternal(bytecodes.defaultUpgrade, hex""));
         console.log("Default upgrade deployed at", output.gatewayStateTransition.defaultUpgrade);
-        output.gatewayStateTransition.diamondInit = address(new DiamondInit());
+        output.gatewayStateTransition.diamondInit = address(_deployInternal(bytecodes.diamondInit, hex""));
         console.log("Diamond init deployed at", output.gatewayStateTransition.diamondInit);
 
         deployGatewayStateTransitionManager(bytecodes);
