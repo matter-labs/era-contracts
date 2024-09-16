@@ -78,9 +78,9 @@ interface IL1Nullifier {
 
     function setL1AssetRouter(address _l1AssetRouter) external;
 
-    function __DEPRECATED_chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
-    function __DEPRECATED_l2BridgeAddress(uint256 _chainId) external view returns (address);
+    function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
     function transferTokenToNTV(address _token) external;
 

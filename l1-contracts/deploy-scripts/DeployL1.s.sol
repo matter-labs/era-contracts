@@ -339,7 +339,8 @@ contract DeployL1Script is Script {
     }
 
     function deployGenesisUpgrade() internal {
-        address contractAddress = deployViaCreate2(type(L1GenesisUpgrade).creationCode);
+        bytes memory bytecode = abi.encodePacked(type(L1GenesisUpgrade).creationCode);
+        address contractAddress = deployViaCreate2(bytecode);
         console.log("GenesisUpgrade deployed at:", contractAddress);
         addresses.stateTransition.genesisUpgrade = contractAddress;
     }

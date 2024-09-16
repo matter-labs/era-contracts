@@ -217,6 +217,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         return __DEPRECATED_l2BridgeAddress[_chainId];
     }
 
+    /// @notice Legacy function used for migration, do not use!
+    /// @param _chainId The chain id we want to get the balance for.
+    /// @param _token The address of the token.
+    // slither-disable-next-line uninitialized-state-variables
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256) {
+        // slither-disable-next-line uninitialized-state-variables
+        return __DEPRECATED_chainBalance[_chainId][_token];
+    }
+
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.

@@ -540,7 +540,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     ) external override {
         /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
         /// by the legacy bridge.
-        address legacyL2Bridge = L1_NULLIFIER.__DEPRECATED_l2BridgeAddress(_chainId);
+        address legacyL2Bridge = L1_NULLIFIER.l2BridgeAddress(_chainId);
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: _chainId,
             l2BatchNumber: _l2BatchNumber,

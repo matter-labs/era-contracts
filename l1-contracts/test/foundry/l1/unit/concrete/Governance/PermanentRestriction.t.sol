@@ -20,6 +20,8 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
     ChainAdmin internal chainAdmin;
@@ -202,6 +204,18 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), new MessageRoot(bridgehub));
+        address l1Nullifier = makeAddr("l1Nullifier");
+        address l2LegacySharedBridge = makeAddr("l2LegacySharedBridge");
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
+            abi.encode(l1Nullifier)
+        );
+        vm.mockCall(
+            address(l1Nullifier),
+            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
+            abi.encode(l2LegacySharedBridge)
+        );
         bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(chainContractAddress),

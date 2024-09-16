@@ -259,8 +259,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             if (msg.value != 0) {
                 revert NonEmptyMsgValue();
             }
-            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             amount = _depositAmount;
+            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (!_depositChecked) {
                 uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
                 // The token has non-standard transfer logic

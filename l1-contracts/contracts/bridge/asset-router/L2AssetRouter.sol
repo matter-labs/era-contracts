@@ -73,7 +73,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _eraChainId,
         address _l1AssetRouter,
         address _legacySharedBridge,
-        bytes32 _baseTokenAssetId
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
     ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
@@ -83,6 +84,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         assetHandlerAddress[_baseTokenAssetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
+        _transferOwnership(_aliasedOwner);
     }
 
     /// @inheritdoc IL2AssetRouter
@@ -164,8 +166,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             // slither-disable-next-line unused-return
             L2ContractHelper.sendMessageToL1(message);
         } else {
-            address l1Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId);
-            require(l1Token != address(0), "Unsupported asset Id by NTV");
+            address l1Token = IBridgedStandardToken(
+                IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
+            ).originToken();
+            if (l1Token == address(0)) {
+                revert AssetIdNotSupported(_assetId);
+            }
             (uint256 amount, address l1Receiver) = abi.decode(_assetData, (uint256, address));
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
             IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);

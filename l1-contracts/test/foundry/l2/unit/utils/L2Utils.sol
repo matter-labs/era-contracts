@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
+import "forge-std/console.sol";
 
 import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -66,13 +67,14 @@ library L2Utils {
     function forceDeployAssetRouter(
         uint256 _l1ChainId,
         uint256 _eraChainId,
+        address _aliasedOwner,
         address _l1AssetRouter,
         address _legacySharedBridge
     ) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId);
+            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner);
         }
 
         bytes memory bytecode = readEraBytecode("L2AssetRouter");
@@ -85,7 +87,7 @@ library L2Utils {
             newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: true,
             value: 0,
-            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId)
+            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner)
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
