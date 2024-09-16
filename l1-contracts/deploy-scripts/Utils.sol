@@ -14,6 +14,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
 /// @dev The offset from which the built-in, but user space contracts are located.
 uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
@@ -521,6 +522,80 @@ library Utils {
         }
     }
 
+
+    function runAdminL1L2TwoBridgesTransaction(
+        address admin,
+        uint256 l2GasLimit,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy,
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) internal returns (bytes32 txHash) {
+        (
+            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2TransactionTwoBridges(
+                l2GasLimit,
+                chainId,
+                bridgehubAddress,
+                secondBridgeAddress,
+                secondBridgeValue,
+                secondBridgeCalldata
+            );
+
+        requiredValueToDeploy = approveBaseTokenAdmin(
+            Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy,
+            admin,
+            chainId,
+            requiredValueToDeploy
+        );
+
+        bytes memory l2TransactionRequesCalldata = abi.encodeCall(
+            Bridgehub.requestL2TransactionTwoBridges,
+            (l2TransactionRequest)
+        );
+
+        console.log("Executing transaction");
+        vm.recordLogs();
+        adminExecute(admin, bridgehubAddress, l2TransactionRequesCalldata, requiredValueToDeploy);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
+    }
+
+    function approveBaseTokenAdmin(
+        Bridgehub bridgehub,
+        address l1SharedBridgeProxy,
+        address admin,
+        uint256 chainId,
+        uint256 amountToApprove
+    ) internal returns (uint256 ethAmountToPass) {
+        address baseTokenAddress = bridgehub.baseToken(chainId);
+        if (ADDRESS_ONE != baseTokenAddress) {
+            console.log("Base token not ETH, approving");
+            IERC20 baseToken = IERC20(baseTokenAddress);
+
+            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+
+            adminExecute(admin, address(baseToken), approvalCalldata, 0);
+
+            ethAmountToPass = 0;
+        } else {
+            console.log("Base token is ETH, no need to approve");
+            ethAmountToPass = amountToApprove;
+        }
+    }
+
+
     function extractPriorityOpFromLogs(
         address expectedDiamondProxyAddress,
         Vm.Log[] memory logs
@@ -615,6 +690,20 @@ library Utils {
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
         }
+        vm.stopBroadcast();
+    }
+
+    function adminExecute(
+        address _admin,
+        address _target,
+        bytes memory _data,
+        uint256 _value
+    ) internal {
+        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
+        calls[0] = IChainAdmin.Call({target: _target, value: _value, data: _data});
+
+        vm.startBroadcast();
+        IChainAdmin(_admin).multicall{value: _value}(calls, true);
         vm.stopBroadcast();
     }
 

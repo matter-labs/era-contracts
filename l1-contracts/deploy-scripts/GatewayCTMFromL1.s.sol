@@ -268,7 +268,7 @@ contract GatewaySTM is Script {
     function deployValidatorTimelock(L2ContractsBytecodes memory bytecodes) internal returns (address validatorTimelock) {
         // address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         // FIXME: eventually the governance should be moved to the governance contract
-        validatorTimelock = address(_deployInternal(bytecodes.validatorTimelock, abi.encode(deployerAddress, 0, config.eraChainId)));
+        validatorTimelock = address(_deployInternal(bytecodes.validatorTimelock, abi.encode(AddressAliasHelper.applyL1ToL2Alias(deployerAddress), 0, config.eraChainId)));
         console.log("Validator timelock deployed at", validatorTimelock);
     }
 

@@ -36,20 +36,9 @@ contract GatewayPreparation is Script {
         address sharedBridgeProxy;
         address governance;
         uint256 chainChainId;
+
+        bytes gatewayDiamondCutData;
     }
-
-    // struct Output {
-    //     StateTransitionDeployedAddresses gatewayStateTransition;
-    //     bytes gatewayDiamondInit;
-    //     address gatewayValidatorTimelock;
-    // }
-
-    // struct GatewayFacets {
-    //     address adminFacet;
-    //     address mailboxFacet;
-    //     address executorFacet;
-    //     address gettersFacet;
-    // }
 
     Config internal config;
 
@@ -83,7 +72,8 @@ contract GatewayPreparation is Script {
             ),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
             chainChainId: toml.readUint("$.chain_chain_id"),
-            governance: toml.readAddress("$.governance")
+            governance: toml.readAddress("$.governance"),
+            gatewayDiamondCutData: toml.readBytes("$.gateway_diamond_cut_data")
         });
     }
 
@@ -186,6 +176,44 @@ contract GatewayPreparation is Script {
             config.bridgehub,
             config.sharedBridgeProxy,
             config.stmDeploymentTracker,
+            0,
+            secondBridgeData
+        );
+
+        saveOutput(l2TxHash);
+    }
+
+    // TODO: maybe move into a separate script
+    /// @dev Calling this function requires private key to the admin of the chain
+    function migrateChainToGateway(
+        address chainAdmin,
+        uint256 chainId,
+        bytes32 adminOperationSalt
+    ) public {
+        initializeConfig();
+
+        // For now this is how it is going to be.
+        // TODO: include it in the input
+        address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
+
+        bytes32 chainAssetId = IBridgehub(config.bridgehub).stmAssetIdFromChainId(chainId);
+
+        bytes memory bridgehubData = abi.encode(BridgehubBurnSTMAssetData({
+            chainId: chainId,
+            stmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
+            chainData: abi.encode(IZkSyncHyperchain(IBridgehub(config.bridgehub).getHyperchain(chainId)).getProtocolVersion())
+        }));
+
+        // TODO: use constant for the 0x01
+        bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
+
+        bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
+            chainAdmin,
+            Utils.MAX_PRIORITY_TX_GAS,
+            config.chainChainId,
+            config.bridgehub,
+            config.sharedBridgeProxy,
+            config.sharedBridgeProxy,
             0,
             secondBridgeData
         );
