@@ -19,7 +19,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import { AdminFacet } from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import { ExecutorFacet } from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import { GettersFacet } from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import { Mailbox } from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import { MailboxFacet } from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
@@ -35,10 +35,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
-
-struct VerifierConfig {
-}
+import {StateTransitionManagerInitializeData, ChainCreationParams, IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewaySTM is Script {
@@ -65,7 +62,7 @@ contract GatewaySTM is Script {
         bytes32 recursionNodeLevelVkHash;
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
-        uint256 diamondInitPubdataPricingMode;
+        PubdataPricingMode diamondInitPubdataPricingMode;
         uint256 diamondInitBatchOverheadL1Gas;
         uint256 diamondInitMaxPubdataPerBatch;
         uint256 diamondInitMaxL2GasPerBatch;
@@ -77,8 +74,11 @@ contract GatewaySTM is Script {
 
         uint256 priorityTxMaxGasLimit;
 
+        bytes32 genesisRoot;
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
+
+        uint256 latestProtocolVersion;
 
         bytes forceDeploymentsData;
     }
@@ -96,18 +96,21 @@ contract GatewaySTM is Script {
     }
 
     Config internal config;
-    StateTransitionDeployedAddresses internal output;
+    Output internal output;
 
     function run() public {
         console.log("Setting up the Gateway script");
 
         initializeConfig();
+        deployGatewayContracts();
+
+        saveOutput();
     }
 
     function initializeConfig() internal {
         deployerAddress = msg.sender;
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/gateway-deploy.toml");
+        string memory path = string.concat(root, "/script-config/config-deploy-gateway-ctm.toml");
         string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
@@ -124,18 +127,18 @@ contract GatewaySTM is Script {
             nativeTokenVault: toml.readAddress("$.native_token_vault_addr"),
             stateTransitionProxy: toml.readAddress(
                 "$.state_transition_proxy_addr"
-            );
+            ),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
-            chainChainId: toml.readAddress("$.chain_chain_id"),
+            chainChainId: toml.readUint("$.chain_chain_id"),
             governance: toml.readAddress("$.governance"),
-            l1ChainId: toml.readAddress("$.l1_chain_id"),
-            eraChainId: toml.readAddress("$.era_chain_id"),
+            l1ChainId: toml.readUint("$.l1_chain_id"),
+            eraChainId: toml.readUint("$.era_chain_id"),
             testnetVerifier: toml.readBool("$.testnet_verifier"),
 
             recursionNodeLevelVkHash: toml.readBytes32("$.recursion_node_level_vk_hash"),
             recursionLeafLevelVkHash: toml.readBytes32("$.recursion_leaf_level_vk_hash"),
             recursionCircuitsSetVksHash: toml.readBytes32("$.recursion_circuits_set_vks_hash"),
-            diamondInitPubdataPricingMode: toml.readUint("$.diamond_init_pubdata_pricing_mode"),
+            diamondInitPubdataPricingMode: PubdataPricingMode(toml.readUint("$.diamond_init_pubdata_pricing_mode")),
             diamondInitBatchOverheadL1Gas: toml.readUint("$.diamond_init_batch_overhead_l1_gas"),
             diamondInitMaxPubdataPerBatch: toml.readUint("$.diamond_init_max_pubdata_per_batch"),
             diamondInitMaxL2GasPerBatch: toml.readUint("$.diamond_init_max_l2_gas_per_batch"),
@@ -145,8 +148,12 @@ contract GatewaySTM is Script {
             bootloaderHash: toml.readBytes32("$.bootloader_hash"),
             defaultAAHash: toml.readBytes32("$.default_aa_hash"),
             priorityTxMaxGasLimit: toml.readUint("$.priority_tx_max_gas_limit"),
+
+            genesisRoot: toml.readBytes32("$.genesis_root"),
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
+
+            latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
             forceDeploymentsData: toml.readBytes("$.force_deployments_data")
         });
     
@@ -154,30 +161,31 @@ contract GatewaySTM is Script {
 
     function saveOutput() internal {
         vm.serializeAddress(
-            "root",
+            "gateway_state_transition",
             "state_transition_proxy_addr",
             output.gatewayStateTransition.stateTransitionProxy
         );
         vm.serializeAddress(
-            "root",
+            "gateway_state_transition",
             "state_transition_implementation_addr",
             output.gatewayStateTransition.stateTransitionImplementation
         );
-        vm.serializeAddress("root", "verifier_addr", output.gatewayStateTransition.verifier);
-        vm.serializeAddress("root", "admin_facet_addr", output.gatewayStateTransition.adminFacet);
-        vm.serializeAddress("root", "mailbox_facet_addr", output.gatewayStateTransition.mailboxFacet);
-        vm.serializeAddress("root", "executor_facet_addr", output.gatewayStateTransition.executorFacet);
-        vm.serializeAddress("root", "getters_facet_addr", output.gatewayStateTransition.gettersFacet);
-        vm.serializeAddress("root", "diamond_init_addr", output.gatewayStateTransition.diamondInit);
-        vm.serializeAddress("root", "genesis_upgrade_addr", output.gatewayStateTransition.genesisUpgrade);
-        vm.serializeAddress("root", "default_upgrade_addr", output.gatewayStateTransition.defaultUpgrade);
-        vm.serializeAddress(
-            "root",
+        vm.serializeAddress("gateway_state_transition", "verifier_addr", output.gatewayStateTransition.verifier);
+        vm.serializeAddress("gateway_state_transition", "admin_facet_addr", output.gatewayStateTransition.adminFacet);
+        vm.serializeAddress("gateway_state_transition", "mailbox_facet_addr", output.gatewayStateTransition.mailboxFacet);
+        vm.serializeAddress("gateway_state_transition", "executor_facet_addr", output.gatewayStateTransition.executorFacet);
+        vm.serializeAddress("gateway_state_transition", "getters_facet_addr", output.gatewayStateTransition.gettersFacet);
+        vm.serializeAddress("gateway_state_transition", "diamond_init_addr", output.gatewayStateTransition.diamondInit);
+        vm.serializeAddress("gateway_state_transition", "genesis_upgrade_addr", output.gatewayStateTransition.genesisUpgrade);
+        vm.serializeAddress("gateway_state_transition", "default_upgrade_addr", output.gatewayStateTransition.defaultUpgrade);
+        string memory gatewayStateTransition = vm.serializeAddress(
+            "gateway_state_transition",
             "diamond_proxy_addr",
             output.gatewayStateTransition.diamondProxy
         );
-        string memory toml = vm.serializeAddress("root", "diamond_cut_data", output.diamondCutData);
-        string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-deploy.toml");
+        vm.serializeString("root", "gateway_state_transition", gatewayStateTransition);
+        string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
+        string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-gateway-ctm.toml");
         vm.writeToml(toml, path);
     }
 
@@ -197,7 +205,7 @@ contract GatewaySTM is Script {
         output.gatewayStateTransition.diamondInit = address(new DiamondInit());
         console.log("Diamond init deployed at", output.gatewayStateTransition.diamondInit);
 
-        deployGatewayStateTransitionManager();
+        deployGatewayStateTransitionManager(bytecodes);
         setStateTransitionManagerInValidatorTimelock();
     }
 
@@ -206,12 +214,12 @@ contract GatewaySTM is Script {
             bytecode: bytecode,
             constructorargs: constructorargs,
             create2salt: bytes32(0),
-            l2GasLimit Utils.MAX_PRIORITY_TX_GAS,
-            new bytes()[0],
-            config.chainChainId,
-            config.bridgehub,
-            address l1SharedBridgeProxy
-        })
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy
+        });
     }
 
     function deployGatewayFacets(L2ContractsBytecodes memory bytecodes) internal returns (GatewayFacets memory facets) {
@@ -261,7 +269,7 @@ contract GatewaySTM is Script {
         console.log("Validator timelock deployed at", validatorTimelock);
     }
 
-    function deployGatewayStateTransitionManager() internal {
+    function deployGatewayStateTransitionManager(L2ContractsBytecodes memory bytecodes) internal {
         // We need to publish the bytecode of the diamdon proxy contract,
         // we can only do it via deploying its dummy version.
         // FIXME: this was straightworward copy pasted from another code where there was not factory deps publishing
@@ -334,7 +342,7 @@ contract GatewaySTM is Script {
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: output.gatewayStateTransition.genesisUpgrade,
-            genesisBatchHash: output.gatewayStateTransition.genesisRoot,
+            genesisBatchHash: config.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
             genesisBatchCommitment: config.genesisBatchCommitment,
             diamondCut: diamondCut,
@@ -344,23 +352,33 @@ contract GatewaySTM is Script {
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
             owner: msg.sender,
-            validatorTimelock: addresses.validatorTimelock,
+            validatorTimelock: output.gatewayStateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: config.contracts.latestProtocolVersion
+            protocolVersion: config.latestProtocolVersion
         });
 
-        output.gatewayStateTransition.stateTransitionProxy = _deployInternal(bytecodes.transparentUpgradeableProxy, abi.encode(stmImpl, deployerAddress, abi.encodeCall(StateTransitionManager.initialize, (diamondInitData))));
+        output.gatewayStateTransition.stateTransitionProxy = _deployInternal(bytecodes.transparentUpgradeableProxy, abi.encode(output.gatewayStateTransition.stateTransitionImplementation, deployerAddress, abi.encodeCall(StateTransitionManager.initialize, (diamondInitData))));
 
         console.log("StateTransitionManagerProxy deployed at:", output.gatewayStateTransition.stateTransitionProxy);
         output.gatewayStateTransition.stateTransitionProxy = output.gatewayStateTransition.stateTransitionProxy;
     }
 
     function setStateTransitionManagerInValidatorTimelock() internal {
-        ValidatorTimelock validatorTimelock = ValidatorTimelock(output.gatewayStateTransition.validatorTimelock);
-        vm.broadcast();
-        validatorTimelock.setStateTransitionManager(
-            IStateTransitionManager(output.gatewayStateTransition.stateTransitionProxy)
+        bytes memory data = abi.encodeCall(
+            ValidatorTimelock.setStateTransitionManager,
+            (IStateTransitionManager(output.gatewayStateTransition.stateTransitionProxy))
         );
+        
+        Utils.runL1L2Transaction({
+            l2Calldata: data, 
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0), 
+            dstAddress: output.gatewayStateTransition.validatorTimelock, 
+            chainId: config.chainChainId, 
+            bridgehubAddress: config.bridgehub, 
+            l1SharedBridgeProxy: config.sharedBridgeProxy
+        });
+
         console.log("StateTransitionManager set in ValidatorTimelock");
     }
 

@@ -126,10 +126,10 @@ contract GatewaySTM is Script {
                 "$.state_transition_proxy_addr"
             );
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
-            chainChainId: toml.readAddress("$.chain_chain_id"),
+            chainChainId: toml.readUint("$.chain_chain_id"),
             governance: toml.readAddress("$.governance"),
-            l1ChainId: toml.readAddress("$.l1_chain_id"),
-            eraChainId: toml.readAddress("$.era_chain_id"),
+            l1ChainId: toml.readUint("$.l1_chain_id"),
+            eraChainId: toml.readUint("$.era_chain_id"),
             testnetVerifier: toml.readBool("$.testnet_verifier"),
 
             recursionNodeLevelVkHash: toml.readBytes32("$.recursion_node_level_vk_hash"),

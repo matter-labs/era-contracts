@@ -45,6 +45,7 @@ struct L2ContractsBytecodes {
     bytes verifier;
     bytes testnetVerifier;
     bytes validatorTimelock;
+    bytes diamondProxy;
 }
 
 struct DAContractBytecodes {
@@ -64,6 +65,7 @@ struct StateTransitionDeployedAddresses {
     address diamondInit;
     address genesisUpgrade;
     address defaultUpgrade;
+    address validatorTimelock;
     // TODO: delete the last field it is never really used
     address diamondProxy;
 }
@@ -133,8 +135,8 @@ library Utils {
 
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
         // FIXME: use forge to read the bytecode
-        string memory path = string.concat("../l1-contracts/artifacts/", facetName, ".sol/", facetName, "Facet.json");
-        bytes memory bytecode = readHardhatBytecode(path);
+        string memory path = string.concat("/../l1-contracts/out/", facetName, ".sol/", facetName, "Facet.json");
+        bytes memory bytecode = readFoundryDeployedBytecode(path);
         return getAllSelectors(bytecode);
     }
 
@@ -579,6 +581,18 @@ library Utils {
         return bytecode;
     }
 
+    /**
+     * @dev Read hardhat bytecodes
+     */
+    function readFoundryDeployedBytecode(string memory artifactPath) internal view returns (bytes memory) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, artifactPath);
+        string memory json = vm.readFile(path);
+        bytes memory bytecode = vm.parseJsonBytes(json, ".deployedBytecode.object");
+        return bytecode;
+    }
+
+
     function executeUpgrade(
         address _governor,
         bytes32 _salt,
@@ -651,16 +665,16 @@ library Utils {
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/StateTransitionManager.sol/StateTransitionManager.json"
             ),
             adminFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Admin.sol/Admin.json"
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Admin.sol/AdminFacet.json"
             ),
             mailboxFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Mailbox.sol/Mailbox.json"
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Mailbox.sol/MailboxFacet.json"
             ),
             executorFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Executor.sol/Executor.json"
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Executor.sol/ExecutorFacet.json"
             ),
             gettersFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Getters.sol/Getters.json"
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Getters.sol/GettersFacet.json"
             ),
             verifier: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/Verifier.sol/Verifier.json"
@@ -673,6 +687,9 @@ library Utils {
             ),
             diamondInit: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/DiamondInit.sol/DiamondInit.json"
+            ),
+            diamondProxy: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/DiamondProxy.sol/DiamondProxy.json"
             )
         });
     }
