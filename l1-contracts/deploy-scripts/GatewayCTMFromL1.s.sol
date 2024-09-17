@@ -9,10 +9,10 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {StateTransitionDeployedAddresses, Utils, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
@@ -30,15 +30,15 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 
-import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionManagerInitializeData, ChainCreationParams, IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewaySTM is Script {
+contract GatewayCTMFromL1 is Script {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
@@ -49,9 +49,9 @@ contract GatewaySTM is Script {
     // solhint-disable-next-line gas-struct-packing
     struct Config {
         address bridgehub;
-        address stmDeploymentTracker;
+        address ctmDeploymentTracker;
         address nativeTokenVault;
-        address stateTransitionProxy;
+        address chainTypeManagerProxy;
         address sharedBridgeProxy;
         address governance;
         uint256 chainChainId;
@@ -125,12 +125,12 @@ contract GatewaySTM is Script {
         // the fact that all values are initialized
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),
-            stmDeploymentTracker: toml.readAddress(
+            ctmDeploymentTracker: toml.readAddress(
                 "$.stm_deployment_tracker_proxy_addr"
             ),
             nativeTokenVault: toml.readAddress("$.native_token_vault_addr"),
-            stateTransitionProxy: toml.readAddress(
-                "$.state_transition_proxy_addr"
+            chainTypeManagerProxy: toml.readAddress(
+                "$.chain_type_manager_proxy_addr"
             ),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
             chainChainId: toml.readUint("$.chain_chain_id"),
@@ -166,12 +166,12 @@ contract GatewaySTM is Script {
     function saveOutput() internal {
         vm.serializeAddress(
             "gateway_state_transition",
-            "state_transition_proxy_addr",
-            output.gatewayStateTransition.stateTransitionProxy
+            "chain_type_manager_proxy_addr",
+            output.gatewayStateTransition.chainTypeManagerProxy
         );
         vm.serializeAddress(
             "gateway_state_transition",
-            "state_transition_implementation_addr",
+            "chain_type_manager_implementation_addr",
             output.gatewayStateTransition.stateTransitionImplementation
         );
         vm.serializeAddress("gateway_state_transition", "verifier_addr", output.gatewayStateTransition.verifier);
@@ -215,8 +215,8 @@ contract GatewaySTM is Script {
         output.gatewayStateTransition.diamondInit = address(_deployInternal(bytecodes.diamondInit, hex""));
         console.log("Diamond init deployed at", output.gatewayStateTransition.diamondInit);
 
-        deployGatewayStateTransitionManager(bytecodes);
-        setStateTransitionManagerInValidatorTimelock();
+        deployGatewayChainTypeManager(bytecodes);
+        setChainTypeManagerInValidatorTimelock();
 
         output.relayedSLDAValidator = _deployInternal(bytecodes.relayedSLDAValidator, hex"");
     }
@@ -282,7 +282,7 @@ contract GatewaySTM is Script {
         console.log("Validator timelock deployed at", validatorTimelock);
     }
 
-    function deployGatewayStateTransitionManager(L2ContractsBytecodes memory bytecodes) internal {
+    function deployGatewayChainTypeManager(L2ContractsBytecodes memory bytecodes) internal {
         // We need to publish the bytecode of the diamdon proxy contract,
         // we can only do it via deploying its dummy version.
         // FIXME: this was straightworward copy pasted from another code where there was not factory deps publishing
@@ -363,23 +363,23 @@ contract GatewaySTM is Script {
             forceDeploymentsData: config.forceDeploymentsData
         });
 
-        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
+        ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: msg.sender,
             validatorTimelock: output.gatewayStateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: config.latestProtocolVersion
         });
 
-        output.gatewayStateTransition.stateTransitionProxy = _deployInternal(bytecodes.transparentUpgradeableProxy, abi.encode(output.gatewayStateTransition.stateTransitionImplementation, deployerAddress, abi.encodeCall(StateTransitionManager.initialize, (diamondInitData))));
+        output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(bytecodes.transparentUpgradeableProxy, abi.encode(output.gatewayStateTransition.stateTransitionImplementation, deployerAddress, abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))));
 
-        console.log("StateTransitionManagerProxy deployed at:", output.gatewayStateTransition.stateTransitionProxy);
-        output.gatewayStateTransition.stateTransitionProxy = output.gatewayStateTransition.stateTransitionProxy;
+        console.log("ChainTypeManagerProxy deployed at:", output.gatewayStateTransition.chainTypeManagerProxy);
+        output.gatewayStateTransition.chainTypeManagerProxy = output.gatewayStateTransition.chainTypeManagerProxy;
     }
 
-    function setStateTransitionManagerInValidatorTimelock() internal {
+    function setChainTypeManagerInValidatorTimelock() internal {
         bytes memory data = abi.encodeCall(
-            ValidatorTimelock.setStateTransitionManager,
-            (IStateTransitionManager(output.gatewayStateTransition.stateTransitionProxy))
+            ValidatorTimelock.setChainTypeManager,
+            (IChainTypeManager(output.gatewayStateTransition.chainTypeManagerProxy))
         );
         
         Utils.runL1L2Transaction({
@@ -393,6 +393,6 @@ contract GatewaySTM is Script {
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
-        console.log("StateTransitionManager set in ValidatorTimelock");
+        console.log("ChainTypeManager set in ValidatorTimelock");
     }
 }

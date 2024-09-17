@@ -67,7 +67,7 @@ library PriorityTree {
     }
 
     /// @notice Process the priority operations of a batch.
-    function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
+    function processBatch(Tree storage _tree, PriorityOpsBatchInfo memory _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {
             bytes32 expectedRoot = Merkle.calculateRootPaths(
                 _priorityOpsData.leftPath,
@@ -98,14 +98,14 @@ library PriorityTree {
     }
 
     /// @notice Reinitialize the tree from a commitment on L1.
-    function checkL1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
+    function checkL1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal view {
         require(_tree.startIndex == _commitment.startIndex, "PT: invalid start index");
         require(_tree.unprocessedIndex >= _commitment.unprocessedIndex, "PT: invalid unprocessed index");
         require(_tree.tree._nextLeafIndex >= _commitment.nextLeafIndex, "PT: invalid next leaf index");
     }
 
     /// @notice Reinitialize the tree from a commitment on GW.
-    function checkGWReinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
+    function checkGWReinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal view {
         require(_tree.startIndex == _commitment.startIndex, "PT: invalid start index");
         require(_tree.unprocessedIndex <= _commitment.unprocessedIndex, "PT: invalid unprocessed index");
         require(_tree.tree._nextLeafIndex <= _commitment.nextLeafIndex, "PT: invalid next leaf index");

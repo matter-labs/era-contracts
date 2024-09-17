@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
+import * as zksync from "zksync-ethers";
 import type { ComplexUpgrader, L2GenesisUpgrade } from "../typechain";
 import { ComplexUpgraderFactory, L2GenesisUpgradeFactory } from "../typechain";
 import {
@@ -8,8 +9,9 @@ import {
   REAL_L2_ASSET_ROUTER_ADDRESS,
   REAL_L2_MESSAGE_ROOT_ADDRESS,
   TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS,
+  ADDRESS_ONE,
 } from "./shared/constants";
-import { deployContractOnAddress } from "./shared/utils";
+import { deployContractOnAddress, loadArtifact } from "./shared/utils";
 import { setResult } from "./shared/mocks";
 
 describe("L2GenesisUpgrade tests", function () {
@@ -17,7 +19,7 @@ describe("L2GenesisUpgrade tests", function () {
   let complexUpgrader: ComplexUpgrader;
   const chainId = 270;
 
-  const stmDeployerAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+  const ctmDeployerAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
   const bridgehubOwnerAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
   const forceDeployments = [
@@ -30,6 +32,19 @@ describe("L2GenesisUpgrade tests", function () {
     },
   ];
 
+  let fixedForceDeploymentsData: string;
+
+  const additionalForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
+    ["tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address l2Weth)"],
+    [
+      {
+        baseTokenAssetId: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
+        l2LegacySharedBridge: ADDRESS_ONE,
+        l2Weth: ADDRESS_ONE,
+      },
+    ]
+  );
+
   before(async () => {
     const wallet = await ethers.getImpersonatedSigner(TEST_FORCE_DEPLOYER_ADDRESS);
     await deployContractOnAddress(TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS, "ComplexUpgrader");
@@ -40,7 +55,7 @@ describe("L2GenesisUpgrade tests", function () {
     await setResult(
       "IBridgehub",
       "setAddresses",
-      [REAL_L2_ASSET_ROUTER_ADDRESS, stmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS],
+      [REAL_L2_ASSET_ROUTER_ADDRESS, ctmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS],
       {
         failure: false,
         returnData: "0x",
@@ -60,19 +75,47 @@ describe("L2GenesisUpgrade tests", function () {
       failure: false,
       returnData: "0x",
     });
+
+    const msgRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
+    const messageRootBytecodeHash = zksync.utils.hashBytecode(msgRootBytecode);
+
+    const ntvBytecode = (await loadArtifact("DummyL2NativeTokenVault")).bytecode;
+    const ntvBytecodeHash = zksync.utils.hashBytecode(ntvBytecode);
+
+    const l2AssetRouterBytecode = (await loadArtifact("DummyL2AssetRouter")).bytecode;
+    const l2AssetRouterBytecodeHash = zksync.utils.hashBytecode(l2AssetRouterBytecode);
+
+    const bridgehubBytecode = (await loadArtifact("DummyBridgehub")).bytecode;
+    const bridgehubBytecodeHash = zksync.utils.hashBytecode(bridgehubBytecode);
+
+    fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
+      [
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash)",
+      ],
+      [
+        {
+          l1ChainId: 1,
+          eraChainId: 1,
+          l1AssetRouter: ADDRESS_ONE,
+          l2TokenProxyBytecodeHash: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
+          aliasedL1Governance: ADDRESS_ONE,
+          maxNumberOfZKChains: 100,
+          bridgehubBytecodeHash: bridgehubBytecodeHash,
+          l2AssetRouterBytecodeHash: l2AssetRouterBytecodeHash,
+          l2NtvBytecodeHash: ntvBytecodeHash,
+          messageRootBytecodeHash: messageRootBytecodeHash,
+        },
+      ]
+    );
   });
 
   describe("upgrade", function () {
     it("successfully upgraded", async () => {
-      const forceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
-        ["tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]"],
-        [forceDeployments]
-      );
-
       const data = l2GenesisUpgrade.interface.encodeFunctionData("genesisUpgrade", [
         chainId,
-        stmDeployerAddress,
-        forceDeploymentsData,
+        ctmDeployerAddress,
+        fixedForceDeploymentsData,
+        additionalForceDeploymentsData,
       ]);
 
       // Note, that the event is emitted at the complex upgrader, but the event declaration is taken from the l2GenesisUpgrade contract.

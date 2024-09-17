@@ -12,14 +12,14 @@ contract DummyBridgehubSetter is Bridgehub {
     constructor(
         uint256 _l1ChainId,
         address _owner,
-        uint256 _maxNumberOfHyperchains
-    ) Bridgehub(_l1ChainId, _owner, _maxNumberOfHyperchains) {}
+        uint256 _maxNumberOfZKChains
+    ) Bridgehub(_l1ChainId, _owner, _maxNumberOfZKChains) {}
 
-    function setHyperchain(uint256 _chainId, address _hyperchain) external {
-        _registerNewHyperchain(_chainId, _hyperchain);
+    function setZKChain(uint256 _chainId, address _zkChain) external {
+        _registerNewZKChain(_chainId, _zkChain);
     }
 
-    function setSTM(uint256 _chainId, address _stm) external {
-        stateTransitionManager[_chainId] = _stm;
+    function setCTM(uint256 _chainId, address _ctm) external {
+        chainTypeManager[_chainId] = _ctm;
     }
 }

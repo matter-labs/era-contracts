@@ -8,7 +8,7 @@ interface IL1AssetDeploymentTracker {
     function bridgeCheckCounterpartAddress(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         address _assetHandlerAddressOnCounterpart
     ) external view;
 }

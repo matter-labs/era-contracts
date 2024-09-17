@@ -8,12 +8,12 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {StateTransitionDeployedAddresses, Utils, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -33,8 +33,8 @@ contract GatewayPreparation is Script {
     // solhint-disable-next-line gas-struct-packing
     struct Config {
         address bridgehub;
-        address stmDeploymentTracker;
-        address stateTransitionProxy;
+        address ctmDeploymentTracker;
+        address chainTypeManagerProxy;
         address sharedBridgeProxy;
         address governance;
         uint256 chainChainId;
@@ -66,11 +66,11 @@ contract GatewayPreparation is Script {
         // the fact that all values are initialized
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),
-            stmDeploymentTracker: toml.readAddress(
-                "$.stm_deployment_tracker_proxy_addr"
+            ctmDeploymentTracker: toml.readAddress(
+                "$.ctm_deployment_tracker_proxy_addr"
             ),
-            stateTransitionProxy: toml.readAddress(
-                "$.state_transition_proxy_addr"
+            chainTypeManagerProxy: toml.readAddress(
+                "$.chain_type_manager_proxy_addr"
             ),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
             chainChainId: toml.readUint("$.chain_chain_id"),
@@ -112,12 +112,12 @@ contract GatewayPreparation is Script {
     }
 
     /// @dev Requires the sender to be the owner of the contract
-    function governanceWhitelistGatewaySTM(address gatewaySTMAddress, bytes32 governanoceOperationSalt) public {
+    function governanceWhitelistGatewayCTM(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
         bytes memory data = abi.encodeCall(
-            IBridgehub.addStateTransitionManager,
-            (gatewaySTMAddress)
+            IBridgehub.addChainTypeManager,
+            (gatewayCTMAddress)
         );
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
@@ -135,15 +135,15 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
-    function governanceSetSTMAssetHandler(bytes32 governanoceOperationSalt) public {
+    function governanceSetCTMAssetHandler(bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes32 assetId = IBridgehub(config.bridgehub).stmAssetId(config.stateTransitionProxy);
+        bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetId(config.chainTypeManagerProxy);
         
-        // This should be equivalent to `config.stateTransitionProxy`, but we just double checking to ensure that
+        // This should be equivalent to `config.chainTypeManagerProxy`, but we just double checking to ensure that
         // bridgehub was initialized correctly
-        address stmAddress = IBridgehub(config.bridgehub).stmAssetIdToAddress(assetId);
-        require(stmAddress == config.stateTransitionProxy, "STM asset id does not match the expected STM address");
+        address ctmAddress = IBridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
+        require(ctmAddress == config.chainTypeManagerProxy, "CTM asset id does not match the expected CTM address");
 
 
         // TODO; refactor to use a constant
@@ -164,11 +164,11 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
-    function registerAssetIdInBridgehub(address gatewaySTMAddress, bytes32 governanoceOperationSalt) public {
+    function registerAssetIdInBridgehub(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
         // TODO; refactor to use 0x02
-        bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(config.stateTransitionProxy, gatewaySTMAddress));
+        bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
             config.governance,
@@ -177,7 +177,7 @@ contract GatewayPreparation is Script {
             config.chainChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
-            config.stmDeploymentTracker,
+            config.ctmDeploymentTracker,
             0,
             secondBridgeData
         );
@@ -198,7 +198,7 @@ contract GatewayPreparation is Script {
         // TODO: include it in the input
         address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
 
-        bytes32 chainAssetId = IBridgehub(config.bridgehub).stmAssetIdFromChainId(chainId);
+        bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
 
         uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
         if (currentSettlementLayer == config.chainChainId) {
@@ -207,10 +207,10 @@ contract GatewayPreparation is Script {
             return;
         }
 
-        bytes memory bridgehubData = abi.encode(BridgehubBurnSTMAssetData({
+        bytes memory bridgehubData = abi.encode(BridgehubBurnCTMAssetData({
             chainId: chainId,
-            stmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
-            chainData: abi.encode(IZkSyncHyperchain(IBridgehub(config.bridgehub).getHyperchain(chainId)).getProtocolVersion())
+            ctmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
+            chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getHyperchain(chainId)).getProtocolVersion())
         }));
 
         // TODO: use constant for the 0x01
@@ -314,7 +314,7 @@ contract GatewayPreparation is Script {
     //     address verifierAddress = deployGatewayVerifier(bytecodes);
 
 
-    //     deployGatewayStateTransitionManager(bytecodes);
+    //     deployGatewayChainTypeManager(bytecodes);
 
 
     //     // Deploy validator timelock
@@ -409,11 +409,11 @@ contract GatewayPreparation is Script {
     //     });
     // }
 
-    // function deployGatewayStateTransitionManager(L2ContractsBytecodes memory bytecodes) internal {
+    // function deployGatewayChainTypeManager(L2ContractsBytecodes memory bytecodes) internal {
     //     // 
 
-    //     // Deploy stm implementation
-    //     address stmImplAddress = Utils.deployThroughL1({
+    //     // Deploy ctm implementation
+    //     address ctmImplAddress = Utils.deployThroughL1({
     //         bytecode: bytecodes.stateTransitionManager,
     //         constructorargs: L2_BRIDGEHUB_ADDRESS,
     //         create2salt: bytes32(0),
@@ -447,19 +447,19 @@ contract GatewayPreparation is Script {
 
     //     address newAdmin = ownable.owner();
     //     console.log("newAdmin", newAdmin);
-    //     IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
+    //     IZKChain chain = IZKChain(bridgehub.getHyperchain(config.chainChainId));
     //     console.log("chainAdmin", bridgehub.getHyperchain(config.chainChainId), chain.getAdmin());
-    //     bytes32 stmAssetId = bridgehub.stmAssetIdFromChainId(config.chainChainId);
+    //     bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
     //     bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
-    //     bytes memory stmData = abi.encode(newAdmin, diamondCutData);
+    //     bytes memory ctmData = abi.encode(newAdmin, diamondCutData);
     //     bytes memory chainData = abi.encode(chain.getProtocolVersion());
-    //     BridgehubBurnSTMAssetData memory stmAssetData = BridgehubBurnSTMAssetData({
+    //     BridgehubBurnCTMAssetData memory ctmAssetData = BridgehubBurnCTMAssetData({
     //         chainId: config.chainChainId,
-    //         stmData: stmData,
+    //         ctmData: ctmData,
     //         chainData: chainData
     //     });
-    //     bytes memory bridgehubData = abi.encode(stmAssetData);
-    //     bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(stmAssetId, bridgehubData));
+    //     bytes memory bridgehubData = abi.encode(ctmAssetData);
+    //     bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(ctmAssetId, bridgehubData));
 
     //     vm.startBroadcast(chain.getAdmin());
     //     L2TransactionRequestTwoBridgesOuter memory request = L2TransactionRequestTwoBridgesOuter({
@@ -480,8 +480,8 @@ contract GatewayPreparation is Script {
 
     // function registerL2Contracts() public {
     //     IBridgehub bridgehub = IBridgehub(config.bridgehub);
-    //     Ownable ownable = Ownable(config.stmDeploymentTracker);
-    //     // IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
+    //     Ownable ownable = Ownable(config.ctmDeploymentTracker);
+    //     // IChainTypeManager ctm = IChainTypeManager(config.chainTypeManagerProxy);
 
     //     uint256 gasPrice = 10;
     //     uint256 l2GasLimit = 72000000;
@@ -492,7 +492,7 @@ contract GatewayPreparation is Script {
     //         l2GasLimit,
     //         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
     //     ) * 2;
-    //     bytes32 assetId = bridgehub.stmAssetIdFromChainId(config.chainChainId);
+    //     bytes32 assetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
     //     bytes memory routerData = bytes.concat(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDR));
     //     L2TransactionRequestTwoBridgesOuter
     //         memory assetRouterRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
@@ -514,11 +514,11 @@ contract GatewayPreparation is Script {
     //         l2GasLimit: l2GasLimit,
     //         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     //         refundRecipient: ownable.owner(),
-    //         secondBridgeAddress: config.stmDeploymentTracker,
+    //         secondBridgeAddress: config.ctmDeploymentTracker,
     //         secondBridgeValue: 0,
     //         secondBridgeCalldata: bytes.concat(
     //             bytes1(0x01),
-    //             abi.encode(config.stateTransitionProxy, config.stateTransitionProxy)
+    //             abi.encode(config.chainTypeManagerProxy, config.chainTypeManagerProxy)
     //         )
     //     });
     //     vm.startBroadcast(ownable.owner());

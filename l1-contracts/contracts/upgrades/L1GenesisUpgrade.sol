@@ -8,8 +8,10 @@ import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgradeGenesis} from "./BaseZkSyncUpgradeGenesis.sol";
 import {ProposedUpgrade} from "./IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IL2GenesisUpgrade, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
@@ -26,8 +28,8 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         address _l1GenesisUpgrade,
         uint256 _chainId,
         uint256 _protocolVersion,
-        address _stmDeployerAddress,
-        bytes calldata _forceDeploymentsData,
+        address _l1CtmDeployerAddress,
+        bytes calldata _fixedForceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
         L2CanonicalTransaction memory l2ProtocolUpgradeTx;
@@ -35,9 +37,10 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         {
             bytes memory complexUpgraderCalldata;
             {
+                bytes memory additionalForceDeploymentsData = _getZKChainSpecificForceDeploymentsData();
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _stmDeployerAddress, _forceDeploymentsData)
+                    (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -100,5 +103,17 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
+    }
+
+    function _getZKChainSpecificForceDeploymentsData() internal view returns (bytes memory) {
+        IL1Nullifier l1Nullifier = IL1AssetRouter(s.baseTokenBridge).L1_NULLIFIER();
+        address legacySharedBridge = l1Nullifier.l2BridgeAddress(s.chainId);
+        ZKChainSpecificForceDeploymentsData
+            memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
+                baseTokenAssetId: s.baseTokenAssetId,
+                l2LegacySharedBridge: legacySharedBridge,
+                l2Weth: address(0) // kl todo
+            });
+        return abi.encode(additionalForceDeploymentsData);
     }
 }

@@ -11,10 +11,12 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "c
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {Call} from "contracts/governance/Common.sol";
 
 /// @dev The offset from which the built-in, but user space contracts are located.
 uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
@@ -37,7 +39,7 @@ struct L2ContractsBytecodes {
     bytes forceDeployUpgrader;
     bytes rollupL2DAValidator;
     bytes validiumL2DAValidator;
-    bytes stateTransitionManager;
+    bytes chainTypeManager;
     bytes adminFacet;
     bytes mailboxFacet;
     bytes executorFacet;
@@ -695,7 +697,7 @@ library Utils {
     }
 
     /**
-     * @dev Read hardhat bytecodes
+     * @dev Read foundry bytecodes
      */
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
@@ -728,8 +730,8 @@ library Utils {
         IGovernance governance = IGovernance(_governor);
         Ownable ownable = Ownable(_governor);
 
-        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
-        calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: _value, data: _data});
 
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,
@@ -751,8 +753,8 @@ library Utils {
         bytes memory _data,
         uint256 _value
     ) internal {
-        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({target: _target, value: _value, data: _data});
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: _value, data: _data});
 
         vm.startBroadcast();
         IChainAdmin(_admin).multicall{value: _value}(calls, true);
@@ -770,25 +772,25 @@ library Utils {
                 "/../l1-contracts/artifacts-zk/contracts/bridgehub/Bridgehub.sol/Bridgehub.json"
             ),
             l2NativeTokenVault: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/bridge/L2NativeTokenVault.sol/L2NativeTokenVault.json"
+                "/../l1-contracts/artifacts-zk/contracts/bridge/ntv/L2NativeTokenVault.sol/L2NativeTokenVault.json"
             ),
             l2AssetRouter: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/bridge/L2AssetRouter.sol/L2AssetRouter.json"
+                "/../l1-contracts/artifacts-zk/contracts/bridge/asset-router/L2AssetRouter.sol/L2AssetRouter.json"
             ),
             messageRoot: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/bridgehub/MessageRoot.sol/MessageRoot.json"
             ),
             upgradableBeacon: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+                "/../l1-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
             ),
             beaconProxy: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+                "/../l1-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
             ),
             standardErc20: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+                "/../l1-contracts/artifacts-zk/contracts/bridge/BridgedStandardERC20.sol/BridgedStandardERC20.json"
             ),
             transparentUpgradeableProxy: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+                "/../l1-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
             ),
             forceDeployUpgrader: readHardhatBytecode(
                 "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
@@ -799,8 +801,8 @@ library Utils {
             validiumL2DAValidator: readHardhatBytecode(
                 "/../l2-contracts/artifacts-zk/contracts/data-availability/ValidiumL2DAValidator.sol/ValidiumL2DAValidator.json"
             ),
-            stateTransitionManager: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/StateTransitionManager.sol/StateTransitionManager.json"
+            chainTypeManager: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/ChainTypeManager.sol/ChainTypeManager.json"
             ),
             adminFacet: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Admin.sol/AdminFacet.json"
