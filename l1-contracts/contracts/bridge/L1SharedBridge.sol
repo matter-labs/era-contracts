@@ -40,20 +40,20 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
-    /// @dev The address of zkSync Era diamond proxy contract.
+    /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
-    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Diamond proxy upgrade.
+    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraPostDiamondUpgradeFirstBatch;
 
-    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
+    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade ERC20 withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraPostLegacyBridgeUpgradeFirstBatch;
 
-    /// @dev Stores the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
+    /// @dev Stores the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
@@ -90,6 +90,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
+    /// @dev Admin has the ability to register new chains within the shared bridge.
+    address public admin;
+
+    /// @dev The pending admin, i.e. the candidate to the admin role.
+    address public pendingAdmin;
+
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
@@ -98,7 +104,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
+    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
             revert Unauthorized(msg.sender);
@@ -119,6 +125,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (msg.sender != address(this)) {
             revert Unauthorized(msg.sender);
         }
+        _;
+    }
+
+    /// @notice Checks that the message sender is either the owner or admin.
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner() || msg.sender == admin, "ShB not owner or admin");
         _;
     }
 
@@ -147,8 +159,33 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _transferOwnership(_owner);
     }
 
+    /// @inheritdoc IL1SharedBridge
+    /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
+    /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
+    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
+        // Save previous value into the stack to put it into the event later
+        address oldPendingAdmin = pendingAdmin;
+        // Change pending admin
+        pendingAdmin = _newPendingAdmin;
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
+    }
+
+    /// @inheritdoc IL1SharedBridge
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    function acceptAdmin() external {
+        address currentPendingAdmin = pendingAdmin;
+        require(msg.sender == currentPendingAdmin, "ShB not pending admin"); // Only proposed by current admin address can claim the admin rights
+
+        address previousAdmin = admin;
+        admin = currentPendingAdmin;
+        delete pendingAdmin;
+
+        emit NewPendingAdmin(currentPendingAdmin, address(0));
+        emit NewAdmin(previousAdmin, currentPendingAdmin);
+    }
+
     /// @dev This sets the first post diamond upgrade batch for era, used to check old eth withdrawals
-    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
+    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after diamond proxy upgrade.
     function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external onlyOwner {
         if (eraPostDiamondUpgradeFirstBatch != 0) {
             revert SharedBridgeValueAlreadySet(SharedBridgeKey.PostUpgradeFirstBatch);
@@ -157,7 +194,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev This sets the first post upgrade batch for era, used to check old token withdrawals
-    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
+    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after legacy bridge upgrade.
     function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external onlyOwner {
         if (eraPostLegacyBridgeUpgradeFirstBatch != 0) {
             revert SharedBridgeValueAlreadySet(SharedBridgeKey.LegacyBridgeFirstBatch);
@@ -166,7 +203,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    /// @param _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
+    /// @param _eraLegacyBridgeLastDepositBatch The the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
     function setEraLegacyBridgeLastDepositTime(
         uint256 _eraLegacyBridgeLastDepositBatch,
@@ -236,7 +273,21 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
-    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
+    /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
+    /// @param _l2BridgeAddress The address of the L2 bridge contract.
+    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwnerOrAdmin {
+        require(l2BridgeAddress[_chainId] == address(0), "ShB: l2 bridge already set");
+        require(_l2BridgeAddress != address(0), "ShB: l2 bridge 0");
+        l2BridgeAddress[_chainId] = _l2BridgeAddress;
+    }
+
+    /// @dev Reinitializes the l2Bridge address by governance for a specific chain.
+    /// @dev Only accessible to the owner of the bridge to prevent malicious admin from changing the bridge address for
+    /// an existing chain.
+    /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
+    /// @param _l2BridgeAddress The address of the L2 bridge contract.
+    function reinitializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
+        require(l2BridgeAddress[_chainId] != address(0), "ShB: l2 bridge not yet set");
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
@@ -413,8 +464,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
+            bytes memory name = abi.encode("Ether");
+            bytes memory symbol = abi.encode("ETH");
             bytes memory decimals = abi.encode(uint8(18));
             return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
         }
@@ -537,10 +588,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, _amount);
     }
 
-    /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
-    /// @return Whether withdrawal was initiated on zkSync Era before diamond proxy upgrade.
+    /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
     function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
         if ((_chainId == ERA_CHAIN_ID) && eraPostDiamondUpgradeFirstBatch == 0) {
             revert SharedBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
@@ -548,10 +599,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostDiamondUpgradeFirstBatch);
     }
 
-    /// @dev Determines if a token withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if a token withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
-    /// @return Whether withdrawal was initiated on zkSync Era before Legacy Bridge upgrade.
+    /// @return Whether withdrawal was initiated on ZKsync Era before Legacy Bridge upgrade.
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
         if ((_chainId == ERA_CHAIN_ID) && eraPostLegacyBridgeUpgradeFirstBatch == 0) {
             revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
@@ -559,11 +610,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
-    /// @dev Determines if a deposit was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if a deposit was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the deposit where it was processed.
     /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the deposit was processed.
-    /// @return Whether deposit was initiated on zkSync Era before Shared Bridge upgrade.
+    /// @return Whether deposit was initiated on ZKsync Era before Shared Bridge upgrade.
     function _isEraLegacyDeposit(
         uint256 _chainId,
         uint256 _l2BatchNumber,
@@ -632,7 +683,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
-        // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
+        // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         if (_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber)) {
             // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(
@@ -866,7 +917,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         });
     }
 
-    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on zkSync Era chain.
+    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.
     /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit`
     /// method in `L1ERC20Bridge`.
     ///

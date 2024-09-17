@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
@@ -10,6 +10,13 @@ import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1SharedBridge {
+    /// @notice pendingAdmin is changed
+    /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
+    event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
+
+    /// @notice Admin changed
+    event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
+
     event LegacyDepositInitiated(
         uint256 indexed chainId,
         bytes32 indexed l2DepositTxHash,
@@ -151,4 +158,12 @@ interface IL1SharedBridge {
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function receiveEth(uint256 _chainId) external payable;
+
+    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
+    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
+    /// @param _newPendingAdmin Address of the new admin
+    function setPendingAdmin(address _newPendingAdmin) external;
+
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    function acceptAdmin() external;
 }
