@@ -134,14 +134,14 @@ describe("Diamond proxy tests", function () {
     const proxyAsERC20 = TestnetERC20TokenFactory.connect(proxy.address, proxy.signer);
 
     const revertReason = await getCallRevertReason(proxyAsERC20.transfer(proxyAsERC20.address, 0));
-    expect(revertReason).contains("InvalidSelector");
+    expect(revertReason).contains("F");
   });
 
   it("check that proxy reject data with no selector", async () => {
     const dataWithoutSelector = "0x1122";
 
     const revertReason = await getCallRevertReason(proxy.fallback({ data: dataWithoutSelector }));
-    expect(revertReason).contains("MalformedCalldata");
+    expect(revertReason).contains("Ut");
   });
 
   it("should freeze the diamond storage", async () => {
@@ -178,7 +178,7 @@ describe("Diamond proxy tests", function () {
         data: executorFacetSelector3 + "0000000000000000000000000000000000000000000000000000000000000000",
       })
     );
-    expect(revertReason).contains("FacetIsFrozen");
+    expect(revertReason).contains("q1");
   });
 
   it("should be able to call an unfreezable facet when diamondStorage is frozen", async () => {

@@ -344,11 +344,12 @@ contract ExperimentalBridgeTest is Test {
         address randomCaller,
         uint256 randomValue
     ) public useRandomToken(randomValue) {
-        if (randomCaller != bridgeOwner) {
-            vm.prank(randomCaller);
-            vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.addToken(randomAddress);
-        }
+        vm.assume(randomCaller != bridgeOwner);
+        vm.assume(randomCaller != bridgeHub.admin());
+
+        vm.prank(randomCaller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
+        bridgeHub.addToken(randomAddress);
 
         assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
 
