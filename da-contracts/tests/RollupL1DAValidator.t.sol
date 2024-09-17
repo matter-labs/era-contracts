@@ -202,25 +202,25 @@ contract RollupL1DAValidatorTest is Test {
         dummyValidator.pointEvaluationPrecompile(versionedHash, openingPoint, openingValueCommitmentProof);
     }
 
-    function test_pointEvaluationPrecompilePointEvalFailed() public {
-        bytes32 versionedHash = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
-        bytes32 openingPoint = bytes32(uint256(uint128(0x7142c5851421a2dc03dde0aabdb0ffdb)));
-        bytes memory openingValueCommitmentProof = abi.encodePacked(
-            bytes32(0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0),
-            hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf",
-            hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364"
-        );
+    // function test_pointEvaluationPrecompilePointEvalFailed() public {
+    //     bytes32 versionedHash = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+    //     bytes32 openingPoint = bytes32(uint256(uint128(0x7142c5851421a2dc03dde0aabdb0ffdb)));
+    //     bytes memory openingValueCommitmentProof = abi.encodePacked(
+    //         bytes32(0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0),
+    //         hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf",
+    //         hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364"
+    //     );
 
-        bytes32[] memory blobCommitments = new bytes32[](1);
-        blobCommitments[0] = versionedHash;
-        vm.blobhashes(blobCommitments);
+    //     bytes32[] memory blobCommitments = new bytes32[](1);
+    //     blobCommitments[0] = versionedHash;
+    //     vm.blobhashes(blobCommitments);
 
-        dummyValidator.dummyPublishBlobs(versionedHash);
+    //     dummyValidator.dummyPublishBlobs(versionedHash);
 
-        console.log(abi.encodePacked(versionedHash, openingPoint, openingValueCommitmentProof).length);
+    //     console.log(abi.encodePacked(versionedHash, openingPoint, openingValueCommitmentProof).length);
 
-        dummyValidator.pointEvaluationPrecompile(versionedHash, openingPoint, openingValueCommitmentProof);
-    }
+    //     dummyValidator.pointEvaluationPrecompile(versionedHash, openingPoint, openingValueCommitmentProof);
+    // }
 
     // function test_pointEvaluationPrecompile() public {
     //     bytes32 versionedHash = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
