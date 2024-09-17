@@ -593,12 +593,15 @@ contract DeployL1Script is Script {
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         bridgehub.transferOwnership(addresses.governance);
+        bridgehub.setPendingAdmin(addresses.chainAdmin);
 
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
+        sharedBridge.setPendingAdmin(addresses.chainAdmin);
 
         StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         stm.transferOwnership(addresses.governance);
+        stm.setPendingAdmin(addresses.chainAdmin);
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -709,6 +712,7 @@ contract DeployL1Script is Script {
             addresses.blobVersionedHashRetriever
         );
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
+        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "bridges", bridges);
