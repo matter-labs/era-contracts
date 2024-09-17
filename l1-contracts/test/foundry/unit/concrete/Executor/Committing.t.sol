@@ -9,7 +9,7 @@ import {IExecutor, MAX_NUMBER_OF_BLOBS} from "contracts/state-transition/chain-i
 import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {TimeNotReached, BatchNumberMismatch, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, PubdataCommitmentsEmpty, L2TimestampTooBig, EmptyBlobVersionHash, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs, InvalidPubdataLength, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "contracts/common/L1ContractErrors.sol";
+import {TimeReached, BatchNumberMismatch, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, PubdataCommitmentsEmpty, L2TimestampTooBig, EmptyBlobVersionHash, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs, InvalidPubdataLength, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "contracts/common/L1ContractErrors.sol";
 
 contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {
@@ -86,7 +86,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, 1, 2));
+        vm.expectRevert(abi.encodeWithSelector(TimeReached.selector, 1, 2));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
