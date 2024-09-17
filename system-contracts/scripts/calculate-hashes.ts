@@ -100,7 +100,7 @@ const readBytecode = (details: ContractDetails): string => {
   try {
     if (details.bytecodePath.endsWith(".json")) {
       const jsonFile = fs.readFileSync(absolutePath, "utf8");
-      return ethers.utils.hexlify(JSON.parse(jsonFile).bytecode);
+      return ethers.utils.hexlify("0x" + JSON.parse(jsonFile).bytecode.object);
     } else {
       return ethers.utils.hexlify(fs.readFileSync(absolutePath));
     }
@@ -204,8 +204,8 @@ const main = async () => {
   const checkOnly = args.includes("--check-only");
 
   const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
-  const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
-  const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
+  // const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
+  const systemContractsDetails = [...solidityContractsDetails];
 
   const newSystemContractsHashes = getSystemContractsHashes(systemContractsDetails);
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
