@@ -3,39 +3,31 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-
+import "forge-std/console.sol";
 import {ValidiumL1DAValidator} from "../contracts/ValidiumL1DAValidator.sol";
+import {L1DAValidatorOutput} from "../contracts/IL1DAValidator.sol";
+import {Utils} from "./Utils.sol";
 
 contract ValidiumL1DAValidatorTest is Test {
 
     ValidiumL1DAValidator internal validium;
 
-    function test_checkDARevert() public {
-        bytes opertatorDaInput = 12;
-
-        validium.checkDA(1, 1, 1, operatorDAInput, 1);
+    function setUp() public {
+        validium = new ValidiumL1DAValidator();
     }
 
-    function test_checkDA() public {
-        bytes1 source = bytes1(0x01);
-        bytes defaultBlobCommitment = Utils.getDefaultBlobCommitment();
+    function test_checkDARevert() public {
+        bytes memory operatorDAInput = bytes("12");
+        bytes32 l2DAValidatorOutputHash = Utils.randomBytes32("");
+        vm.expectRevert("ValL1DA wrong input length");
+        validium.checkDA(1, 1, l2DAValidatorOutputHash, operatorDAInput, 1);
+    }
 
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
-        uint8 numberOfBlobs = 1;
-        bytes32[] memory blobsLinearHashes = new bytes32[](1);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
+    function test_checkDA(bytes32 operatorDAInput) public {
+        bytes memory input = abi.encode(operatorDAInput);
+        console.log(operatorDAInput.length);
+        L1DAValidatorOutput memory result = validium.checkDA(1, 1, Utils.randomBytes32(""), input, 1);
 
-        operatorDAInput = abi.encodePacked(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            numberOfBlobs,
-            blobsLinearHashes,
-            source,
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
-
-        validium.checkDA(1, 1, 1, operatorDAInput, 1);
+        assertEq(result.stateDiffHash, abi.decode(input, (bytes32)), "Invalid operator DA input");
     }
 }

@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
-
+import "forge-std/console.sol";
 import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
