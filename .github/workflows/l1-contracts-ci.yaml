@@ -138,7 +138,7 @@ jobs:
             l2-contracts/typechain
 
       - name: Run tests
-        run: yarn l1 test --no-compile
+        run: yarn l1 test
 
   check-verifier-generator:
     runs-on: ubuntu-latest
