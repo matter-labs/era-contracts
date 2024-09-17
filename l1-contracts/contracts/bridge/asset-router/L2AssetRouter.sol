@@ -101,7 +101,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
-    ) external override(AssetRouterBase) {
+    ) external override(AssetRouterBase, IAssetRouterBase) {
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
@@ -117,7 +117,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public override onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
+    ) public override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
@@ -250,7 +250,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         _withdrawSender(assetId, data, _sender, false);
     }
@@ -258,7 +258,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @notice Legacy getL1TokenAddress.
     /// @param _l2Token The address of token on L2.
     /// @return The address of token on L1.
-    function getL1TokenAddress(address _l2Token) public view returns (address) {
+    function l1TokenAddress(address _l2Token) public view returns (address) {
         return IBridgedStandardToken(_l2Token).l1Address();
     }
 

@@ -43,6 +43,9 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @dev Address of the native token vault that is used as trustee who can mint/burn tokens
     address public nativeTokenVault;
 
+    /// @dev The assetId of the token.
+    bytes32 public assetId;
+
     /// @dev This also sets the native token vault to the default value if it is not set.
     /// It is not set only on the L2s for legacy tokens.
     modifier onlyNTV() {
@@ -74,14 +77,20 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
     /// @dev Stores the L1 address of the bridge and set `name`/`symbol`/`decimals` getters that L1 token has.
+    /// @param _assetId The assetId of the token.
     /// @param _originToken Address of the origin token that can be deposited to mint this bridged token
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
-    function bridgeInitialize(address _originToken, bytes calldata _data) external initializer returns (uint256) {
+    function bridgeInitialize(
+        bytes32 _assetId,
+        address _originToken,
+        bytes calldata _data
+    ) external initializer returns (uint256) {
         if (_originToken == address(0)) {
             revert ZeroAddress();
         }
         originToken = _originToken;
+        assetId = _assetId;
 
         nativeTokenVault = msg.sender;
 

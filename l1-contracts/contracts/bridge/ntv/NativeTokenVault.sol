@@ -390,7 +390,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes memory _erc20Data,
         address _expectedToken
     ) internal {
-        address deployedToken = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
+        address deployedToken = _deployBridgedToken(_originChainId, _assetId, _originToken, _erc20Data);
         if (deployedToken != _expectedToken) {
             revert AddressMismatch(_expectedToken, deployedToken);
         }
@@ -412,13 +412,18 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @return The address of the beacon proxy (bridged token).
     function _deployBridgedToken(
         uint256 _originChainId,
+        bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
     ) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt);
-        uint256 tokenOriginChainId = BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
+        uint256 tokenOriginChainId = BridgedStandardERC20(address(l2Token)).bridgeInitialize(
+            _assetId,
+            _originToken,
+            _erc20Data
+        );
         tokenOriginChainId = tokenOriginChainId == 0 ? L1_CHAIN_ID : tokenOriginChainId;
         originChainId[DataEncoding.encodeNTVAssetId(tokenOriginChainId, _originToken)] = tokenOriginChainId;
         return address(l2Token);
