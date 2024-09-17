@@ -23,6 +23,7 @@ jobs:
         with:
           ref: ${{ inputs.commit }}
           submodules: recursive
+
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
