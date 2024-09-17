@@ -204,8 +204,8 @@ const main = async () => {
   const checkOnly = args.includes("--check-only");
 
   const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
-  // const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
-  const systemContractsDetails = [...solidityContractsDetails];
+  const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
+  const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
 
   const newSystemContractsHashes = getSystemContractsHashes(systemContractsDetails);
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);

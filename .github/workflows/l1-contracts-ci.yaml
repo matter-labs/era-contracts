@@ -18,7 +18,6 @@ jobs:
         with:
           submodules: recursive
 
-
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
@@ -38,7 +37,6 @@ jobs:
 
       - name: Build L2 artifacts
         run: cd l2-contracts/ && forge build --zksync --zk-enable-eravm-extensions
-
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -70,7 +68,7 @@ jobs:
         run: yarn lint:check
 
   test-foundry:
-    needs: [ build, lint ]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
@@ -110,7 +108,7 @@ jobs:
         run: yarn l1 test:foundry
 
   test-hardhat:
-    needs: [ build, lint ]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
@@ -167,7 +165,7 @@ jobs:
     defaults:
       run:
         working-directory: l1-contracts
-    needs: [ build, lint ]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:

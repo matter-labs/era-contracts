@@ -62,7 +62,7 @@ jobs:
         run: yarn lint:check
 
   test-bootloader:
-    needs: [ build, lint ]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
@@ -89,7 +89,7 @@ jobs:
           cargo run
 
   test-contracts:
-    needs: [ build, lint ]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
