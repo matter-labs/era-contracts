@@ -129,7 +129,7 @@ contract EvmGasManager {
         }
     }
 
-    function consumeEvmFrame() external view returns (uint256 passGas, bool isStatic) {
+    function consumeEvmFrame() external onlySystemEvm returns (uint256 passGas, bool isStatic) {
         uint256 stackDepth;
         assembly {
             stackDepth := tload(EVM_STACK_SLOT)
@@ -140,6 +140,7 @@ contract EvmGasManager {
             let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
             passGas := tload(stackPointer)
             isStatic := tload(add(stackPointer, 1))
+            tstore(stackPointer, INF_PASS_GAS) // mark as consumed
         }
     }
 
