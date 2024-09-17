@@ -31,6 +31,7 @@ contract DeployL2Script is Script {
         address l2SharedBridgeProxy;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
+        address multicall3;
         address forceDeployUpgraderAddress;
     }
 
@@ -42,6 +43,7 @@ contract DeployL2Script is Script {
         bytes l2SharedBridgeProxyBytecode;
         bytes consensusRegistryBytecode;
         bytes consensusRegistryProxyBytecode;
+        bytes multicall3Bytecode;
         bytes forceDeployUpgrader;
     }
 
@@ -64,6 +66,7 @@ contract DeployL2Script is Script {
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
+        deployMulticall3();
 
         saveOutput();
     }
@@ -117,11 +120,11 @@ contract DeployL2Script is Script {
         );
 
         if (legacyBridge) {
-            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
+            contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
                 "/../l2-contracts/artifacts-zk/contracts/dev-contracts/DevL2SharedBridge.sol/DevL2SharedBridge.json"
             );
         } else {
-            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
+            contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
                 "/../l2-contracts/zkout/L2SharedBridge.sol/L2SharedBridge.json"
             );
         }
@@ -135,6 +138,10 @@ contract DeployL2Script is Script {
         );
         contracts.consensusRegistryProxyBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+        );
+
+        contracts.multicall3Bytecode = Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
         );
 
         contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
@@ -160,6 +167,7 @@ contract DeployL2Script is Script {
         vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
         vm.serializeAddress("root", "consensus_registry_implementation", config.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", config.consensusRegistryProxy);
+        vm.serializeAddress("root", "multicall3", config.multicall3);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
@@ -261,6 +269,22 @@ contract DeployL2Script is Script {
         });
     }
 
+    function deployMulticall3() internal {
+        // Multicall3 doesn't have a constructor.
+        bytes memory constructorData = "";
+
+        config.multicall3 = Utils.deployThroughL1({
+            bytecode: contracts.multicall3Bytecode,
+            constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
     // Deploy a transparent upgradable proxy for the already deployed consensus registry
     // implementation and save its address into the config.
     function deployConsensusRegistryProxy() internal {
@@ -295,13 +319,11 @@ contract DeployL2Script is Script {
     function initializeChain() internal {
         L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
 
-        Utils.executeUpgrade({
-            _governor: bridge.owner(),
-            _salt: bytes32(0),
+        Utils.chainAdminMulticall({
+            _chainAdmin: bridge.admin(),
             _target: config.l1SharedBridgeProxy,
             _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
-            _value: 0,
-            _delay: 0
+            _value: 0
         });
     }
 }

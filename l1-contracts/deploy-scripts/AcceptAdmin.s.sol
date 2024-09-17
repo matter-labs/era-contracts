@@ -5,7 +5,10 @@ import {Script} from "forge-std/Script.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IBridgehub, IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Utils} from "./Utils.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -56,10 +59,10 @@ contract AcceptAdmin is Script {
 
     // This function should be called by the owner to accept the admin role
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
-        IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
+        IBridgehub adminContract = IBridgehub(target);
 
-        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
 
         vm.startBroadcast();
         chainAdmin.multicall(calls, true);
@@ -67,9 +70,13 @@ contract AcceptAdmin is Script {
     }
 
     // This function should be called by the owner to update token multiplier setter role
-    function chainSetTokenMultiplierSetter(address chainAdmin, address target) public {
-        IChainAdmin admin = IChainAdmin(chainAdmin);
+    function chainSetTokenMultiplierSetter(address payable chainAdmin, address target) public {
+        ChainAdmin admin = ChainAdmin(chainAdmin);
 
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.setTokenMultiplierSetter, ())});
+
+        // todo fix it
         vm.startBroadcast();
         admin.setTokenMultiplierSetter(target);
         vm.stopBroadcast();
