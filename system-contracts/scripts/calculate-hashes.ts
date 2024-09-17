@@ -42,10 +42,10 @@ const findFilesEndingWith = (path: string, endingWith: string): string[] => {
   }
 };
 
-const SOLIDITY_ARTIFACTS_DIR = "artifacts-zk";
+const SOLIDITY_ARTIFACTS_DIR = "zkout";
 
 const getSolidityContractDetails = (dir: string, contractName: string): ContractDetails => {
-  const bytecodePath = join(SOLIDITY_ARTIFACTS_DIR, dir, contractName + ".sol", contractName + ".json");
+  const bytecodePath = join(SOLIDITY_ARTIFACTS_DIR, contractName + ".sol", contractName + ".json");
   const sourceCodePath = join(dir, contractName + ".sol");
   return {
     contractName,
@@ -55,7 +55,7 @@ const getSolidityContractDetails = (dir: string, contractName: string): Contract
 };
 
 const getSolidityContractsDetails = (dir: string): ContractDetails[] => {
-  const bytecodesDir = join(SOLIDITY_ARTIFACTS_DIR, dir);
+  const bytecodesDir = SOLIDITY_ARTIFACTS_DIR;
   const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol");
   const contractNames = dirsEndingWithSol.map((d) => d.replace(".sol", ""));
   const solidityContractsDetails = contractNames.map((c) => getSolidityContractDetails(dir, c));

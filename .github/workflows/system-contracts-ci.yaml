@@ -25,9 +25,6 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      #      - name: Install dependencies
-      #        run: yarn
-
       - name: Build artifacts
         run: |
           cd system-contracts
@@ -42,11 +39,8 @@ jobs:
         with:
           key: artifacts-system-${{ github.sha }}
           path: |
-            system-contracts/artifacts-zk
-            system-contracts/cache-zk
-            system-contracts/typechain
-            system-contracts/contracts-preprocessed
-            system-contracts/bootloader/build
+            system-contracts/zkout
+            system-contracts/cache-forge
 
   lint:
     runs-on: ubuntu-latest
@@ -86,11 +80,8 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
           path: |
-            system-contracts/artifacts-zk
-            system-contracts/cache-zk
-            system-contracts/typechain
-            system-contracts/contracts-preprocessed
-            system-contracts/bootloader/build
+            system-contracts/zkout
+            system-contracts/cache-forge
 
       - name: Run bootloader tests
         run: |
@@ -125,11 +116,8 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
           path: |
-            system-contracts/artifacts-zk
-            system-contracts/cache-zk
-            system-contracts/typechain
-            system-contracts/contracts-preprocessed
-            system-contracts/bootloader/build
+            system-contracts/zkout
+            system-contracts/cache-forge
 
       - name: Run tests
         run: yarn sc test
@@ -161,11 +149,8 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
           path: |
-            system-contracts/artifacts-zk
-            system-contracts/cache-zk
-            system-contracts/typechain
-            system-contracts/contracts-preprocessed
-            system-contracts/bootloader/build
+            system-contracts/zkout
+            system-contracts/cache-forge
 
       - name: Check hashes
         run: yarn sc calculate-hashes:check
