@@ -36,7 +36,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
     bytes16 defaultBlobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
     bytes32 defaultBlobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
     bytes l2Logs;
-    bytes32 l2ProtocoUpgradeTxHash;
+    bytes32 l2ProtocolUpgradeTxHash;
 
     bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
     bytes constant POINT_EVALUATION_PRECOMPILE_RESULT =
@@ -121,7 +121,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
                 reservedDynamic: new bytes(0)
             });
         }
-        l2ProtocoUpgradeTxHash = keccak256(abi.encode(l2ProtocolUpgradeTx));
+        l2ProtocolUpgradeTxHash = keccak256(abi.encode(l2ProtocolUpgradeTx));
     }
 
     function test_SuccessfulBatchReverting() public {
@@ -167,7 +167,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
         bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransactionForCTM(
-            l2ProtocoUpgradeTxHash,
+            l2ProtocolUpgradeTxHash,
             l2DAValidatorOutputHash
         );
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
