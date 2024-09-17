@@ -7,6 +7,10 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {FacetIsFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract freezeChainTest is StateTransitionManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_FreezingChain() public {
         createNewChain(getDiamondCutData(diamondInit));
 
