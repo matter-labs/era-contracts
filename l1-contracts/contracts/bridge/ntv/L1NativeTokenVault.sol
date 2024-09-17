@@ -117,7 +117,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-        uint256 nullifierChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
+        uint256 nullifierChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
         originChainId[assetId] = block.chainid;

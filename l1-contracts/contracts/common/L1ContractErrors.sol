@@ -25,19 +25,19 @@ error RemovingPermanentRestriction();
 error UnallowedImplementation(bytes32 implementationHash);
 // 0x1ff9d522
 error AddressAlreadyUsed(address addr);
-//
+// 0x0dfb42bf
 error AddressAlreadySet(address addr);
 // 0x86bb51b8
 error AddressHasNoCode(address);
-//
+// 0x1f73225f
 error AddressMismatch(address expected, address supplied);
 // 0x1eee5481
 error AddressTooLow(address);
-//
+// 0x5e85ae73
 error AmountMustBeGreaterThanZero();
-//
+// 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
-//
+// 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 //
 error AssetIdAlreadyRegistered();

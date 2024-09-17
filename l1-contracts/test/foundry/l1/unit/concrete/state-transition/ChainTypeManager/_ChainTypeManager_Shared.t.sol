@@ -16,7 +16,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {L1GenesisUpgrade as GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
@@ -29,7 +29,7 @@ import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
-    GenesisUpgrade internal genesisUpgradeContract;
+    L1GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
     RollupL1DAValidator internal rollupL1DAValidator;
     address internal diamondInit;
@@ -41,7 +41,8 @@ contract ChainTypeManagerTest is Test {
     address internal newChainAdmin;
     uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
-    bytes internal forceDeploymentsData = "0x";
+    bytes internal forceDeploymentsData = hex"";
+    uint256 eraChainId = 9;
 
     Diamond.FacetCut[] internal facetCuts;
 
@@ -52,7 +53,7 @@ contract ChainTypeManagerTest is Test {
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
-        genesisUpgradeContract = new GenesisUpgrade();
+        genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
             Diamond.FacetCut({
