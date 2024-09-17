@@ -8,14 +8,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
-
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
@@ -38,6 +30,9 @@ jobs:
       - name: Install Slither
         run: |
           pip install slither-analyzer
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
 
       - name: Remove non-compiled files
         run: |
