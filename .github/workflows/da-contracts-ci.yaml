@@ -1,7 +1,7 @@
 name: DA Contracts Foundry CI
 
 env:
-ANVIL_RPC_URL: "http://127.0.0.1:8545"
+  ANVIL_RPC_URL: "http://127.0.0.1:8545"
 
 on:
   pull_request:
