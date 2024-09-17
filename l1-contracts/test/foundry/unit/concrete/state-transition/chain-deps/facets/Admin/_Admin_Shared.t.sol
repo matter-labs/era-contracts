@@ -38,13 +38,13 @@ contract AdminTest is Test {
         facetCuts[0] = Diamond.FacetCut({
             facet: address(new AdminFacet()),
             action: Diamond.Action.Add,
-            isFreezable: true,
+            isFreezable: false,
             selectors: getAdminSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(new UtilsFacet()),
             action: Diamond.Action.Add,
-            isFreezable: true,
+            isFreezable: false,
             selectors: Utils.getUtilsFacetSelectors()
         });
 
