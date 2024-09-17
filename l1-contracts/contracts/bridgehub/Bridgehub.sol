@@ -141,7 +141,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
-    // solhint-disable-next-line no-unused-vars
+        // solhint-disable-next-line no-unused-vars
         uint256 _salt,
         address _admin,
         bytes calldata _initData
@@ -248,13 +248,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address hyperchain = getHyperchain(_chainId);
         return
             IZkSyncHyperchain(hyperchain).proveL1ToL2TransactionStatus({
-            _l2TxHash: _l2TxHash,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof,
-            _status: _status
-        });
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: _status
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
