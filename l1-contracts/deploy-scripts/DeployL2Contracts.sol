@@ -142,7 +142,7 @@ contract DeployL2Script is Script {
         );
 
         contracts.multicall3Bytecode = Utils.readFoundryBytecode(
-            "/../l2-contracts/zkout/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
+            "/../l2-contracts/zkout/Multicall3.sol/Multicall3.json"
         );
 
         contracts.forceDeployUpgrader = Utils.readFoundryBytecode(
