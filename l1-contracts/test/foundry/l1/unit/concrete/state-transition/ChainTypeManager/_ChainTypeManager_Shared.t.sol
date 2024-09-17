@@ -41,7 +41,7 @@ contract ChainTypeManagerTest is Test {
     address internal newChainAdmin;
     uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
-    bytes internal forceDeploymentsData = hex"";
+    bytes internal forceDeploymentsData = "0x";
 
     Diamond.FacetCut[] internal facetCuts;
 
