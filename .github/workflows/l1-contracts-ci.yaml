@@ -15,6 +15,16 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -22,26 +32,21 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      - name: Install dependencies
-        run: yarn
-
       - name: Build artifacts
-        run: yarn l1 build
+        run: cd l1-contracts/ && forge build
 
       - name: Build L2 artifacts
-        run: yarn l2 build
+        run: cd l2-contracts/ && forge build --zksync --zk-enable-eravm-extensions
 
       - name: Create cache
         uses: actions/cache/save@v3
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
-            l1-contracts/artifacts
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
   lint:
     runs-on: ubuntu-latest
@@ -72,15 +77,19 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
           cache: yarn
 
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
       - name: Install dependencies
         run: yarn
 
@@ -128,7 +137,7 @@ jobs:
             l2-contracts/typechain
 
       - name: Run tests
-        run: yarn l1 test --no-compile
+        run: yarn l1 test
 
   check-verifier-generator:
     runs-on: ubuntu-latest
@@ -164,14 +173,19 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
           cache: yarn
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: yarn
