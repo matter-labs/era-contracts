@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {FeeParams} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../common/Config.sol";
 

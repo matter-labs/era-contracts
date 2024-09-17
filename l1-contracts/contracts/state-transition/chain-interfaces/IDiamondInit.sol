@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
-import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
-/// @param stateTransitionManager contract's address
+/// @param chainTypeManager contract's address
 /// @param protocolVersion initial protocol version
 /// @param validatorTimelock address of the validator timelock that delays execution
 /// @param admin address who can manage the contract
@@ -25,7 +25,7 @@ import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 struct InitializeData {
     uint256 chainId;
     address bridgehub;
-    address stateTransitionManager;
+    address chainTypeManager;
     uint256 protocolVersion;
     address admin;
     address validatorTimelock;

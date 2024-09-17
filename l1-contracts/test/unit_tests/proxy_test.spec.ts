@@ -88,7 +88,7 @@ describe("Diamond proxy tests", function () {
       {
         chainId,
         bridgehub: dummyBridgehub.address,
-        stateTransitionManager: await owner.getAddress(),
+        chainTypeManager: await owner.getAddress(),
         protocolVersion: 0,
         admin: governorAddress,
         validatorTimelock: governorAddress,

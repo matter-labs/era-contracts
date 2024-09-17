@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
 /// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IMailbox is IZkSyncHyperchainBase {
+interface IMailbox is IZKChainBase {
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message

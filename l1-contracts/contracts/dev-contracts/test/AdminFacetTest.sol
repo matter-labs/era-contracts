@@ -10,7 +10,7 @@ contract AdminFacetTest is AdminFacet {
 
     constructor(uint256 _l1ChainId) AdminFacet(_l1ChainId) {
         s.admin = msg.sender;
-        s.stateTransitionManager = msg.sender;
+        s.chainTypeManager = msg.sender;
     }
 
     function getPorterAvailability() external view returns (bool) {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 object "Bootloader" {
     code {
     }
@@ -620,10 +622,10 @@ object "Bootloader" {
                         switch isETHCall
                             case 1 {
                                 let gasLimitForTx, reservedGas := getGasLimitForTx(
-                                    innerTxDataOffset, 
-                                    transactionIndex, 
+                                    innerTxDataOffset,
+                                    transactionIndex,
                                     gasPerPubdata,
-                                    L2_TX_INTRINSIC_GAS(), 
+                                    L2_TX_INTRINSIC_GAS(),
                                     L2_TX_INTRINSIC_PUBDATA()
                                 )
 
@@ -1279,7 +1281,7 @@ object "Bootloader" {
             /// @param gasLimitForTx The L2 gas limit for the transaction validation & execution.
             /// @param gasPrice The L2 gas price that should be used by the transaction.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return gasLeft The gas left after the validation step.
             function l2TxValidation(
@@ -1343,7 +1345,7 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param gasLeft The gas left after the validation step.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return success Whether or not the execution step was successful.
             /// @return gasSpentOnExecute The gas spent on the transaction execution.
@@ -1440,7 +1442,7 @@ object "Bootloader" {
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             function ZKSYNC_NEAR_CALL_executeL2Tx(
                 abi,
@@ -1483,7 +1485,7 @@ object "Bootloader" {
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             function ZKSYNC_NEAR_CALL_markFactoryDepsL2(
                 abi,
@@ -1835,7 +1837,7 @@ object "Bootloader" {
                 debugLog("from", from)
                 debugLog("gasPrice", gasPrice)
 
-                // We assume that addresses of smart contracts on zkSync and Ethereum
+                // We assume that addresses of smart contracts on ZKsync and Ethereum
                 // never overlap, so no need to check whether `from` is an EOA here.
                 debugLog("setting tx origin", from)
 
@@ -2268,7 +2270,7 @@ object "Bootloader" {
             /// @param maxRefundedGas The maximum number of gas the bootloader can be refunded.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// This is the `maximum` number because it does not take into account the number of gas that
             /// can be spent by the paymaster itself.
             function ZKSYNC_NEAR_CALL_callPostOp(
@@ -2552,7 +2554,7 @@ object "Bootloader" {
             }
 
             ///
-            /// zkSync-specific utilities:
+            /// ZKsync-specific utilities:
             ///
 
             /// @dev Returns an ABI that can be used for low-level
@@ -2797,7 +2799,7 @@ object "Bootloader" {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
-                
+
                 ret := lt(allowedGasLimit, spentErgs)
             }
 
@@ -3587,7 +3589,7 @@ object "Bootloader" {
             }
 
             /// @dev Asks operator for the refund for the transaction. The function provides
-            /// the operator with the proposed refund gas by the bootloader, 
+            /// the operator with the proposed refund gas by the bootloader,
             /// total spent gas on the pubdata and gas per 1 byte of pubdata.
             /// This function is called before the refund stage, because at that point
             /// only the operator knows how close does a transaction
@@ -3898,17 +3900,17 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function chainedPriorityTxnHashLogKey() -> ret {
-                ret := 5
+                ret := 3
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function numberOfLayer1TxsLogKey() -> ret {
-                ret := 6
+                ret := 4
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 9
+                ret := 7
             }
 
             ////////////////////////////////////////////////////////////////////////////
