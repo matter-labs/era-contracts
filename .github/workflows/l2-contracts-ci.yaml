@@ -20,23 +20,21 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build L1 artifacts
-        run: yarn l1 build
+      - name: Build artifacts
+        run: cd l1-contracts/ && forge build
 
       - name: Build L2 artifacts
-        run: yarn l2 build
+        run: cd l2-contracts/ && forge build --zksync --zk-enable-eravm-extensions
 
       - name: Create cache
         uses: actions/cache/save@v3
         with:
-          key: artifacts-l2-${{ github.sha }}
+          key: artifacts-l1-${{ github.sha }}
           path: |
-            l1-contracts/artifacts
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
   lint:
     runs-on: ubuntu-latest
@@ -58,7 +56,7 @@ jobs:
         run: yarn lint:check
 
   test:
-    needs: [build, lint]
+    needs: [ build, lint ]
     runs-on: ubuntu-latest
 
     steps:

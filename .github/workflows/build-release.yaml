@@ -23,6 +23,14 @@ jobs:
         with:
           ref: ${{ inputs.commit }}
 
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -37,8 +45,16 @@ jobs:
 
       - name: Build contracts
         run: |
-          yarn l1 build
-          yarn l2 build
+          cd l1-contracts/ && forge build
+          cd ..
+          cd l2-contracts/ && forge build --zksync --zk-enable-eravm-extensions
+          cd ..
+          cd system-contracts 
+          yarn install
+          yarn preprocess:system-contracts
+          forge build --zksync --zk-enable-eravm-extensions
+          yarn preprocess:bootloader
+          forge build --zksync --zk-enable-eravm-extensions
           yarn sc build
 
       - name: Prepare artifacts
