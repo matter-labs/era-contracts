@@ -13,12 +13,11 @@
     "eslint-plugin-prettier": "^5.0.1",
     "ethers": "^5.7.0",
     "fast-glob": "^3.3.2",
-    "hardhat": "^2.18.3",
-    "preprocess": "^3.2.0",
-    "zksync-ethers": "^5.9.0"
+    "hardhat": "=2.22.2",
+    "preprocess": "^3.2.0"
   },
   "devDependencies": {
-    "@matterlabs/hardhat-zksync-chai-matchers": "^0.1.4",
+    "@matterlabs/hardhat-zksync-chai-matchers": "^0.2.0",
     "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
     "@matterlabs/hardhat-zksync-verify": "0.6.1",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",

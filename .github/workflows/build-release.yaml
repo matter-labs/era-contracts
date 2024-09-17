@@ -56,7 +56,6 @@ jobs:
           forge build --zksync --zk-enable-eravm-extensions
           yarn preprocess:bootloader
           forge build --zksync --zk-enable-eravm-extensions
-          yarn sc build
 
       - name: Prepare artifacts
         run: |
