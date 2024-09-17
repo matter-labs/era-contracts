@@ -95,8 +95,6 @@ error DepositDoesNotExist();
 error DepositExists();
 // 0x79cacff1
 error DepositFailed();
-// 0xae08e4af
-error DepositIncorrectAmount(uint256 expectedAmt, uint256 providedAmt);
 // 0x0e7ee319
 error DiamondAlreadyFrozen();
 // 0x682dabb4

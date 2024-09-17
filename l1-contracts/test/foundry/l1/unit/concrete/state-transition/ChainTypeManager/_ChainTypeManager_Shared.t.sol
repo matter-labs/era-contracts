@@ -24,12 +24,14 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
     GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
+    RollupL1DAValidator internal rollupL1DAValidator;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
     address internal constant admin = address(0x2020202);
@@ -121,6 +123,8 @@ contract ChainTypeManagerTest is Test {
             abi.encodeCall(ChainTypeManager.initialize, ctmInitializeData)
         );
         chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
+
+        rollupL1DAValidator = new RollupL1DAValidator();
 
         vm.stopPrank();
         vm.startPrank(governor);

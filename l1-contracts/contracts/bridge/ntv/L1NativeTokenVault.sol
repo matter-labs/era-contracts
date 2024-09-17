@@ -20,6 +20,7 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
@@ -121,6 +122,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
         originChainId[assetId] = block.chainid;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
+    }
+
+    /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
+    /// @param _originalCaller the address that called the Router
+    /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
+    function bridgeCheckCounterpartAddress(
+        uint256,
+        bytes32,
+        address _originalCaller,
+        address _assetHandlerAddressOnCounterpart
+    ) external view override onlyAssetRouter {
+        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");
     }
 
     /*//////////////////////////////////////////////////////////////
