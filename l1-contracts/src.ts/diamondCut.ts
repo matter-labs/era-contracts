@@ -3,8 +3,8 @@ import type { Interface } from "ethers/lib/utils";
 import "@nomiclabs/hardhat-ethers";
 import type { Wallet, BigNumberish } from "ethers";
 import { ethers } from "ethers";
-import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
-import { IZkSyncHyperchainBaseFactory } from "../typechain/IZkSyncHyperchainBaseFactory";
+import { IZKChainFactory } from "../typechain/IZKChainFactory";
+import { IZKChainBaseFactory } from "../typechain/IZKChainBaseFactory";
 
 export enum Action {
   Add = 0,
@@ -98,12 +98,12 @@ export async function getCurrentFacetCutsForAdd(
 }
 
 export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddress: string, updatedFaceNames: string[]) {
-  const mainContract = IZkSyncHyperchainFactory.connect(zkSyncAddress, wallet);
+  const mainContract = IZKChainFactory.connect(zkSyncAddress, wallet);
   const diamondCutFacets = await mainContract.facets();
   // We don't care about freezing, because we are removing the facets.
   const result = [];
   for (const { addr, selectors } of diamondCutFacets) {
-    const facet = IZkSyncHyperchainBaseFactory.connect(addr, wallet);
+    const facet = IZKChainBaseFactory.connect(addr, wallet);
     const facetName = await facet.getName();
     if (updatedFaceNames.includes(facetName)) {
       result.push({

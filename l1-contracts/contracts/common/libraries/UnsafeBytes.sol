@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 /**
@@ -26,6 +26,13 @@ library UnsafeBytes {
     function readAddress(bytes memory _bytes, uint256 _start) internal pure returns (address result, uint256 offset) {
         assembly {
             offset := add(_start, 20)
+            result := mload(add(_bytes, offset))
+        }
+    }
+
+    function readUint128(bytes memory _bytes, uint256 _start) internal pure returns (uint128 result, uint256 offset) {
+        assembly {
+            offset := add(_start, 16)
             result := mload(add(_bytes, offset))
         }
     }

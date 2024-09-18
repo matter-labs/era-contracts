@@ -15,6 +15,12 @@ struct ForceDeployment {
     bytes input;
 }
 
+struct ZKChainSpecificForceDeploymentsData {
+    bytes32 baseTokenAssetId;
+    address l2LegacySharedBridge;
+    address l2Weth;
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2GenesisUpgrade {
@@ -22,7 +28,8 @@ interface IL2GenesisUpgrade {
 
     function genesisUpgrade(
         uint256 _chainId,
-        address _stmDeployer,
-        bytes calldata _forceDeploymentsData
+        address _ctmDeployer,
+        bytes calldata _fixedForceDeploymentsData,
+        bytes calldata _additionalForceDeploymentsData
     ) external payable;
 }

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
 /// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IMailbox is IZkSyncHyperchainBase {
+interface IMailbox is IZKChainBase {
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -101,23 +101,14 @@ interface IMailbox is IZkSyncHyperchainBase {
     ) external returns (bytes32 canonicalTxHash);
 
     /// @dev On the Gateway the chain's mailbox receives the tx from the bridgehub.
-    function bridgehubRequestL2TransactionOnGateway(
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
+    function bridgehubRequestL2TransactionOnGateway(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) external;
 
     /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gw
     /// @param _chainId the chainId of the chain
-    /// @param _transaction the transaction to be relayed
-    /// @param _factoryDeps the factory dependencies
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp the expiration timestamp
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external returns (bytes32 canonicalTxHash);
@@ -175,4 +166,13 @@ interface IMailbox is IZkSyncHyperchainBase {
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps
     );
+
+    /// @notice New relayed priority request event. It is emitted on a chain that is deployed
+    /// on top of the gateway when it receives a request relayed via the Bridgehub.
+    /// @dev IMPORTANT: this event most likely will be removed in the future, so
+    /// no one should rely on it for indexing purposes.
+    /// @param txId Serial number of the priority operation
+    /// @param txHash keccak256 hash of encoded transaction representation
+    /// @param expirationTimestamp Timestamp up to which priority request should be processed
+    event NewRelayedPriorityTransaction(uint256 txId, bytes32 txHash, uint64 expirationTimestamp);
 }
