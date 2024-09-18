@@ -176,7 +176,28 @@ contract DeployL1Script is Script {
     function run() public {
         console.log("Deploying L1 contracts");
 
-        initializeConfig();
+        runInner(
+            "/script-config/config-deploy-l1.toml", 
+            string.concat(vm.projectRoot(), "/script-out/output-deploy-l1.toml")
+        );
+    }
+
+    function runForTest() public {
+        runInner(
+            vm.envString("L1_CONFIG"),
+            vm.envString("L1_OUTPUT")
+        );
+    }
+
+    function runInner(
+        string memory inputPath,
+        string memory outputPath
+    ) internal {
+        string memory root = vm.projectRoot();
+        inputPath = string.concat(root, inputPath);
+        outputPath = string.concat(root, outputPath);
+
+        initializeConfig(inputPath);
 
         instantiateCreate2Factory();
         deployIfNeededMulticall3();
@@ -214,7 +235,7 @@ contract DeployL1Script is Script {
 
         updateOwners();
 
-        saveOutput();
+        saveOutput(outputPath);
     }
 
     function getBridgehubProxyAddress() public view returns (address) {
@@ -245,10 +266,8 @@ contract DeployL1Script is Script {
         return config.contracts.diamondCutData;
     }
 
-    function initializeConfig() internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-l1.toml");
-        string memory toml = vm.readFile(path);
+    function initializeConfig(string memory configPath) internal {
+        string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
         config.deployerAddress = msg.sender;
@@ -902,7 +921,7 @@ contract DeployL1Script is Script {
         console.log("Owners updated");
     }
 
-    function saveOutput() internal {
+    function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
         vm.serializeAddress(
@@ -1057,8 +1076,7 @@ contract DeployL1Script is Script {
         vm.serializeString("root", "contracts_config", contractsConfig);
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
-        string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-l1.toml");
-        vm.writeToml(toml, path);
+        vm.writeToml(toml, outputPath);
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {

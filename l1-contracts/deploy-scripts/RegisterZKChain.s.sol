@@ -14,7 +14,8 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {Utils, L2ContractsBytecodes} from "./Utils.sol";
+import {Utils} from "./Utils.sol";
+import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
@@ -71,18 +72,33 @@ contract RegisterZKChainScript is Script {
 
     LegacySharedBridgeParams internal legacySharedBridgeParams;
     
-    L2ContractsBytecodes l2ContractsBytecodes;
     Config internal config;
 
     function run() public {
         console.log("Deploying ZKChain");
 
-        l2ContractsBytecodes = Utils.readL2ContractsBytecodes();
-
         initializeConfig();
-
         // TODO: some chains may not want to have a legacy shared bridge
-        setUpLegacySharedBridgeParams();
+        runInner("/script-out/output-register-zk-chain.toml", true);
+    }
+
+    function runForTest() public {
+        console.log("Deploying ZKChain");
+
+        initializeConfigTest();
+        // TODO: Yes, it is the same as for prod since it is never read from down the line 
+        runInner("/script-out/output-register-zk-chain.toml", false);
+    }
+
+    function runInner(string memory outputPath, bool initializeL2LegacyBridge) internal {
+        string memory root = vm.projectRoot();
+        outputPath = string.concat(root, outputPath);
+
+
+        if (initializeL2LegacyBridge) {
+            // This must be run before the chain is deployed
+            setUpLegacySharedBridgeParams();
+        }
 
         deployGovernance();
         deployChainAdmin();
@@ -94,9 +110,11 @@ contract RegisterZKChainScript is Script {
         configureZkSyncStateTransition();
         setPendingAdmin();
 
-        deployLegacySharedBridge();
+        if (initializeL2LegacyBridge) {
+            deployLegacySharedBridge();
+        }
 
-        saveOutput();
+        saveOutput(outputPath);
     }
 
     function initializeConfig() internal {
@@ -142,6 +160,55 @@ contract RegisterZKChainScript is Script {
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
     }
 
+    function initializeConfigTest() internal {
+        // Grab config from output of l1 deployment
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-zkChain.toml");
+        string memory toml = vm.readFile(path);
+
+        config.deployerAddress = msg.sender;
+
+        // Config file must be parsed key by key, otherwise values returned
+        // are parsed alfabetically and not by key.
+        // https://book.getfoundry.sh/cheatcodes/parse-toml
+
+        config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        // FIXME: name of the key is a bit inconsistent
+        config.chainTypeManagerProxy = toml.readAddress(
+            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        );
+        config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
+        // config.bridgehubGovernance = toml.readAddress("$.deployed_addresses.governance_addr");
+        config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
+        config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
+        config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
+
+
+        config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
+        config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
+
+        path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
+        toml = vm.readFile(path);
+
+        config.ownerAddress = toml.readAddress("$.owner_address");
+
+        config.chainChainId = toml.readUint("$.chain.chain_chain_id");
+        config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
+        config.baseToken = toml.readAddress("$.chain.base_token_addr");
+        config.validiumMode = toml.readBool("$.chain.validium_mode");
+        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
+        config.baseTokenGasPriceMultiplierNominator = uint128(
+            toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
+        );
+        config.baseTokenGasPriceMultiplierDenominator = uint128(
+            toml.readUint("$.chain.base_token_gas_price_multiplier_denominator")
+        );
+        config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
+        config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+    }
+
+
     function checkTokenAddress() internal view {
         if (config.baseToken == address(0)) {
             revert("Token address is not set");
@@ -165,7 +232,7 @@ contract RegisterZKChainScript is Script {
         address legacyBridgeImplementationAddress = L2ContractHelper.computeCreate2Address(
             msg.sender,
             "",
-            L2ContractHelper.hashL2Bytecode(l2ContractsBytecodes.l2LegacySharedBridge),
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()),
             keccak256(implemementationConstructorParams)
         );
 
@@ -173,7 +240,7 @@ contract RegisterZKChainScript is Script {
             config.sharedBridgeProxy,
             // TODO: Here we assume there is no legacy bridge for now
             address(0),
-            L2ContractHelper.hashL2Bytecode(l2ContractsBytecodes.beaconProxy),
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBeaconProxyBytecode()),
             // This is not exactly correct, this should be ecosystem governance and not chain governance
             msg.sender
         ));
@@ -189,7 +256,7 @@ contract RegisterZKChainScript is Script {
         address proxyAddress = L2ContractHelper.computeCreate2Address(
             msg.sender,
             "",
-            L2ContractHelper.hashL2Bytecode(l2ContractsBytecodes.transparentUpgradeableProxy),
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode()),
             keccak256(proxyConstructorParams)
         );
 
@@ -348,7 +415,7 @@ contract RegisterZKChainScript is Script {
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
         address correctLegacyBridgeImplAddr = Utils.deployThroughL1({
-            bytecode: l2ContractsBytecodes.l2LegacySharedBridge,
+            bytecode: L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode(),
             constructorargs: legacySharedBridgeParams.implemementationConstructorParams,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -359,7 +426,7 @@ contract RegisterZKChainScript is Script {
         });
 
         address correctProxyAddress = Utils.deployThroughL1({
-            bytecode: l2ContractsBytecodes.transparentUpgradeableProxy,
+            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
             constructorargs: legacySharedBridgeParams.proxyConstructorParams,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -377,20 +444,19 @@ contract RegisterZKChainScript is Script {
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
         bytes[] memory factoryDeps = new bytes[](3);
-        factoryDeps[0] = l2ContractsBytecodes.beaconProxy;
-        factoryDeps[1] = l2ContractsBytecodes.standardErc20;
-        factoryDeps[2] = l2ContractsBytecodes.upgradableBeacon;
+        factoryDeps[0] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
+        factoryDeps[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
+        factoryDeps[2] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
         return factoryDeps;
     }
 
-    function saveOutput() internal {
+    function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
         vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", config.l2LegacySharedBridge);
         string memory toml = vm.serializeAddress("root", "governance_addr", config.governance);
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-register-zk-chain.toml");
-        vm.writeToml(toml, path);
-        console.log("Output saved at:", path);
+        vm.writeToml(toml, outputPath);
+        console.log("Output saved at:", outputPath);
     }
 }

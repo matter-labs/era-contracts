@@ -42,7 +42,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         deployScript = new RegisterZKChainScript();
         saveZKChainConfig(_getDefaultDescription(eraZKChainId, ETH_TOKEN_ADDRESS, eraZKChainId));
         vm.warp(100);
-        deployScript.run();
+        deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
     }
 

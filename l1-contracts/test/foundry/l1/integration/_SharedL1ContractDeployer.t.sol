@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
-import {GenerateForceDeploymentsData} from "deploy-scripts/GenerateForceDeploymentsData.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -24,7 +23,6 @@ contract L1ContractDeployer is Test {
     L1NativeTokenVault public l1NativeTokenVault;
 
     DeployL1Script l1Script;
-    GenerateForceDeploymentsData forceDeploymentsScript;
 
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
@@ -33,14 +31,8 @@ contract L1ContractDeployer is Test {
             "ZK_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
-        vm.setEnv(
-            "FORCE_DEPLOYMENTS_CONFIG",
-            "/test/foundry/l1/integration/deploy-scripts/script-config/generate-force-deployments-data.toml"
-        );
-        forceDeploymentsScript = new GenerateForceDeploymentsData();
         l1Script = new DeployL1Script();
-        forceDeploymentsScript.run();
-        l1Script.run();
+        l1Script.runForTest();
 
         bridgehubProxyAddress = l1Script.getBridgehubProxyAddress();
         bridgeHub = Bridgehub(bridgehubProxyAddress);
