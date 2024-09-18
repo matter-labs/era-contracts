@@ -36,7 +36,6 @@ contract revertBatchesTest is ChainTypeManagerTest {
     bytes16 defaultBlobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
     bytes32 defaultBlobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
     bytes l2Logs;
-    bytes32 l2ProtocolUpgradeTxHash;
 
     bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
     bytes constant POINT_EVALUATION_PRECOMPILE_RESULT =
@@ -83,15 +82,13 @@ contract revertBatchesTest is ChainTypeManagerTest {
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
 
-        L2CanonicalTransaction memory l2ProtocolUpgradeTx;
-
         {
             bytes memory complexUpgraderCalldata;
             address l1CtmDeployer = address(bridgehub.l1CtmDeployer());
             {
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (chainId, l1CtmDeployer, forceDeploymentsData)
+                    (chainId, l1CtmDeployer, forceDeploymentsData, "0x")
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -101,27 +98,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
 
             // slither-disable-next-line unused-return
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(0));
-            l2ProtocolUpgradeTx = L2CanonicalTransaction({
-                txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-                from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-                to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
-                gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-                gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                maxFeePerGas: uint256(0),
-                maxPriorityFeePerGas: uint256(0),
-                paymaster: uint256(0),
-                // Note, that the protocol version is used as "nonce" for system upgrade transactions
-                nonce: minorVersion,
-                value: 0,
-                reserved: [uint256(0), 0, 0, 0],
-                data: complexUpgraderCalldata,
-                signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(new bytes[](0)),
-                paymasterInput: new bytes(0),
-                reservedDynamic: new bytes(0)
-            });
         }
-        l2ProtocolUpgradeTxHash = keccak256(abi.encode(l2ProtocolUpgradeTx));
     }
 
     function test_SuccessfulBatchReverting() public {
@@ -166,8 +143,9 @@ contract revertBatchesTest is ChainTypeManagerTest {
 
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
+        bytes32 expectedSystemContractUpgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
         bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransactionForCTM(
-            l2ProtocolUpgradeTxHash,
+            expectedSystemContractUpgradeTxHash,
             l2DAValidatorOutputHash
         );
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
@@ -220,7 +198,6 @@ contract revertBatchesTest is ChainTypeManagerTest {
         assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
         assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
-        // assertEq(entries[0].topics[3], expectedBatchCommitment); // commitment
 
         uint256 totalBatchesCommitted = gettersFacet.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -235,19 +212,6 @@ contract revertBatchesTest is ChainTypeManagerTest {
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
         });
-
-        // newCommitBatchInfo = IExecutor.CommitBatchInfo({
-        //     batchNumber: 1,
-        //     timestamp: uint64(currentTimestamp),
-        //     indexRepeatedStorageChanges: 0,
-        //     newStateRoot: Utils.randomBytes32("newStateRoot"),
-        //     numberOfLayer1Txs: 0,
-        //     priorityOperationsHash: keccak256(""),
-        //     bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
-        //     eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
-        //     systemLogs: l2Logs,
-        //     operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-        // });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
@@ -279,115 +243,5 @@ contract revertBatchesTest is ChainTypeManagerTest {
 
         uint256 totalBlocksVerified = gettersFacet.getTotalBlocksVerified();
         assertEq(totalBlocksVerified, 0, "totalBlocksVerified");
-
-        //     // Initial setup for logs & commits
-        //     vm.stopPrank();
-        //     vm.startPrank(newChainAdmin);
-
-        //     genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
-        //         batchNumber: 0,
-        //         batchHash: bytes32(uint256(0x01)),
-        //         indexRepeatedStorageChanges: 1,
-        //         numberOfLayer1Txs: 0,
-        //         priorityOperationsHash: EMPTY_STRING_KECCAK,
-        //         l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-        //         timestamp: 0,
-        //         commitment: bytes32(uint256(0x01))
-        //     });
-
-        //     adminFacet.setTokenMultiplier(1, 1);
-
-        //     uint256[] memory recursiveAggregationInput;
-        //     uint256[] memory serializedProof;
-        //     proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
-
-        //     // foundry's default value is 1 for the block's timestamp, it is expected
-        //     // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
-        //     vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
-        //     currentTimestamp = block.timestamp;
-
-        //     bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs());
-        //     newCommitBatchInfo = IExecutor.CommitBatchInfo({
-        //         batchNumber: 1,
-        //         timestamp: uint64(currentTimestamp),
-        //         indexRepeatedStorageChanges: 1,
-        //         newStateRoot: Utils.randomBytes32("newStateRoot"),
-        //         numberOfLayer1Txs: 0,
-        //         priorityOperationsHash: keccak256(""),
-        //         bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
-        //         eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
-        //         systemLogs: l2Logs,
-        //         pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-        //     });
-
-        //     // Commit & prove batches
-        //     vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
-        //     currentTimestamp = block.timestamp;
-
-        //     bytes32 expectedSystemContractUpgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
-        //     bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransaction(
-        //         expectedSystemContractUpgradeTxHash
-        //     );
-
-        //     correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
-        //         true,
-        //         L2_SYSTEM_CONTEXT_ADDRESS,
-        //         uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-        //         Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        //     );
-
-        //     correctL2Logs[uint256(uint256(SystemLogKey.PREV_BATCH_HASH_KEY))] = Utils.constructL2Log(
-        //         true,
-        //         L2_SYSTEM_CONTEXT_ADDRESS,
-        //         uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-        //         bytes32(uint256(0x01))
-        //     );
-
-        //     l2Logs = Utils.encodePacked(correctL2Logs);
-        //     newCommitBatchInfo.timestamp = uint64(currentTimestamp);
-        //     newCommitBatchInfo.systemLogs = l2Logs;
-
-        //     IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
-        //     commitBatchInfoArray[0] = newCommitBatchInfo;
-
-        //     vm.stopPrank();
-        //     vm.startPrank(validator);
-        //     vm.recordLogs();
-        //     executorFacet.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, commitBatchInfoArray);
-        //     Vm.Log[] memory entries = vm.getRecordedLogs();
-
-        //     newStoredBatchInfo = IExecutor.StoredBatchInfo({
-        //         batchNumber: 1,
-        //         batchHash: entries[0].topics[2],
-        //         indexRepeatedStorageChanges: 1,
-        //         numberOfLayer1Txs: 0,
-        //         priorityOperationsHash: keccak256(""),
-        //         l2LogsTreeRoot: 0,
-        //         timestamp: currentTimestamp,
-        //         commitment: entries[0].topics[3]
-        //     });
-
-        //     IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
-        //     storedBatchInfoArray[0] = newStoredBatchInfo;
-
-        //     executorFacet.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
-
-        //     // Test batch revert triggered from CTM
-        //     vm.stopPrank();
-        //     vm.startPrank(governor);
-
-        //     uint256 totalBlocksCommittedBefore = gettersFacet.getTotalBlocksCommitted();
-        //     assertEq(totalBlocksCommittedBefore, 1, "totalBlocksCommittedBefore");
-
-        //     uint256 totalBlocksVerifiedBefore = gettersFacet.getTotalBlocksVerified();
-        //     assertEq(totalBlocksVerifiedBefore, 1, "totalBlocksVerifiedBefore");
-
-        //     chainContractAddress.revertBatches(chainId, 0);
-
-        //     uint256 totalBlocksCommitted = gettersFacet.getTotalBlocksCommitted();
-        //     assertEq(totalBlocksCommitted, 0, "totalBlocksCommitted");
-
-        //     uint256 totalBlocksVerified = gettersFacet.getTotalBlocksVerified();
-        //     assertEq(totalBlocksVerified, 0, "totalBlocksVerified");
     }
 }

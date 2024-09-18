@@ -10,6 +10,8 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -38,6 +40,7 @@ contract ChainTypeManagerTest is Test {
     address internal constant baseToken = address(0x3030303);
     address internal constant sharedBridge = address(0x4040404);
     address internal constant validator = address(0x5050505);
+    address internal constant l1Nullifier = address(0x6060606);
     address internal newChainAdmin;
     uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
@@ -47,6 +50,13 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
+        //     constructor(
+        //     address _l1WethAddress,
+        //     address _bridgehub,
+        //     address _l1Nullifier,
+        //     uint256 _eraChainId,
+        //     address _eraDiamondProxy
+        // )
         bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
         newChainAdmin = makeAddr("chainadmin");
 
@@ -146,6 +156,18 @@ contract ChainTypeManagerTest is Test {
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
         vm.stopPrank();
         vm.startPrank(address(bridgehub));
+
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
+            abi.encode(l1Nullifier)
+        );
+
+        vm.mockCall(
+            address(l1Nullifier),
+            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
+            abi.encode(l1Nullifier)
+        );
 
         return
             chainContractAddress.createNewChain({
