@@ -12,16 +12,15 @@ contract LayerNameL1DAValidator is IL1DAValidator {
         uint256, // _batchNumber
         bytes32, // _l2DAValidatorOutputHash
         bytes calldata _operatorDAInput,
-        uint256 // maxBlobsSupported
-    ) external override returns (L1DAValidatorOutput memory output) {
+        uint256 _maxBlobsSupported
+    ) external returns (L1DAValidatorOutput memory output) {
         // - use the _l2DAValidatorOutputHash to verify that the pubdata is the data which inclusion is being verified here
         // - encode any data you need into the _operatorDAInput, feel free to define any structs you need and use `abi.decode` with them
-        // - set the output.stateDiffHash (should be a part of _operatorDAInput)
+        // - set the output.stateDiffHash (must be a part of _operatorDAInput)
 
         // just replace this with `output.stateDiffHash = YourStruct.stateDiffHash;`
-        bytes32 stateDiffHash = abi.decode(_operatorDAInput, (bytes32));
-        output.stateDiffHash = stateDiffHash;
-
-        // The rest of the fields that relate to blobs are empty as we don't use 4844 blobs in validiums
+        output.stateDiffHash = bytes32(0);
+        output.blobsLinearHashes = new bytes32[](_maxBlobsSupported);
+        output.blobsOpeningCommitments = new bytes32[](_maxBlobsSupported);
     }
 }

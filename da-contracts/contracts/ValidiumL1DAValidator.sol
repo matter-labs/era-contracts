@@ -12,7 +12,7 @@ contract ValidiumL1DAValidator is IL1DAValidator {
         uint256, // _batchNumber
         bytes32, // _l2DAValidatorOutputHash
         bytes calldata _operatorDAInput,
-        uint256 // maxBlobsSupported
+        uint256 _maxBlobsSupported
     ) external override returns (L1DAValidatorOutput memory output) {
         // For Validiums, we expect the operator to just provide the data for us.
         // We don't need to do any checks with regard to the l2DAValidatorOutputHash.
@@ -22,5 +22,7 @@ contract ValidiumL1DAValidator is IL1DAValidator {
 
         // The rest of the fields that relate to blobs are empty.
         output.stateDiffHash = stateDiffHash;
+        output.blobsLinearHashes = new bytes32[](_maxBlobsSupported);
+        output.blobsOpeningCommitments = new bytes32[](_maxBlobsSupported);
     }
 }
