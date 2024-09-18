@@ -44,13 +44,19 @@ jobs:
           yarn
           echo "release_tag=${{ inputs.prefix }}-${{ inputs.commit }}" >> $GITHUB_OUTPUT
 
-      - name: Build contracts
+      - name: Build l1 contracts
+        working-directory: l1-contracts
         run: |
-          cd l1-contracts/ && forge build
-          cd ..
-          cd l2-contracts/ && forge build --zksync --zk-enable-eravm-extensions
-          cd ..
-          cd system-contracts 
+          forge build
+
+      - name: Build l2 contracts
+        working-directory: l2-contracts
+        run: |
+          forge build --zksync --zk-enable-eravm-extensions
+
+      - name: Build system-contracts
+        working-directory: system-contracts
+        run: |
           yarn install
           yarn preprocess:system-contracts
           forge build --zksync --zk-enable-eravm-extensions
