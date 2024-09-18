@@ -238,7 +238,7 @@ contract DeployL1Script is Script {
     }
 
     function getCTM() public view returns (address) {
-        return addresses.stateTransition.stateTransitionProxy;
+        return addresses.stateTransition.chainTypeManagerProxy;
     }
 
     function getInitialDiamondCutData() public view returns (bytes memory) {
@@ -541,7 +541,7 @@ contract DeployL1Script is Script {
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ChainTypeManagerImplementation deployed at:", contractAddress);
-        addresses.stateTransition.stateTransitionImplementation = contractAddress;
+        addresses.stateTransition.chainTypeManagerImplementation = contractAddress;
     }
 
     function deployChainTypeManagerProxy() internal {
@@ -624,35 +624,35 @@ contract DeployL1Script is Script {
             abi.encodePacked(
                 type(TransparentUpgradeableProxy).creationCode,
                 abi.encode(
-                    addresses.stateTransition.stateTransitionImplementation,
+                    addresses.stateTransition.chainTypeManagerImplementation,
                     addresses.transparentProxyAdmin,
                     abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
                 )
             )
         );
         console.log("ChainTypeManagerProxy deployed at:", contractAddress);
-        addresses.stateTransition.stateTransitionProxy = contractAddress;
+        addresses.stateTransition.chainTypeManagerProxy = contractAddress;
     }
 
     function registerChainTypeManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
-        bridgehub.addChainTypeManager(addresses.stateTransition.stateTransitionProxy);
+        bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         console.log("ChainTypeManager registered");
         CTMDeploymentTracker ctmDT = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
         // vm.startBroadcast(msg.sender);
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.setAssetDeploymentTracker(
-            bytes32(uint256(uint160(addresses.stateTransition.stateTransitionProxy))),
+            bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
             address(ctmDT)
         );
         console.log("CTM DT whitelisted");
 
-        ctmDT.registerCTMAssetOnL1(addresses.stateTransition.stateTransitionProxy);
+        ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);
         vm.stopBroadcast();
         console.log("CTM registered in CTMDeploymentTracker");
 
-        bytes32 assetId = bridgehub.ctmAssetId(addresses.stateTransition.stateTransitionProxy);
+        bytes32 assetId = bridgehub.ctmAssetId(addresses.stateTransition.chainTypeManagerProxy);
         // console.log(address(bridgehub.ctmDeployer()), addresses.bridgehub.ctmDeploymentTrackerProxy);
         // console.log(address(bridgehub.ctmDeployer().BRIDGE_HUB()), addresses.bridgehub.bridgehubProxy);
         console.log(
@@ -665,7 +665,7 @@ contract DeployL1Script is Script {
     function setChainTypeManagerInValidatorTimelock() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
         vm.broadcast(msg.sender);
-        validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.stateTransitionProxy));
+        validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
         console.log("ChainTypeManager set in ValidatorTimelock");
     }
 
@@ -891,7 +891,7 @@ contract DeployL1Script is Script {
         sharedBridge.transferOwnership(addresses.governance);
         // sharedBridge.setPendingAdmin(addresses.chainAdmin);
 
-        ChainTypeManager ctm = ChainTypeManager(addresses.stateTransition.stateTransitionProxy);
+        ChainTypeManager ctm = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         ctm.transferOwnership(addresses.governance);
         ctm.setPendingAdmin(addresses.chainAdmin);
 
@@ -926,12 +926,12 @@ contract DeployL1Script is Script {
         vm.serializeAddress(
             "state_transition",
             "state_transition_proxy_addr",
-            addresses.stateTransition.stateTransitionProxy
+            addresses.stateTransition.chainTypeManagerProxy
         );
         vm.serializeAddress(
             "state_transition",
             "state_transition_implementation_addr",
-            addresses.stateTransition.stateTransitionImplementation
+            addresses.stateTransition.chainTypeManagerImplementation
         );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
         vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
