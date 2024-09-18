@@ -115,7 +115,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "CTMDT: wrong counter part");
     }
 
-    function getAssetId(address _l1CTM) public view override returns (bytes32) {
+    function calculateAssetId(address _l1CTM) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1CTM)))));
     }
 

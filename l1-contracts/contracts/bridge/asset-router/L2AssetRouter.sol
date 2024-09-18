@@ -127,6 +127,22 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /*//////////////////////////////////////////////////////////////
+                     Internal & Helpers
+    //////////////////////////////////////////////////////////////*/
+
+    // kl todo add handle Legaacy data here, which calls esureTokenRegisteredWithNTV
+    // have handleLegacyData called from somewhere. 
+
+    /// @inheritdoc AssetRouterBase
+    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assetId = nativeTokenVault.calculateAssetId(block.chainid, _token);
+        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
+            nativeTokenVault.registerToken(_token);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -136,6 +152,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
+        _withdrawSender(_assetId, _assetData, msg.sender, true);
+    }
+
+    function withdrawToken(bytes32 _assetId, bytes memory _assetData) public override {
         _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 

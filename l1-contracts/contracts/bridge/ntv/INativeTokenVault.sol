@@ -25,14 +25,17 @@ interface INativeTokenVault {
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external;
 
-    /// @notice Used to get the assetId of a token
-    function getAssetId(uint256 _chainId, address _tokenAddress) external view returns (bytes32);
+    /// @notice Used to calculate the assetId of a token
+    function calculateAssetId(uint256 _chainId, address _tokenAddress) external view returns (bytes32);
 
     /// @notice Used to get the the ERC20 data for a token
     function getERC20Getters(address _token, uint256 _originChainId) external view returns (bytes memory);
 
     /// @notice Used to get the token address of an assetId
     function tokenAddress(bytes32 assetId) external view returns (address);
+
+    /// @notice Used to get the assetId of a token
+    function assetId(address token) external view returns (bytes32);
 
     /// @notice Used to get the expected bridged token address corresponding to its native counterpart
     function calculateCreate2TokenAddress(uint256 _originChainId, address _originToken) external view returns (address);
