@@ -50,13 +50,6 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        //     constructor(
-        //     address _l1WethAddress,
-        //     address _bridgehub,
-        //     address _l1Nullifier,
-        //     uint256 _eraChainId,
-        //     address _eraDiamondProxy
-        // )
         bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
         newChainAdmin = makeAddr("chainadmin");
 

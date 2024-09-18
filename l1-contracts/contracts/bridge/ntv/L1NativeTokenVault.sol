@@ -125,12 +125,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
-    /// @param _originalCaller the address that called the Router
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
     function bridgeCheckCounterpartAddress(
         uint256,
         bytes32,
-        address _originalCaller,
+        address,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyAssetRouter {
         require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");

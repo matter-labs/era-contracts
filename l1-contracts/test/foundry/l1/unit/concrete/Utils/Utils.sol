@@ -109,52 +109,15 @@ library Utils {
     }
 
     function createSystemLogsWithEmptyDAValidator(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](7);
-        logs[0] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY),
-            bytes32("")
-        );
-        logs[1] = constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            bytes32("")
-        );
-        logs[2] = constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            bytes32("")
-        );
-        logs[3] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-            keccak256("")
-        );
-        logs[4] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32("")
-        );
-
-        logs[5] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
-            _outputHash
-        );
-        logs[6] = constructL2Log(
+        bytes[] memory systemLogs = createSystemLogs(bytes32(0));
+        systemLogs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
             bytes32(uint256(0))
         );
 
-        return logs;
+        return systemLogs;
     }
 
     function createSystemLogsWithUpgradeTransaction(
