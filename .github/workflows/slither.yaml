@@ -48,6 +48,6 @@ jobs:
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol
 
       - name: Run Slither
+        working-directory: l1-contracts
         run: |
-          cd l1-contracts
           slither --config ./slither.config.json .

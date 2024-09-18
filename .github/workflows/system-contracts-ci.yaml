@@ -28,8 +28,8 @@ jobs:
           cache: yarn
 
       - name: Build artifacts
+        working-directory: system-contracts
         run: |
-          cd system-contracts
           yarn install
           yarn preprocess:system-contracts
           forge build --zksync --zk-enable-eravm-extensions
