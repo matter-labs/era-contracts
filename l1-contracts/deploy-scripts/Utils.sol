@@ -53,6 +53,7 @@ struct L2ContractsBytecodes {
     bytes defaultUpgrade;
     bytes multicall3;
     bytes relayedSLDAValidator;
+    bytes l2LegacySharedBridge;
 }
 
 struct DAContractBytecodes {
@@ -62,8 +63,8 @@ struct DAContractBytecodes {
 
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
-    address stateTransitionProxy;
-    address stateTransitionImplementation;
+    address chainTypeManagerProxy;
+    address chainTypeManagerImplementation;
     address verifier;
     address adminFacet;
     address mailboxFacet;
@@ -842,6 +843,9 @@ library Utils {
             ),
             relayedSLDAValidator: readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/RelayedSLDAValidator.sol/RelayedSLDAValidator.json"
+            ),
+            l2LegacySharedBridge: readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/bridge/L2SharedBridgeLegacy.sol/L2SharedBridgeLegacy.json"
             )
         });
     }

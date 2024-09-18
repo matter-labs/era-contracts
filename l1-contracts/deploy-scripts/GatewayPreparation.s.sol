@@ -210,7 +210,7 @@ contract GatewayPreparation is Script {
         bytes memory bridgehubData = abi.encode(BridgehubBurnCTMAssetData({
             chainId: chainId,
             ctmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
-            chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getHyperchain(chainId)).getProtocolVersion())
+            chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
         }));
 
         // TODO: use constant for the 0x01
@@ -447,8 +447,8 @@ contract GatewayPreparation is Script {
 
     //     address newAdmin = ownable.owner();
     //     console.log("newAdmin", newAdmin);
-    //     IZKChain chain = IZKChain(bridgehub.getHyperchain(config.chainChainId));
-    //     console.log("chainAdmin", bridgehub.getHyperchain(config.chainChainId), chain.getAdmin());
+    //     IZKChain chain = IZKChain(bridgehub.getZKChain(config.chainChainId));
+    //     console.log("chainAdmin", bridgehub.getZKChain(config.chainChainId), chain.getAdmin());
     //     bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
     //     bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
     //     bytes memory ctmData = abi.encode(newAdmin, diamondCutData);

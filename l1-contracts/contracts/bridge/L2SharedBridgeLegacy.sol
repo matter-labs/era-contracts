@@ -22,10 +22,6 @@ import {ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, De
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Disable the initialization to prevent Parity hack.
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
 
@@ -57,8 +53,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         _;
     }
 
-    constructor(uint256 _eraChainId) {
-        ERA_CHAIN_ID = _eraChainId;
+    constructor() {
         _disableInitializers();
     }
 
@@ -87,18 +82,20 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
         l1SharedBridge = _l1SharedBridge;
 
-        if (block.chainid != ERA_CHAIN_ID) {
+        // FIXME: important! this logic is not needed in production and only for local testing,
+        // we should remove it.
+        // if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
-        } else {
-            if (_l1Bridge == address(0)) {
-                revert ZeroAddress();
-            }
-            l1Bridge = _l1Bridge;
-            // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
-        }
+        // } else {
+        //     if (_l1Bridge == address(0)) {
+        //         revert ZeroAddress();
+        //     }
+        //     l1Bridge = _l1Bridge;
+        //     // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
+        // }
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1

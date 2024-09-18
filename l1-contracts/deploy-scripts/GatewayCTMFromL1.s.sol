@@ -8,7 +8,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
@@ -33,7 +33,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -126,7 +126,7 @@ contract GatewayCTMFromL1 is Script {
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),
             ctmDeploymentTracker: toml.readAddress(
-                "$.stm_deployment_tracker_proxy_addr"
+                "$.ctm_deployment_tracker_proxy_addr"
             ),
             nativeTokenVault: toml.readAddress("$.native_token_vault_addr"),
             chainTypeManagerProxy: toml.readAddress(
@@ -172,7 +172,7 @@ contract GatewayCTMFromL1 is Script {
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_implementation_addr",
-            output.gatewayStateTransition.stateTransitionImplementation
+            output.gatewayStateTransition.chainTypeManagerImplementation
         );
         vm.serializeAddress("gateway_state_transition", "verifier_addr", output.gatewayStateTransition.verifier);
         vm.serializeAddress("gateway_state_transition", "admin_facet_addr", output.gatewayStateTransition.adminFacet);
@@ -289,8 +289,8 @@ contract GatewayCTMFromL1 is Script {
         address dp = address(_deployInternal(bytecodes.diamondProxy, hex""));
         console.log("Dummy diamond proxy deployed at", dp);
 
-        output.gatewayStateTransition.stateTransitionImplementation = address(_deployInternal(bytecodes.stateTransitionManager, abi.encode(L2_BRIDGEHUB_ADDRESS)));
-        console.log("StateTransitionImplementation deployed at", output.gatewayStateTransition.stateTransitionImplementation);
+        output.gatewayStateTransition.chainTypeManagerImplementation = address(_deployInternal(bytecodes.chainTypeManager, abi.encode(L2_BRIDGEHUB_ADDRESS)));
+        console.log("StateTransitionImplementation deployed at", output.gatewayStateTransition.chainTypeManagerImplementation);
 
         // FIXME: eventually a proxy admin or something should be deplyoed here
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
@@ -370,7 +370,7 @@ contract GatewayCTMFromL1 is Script {
             protocolVersion: config.latestProtocolVersion
         });
 
-        output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(bytecodes.transparentUpgradeableProxy, abi.encode(output.gatewayStateTransition.stateTransitionImplementation, deployerAddress, abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))));
+        output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(bytecodes.transparentUpgradeableProxy, abi.encode(output.gatewayStateTransition.chainTypeManagerImplementation, deployerAddress, abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))));
 
         console.log("ChainTypeManagerProxy deployed at:", output.gatewayStateTransition.chainTypeManagerProxy);
         output.gatewayStateTransition.chainTypeManagerProxy = output.gatewayStateTransition.chainTypeManagerProxy;

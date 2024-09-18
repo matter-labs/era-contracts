@@ -28,6 +28,10 @@ contract DeployL2Script is Script {
         bool validiumMode;
         // Not used right now, maybe will be needed later
         address consensusRegistryOwner;
+        // This contract is deployed in this script,
+        // buts its address was derived when the chain was created.
+        // So we'll just double check its correctness.
+        // address l2LegacySharedBridge;
     }
 
     struct DeployedContrats {
@@ -96,6 +100,7 @@ contract DeployL2Script is Script {
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
+        // config.l2LegacySharedBridge = toml.readAddress("$.l2_legacy_shared_bridge");
     }
 
     function saveOutput() internal {
@@ -144,6 +149,22 @@ contract DeployL2Script is Script {
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
     }
+
+    // function deployLegacySharedBridge() internal {
+    //     // Deploy the L2SharedBridgeLegacy implementation and save its address into the config.
+    //     bytes memory constructorData = abi.encode(config.eraChainId);
+
+    //     deployed.l2SharedBridgeImplementation = Utils.deployThroughL1({
+    //         bytecode: contracts.l2LgacySharedBridge,
+    //         constructorargs: constructorData,
+    //         create2salt: "",
+    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+    //         factoryDeps: new bytes[](0),
+    //         chainId: config.chainId,
+    //         bridgehubAddress: config.bridgehubAddress,
+    //         l1SharedBridgeProxy: config.l1SharedBridgeProxy
+    //     });
+    // }
 
     // FIXME: restore consensus registry deployment
     // // Deploy the ConsensusRegistry implementation and save its address into the config.

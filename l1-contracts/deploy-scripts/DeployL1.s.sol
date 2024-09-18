@@ -48,6 +48,7 @@ import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol"
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
@@ -701,8 +702,9 @@ contract DeployL1Script is Script {
     }
 
     function deployL1NullifierImplementation() internal {
+        // TODO: maybe allow non-dev nullifier in the local deployment
         bytes memory bytecode = abi.encodePacked(
-            type(L1Nullifier).creationCode,
+            type(L1NullifierDev).creationCode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.stateTransition.diamondProxy)
         );
