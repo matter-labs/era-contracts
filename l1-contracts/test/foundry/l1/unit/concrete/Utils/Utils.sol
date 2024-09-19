@@ -108,9 +108,9 @@ library Utils {
         return logs;
     }
 
-    function createSystemLogsWithEmptyDAValidator(bytes32 _outputHash) public returns (bytes[] memory) {
+    function createSystemLogsWithEmptyDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[6] = constructL2Log(
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
@@ -146,7 +146,7 @@ library Utils {
         for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
             logs[i] = logsWithoutUpgradeTx[i];
         }
-        logs[2] = constructL2Log(
+        logs[uint256(SystemLogKey.PREV_BATCH_HASH_KEY)] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),

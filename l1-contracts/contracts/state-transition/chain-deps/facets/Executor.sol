@@ -39,7 +39,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _;
     }
 
-    error Mismatch(bytes32, bytes32);
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage

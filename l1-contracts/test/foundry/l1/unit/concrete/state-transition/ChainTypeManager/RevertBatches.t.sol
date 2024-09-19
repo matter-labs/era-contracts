@@ -36,6 +36,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
     bytes16 defaultBlobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
     bytes32 defaultBlobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
     bytes l2Logs;
+    address newChainAddress;
 
     bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
     bytes constant POINT_EVALUATION_PRECOMPILE_RESULT =
@@ -99,10 +100,8 @@ contract revertBatchesTest is ChainTypeManagerTest {
             // slither-disable-next-line unused-return
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(0));
         }
-    }
 
-    function test_SuccessfulBatchReverting() public {
-        address newChainAddress = createNewChain(getDiamondCutData(diamondInit));
+        newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehub.getZKChain.selector),
@@ -116,6 +115,9 @@ contract revertBatchesTest is ChainTypeManagerTest {
         vm.stopPrank();
         vm.prank(newChainAdmin);
         adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
+    }
+
+    function test_SuccessfulBatchReverting() public {
         vm.startPrank(governor);
 
         bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
