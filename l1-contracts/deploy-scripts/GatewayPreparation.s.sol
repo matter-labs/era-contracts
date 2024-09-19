@@ -77,7 +77,7 @@ contract GatewayPreparation is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        // Initializing all values at once is preferrable to ensure type safety of
+        // Initializing all values at once is preferable to ensure type safety of
         // the fact that all values are initialized
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),

@@ -109,7 +109,7 @@ contract GatewayCTMFromL1 is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        // Initializing all values at once is preferrable to ensure type safety of
+        // Initializing all values at once is preferableo ensure type safety of
         // the fact that all values are initialized
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),
@@ -297,7 +297,7 @@ contract GatewayCTMFromL1 is Script {
     function deployGatewayChainTypeManager() internal {
         // We need to publish the bytecode of the diamdon proxy contract,
         // we can only do it via deploying its dummy version.
-        // We could've publshed the dependency separately, but we just repeated the code that would be
+        // We could've published the dependency separately, but we just repeated the code that would be
         // used for pure L2 execution.
         address dp = address(_deployInternal(L2ContractsBytecodesLib.readDiamondInitBytecode(), hex""));
         console.log("Dummy diamond proxy deployed at", dp);
