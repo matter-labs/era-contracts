@@ -155,8 +155,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 
-    function withdrawToken(bytes32 _assetId, bytes memory _assetData) public override {
-        _withdrawSender(_assetId, _assetData, msg.sender, true);
+    function withdrawToken(address _l2NativeToken, bytes memory _assetData) public  {
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
+        _withdrawSender(assetId, _assetData, msg.sender, true);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
