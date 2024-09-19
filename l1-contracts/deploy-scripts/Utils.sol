@@ -765,12 +765,12 @@ library Utils {
 
     function adminExecute(
         address _admin,
-        address _approveBaseTokenAdmin,
+        address _accessControlRestriction,
         address _target,
         bytes memory _data,
         uint256 _value
     ) internal {
-        address defaultAdmin = AccessControlRestriction(_approveBaseTokenAdmin).defaultAdmin();
+        address defaultAdmin = AccessControlRestriction(_accessControlRestriction).defaultAdmin();
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});

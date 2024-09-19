@@ -33,8 +33,13 @@ contract L1ContractDeployer is Test {
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
+        );
+        vm.setEnv(
+            "ZK_CHAIN_OUT",
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
+
         l1Script = new DeployL1Script();
         l1Script.runForTest();
 

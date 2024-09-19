@@ -106,14 +106,19 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         prepare();
     }
 
+    function _setUpGatewayWithFilterer() internal {
+        gatewayScript.governanceRegisterGateway();
+        gatewayScript.deployAndSetGatewayTransactionFilterer();
+    }
+
     //
     function test_registerGateway() public {
-        gatewayScript.governanceRegisterGateway();
+        _setUpGatewayWithFilterer();
     }
 
     //
     function test_moveChainToGateway() public {
-        gatewayScript.governanceRegisterGateway();
+        _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
             _extractAccessControlRestriction(migratingChain.getAdmin()),
@@ -123,7 +128,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
     }
 
     function test_l2Registration() public {
-        gatewayScript.governanceRegisterGateway();
+        _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
             _extractAccessControlRestriction(migratingChain.getAdmin()),
@@ -164,7 +169,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
     }
 
     function test_recoverFromFailedChainMigration() public {
-        gatewayScript.governanceRegisterGateway();
+        _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
             _extractAccessControlRestriction(migratingChain.getAdmin()),

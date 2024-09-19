@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -65,6 +66,7 @@ contract RegisterZKChainScript is Script {
         address chainAdmin;
         address l2LegacySharedBridge;
         address accessControlRestrictionAddress;
+        address chainProxyAdmin;
     }
 
     struct LegacySharedBridgeParams {
@@ -92,7 +94,7 @@ contract RegisterZKChainScript is Script {
 
         initializeConfigTest();
         // TODO: Yes, it is the same as for prod since it is never read from down the line 
-        runInner("/script-out/output-register-zk-chain.toml", false);
+        runInner(vm.envString("ZK_CHAIN_OUT"), false);
     }
 
     function runInner(string memory outputPath, bool initializeL2LegacyBridge) internal {
@@ -107,6 +109,7 @@ contract RegisterZKChainScript is Script {
 
         deployGovernance();
         deployChainAdmin();
+        deployChainProxyAddress();
         checkTokenAddress();
         registerAssetIdOnBridgehub();
         registerTokenOnNTV();
@@ -421,6 +424,15 @@ contract RegisterZKChainScript is Script {
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
     }
 
+    function deployChainProxyAddress() internal {
+        vm.startBroadcast();
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        proxyAdmin.transferOwnership(output.chainAdmin);
+        vm.stopBroadcast();
+        console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
+        output.chainProxyAdmin = address(proxyAdmin);
+    }
+
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
         address correctLegacyBridgeImplAddr = Utils.deployThroughL1({
@@ -464,6 +476,7 @@ contract RegisterZKChainScript is Script {
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
         vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
+        vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 
         string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
         string memory root = vm.projectRoot();

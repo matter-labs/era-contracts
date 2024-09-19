@@ -18,7 +18,8 @@ import {StateTransitionDeployedAddresses, Utils, L2ContractsBytecodes, L2_BRIDGE
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-
+import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayPreparation is Script {
@@ -37,9 +38,18 @@ contract GatewayPreparation is Script {
         address chainTypeManagerProxy;
         address sharedBridgeProxy;
         address governance;
-        uint256 chainChainId;
+        uint256 gatewayChainId;
+        address gatewayChainAdmin;
+        address gatewayAccessControlRestriction;
+        address gatewayChainProxyAdmin;
 
         bytes gatewayDiamondCutData;
+    }
+
+    struct Output {
+        bytes32 governanceL2TxHash;
+        address gatewayTransactionFiltererImplementation;
+        address gatewayTransactionFiltererProxy;
     }
 
     Config internal config;
@@ -77,16 +87,43 @@ contract GatewayPreparation is Script {
                 "$.chain_type_manager_proxy_addr"
             ),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
-            chainChainId: toml.readUint("$.chain_chain_id"),
+            gatewayChainId: toml.readUint("$.chain_chain_id"),
             governance: toml.readAddress("$.governance"),
-            gatewayDiamondCutData: toml.readBytes("$.gateway_diamond_cut_data")
+            gatewayDiamondCutData: toml.readBytes("$.gateway_diamond_cut_data"),
+            gatewayChainAdmin: toml.readAddress("$.chain_admin"),
+            gatewayAccessControlRestriction: toml.readAddress(
+                "$.access_control_restriction"
+            ),
+            gatewayChainProxyAdmin: toml.readAddress("$.chain_proxy_admin")
         });
     }
 
-    function saveOutput(bytes32 l2TxHash) internal {
-        string memory toml = vm.serializeBytes32("root", "governance_l2_tx_hash", l2TxHash);
+    function saveOutput(Output memory output) internal {
+        vm.serializeAddress("root", "gateway_transaction_filterer_implementation", output.gatewayTransactionFiltererImplementation);
+        vm.serializeAddress("root", "gateway_transaction_filterer_proxy", output.gatewayTransactionFiltererProxy);
+        string memory toml = vm.serializeBytes32("root", "governance_l2_tx_hash", output.governanceL2TxHash);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-preparation-l1.toml");
         vm.writeToml(toml, path);
+    }
+
+    function saveOutput(bytes32 governanceL2TxHash) internal {
+        Output memory output = Output({
+            governanceL2TxHash: governanceL2TxHash,
+            gatewayTransactionFiltererImplementation: address(0),
+            gatewayTransactionFiltererProxy: address(0)
+        });
+
+        saveOutput(output);
+    }
+
+    function saveOutput(address gatewayTransactionFiltererImplementation, address gatewayTransactionFiltererProxy) internal {
+        Output memory output = Output({
+            governanceL2TxHash: bytes32(0),
+            gatewayTransactionFiltererImplementation: gatewayTransactionFiltererImplementation,
+            gatewayTransactionFiltererProxy: gatewayTransactionFiltererProxy
+        });
+
+        saveOutput(output);
     }
 
     /// FIXME: include `GatewayTransactionFilterer` in the script
@@ -97,11 +134,11 @@ contract GatewayPreparation is Script {
 
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
 
-        if(bridgehub.whitelistedSettlementLayers(config.chainChainId)) {
+        if(bridgehub.whitelistedSettlementLayers(config.gatewayChainId)) {
             console.log("Chain already whitelisted as settlement layer");
         } else {
 
-            bytes memory data = abi.encodeCall(bridgehub.registerSettlementLayer, (config.chainChainId, true));
+            bytes memory data = abi.encodeCall(bridgehub.registerSettlementLayer, (config.gatewayChainId, true));
             Utils.executeUpgrade({
                 _governor: config.governance,
                 _salt: bytes32(0),
@@ -134,7 +171,7 @@ contract GatewayPreparation is Script {
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             L2_BRIDGEHUB_ADDRESS,
-            config.chainChainId,
+            config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
         );
@@ -161,7 +198,7 @@ contract GatewayPreparation is Script {
             config.governance,
             governanoceOperationSalt,
             Utils.MAX_PRIORITY_TX_GAS,
-            config.chainChainId,
+            config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
             config.sharedBridgeProxy,
@@ -183,7 +220,7 @@ contract GatewayPreparation is Script {
             config.governance,
             governanoceOperationSalt,
             Utils.MAX_PRIORITY_TX_GAS,
-            config.chainChainId,
+            config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
             config.ctmDeploymentTracker,
@@ -210,7 +247,7 @@ contract GatewayPreparation is Script {
         bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
 
         uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
-        if (currentSettlementLayer == config.chainChainId) {
+        if (currentSettlementLayer == config.gatewayChainId) {
             console.log("Chain already whitelisted as settlement layer");
             saveOutput(bytes32(0));
             return;
@@ -230,7 +267,7 @@ contract GatewayPreparation is Script {
             chainAdmin,
             accessControlRestriction,
             Utils.MAX_PRIORITY_TX_GAS,
-            config.chainChainId,
+            config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
             config.sharedBridgeProxy,
@@ -263,7 +300,7 @@ contract GatewayPreparation is Script {
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             chainDiamondProxyOnGateway,
-            config.chainChainId,
+            config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
         );
@@ -290,7 +327,7 @@ contract GatewayPreparation is Script {
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             gatewayValidatorTimelock,
-            config.chainChainId,
+            config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
         );
@@ -313,12 +350,62 @@ contract GatewayPreparation is Script {
             amount,
             new bytes[](0),
             addr,
-            config.chainChainId,
+            config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
         );
 
         saveOutput(bytes32(0));
+    }
+
+    /// The caller of this function should have private key of the admin of the *gateway*
+    function deployAndSetGatewayTransactionFilterer() public {
+        initializeConfig();
+
+        GatewayTransactionFilterer impl = new GatewayTransactionFilterer(
+            IBridgehub(config.bridgehub),
+            config.sharedBridgeProxy
+        );  
+
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(impl),
+            config.gatewayChainProxyAdmin,
+            abi.encodeCall(GatewayTransactionFilterer.initialize, (config.gatewayChainAdmin))
+        );
+
+        GatewayTransactionFilterer proxyAsFilterer = GatewayTransactionFilterer(address(proxy));
+
+        IZKChain chain = IZKChain(IBridgehub(config.bridgehub).getZKChain(config.gatewayChainId));
+
+        // Firstly, we set the filterer
+        Utils.adminExecute({
+            _admin: config.gatewayChainAdmin,
+            _accessControlRestriction: config.gatewayAccessControlRestriction,
+            _target: address(chain),
+            _data: abi.encodeCall(IAdmin.setTransactionFilterer, (address(proxyAsFilterer))),
+            _value: 0
+        });
+
+        grantWhitelist(address(proxy), config.gatewayChainAdmin);
+        grantWhitelist(address(proxy), config.sharedBridgeProxy);
+        grantWhitelist(address(proxy), config.ctmDeploymentTracker);
+
+        // Then, we grant the whitelist to a few addresses
+
+        saveOutput(address(impl), address(proxy));
+    }
+
+    function grantWhitelist(
+        address filtererProxy,
+        address addr
+    ) public {
+        Utils.adminExecute({
+            _admin: config.gatewayChainAdmin,
+            _accessControlRestriction: config.gatewayAccessControlRestriction,
+            _target: address(filtererProxy),
+            _data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (addr)),
+            _value: 0
+        });
     }
 
 
@@ -348,7 +435,7 @@ contract GatewayPreparation is Script {
     //         create2salt: bytes32(0),
     //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
     //         factoryDeps: emoptyDeps, 
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         bridgehubAddress: config.bridgehub,
     //         l1SharedBridgeProxy: config.sharedBridgeProxy
     //     });
@@ -359,7 +446,7 @@ contract GatewayPreparation is Script {
     //         create2salt: bytes32(0),
     //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
     //         factoryDeps: emoptyDeps, 
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         bridgehubAddress: config.bridgehub,
     //         l1SharedBridgeProxy: config.sharedBridgeProxy
     //     });
@@ -370,7 +457,7 @@ contract GatewayPreparation is Script {
     //         create2salt: bytes32(0),
     //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
     //         factoryDeps: emoptyDeps, 
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         bridgehubAddress: config.bridgehub,
     //         l1SharedBridgeProxy: config.sharedBridgeProxy
     //     });
@@ -381,7 +468,7 @@ contract GatewayPreparation is Script {
     //         create2salt: bytes32(0),
     //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
     //         factoryDeps: emoptyDeps, 
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         bridgehubAddress: config.bridgehub,
     //         l1SharedBridgeProxy: config.sharedBridgeProxy
     //     });
@@ -403,7 +490,7 @@ contract GatewayPreparation is Script {
     //         create2salt: bytes32(0),
     //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
     //         factoryDeps: emoptyDeps, 
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         bridgehubAddress: config.bridgehub,
     //         l1SharedBridgeProxy: config.sharedBridgeProxy
     //     });
@@ -420,7 +507,7 @@ contract GatewayPreparation is Script {
     //         create2salt: bytes32(0),
     //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
     //         factoryDeps: emoptyDeps, 
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         bridgehubAddress: config.bridgehub,
     //         l1SharedBridgeProxy: config.sharedBridgeProxy
     //     });
@@ -464,14 +551,14 @@ contract GatewayPreparation is Script {
 
     //     address newAdmin = ownable.owner();
     //     console.log("newAdmin", newAdmin);
-    //     IZKChain chain = IZKChain(bridgehub.getZKChain(config.chainChainId));
-    //     console.log("chainAdmin", bridgehub.getZKChain(config.chainChainId), chain.getAdmin());
-    //     bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
+    //     IZKChain chain = IZKChain(bridgehub.getZKChain(config.gatewayChainId));
+    //     console.log("chainAdmin", bridgehub.getZKChain(config.gatewayChainId), chain.getAdmin());
+    //     bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(config.gatewayChainId);
     //     bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
     //     bytes memory ctmData = abi.encode(newAdmin, diamondCutData);
     //     bytes memory chainData = abi.encode(chain.getProtocolVersion());
     //     BridgehubBurnCTMAssetData memory ctmAssetData = BridgehubBurnCTMAssetData({
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         ctmData: ctmData,
     //         chainData: chainData
     //     });
@@ -504,16 +591,16 @@ contract GatewayPreparation is Script {
     //     uint256 l2GasLimit = 72000000;
 
     //     uint256 expectedCost = bridgehub.l2TransactionBaseCost(
-    //         config.chainChainId,
+    //         config.gatewayChainId,
     //         gasPrice,
     //         l2GasLimit,
     //         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
     //     ) * 2;
-    //     bytes32 assetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
+    //     bytes32 assetId = bridgehub.ctmAssetIdFromChainId(config.gatewayChainId);
     //     bytes memory routerData = bytes.concat(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDR));
     //     L2TransactionRequestTwoBridgesOuter
     //         memory assetRouterRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
-    //             chainId: config.chainChainId,
+    //             chainId: config.gatewayChainId,
     //             mintValue: expectedCost,
     //             l2Value: 0,
     //             l2GasLimit: l2GasLimit,
@@ -525,7 +612,7 @@ contract GatewayPreparation is Script {
     //         });
 
     //     L2TransactionRequestTwoBridgesOuter memory bridehubRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
-    //         chainId: config.chainChainId,
+    //         chainId: config.gatewayChainId,
     //         mintValue: expectedCost,
     //         l2Value: 0,
     //         l2GasLimit: l2GasLimit,

@@ -27,9 +27,16 @@ contract GatewayPreparationForTests is GatewayPreparation {
         path = string.concat(root, vm.envString("GATEWAY_CONFIG"));
         toml = vm.readFile(path);
 
-        config.chainChainId = toml.readUint("$.chain.chain_chain_id");
+        config.gatewayChainId = toml.readUint("$.chain.chain_chain_id");
 
-        console.log("chain chain id = ", config.chainChainId);
+        path = string.concat(root, vm.envString("GATEWAY_OUTPUT"));
+        toml = vm.readFile(path);
+
+        config.gatewayChainAdmin = toml.readAddress("$.chain_admin_addr");
+        config.gatewayChainProxyAdmin = toml.readAddress("$.chain_proxy_admin_addr");
+        config.gatewayAccessControlRestriction = toml.readAddress("$.deployed_addresses.access_control_restriction_addr");
+
+        console.log("chain chain id = ", config.gatewayChainId);
 
 
         // This value is never checked in the integration tests
