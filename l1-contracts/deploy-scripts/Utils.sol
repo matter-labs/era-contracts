@@ -466,14 +466,14 @@ library Utils {
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequesCalldata = abi.encodeCall(
+        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
             Bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequesCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -604,7 +604,7 @@ library Utils {
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequesCalldata = abi.encodeCall(
+        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
             Bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
@@ -615,7 +615,7 @@ library Utils {
             admin,
             accessControlRestriction,
             bridgehubAddress,
-            l2TransactionRequesCalldata,
+            l2TransactionRequestCalldata,
             requiredValueToDeploy
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();

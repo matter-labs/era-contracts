@@ -13,7 +13,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-bytes32 constant SET_TOKEN_MULITPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULITPLIER_SETTER_ROLE");
+bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
 contract AcceptAdmin is Script {
     using stdToml for string;
@@ -81,20 +81,20 @@ contract AcceptAdmin is Script {
 
         if (
             restriction.requiredRoles(diamondProxyAddress, IAdmin.setTokenMultiplier.selector) !=
-            SET_TOKEN_MULITPLIER_SETTER_ROLE
+            SET_TOKEN_MULTIPLIER_SETTER_ROLE
         ) {
             vm.startBroadcast();
             restriction.setRequiredRoleForCall(
                 diamondProxyAddress,
                 IAdmin.setTokenMultiplier.selector,
-                SET_TOKEN_MULITPLIER_SETTER_ROLE
+                SET_TOKEN_MULTIPLIER_SETTER_ROLE
             );
             vm.stopBroadcast();
         }
 
-        if (!restriction.hasRole(SET_TOKEN_MULITPLIER_SETTER_ROLE, setter)) {
+        if (!restriction.hasRole(SET_TOKEN_MULTIPLIER_SETTER_ROLE, setter)) {
             vm.startBroadcast();
-            restriction.grantRole(SET_TOKEN_MULITPLIER_SETTER_ROLE, setter);
+            restriction.grantRole(SET_TOKEN_MULTIPLIER_SETTER_ROLE, setter);
             vm.stopBroadcast();
         }
     }

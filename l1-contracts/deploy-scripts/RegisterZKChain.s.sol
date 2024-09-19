@@ -70,7 +70,7 @@ contract RegisterZKChainScript is Script {
     }
 
     struct LegacySharedBridgeParams {
-        bytes implemementationConstructorParams;
+        bytes implementationConstructorParams;
         address implementationAddress;
         bytes proxyConstructorParams;
         address proxyAddress;
@@ -236,13 +236,13 @@ contract RegisterZKChainScript is Script {
     }
 
     function setUpLegacySharedBridgeParams() internal {
-        bytes memory implemementationConstructorParams = hex"";
+        bytes memory implementationConstructorParams = hex"";
 
         address legacyBridgeImplementationAddress = L2ContractHelper.computeCreate2Address(
             msg.sender,
             "",
             L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()),
-            keccak256(implemementationConstructorParams)
+            keccak256(implementationConstructorParams)
         );
 
         bytes memory proxyInitializationParams = abi.encodeCall(
@@ -274,7 +274,7 @@ contract RegisterZKChainScript is Script {
         L1NullifierDev(config.l1Nullifier).setL2LegacySharedBridge(config.chainChainId, proxyAddress);
 
         legacySharedBridgeParams = LegacySharedBridgeParams({
-            implemementationConstructorParams: implemementationConstructorParams,
+            implementationConstructorParams: implementationConstructorParams,
             implementationAddress: legacyBridgeImplementationAddress,
             proxyConstructorParams: proxyConstructorParams,
             proxyAddress: proxyAddress
@@ -435,7 +435,7 @@ contract RegisterZKChainScript is Script {
         bytes[] memory emptyDeps = new bytes[](0);
         address correctLegacyBridgeImplAddr = Utils.deployThroughL1({
             bytecode: L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode(),
-            constructorargs: legacySharedBridgeParams.implemementationConstructorParams,
+            constructorargs: legacySharedBridgeParams.implementationConstructorParams,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: emptyDeps,
