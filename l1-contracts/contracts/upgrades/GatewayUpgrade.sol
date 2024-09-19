@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
 
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
@@ -19,7 +19,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This upgrade will be used to migrate Era to be part of the hyperchain ecosystem contracts.
+/// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
 contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
@@ -40,7 +40,9 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
 
         s.baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.__DEPRECATED_baseToken);
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        IBridgehub(s.bridgehub).setLegacyBaseTokenAssetId(s.chainId);
+        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        s.baseTokenBridge = bridgehub.sharedBridge(); // we change the assetRouter
+        bridgehub.setLegacyBaseTokenAssetId(s.chainId);
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         address l2LegacyBridge = IL1SharedBridgeLegacy(s.baseTokenBridge).l2BridgeAddress(s.chainId);
         proposedUpgrade.l2ProtocolUpgradeTx.data = bytes.concat(

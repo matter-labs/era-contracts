@@ -6,7 +6,7 @@ import { SYSTEM_CONTRACTS } from "./constants";
 import { query } from "./utils";
 import { Command } from "commander";
 import * as fs from "fs";
-import { sleep } from "zksync-ethers/build/src/utils";
+import { sleep } from "zksync-ethers/build/utils";
 
 const VERIFICATION_URL = hre.network?.config?.verifyURL;
 

@@ -4,7 +4,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
-import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ForceDeployment} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
@@ -33,6 +33,7 @@ contract GenerateForceDeploymentsData is Script {
         bytes l2StandardErc20FactoryBytecode;
         bytes l2TokenProxyBytecode;
         bytes l2StandardErc20Bytecode;
+        bytes messageRootBytecode;
     }
 
     function run() public {
@@ -47,23 +48,26 @@ contract GenerateForceDeploymentsData is Script {
     function loadContracts() internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+            "/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
         contracts.l2TokenProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+            "/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
         );
         contracts.l2StandardErc20Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+            "/artifacts-zk/contracts/bridge/BridgedStandardERC20.sol/BridgedStandardERC20.json"
         );
 
         contracts.l2AssetRouterBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2AssetRouter.sol/L2AssetRouter.json"
+            "/artifacts-zk/contracts/bridge/asset-router/L2AssetRouter.sol/L2AssetRouter.json"
         );
         contracts.bridgehubBytecode = Utils.readHardhatBytecode(
             "/../l1-contracts/artifacts-zk/contracts/bridgehub/Bridgehub.sol/Bridgehub.json"
         );
+        contracts.messageRootBytecode = Utils.readHardhatBytecode(
+            "/../l1-contracts/artifacts-zk/contracts/bridgehub/MessageRoot.sol/MessageRoot.json"
+        );
         contracts.l2NtvBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2NativeTokenVault.sol/L2NativeTokenVault.json"
+            "/artifacts-zk/contracts/bridge/ntv/L2NativeTokenVault.sol/L2NativeTokenVault.json"
         );
     }
 
@@ -89,40 +93,8 @@ contract GenerateForceDeploymentsData is Script {
 
     function genesisForceDeploymentsData() internal {
         address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-        ForceDeployment[] memory forceDeployments = new ForceDeployment[](3);
+        ForceDeployment[] memory forceDeployments = new ForceDeployment[](4);
 
-        forceDeployments[0] = ForceDeployment({
-            bytecodeHash: keccak256(contracts.bridgehubBytecode),
-            newAddress: L2_BRIDGEHUB_ADDR,
-            callConstructor: true,
-            value: 0,
-            input: abi.encode(config.chainId, aliasedGovernance)
-        });
-
-        forceDeployments[1] = ForceDeployment({
-            bytecodeHash: keccak256(contracts.l2AssetRouterBytecode),
-            newAddress: L2_ASSET_ROUTER_ADDR,
-            callConstructor: true,
-            value: 0,
-            // solhint-disable-next-line func-named-parameters
-            input: abi.encode(config.chainId, config.eraChainId, config.l1AssetRouterProxy, address(1))
-        });
-
-        forceDeployments[2] = ForceDeployment({
-            bytecodeHash: keccak256(contracts.l2NtvBytecode),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
-            callConstructor: true,
-            value: 0,
-            // solhint-disable-next-line func-named-parameters
-            input: abi.encode(
-                config.chainId,
-                aliasedGovernance,
-                keccak256(contracts.l2TokenProxyBytecode),
-                config.l2LegacySharedBridge,
-                config.l2TokenBeacon,
-                config.contractsDeployedAlready
-            )
-        });
         config.forceDeploymentsData = abi.encode(forceDeployments);
     }
 }

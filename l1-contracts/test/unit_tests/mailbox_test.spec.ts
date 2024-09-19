@@ -107,7 +107,7 @@ describe("Mailbox tests", function () {
       )
     );
 
-    expect(revertReason).equal("pq");
+    expect(revertReason).contains("LengthIsNotDivisibleBy32(63)");
   });
 
   it("Should not accept bytecode of even length in words", async () => {
@@ -124,7 +124,7 @@ describe("Mailbox tests", function () {
       )
     );
 
-    expect(revertReason).equal("ps");
+    expect(revertReason).contains("MalformedBytecode");
   });
 
   describe("finalizeEthWithdrawal", function () {
@@ -169,21 +169,21 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+      expect(revertReason).contains("OnlyEraSupported");
     });
 
     it("Successful withdrawal", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+      expect(revertReason).contains("OnlyEraSupported");
     });
 
     it("Reverts when withdrawal is already finalized", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+      expect(revertReason).contains("OnlyEraSupported");
     });
   });
 

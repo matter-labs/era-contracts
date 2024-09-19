@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {MSG_VALUE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS, L1_MESSENGER_CONTRACT} from "./Constants.sol";
 import {IMailbox} from "./interfaces/IMailbox.sol";
 import {Unauthorized, InsufficientFunds} from "./SystemContractErrors.sol";
@@ -16,7 +16,7 @@ import {Unauthorized, InsufficientFunds} from "./SystemContractErrors.sol";
  * Instead, this contract is used by the bootloader and `MsgValueSimulator`/`ContractDeployer` system contracts
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
-contract L2BaseToken is IBaseToken, ISystemContract {
+contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @notice The balances of the users.
     mapping(address account => uint256 balance) internal balance;
 

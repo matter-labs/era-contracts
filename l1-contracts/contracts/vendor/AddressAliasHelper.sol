@@ -15,8 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 library AddressAliasHelper {
     uint160 private constant offset = uint160(0x1111000000000000000000000000000000001111);
@@ -43,19 +43,20 @@ library AddressAliasHelper {
 
     /// @notice Utility function used to calculate the correct refund recipient
     /// @param _refundRecipient the address that should receive the refund
-    /// @param _prevMsgSender the address that triggered the tx to L2
+    /// @param _originalCaller the address that triggered the tx to L2
     /// @return _recipient the corrected address that should receive the refund
     function actualRefundRecipient(
         address _refundRecipient,
-        address _prevMsgSender
+        address _originalCaller
     ) internal view returns (address _recipient) {
         if (_refundRecipient == address(0)) {
-            // If the `_refundRecipient` is not provided, we use the `_prevMsgSender` as the recipient.
+            // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
-            _recipient = _prevMsgSender == tx.origin
-                ? _prevMsgSender
-                : AddressAliasHelper.applyL1ToL2Alias(_prevMsgSender);
+            _recipient = _originalCaller == tx.origin
+                ? _originalCaller
+                : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
+            // solhint-enable avoid-tx-origin
         } else if (_refundRecipient.code.length > 0) {
             // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
             _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);

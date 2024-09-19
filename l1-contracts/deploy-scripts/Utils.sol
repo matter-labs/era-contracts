@@ -5,11 +5,11 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -231,7 +231,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal {
-        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
         uint256 requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
@@ -286,6 +286,17 @@ library Utils {
     }
 
     /**
+     * @dev Read foundry bytecodes
+     */
+    function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, artifactPath);
+        string memory json = vm.readFile(path);
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
+        return bytecode;
+    }
+
+    /**
      * @dev Read hardhat bytecodes
      */
     function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
@@ -307,8 +318,8 @@ library Utils {
         IGovernance governance = IGovernance(_governor);
         Ownable ownable = Ownable(_governor);
 
-        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
-        calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: _value, data: _data});
 
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,

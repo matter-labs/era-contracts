@@ -113,6 +113,57 @@ jobs:
         working-directory: ./l1-contracts
         run: FOUNDRY_PROFILE=default yarn test:foundry
 
+  test-foundry-zksync:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build system contract artifacts
+        run: yarn sc build
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/artifacts-zk
+            l1-contracts/cache
+            l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+            l1-contracts/lib
+
+      - name: Install foundry zksync
+        run: |
+          wget https://github.com/matter-labs/foundry-zksync/releases/download/nightly-f908ce43834bc1ffb4de6576ea5600eaab49dddb/foundry_nightly_linux_amd64.tar.gz -O foundry-zksync.tar.gz
+          tar -xzf foundry-zksync.tar.gz
+          sudo mv forge /usr/local/bin/forge
+          sudo mv cast /usr/local/bin/cast
+          sudo chmod +x /usr/local/bin/forge
+          sudo chmod +x /usr/local/bin/cast
+          forge --version
+
+      - name: Run tests
+        working-directory: ./l1-contracts
+        run: FOUNDRY_PROFILE=default yarn test:zkfoundry
+
   test-hardhat:
     needs: [build, lint]
     runs-on: ubuntu-latest
@@ -149,10 +200,13 @@ jobs:
             l2-contracts/typechain
             l1-contracts/lib
 
+      - name: Build L2 contracts
+        run: yarn l2 build
+
       - name: Run tests
         run: yarn l1 test --no-compile
 
-  check-verifier-generator:
+  check-verifier-generator-l1:
     runs-on: ubuntu-latest
 
     steps:
@@ -226,7 +280,7 @@ jobs:
       - name: Filter directories
         run: |
           sudo apt update && sudo apt install -y lcov
-          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' --output-file lcov.info --rc lcov_branch_coverage=1
+          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' '../lib/forge-std/*' '../lib/murky/*' 'lib/*' '../lib/*' 'lib/' --output-file lcov.info --rc lcov_branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is

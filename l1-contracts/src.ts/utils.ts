@@ -31,6 +31,10 @@ export function readInterface(path: string, fileName: string) {
   return new ethers.utils.Interface(abi);
 }
 
+export function readContract(path: string, fileName: string) {
+  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" }));
+}
+
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
   // For getting the consistent length we first convert the bytecode to UInt8Array
   const bytecodeAsArray = ethers.utils.arrayify(bytecode);
@@ -280,7 +284,7 @@ export function compileInitialCutHash(
     {
       chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
       bridgehub: "0x0000000000000000000000000000000000001234",
-      stateTransitionManager: "0x0000000000000000000000000000000000002234",
+      chainTypeManager: "0x0000000000000000000000000000000000002234",
       protocolVersion: "0x0000000000000000000000000000000000002234",
       admin: "0x0000000000000000000000000000000000003234",
       validatorTimelock: "0x0000000000000000000000000000000000004234",

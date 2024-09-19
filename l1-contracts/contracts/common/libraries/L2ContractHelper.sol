@@ -1,10 +1,42 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-// solhint-disable gas-custom-errors
+import {BytecodeError, MalformedBytecode, LengthIsNotDivisibleBy32} from "../L1ContractErrors.sol";
 
 import {UncheckedMath} from "./UncheckedMath.sol";
+import {L2_MESSENGER} from "../L2ContractAddresses.sol";
+
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for the contract that is used to deploy contracts on L2.
+ */
+interface IContractDeployer {
+    /// @notice A struct that describes a forced deployment on an address.
+    /// @param bytecodeHash The bytecode hash to put on an address.
+    /// @param newAddress The address on which to deploy the bytecodehash to.
+    /// @param callConstructor Whether to run the constructor on the force deployment.
+    /// @param value The `msg.value` with which to initialize a contract.
+    /// @param input The constructor calldata.
+    struct ForceDeployment {
+        bytes32 bytecodeHash;
+        address newAddress;
+        bool callConstructor;
+        uint256 value;
+        bytes input;
+    }
+
+    /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
+    /// @param _deployParams A set of parameters describing force deployment.
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external payable;
+
+    /// @notice Creates a new contract at a determined address using the `CREATE2` salt on L2
+    /// @param _salt a unique value to create the deterministic address of the new contract
+    /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
+    /// @param _input the calldata to be sent to the constructor of the new contract
+    function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
+}
 
 /**
  * @author Matter Labs
@@ -17,6 +49,13 @@ library L2ContractHelper {
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
+    /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
+    /// @param _message Data to be sent to L1.
+    /// @return keccak256 hash of the sent message.
+    function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
+        return L2_MESSENGER.sendToL1(_message);
+    }
+
     /// @notice Validate the bytecode format and calculate its hash.
     /// @param _bytecode The bytecode to hash.
     /// @return hashedBytecode The 32-byte hash of the bytecode.
@@ -26,11 +65,19 @@ library L2ContractHelper {
     /// - Bytecode words length is not odd
     function hashL2Bytecode(bytes memory _bytecode) internal pure returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
-        require(_bytecode.length % 32 == 0, "pq");
+        if (_bytecode.length % 32 != 0) {
+            revert LengthIsNotDivisibleBy32(_bytecode.length);
+        }
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;
-        require(bytecodeLenInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
-        require(bytecodeLenInWords % 2 == 1, "ps"); // bytecode length in words must be odd
+        // bytecode length must be less than 2^16 words
+        if (bytecodeLenInWords >= 2 ** 16) {
+            revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+        // bytecode length in words must be odd
+        if (bytecodeLenInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
         hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
@@ -44,9 +91,15 @@ library L2ContractHelper {
     /// @param _bytecodeHash The hash of the bytecode to validate.
     function validateBytecodeHash(bytes32 _bytecodeHash) internal pure {
         uint8 version = uint8(_bytecodeHash[0]);
-        require(version == 1 && _bytecodeHash[1] == bytes1(0), "zf"); // Incorrectly formatted bytecodeHash
+        // Incorrectly formatted bytecodeHash
+        if (version != 1 || _bytecodeHash[1] != bytes1(0)) {
+            revert MalformedBytecode(BytecodeError.Version);
+        }
 
-        require(bytecodeLen(_bytecodeHash) % 2 == 1, "uy"); // Code length in words must be odd
+        // Code length in words must be odd
+        if (bytecodeLen(_bytecodeHash) % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
     }
 
     /// @notice Returns the length of the bytecode associated with the given hash.

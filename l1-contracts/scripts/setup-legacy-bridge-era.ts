@@ -17,7 +17,7 @@ import { ethTestConfig } from "../src.ts/constants";
 import { getAddressFromEnv } from "../src.ts/utils";
 import { hashL2Bytecode } from "../../l2-contracts/src/utils";
 import { Provider } from "zksync-ethers";
-import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json");
+import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json");
 
 const provider = web3Provider();
 
@@ -65,7 +65,9 @@ async function main() {
 
       await deployer.deploySharedBridgeImplementation(create2Salt, { nonce });
 
-      const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
+      const proxyAdminInterface = new Interface(
+        hardhat.artifacts.readArtifactSync("@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin").abi
+      );
       let calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
         deployer.addresses.Bridges.SharedBridgeProxy,
         deployer.addresses.Bridges.SharedBridgeImplementation,

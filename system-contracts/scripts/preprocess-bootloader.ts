@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 import { render, renderFile } from "template-file";
 import { utils } from "zksync-ethers";
 import { getRevertSelector, getTransactionUtils } from "./constants";
+import * as fs from "node:fs";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const preprocess = require("preprocess");
@@ -17,9 +18,16 @@ const OUTPUT_DIR = "bootloader/build";
 const PREPROCCESING_MODES = ["proved_batch", "playground_batch"];
 
 function getSelector(contractName: string, method: string): string {
-  const artifact = hre.artifacts.readArtifactSync(contractName);
-  const contractInterface = new ethers.utils.Interface(artifact.abi);
-
+  let contractInterface;
+  try {
+    const artifact = hre.artifacts.readArtifactSync(contractName);
+    contractInterface = new ethers.utils.Interface(artifact.abi);
+  } catch (e) {
+    const artifact = JSON.parse(
+      fs.readFileSync(`zkout/${contractName}.sol/${contractName}.json`, { encoding: "utf-8" })
+    );
+    contractInterface = new ethers.utils.Interface(artifact.abi);
+  }
   return contractInterface.getSighash(method);
 }
 
@@ -33,6 +41,7 @@ function padZeroRight(hexData: string, length: number): string {
 }
 
 const PADDED_SELECTOR_LENGTH = 32 * 2 + 2;
+
 function getPaddedSelector(contractName: string, method: string): string {
   const result = getSelector(contractName, method);
 
@@ -40,7 +49,13 @@ function getPaddedSelector(contractName: string, method: string): string {
 }
 
 function getSystemContextCodeHash() {
-  const bytecode = hre.artifacts.readArtifactSync("SystemContext").bytecode;
+  let bytecode;
+  try {
+    const artifact = JSON.parse(fs.readFileSync("zkout/SystemContext.sol/SystemContext.json", { encoding: "utf-8" }));
+    bytecode = "0x" + artifact.bytecode.object;
+  } catch (e) {
+    bytecode = hre.artifacts.readArtifactSync("SystemContext").bytecode;
+  }
   return ethers.utils.hexlify(utils.hashBytecode(bytecode));
 }
 

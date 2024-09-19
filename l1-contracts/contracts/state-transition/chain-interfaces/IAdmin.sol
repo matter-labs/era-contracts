@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZkSyncHyperchainBase {
+interface IAdmin is IZKChainBase {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -61,12 +61,12 @@ interface IAdmin is IZkSyncHyperchainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the STM can unfreeze Diamond Proxy
+    /// @dev Both the admin and the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
     function genesisUpgrade(
         address _l1GenesisUpgrade,
-        address _stmDeployer,
+        address _ctmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external;
@@ -115,7 +115,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
-    /// TODO: maybe include some params
+    /// @notice Emitted when the migration to the new settlement layer is complete.
     event MigrationComplete();
 
     /// @notice Emitted when the contract is frozen.
@@ -135,18 +135,18 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
         address _settlementLayer,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
     /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
-    function forwardedBridgeClaimFailedBurn(
+    function forwardedBridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetInfo,
-        address _prevMsgSender,
-        bytes calldata _data
+        address _originalCaller,
+        bytes calldata _chainData
     ) external payable;
 
     /// @dev Similar to IL1AssetHandler interface, used to receive chains.
-    function forwardedBridgeMint(bytes calldata _data) external payable;
+    function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
 }
