@@ -6,8 +6,7 @@ import {GovernanceTest} from "./_Governance_Shared.t.sol";
 contract ExecutingTest is GovernanceTest {
     function test_SendEtherToGovernance() public {
         startHoax(randomSigner);
-        // TODO: fix it to make it compatible with zk foundry
-        // payable(address(governance)).transfer(100);
+        payable(address(governance)).transfer(100);
     }
 
     function test_RevertWhen_CallWithRandomData() public {

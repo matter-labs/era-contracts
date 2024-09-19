@@ -40,7 +40,6 @@ contract GatewayPreparationForTests is GatewayPreparation {
 
 
         // This value is never checked in the integration tests
-        // TODO: maybe use a more realistic value
         config.gatewayDiamondCutData = hex"";
     }
     

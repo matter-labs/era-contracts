@@ -8,7 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {StateTransitionDeployedAddresses, Utils, DAContractBytecodes, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, DAContractBytecodes, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
@@ -53,6 +53,7 @@ import {AccessControlRestriction} from "contracts/governance/AccessControlRestri
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -726,7 +727,7 @@ contract DeployL1Script is Script {
     }
 
     function deployL1NullifierImplementation() internal {
-        // TODO: maybe allow non-dev nullifier in the local deployment
+        // TODO(EVM-743): allow non-dev nullifier in the local deployment
         bytes memory bytecode = abi.encodePacked(
             type(L1NullifierDev).creationCode,
             // solhint-disable-next-line func-named-parameters
@@ -913,7 +914,6 @@ contract DeployL1Script is Script {
 
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
-        // sharedBridge.setPendingAdmin(addresses.chainAdmin);
 
         ChainTypeManager ctm = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         ctm.transferOwnership(addresses.governance);
@@ -946,7 +946,7 @@ contract DeployL1Script is Script {
             addresses.bridgehub.messageRootImplementation
         );
 
-        // TODO: this has to be renamed to chain type manager
+        // TODO(EVM-744): this has to be renamed to chain type manager
         vm.serializeAddress(
             "state_transition",
             "state_transition_proxy_addr",
@@ -1092,19 +1092,17 @@ contract DeployL1Script is Script {
     function prepareForceDeploymentsData() internal view returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
 
-        L2ContractsBytecodes memory l2ContractBytecodes = Utils.readL2ContractsBytecodes();
-
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.sharedBridgeProxy,
-            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(l2ContractBytecodes.beaconProxy),
+            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBeaconProxyBytecode()),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(l2ContractBytecodes.bridgehub),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(l2ContractBytecodes.l2AssetRouter),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(l2ContractBytecodes.l2NativeTokenVault),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(l2ContractBytecodes.messageRoot)
+            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
+            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AssetRouterBytecode()),
+            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()),
+            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode())
         });
         
         return abi.encode(data);

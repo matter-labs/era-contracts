@@ -28,35 +28,6 @@ address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03)
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
 address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
 
-struct L2ContractsBytecodes {
-    bytes bridgehub;
-    bytes l2NativeTokenVault;
-    bytes l2AssetRouter;
-    bytes messageRoot;
-    bytes upgradableBeacon;
-    bytes beaconProxy;
-    bytes standardErc20;
-    bytes transparentUpgradeableProxy;
-    bytes forceDeployUpgrader;
-    bytes rollupL2DAValidator;
-    bytes validiumL2DAValidator;
-    bytes chainTypeManager;
-    bytes adminFacet;
-    bytes mailboxFacet;
-    bytes executorFacet;
-    bytes gettersFacet;
-    bytes diamondInit;
-    bytes verifier;
-    bytes testnetVerifier;
-    bytes validatorTimelock;
-    bytes diamondProxy;
-    bytes l1Genesis;
-    bytes defaultUpgrade;
-    bytes multicall3;
-    bytes relayedSLDAValidator;
-    bytes l2LegacySharedBridge;
-}
-
 struct DAContractBytecodes {
     bytes rollupL1DAValidator;
     bytes validiumL1DAValidator;
@@ -75,7 +46,6 @@ struct StateTransitionDeployedAddresses {
     address genesisUpgrade;
     address defaultUpgrade;
     address validatorTimelock;
-    // TODO: delete the last field it is never really used
     address diamondProxy;
 }
 
@@ -143,7 +113,7 @@ library Utils {
     }
 
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
-        // FIXME: use forge to read the bytecode
+        // TODO(EVM-746): use forge to read the bytecode
         string memory path = string.concat("/../l1-contracts/out/", facetName, ".sol/", facetName, "Facet.json");
         bytes memory bytecode = readFoundryDeployedBytecode(path);
         return getAllSelectors(bytecode);
@@ -669,7 +639,7 @@ library Utils {
         address expectedDiamondProxyAddress,
         Vm.Log[] memory logs
     ) internal pure returns (bytes32 txHash) {
-        // FIXME: maybe make it less magial
+        // TODO(EVM-749): cleanup the constant and automate its derivation
         bytes32 topic0 = bytes32(uint256(0x4531cd5795773d7101c17bdeb9f5ab7f47d7056017506f937083be5d6e77a382));
 
         for (uint256 i = 0; i < logs.length; i++) {
@@ -778,94 +748,6 @@ library Utils {
         vm.startBroadcast(defaultAdmin);
         IChainAdmin(_admin).multicall{value: _value}(calls, true);
         vm.stopBroadcast();
-    }
-
-    /// @notice A helper function that reads all L2 bytecodes at once.
-    function readL2ContractsBytecodes() internal view returns (L2ContractsBytecodes memory bytecodes) {
-        //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
-
-        // One liner creation is preferrable to creating in separate lines
-        // to ensure that all contracts' bytecodes were filled up
-        bytecodes = L2ContractsBytecodes({
-            bridgehub: Utils.readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridgehub/Bridgehub.sol/Bridgehub.json"
-            ),
-            l2NativeTokenVault: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridge/ntv/L2NativeTokenVault.sol/L2NativeTokenVault.json"
-            ),
-            l2AssetRouter: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridge/asset-router/L2AssetRouter.sol/L2AssetRouter.json"
-            ),
-            messageRoot: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridgehub/MessageRoot.sol/MessageRoot.json"
-            ),
-            upgradableBeacon: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
-            ),
-            beaconProxy: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-            ),
-            standardErc20: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridge/BridgedStandardERC20.sol/BridgedStandardERC20.json"
-            ),
-            transparentUpgradeableProxy: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
-            ),
-            forceDeployUpgrader: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
-            ),
-            rollupL2DAValidator: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/data-availability/RollupL2DAValidator.sol/RollupL2DAValidator.json"
-            ),
-            validiumL2DAValidator: readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/data-availability/ValidiumL2DAValidator.sol/ValidiumL2DAValidator.json"
-            ),
-            chainTypeManager: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/ChainTypeManager.sol/ChainTypeManager.json"
-            ),
-            adminFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Admin.sol/AdminFacet.json"
-            ),
-            mailboxFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Mailbox.sol/MailboxFacet.json"
-            ),
-            executorFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Executor.sol/ExecutorFacet.json"
-            ),
-            gettersFacet: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/facets/Getters.sol/GettersFacet.json"
-            ),
-            verifier: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/Verifier.sol/Verifier.json"
-            ),
-            testnetVerifier: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/TestnetVerifier.sol/TestnetVerifier.json"
-            ),
-            validatorTimelock: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/ValidatorTimelock.sol/ValidatorTimelock.json"
-            ),
-            diamondInit: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/DiamondInit.sol/DiamondInit.json"
-            ),
-            diamondProxy: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/chain-deps/DiamondProxy.sol/DiamondProxy.json"
-            ),
-            l1Genesis: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/upgrades/L1GenesisUpgrade.sol/L1GenesisUpgrade.json"
-            ),
-            defaultUpgrade: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/upgrades/DefaultUpgrade.sol/DefaultUpgrade.json"
-            ),
-            multicall3: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
-            ),
-            relayedSLDAValidator: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/RelayedSLDAValidator.sol/RelayedSLDAValidator.json"
-            ),
-            l2LegacySharedBridge: readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridge/L2SharedBridgeLegacy.sol/L2SharedBridgeLegacy.json"
-            )
-        });
     }
 
     function readDAContractBytecodes() internal view returns (DAContractBytecodes memory bytecodes) {

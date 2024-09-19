@@ -14,12 +14,14 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, L2ContractsBytecodes, L2_BRIDGEHUB_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayPreparation is Script {
@@ -126,8 +128,6 @@ contract GatewayPreparation is Script {
         saveOutput(output);
     }
 
-    /// FIXME: include `GatewayTransactionFilterer` in the script
-
     /// @dev Requires the sender to be the owner of the contract
     function governanceRegisterGateway() public {
         initializeConfig();
@@ -189,9 +189,7 @@ contract GatewayPreparation is Script {
         address ctmAddress = IBridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
         require(ctmAddress == config.chainTypeManagerProxy, "CTM asset id does not match the expected CTM address");
 
-
-        // TODO; refactor to use a constant
-        bytes memory secondBridgeData = abi.encodePacked(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDRESS));
+        bytes memory secondBridgeData = abi.encodePacked(SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, abi.encode(assetId, L2_BRIDGEHUB_ADDRESS));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
             _getL1GasPrice(),
@@ -212,7 +210,6 @@ contract GatewayPreparation is Script {
     function registerAssetIdInBridgehub(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        // TODO; refactor to use 0x02
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
@@ -231,7 +228,6 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
-    // TODO: maybe move into a separate script
     /// @dev Calling this function requires private key to the admin of the chain
     function migrateChainToGateway(
         address chainAdmin,
@@ -240,8 +236,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        // For now this is how it is going to be.
-        // TODO: include it in the input
+        // TODO(EVM-746): Use L2-based chain admin contract
         address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
 
         bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
@@ -278,7 +273,6 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
-    // TODO: maybe move into a separate script
     /// @dev Calling this function requires private key to the admin of the chain
     function setDAValidatorPair(
         address chainAdmin,
@@ -336,14 +330,13 @@ contract GatewayPreparation is Script {
     }
     
 
-    /// FIXME: make that function support non-ETH based chains   
+    /// TODO(EVM-748): make that function support non-ETH based chains   
     function supplyGatewayWallet(
         address addr,
         uint256 amount
     ) public {
         initializeConfig();
 
-        // TODO: maybe provide hash here too
         Utils.runL1L2Transaction(
             hex"",
             Utils.MAX_PRIORITY_TX_GAS,
@@ -355,6 +348,7 @@ contract GatewayPreparation is Script {
             config.sharedBridgeProxy
         );
 
+        // We record L2 tx hash only for governance operations
         saveOutput(bytes32(0));
     }
 
@@ -407,227 +401,4 @@ contract GatewayPreparation is Script {
             _value: 0
         });
     }
-
-
-    // /// @dev The sender may not have any privileges
-    // function deployGatewayContracts() public {
-    //     L2ContractsBytecodes memory bytecodes = Utils.readL2ContractsBytecodes();
-
-        
-    //     GatewayFacets memory facets = deployGatewayFacets(bytecodes);
-    //     address verifierAddress = deployGatewayVerifier(bytecodes);
-
-
-    //     deployGatewayChainTypeManager(bytecodes);
-
-
-    //     // Deploy validator timelock
-
-    // }
-
-    // function deployGatewayFacets(L2ContractsBytecodes memory bytecodes) internal returns (GatewayFacets memory facets) {
-    //     bytes[] memory emoptyDeps = new bytes[](0);
-        
-    //     // Deploy facets
-    //     facets.adminFacet = Utils.deployThroughL1({
-    //         bytecode: bytecodes.adminFacet,
-    //         constructorargs: abi.encode(l1ChainId),
-    //         create2salt: bytes32(0),
-    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-    //         factoryDeps: emoptyDeps, 
-    //         chainId: config.gatewayChainId,
-    //         bridgehubAddress: config.bridgehub,
-    //         l1SharedBridgeProxy: config.sharedBridgeProxy
-    //     });
-
-    //     facets.mailboxFacet = Utils.deployThroughL1({
-    //         bytecode: bytecodes.mailboxFacet,
-    //         constructorargs: abi.encode(l1ChainId, config.eraChainId),
-    //         create2salt: bytes32(0),
-    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-    //         factoryDeps: emoptyDeps, 
-    //         chainId: config.gatewayChainId,
-    //         bridgehubAddress: config.bridgehub,
-    //         l1SharedBridgeProxy: config.sharedBridgeProxy
-    //     });
-
-    //     facets.executorFacet = Utils.deployThroughL1({
-    //         bytecode: bytecodes.executorFacet,
-    //         constructorargs: hex"",
-    //         create2salt: bytes32(0),
-    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-    //         factoryDeps: emoptyDeps, 
-    //         chainId: config.gatewayChainId,
-    //         bridgehubAddress: config.bridgehub,
-    //         l1SharedBridgeProxy: config.sharedBridgeProxy
-    //     });
-
-    //     facets.gettersFacet = Utils.deployThroughL1({
-    //         bytecode: bytecodes.gettersFacet,
-    //         constructorargs: hex"",
-    //         create2salt: bytes32(0),
-    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-    //         factoryDeps: emoptyDeps, 
-    //         chainId: config.gatewayChainId,
-    //         bridgehubAddress: config.bridgehub,
-    //         l1SharedBridgeProxy: config.sharedBridgeProxy
-    //     });
-    // }
-
-    // function deployGatewayVerifier(L2ContractsBytecodes memory bytecodes) internal returns (address verifier) {
-    //     bytes[] memory emoptyDeps = new bytes[](0);
-
-    //     bytes bytecode;
-    //     if (config.testnetVerifier) {
-    //         bytecode = bytecodes.testnetVerifier;
-    //     } else {
-    //         bytecode = bytecodes.verifier;
-    //     }
-
-    //     verifier = Utils.deployThroughL1({
-    //         bytecode: bytecode,
-    //         constructorargs: hex"",
-    //         create2salt: bytes32(0),
-    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-    //         factoryDeps: emoptyDeps, 
-    //         chainId: config.gatewayChainId,
-    //         bridgehubAddress: config.bridgehub,
-    //         l1SharedBridgeProxy: config.sharedBridgeProxy
-    //     });
-    // }
-
-    // function deployValidatorTimelock(L2ContractsBytecodes memory bytecodes) internal returns (address validatorTimelock) {
-    //     bytes[] memory emoptyDeps = new bytes[](0);
-
-    //     address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-
-    //     validatorTimelock = Utils.deployThroughL1({
-    //         bytecode: bytecodes.validatorTimelock,
-    //         constructorargs: abi.encode(aliasedGovernor, 0, config.eraChainId),
-    //         create2salt: bytes32(0),
-    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-    //         factoryDeps: emoptyDeps, 
-    //         chainId: config.gatewayChainId,
-    //         bridgehubAddress: config.bridgehub,
-    //         l1SharedBridgeProxy: config.sharedBridgeProxy
-    //     });
-    // }
-
-    // function deployGatewayChainTypeManager(L2ContractsBytecodes memory bytecodes) internal {
-    //     // 
-
-    //     // Deploy ctm implementation
-    //     address ctmImplAddress = Utils.deployThroughL1({
-    //         bytecode: bytecodes.stateTransitionManager,
-    //         constructorargs: L2_BRIDGEHUB_ADDRESS,
-    //         create2salt: bytes32(0),
-    //         l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-    //         factoryDeps,
-    //         uint256 chainId,
-    //         address bridgehubAddress,
-    //         address l1SharedBridgeProxy
-    //     })
-
-    // }
-
-    // function deployGatewayValidatorTimelock() internal {
-
-    // }
-
-    // function moveChainToGateway() public {
-    //     IBridgehub bridgehub = IBridgehub(config.bridgehub);
-    //     // IL1AssetRouter router = IL1AssetRouter(config.sharedBridgeProxy);
-    //     Ownable ownable = Ownable(config.bridgehub);
-
-    //     uint256 gasPrice = 10; //Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
-    //     uint256 l2GasLimit = 72000000;
-
-    //     uint256 expectedCost = bridgehub.l2TransactionBaseCost(
-    //         config.gatewayChainId,
-    //         gasPrice,
-    //         l2GasLimit,
-    //         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    //     ) * 2;
-
-    //     address newAdmin = ownable.owner();
-    //     console.log("newAdmin", newAdmin);
-    //     IZKChain chain = IZKChain(bridgehub.getZKChain(config.gatewayChainId));
-    //     console.log("chainAdmin", bridgehub.getZKChain(config.gatewayChainId), chain.getAdmin());
-    //     bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(config.gatewayChainId);
-    //     bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
-    //     bytes memory ctmData = abi.encode(newAdmin, diamondCutData);
-    //     bytes memory chainData = abi.encode(chain.getProtocolVersion());
-    //     BridgehubBurnCTMAssetData memory ctmAssetData = BridgehubBurnCTMAssetData({
-    //         chainId: config.gatewayChainId,
-    //         ctmData: ctmData,
-    //         chainData: chainData
-    //     });
-    //     bytes memory bridgehubData = abi.encode(ctmAssetData);
-    //     bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(ctmAssetId, bridgehubData));
-
-    //     vm.startBroadcast(chain.getAdmin());
-    //     L2TransactionRequestTwoBridgesOuter memory request = L2TransactionRequestTwoBridgesOuter({
-    //         chainId: config.gatewayChainId,
-    //         mintValue: expectedCost,
-    //         l2Value: 0,
-    //         l2GasLimit: l2GasLimit,
-    //         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    //         refundRecipient: newAdmin,
-    //         secondBridgeAddress: config.sharedBridgeProxy,
-    //         secondBridgeValue: 0,
-    //         secondBridgeCalldata: routerData
-    //     });
-    //     bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(request);
-    //     vm.stopBroadcast();
-    //     console.log("Chain moved to Gateway");
-    // }
-
-    // function registerL2Contracts() public {
-    //     IBridgehub bridgehub = IBridgehub(config.bridgehub);
-    //     Ownable ownable = Ownable(config.ctmDeploymentTracker);
-    //     // IChainTypeManager ctm = IChainTypeManager(config.chainTypeManagerProxy);
-
-    //     uint256 gasPrice = 10;
-    //     uint256 l2GasLimit = 72000000;
-
-    //     uint256 expectedCost = bridgehub.l2TransactionBaseCost(
-    //         config.gatewayChainId,
-    //         gasPrice,
-    //         l2GasLimit,
-    //         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    //     ) * 2;
-    //     bytes32 assetId = bridgehub.ctmAssetIdFromChainId(config.gatewayChainId);
-    //     bytes memory routerData = bytes.concat(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDR));
-    //     L2TransactionRequestTwoBridgesOuter
-    //         memory assetRouterRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
-    //             chainId: config.gatewayChainId,
-    //             mintValue: expectedCost,
-    //             l2Value: 0,
-    //             l2GasLimit: l2GasLimit,
-    //             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    //             refundRecipient: ownable.owner(),
-    //             secondBridgeAddress: config.sharedBridgeProxy,
-    //             secondBridgeValue: 0,
-    //             secondBridgeCalldata: routerData
-    //         });
-
-    //     L2TransactionRequestTwoBridgesOuter memory bridehubRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
-    //         chainId: config.gatewayChainId,
-    //         mintValue: expectedCost,
-    //         l2Value: 0,
-    //         l2GasLimit: l2GasLimit,
-    //         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    //         refundRecipient: ownable.owner(),
-    //         secondBridgeAddress: config.ctmDeploymentTracker,
-    //         secondBridgeValue: 0,
-    //         secondBridgeCalldata: bytes.concat(
-    //             bytes1(0x01),
-    //             abi.encode(config.chainTypeManagerProxy, config.chainTypeManagerProxy)
-    //         )
-    //     });
-    //     vm.startBroadcast(ownable.owner());
-    //     bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(assetRouterRegistrationRequest);
-    //     bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(bridehubRegistrationRequest);
-    //     vm.stopBroadcast();
-    // }
 }

@@ -48,7 +48,7 @@ contract RegisterZKChainScript is Script {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         address bridgehub;
-        // TODO: maybe rename to asset router
+        // TODO(EVM-744): maybe rename to asset router
         address sharedBridgeProxy;
         address nativeTokenVault;
         address chainTypeManagerProxy;
@@ -181,7 +181,7 @@ contract RegisterZKChainScript is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        // FIXME: name of the key is a bit inconsistent
+        // TODO(EVM-744): name of the key is a bit inconsistent
         config.chainTypeManagerProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
@@ -250,7 +250,7 @@ contract RegisterZKChainScript is Script {
 
         bytes memory proxyInitializationParams = abi.encodeCall(L2SharedBridgeLegacy.initialize, (
             config.sharedBridgeProxy,
-            // TODO: Here we assume there is no legacy bridge for now
+            // TODO(EVM-745): Here we assume there is no legacy bridge for now
             address(0),
             L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBeaconProxyBytecode()),
             // This is not exactly correct, this should be ecosystem governance and not chain governance
@@ -259,7 +259,8 @@ contract RegisterZKChainScript is Script {
 
         bytes memory proxyConstructorParams = abi.encode(
             legacyBridgeImplementationAddress,
-            // TODO: Some form of L2 admin should be used 
+            // In real production, this would be aliased ecosystem governance.
+            // But in real production we also do not initialize legacy shared bridge
             msg.sender,
             proxyInitializationParams
         );

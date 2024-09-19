@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Utils, L2ContractsBytecodes} from "./Utils.sol";
+import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
@@ -65,7 +65,7 @@ contract DeployL2Script is Script {
         deploySharedBridge(false);
     }
 
-    // TODO: maybe remove this param, but it requires amendments to the toolbox
+    // TODO(EVM-745): port legacy contract tests to new contracts
     function deploySharedBridge(bool legacyBridge) internal {
         initializeConfig();
 
@@ -91,7 +91,6 @@ contract DeployL2Script is Script {
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
-        // config.l2LegacySharedBridge = toml.readAddress("$.l2_legacy_shared_bridge");
     }
 
     function saveOutput() internal {
