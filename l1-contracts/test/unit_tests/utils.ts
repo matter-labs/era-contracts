@@ -11,9 +11,13 @@ import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
 import { PubdataPricingMode } from "../../src.ts/utils";
-import { ADDRESS_ONE, EMPTY_STRING_KECCAK,  STORED_BATCH_INFO_ABI_STRING,
+import {
+  ADDRESS_ONE,
+  EMPTY_STRING_KECCAK,
+  STORED_BATCH_INFO_ABI_STRING,
   COMMIT_BATCH_INFO_ABI_STRING,
-  PRIORITY_OPS_BATCH_INFO_ABI_STRING, } from "../../src.ts/constants";
+  PRIORITY_OPS_BATCH_INFO_ABI_STRING,
+} from "../../src.ts/constants";
 
 import { packSemver } from "../../scripts/utils";
 import { keccak256, hexConcat, defaultAbiCoder } from "ethers/lib/utils";

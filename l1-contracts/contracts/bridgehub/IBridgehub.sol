@@ -71,21 +71,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
         address sender
     );
 
-    /// @notice New priority request event. Emitted when a transaction is sent L2->L2, same format as in Mailbox
-    /// @param txId Serial number of the priority operation
-    /// @param txHash keccak256 hash of encoded transaction representation
-    /// @param expirationTimestamp Timestamp up to which priority request should be processed
-    /// @param transaction The whole transaction structure that is requested to be executed on L2
-    /// @param factoryDeps An array of bytecodes that were shown in the L1 public data.
-    /// Will be marked as known bytecodes in L2
-    event NewPriorityRequest(
-        uint256 txId,
-        bytes32 txHash,
-        uint64 expirationTimestamp,
-        L2CanonicalTransaction transaction,
-        bytes[] factoryDeps
-    );
-
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
 
     /// @notice Emitted when the bridging to the chain is started.

@@ -17,10 +17,11 @@ import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, INTEROP_OPERATION_TX_TYPE} from "../common/Config.sol";
 import {L2_MESSENGER} from "../common/L2ContractAddresses.sol";
-import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -580,13 +581,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
         address zkChain = zkChainMap.get(_chainId);
-        if (hyperchain != address(0)) {
+        if (zkChain != address(0)) {
             canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
         } else {
             L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
                 txType: INTEROP_OPERATION_TX_TYPE,
-                from: uint256(uint160(_request.secondBridgeAddress)),
-                to: uint256(uint160(outputRequest.l2Contract)),
+                from: uint256(uint160(_request.sender)),
+                to: uint256(uint160(_request.contractL2)),
                 gasLimit: _request.l2GasLimit,
                 gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                 maxFeePerGas: uint256(0), // todo change in the bootloader
@@ -595,16 +596,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 nonce: uint256(0), //todo
                 value: _request.l2Value,
                 reserved: [_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
-                data: outputRequest.l2Calldata,
+                data: _request.l2Calldata,
                 signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(outputRequest.factoryDeps),
+                factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
                 paymasterInput: new bytes(0),
                 reservedDynamic: new bytes(0)
             });
             /// Fixme this does not have a unique hash atm.
             canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
             // solhint-disable-next-line func-named-parameters
-            emit NewPriorityRequest(0, canonicalTxHash, 0, transaction, outputRequest.factoryDeps);
+            emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
         }
     }
 
