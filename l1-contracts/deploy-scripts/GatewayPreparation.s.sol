@@ -198,6 +198,7 @@ contract GatewayPreparation is Script {
     /// @dev Calling this function requires private key to the admin of the chain
     function migrateChainToGateway(
         address chainAdmin,
+        address accessControlRestriction,
         uint256 chainId
     ) public {
         initializeConfig();
@@ -227,6 +228,7 @@ contract GatewayPreparation is Script {
         bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
             _getL1GasPrice(),
             chainAdmin,
+            accessControlRestriction,
             Utils.MAX_PRIORITY_TX_GAS,
             config.chainChainId,
             config.bridgehub,
@@ -243,6 +245,7 @@ contract GatewayPreparation is Script {
     /// @dev Calling this function requires private key to the admin of the chain
     function setDAValidatorPair(
         address chainAdmin,
+        address accessControlRestriction,
         uint256 chainId,
         address l1DAValidator,
         address l2DAValidator,
@@ -255,6 +258,7 @@ contract GatewayPreparation is Script {
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
+            accessControlRestriction,
             data,
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
@@ -269,6 +273,7 @@ contract GatewayPreparation is Script {
 
     function enableValidator(
         address chainAdmin,
+        address accessControlRestriction,
         uint256 chainId,
         address validatorAddress,
         address gatewayValidatorTimelock
@@ -280,6 +285,7 @@ contract GatewayPreparation is Script {
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
+            accessControlRestriction,
             data,
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),

@@ -213,6 +213,10 @@ contract RegisterZKChainScript is Script {
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
     }
 
+    function getOwnerAddress() public view returns (address) {
+        return config.ownerAddress;
+    }
+
 
     function checkTokenAddress() internal view {
         if (config.baseToken == address(0)) {

@@ -33,6 +33,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
 contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -95,6 +96,12 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         // vm.deal(l1Script.getBridgehubProxyAddress(), 100000000000000000000000000000000000);
     }
 
+    // This is a method to simplify porting the tests for now.
+    // Here we rely that the first restriction is the AccessControlRestriction 
+    function _extractAccessControlRestriction(address admin) internal returns (address) {
+        return ChainAdmin(payable(admin)).getRestrictions()[0];
+    }
+
     function setUp() public {
         prepare();
     }
@@ -109,6 +116,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         gatewayScript.governanceRegisterGateway();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
         // require(bridgehub.settlementLayer())
@@ -118,6 +126,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         gatewayScript.governanceRegisterGateway();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
         gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
@@ -158,6 +167,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         gatewayScript.governanceRegisterGateway();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
 

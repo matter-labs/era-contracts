@@ -285,7 +285,8 @@ contract GatewayCTMFromL1 is Script {
     function deployGatewayChainTypeManager(L2ContractsBytecodes memory bytecodes) internal {
         // We need to publish the bytecode of the diamdon proxy contract,
         // we can only do it via deploying its dummy version.
-        // FIXME: this was straightworward copy pasted from another code where there was not factory deps publishing
+        // We could've publshed the dependency separately, but we just repeated the code that would be
+        // used for pure L2 execution.
         address dp = address(_deployInternal(bytecodes.diamondProxy, hex""));
         console.log("Dummy diamond proxy deployed at", dp);
 

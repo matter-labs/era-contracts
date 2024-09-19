@@ -16,6 +16,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 /// @dev The offset from which the built-in, but user space contracts are located.
@@ -540,6 +541,7 @@ library Utils {
     function runAdminL1L2DirectTransaction(
         uint256 gasPrice,
         address admin,
+        address accessControlRestriction,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
         bytes[] memory factoryDeps,
@@ -563,7 +565,7 @@ library Utils {
                 l1SharedBridgeProxy
             );
 
-        requiredValueToDeploy = approveBaseTokenAdmin(Bridgehub(bridgehubAddress), l1SharedBridgeProxy, admin, chainId, requiredValueToDeploy);
+        requiredValueToDeploy = approveBaseTokenAdmin(Bridgehub(bridgehubAddress), l1SharedBridgeProxy, admin, accessControlRestriction, chainId, requiredValueToDeploy);
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
             Bridgehub.requestL2TransactionDirect,
@@ -572,7 +574,7 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        adminExecute(admin, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy);
+        adminExecute(admin, accessControlRestriction, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -588,6 +590,7 @@ library Utils {
     function runAdminL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         address admin,
+        address accessControlRestriction,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
@@ -613,6 +616,7 @@ library Utils {
             Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             admin,
+            accessControlRestriction,
             chainId,
             requiredValueToDeploy
         );
@@ -624,7 +628,7 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        adminExecute(admin, bridgehubAddress, l2TransactionRequesCalldata, requiredValueToDeploy);
+        adminExecute(admin, accessControlRestriction, bridgehubAddress, l2TransactionRequesCalldata, requiredValueToDeploy);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -640,6 +644,7 @@ library Utils {
         Bridgehub bridgehub,
         address l1SharedBridgeProxy,
         address admin,
+        address accessControlRestriction,
         uint256 chainId,
         uint256 amountToApprove
     ) internal returns (uint256 ethAmountToPass) {
@@ -650,7 +655,7 @@ library Utils {
 
             bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
 
-            adminExecute(admin, address(baseToken), approvalCalldata, 0);
+            adminExecute(admin, accessControlRestriction, address(baseToken), approvalCalldata, 0);
 
             ethAmountToPass = 0;
         } else {
@@ -760,14 +765,17 @@ library Utils {
 
     function adminExecute(
         address _admin,
+        address _approveBaseTokenAdmin,
         address _target,
         bytes memory _data,
         uint256 _value
     ) internal {
+        address defaultAdmin = AccessControlRestriction(_approveBaseTokenAdmin).defaultAdmin();
+
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
 
-        vm.startBroadcast();
+        vm.startBroadcast(defaultAdmin);
         IChainAdmin(_admin).multicall{value: _value}(calls, true);
         vm.stopBroadcast();
     }
