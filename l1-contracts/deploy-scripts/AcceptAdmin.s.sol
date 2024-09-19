@@ -5,11 +5,15 @@ import {Script} from "forge-std/Script.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
 import {stdToml} from "forge-std/StdToml.sol";
+
+bytes32 constant SET_TOKEN_MULITPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULITPLIER_SETTER_ROLE");
 
 contract AcceptAdmin is Script {
     using stdToml for string;
@@ -68,14 +72,25 @@ contract AcceptAdmin is Script {
     }
 
     // This function should be called by the owner to update token multiplier setter role
-    // FIXME: restore this functionality
-    // function chainSetTokenMultiplierSetter(address chainAdmin, address target) public {
-    //     IChainAdmin admin = IChainAdmin(chainAdmin);
+    function chainSetTokenMultiplierSetter(
+        address accessControlRestriction,
+        address diamondProxyAddress,
+        address setter
+    ) public {
+        AccessControlRestriction restriction = AccessControlRestriction(accessControlRestriction); 
 
-    //     vm.startBroadcast();
-    //     admin.setTokenMultiplierSetter(target);
-    //     vm.stopBroadcast();
-    // }
+        if (restriction.requiredRoles(diamondProxyAddress, IAdmin.setTokenMultiplier.selector) != SET_TOKEN_MULITPLIER_SETTER_ROLE) {
+            vm.startBroadcast();
+            restriction.setRequiredRoleForCall(diamondProxyAddress, IAdmin.setTokenMultiplier.selector, SET_TOKEN_MULITPLIER_SETTER_ROLE);
+            vm.stopBroadcast();
+        }
+
+        if (!restriction.hasRole(SET_TOKEN_MULITPLIER_SETTER_ROLE, setter)) {
+            vm.startBroadcast();
+            restriction.grantRole(SET_TOKEN_MULITPLIER_SETTER_ROLE, setter);
+            vm.stopBroadcast();
+        }
+    }
 
     function setDAValidatorPair(
         ChainAdmin chainAdmin,

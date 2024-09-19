@@ -82,20 +82,15 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
         l1SharedBridge = _l1SharedBridge;
 
-        // FIXME: important! this logic is not needed in production and only for local testing,
-        // we should remove it.
-        // if (block.chainid != ERA_CHAIN_ID) {
+        // The following statement is true only in freshly deployed environments. However,
+        // for those environments we do not need to deploy this contract at all. 
+        // This check is primarily for local testing purposes.
+        if (l2TokenProxyBytecodeHash == bytes32(0) && address(l2TokenBeacon) == address(0) ){
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
-        // } else {
-        //     if (_l1Bridge == address(0)) {
-        //         revert ZeroAddress();
-        //     }
-        //     l1Bridge = _l1Bridge;
-        //     // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
-        // }
+        }
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1

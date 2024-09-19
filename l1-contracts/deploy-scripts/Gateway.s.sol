@@ -73,7 +73,7 @@ contract GatewayScript is Script {
 
         // config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         // config.stateTransitionProxy = toml.readAddress(
-        //     "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        //     "$.deployed_addresses.state_transition.chain_type_manager_proxy_addr"
         // );
         // config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         // config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");

@@ -134,11 +134,20 @@ library L2ContractsBytecodesLib {
         );
     }
 
+    // FIXME: replace it with L2 verifier
     /// @notice Reads the bytecode of the Verifier contract.
     /// @return The bytecode of the Verifier contract.
     function readVerifierBytecode() internal view returns (bytes memory) {
         return Utils.readHardhatBytecode(
             "/../l1-contracts/artifacts-zk/contracts/state-transition/Verifier.sol/Verifier.json"
+        );
+    }
+
+    /// @notice Reads the bytecode of the Verifier contract.
+    /// @return The bytecode of the Verifier contract.
+    function readConsensusRegistryBytecode() internal view returns (bytes memory) {
+        return Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/ConsensusRegistry.sol/ConsensusRegistry.json"
         );
     }
 

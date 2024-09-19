@@ -56,11 +56,15 @@ contract RegisterZKChainScript is Script {
         bytes forceDeployments;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
-        address newDiamondProxy;
-        address governance;
-        address chainAdmin;
         address l1Nullifier;
+    }
+
+    struct Output {
+        address governance;
+        address diamondProxy;
+        address chainAdmin;
         address l2LegacySharedBridge;
+        address accessControlRestrictionAddress;
     }
 
     struct LegacySharedBridgeParams {
@@ -73,6 +77,7 @@ contract RegisterZKChainScript is Script {
     LegacySharedBridgeParams internal legacySharedBridgeParams;
     
     Config internal config;
+    Output internal output;
 
     function run() public {
         console.log("Deploying ZKChain");
@@ -315,20 +320,20 @@ contract RegisterZKChainScript is Script {
             config.governanceMinDelay
         );
         console.log("Governance deployed at:", address(governance));
-        config.governance = address(governance);
+        output.governance = address(governance);
     }
 
     function deployChainAdmin() internal {
-        // vm.broadcast();
-        // AccessControlRestriction restriction = new AccessControlRestriction(0, config.ownerAddress);
+        vm.broadcast();
+        AccessControlRestriction restriction = new AccessControlRestriction(0, config.ownerAddress);
+        output.accessControlRestrictionAddress = address(restriction);
 
-        // TODO: return back restrictions
-        address[] memory restrictions = new address[](0);
-        // restrictions[0] = address(restriction);
+        address[] memory restrictions = new address[](1);
+        restrictions[0] = address(restriction);
 
         vm.broadcast();
         ChainAdmin chainAdmin = new ChainAdmin(restrictions);
-        config.chainAdmin = address(chainAdmin);
+        output.chainAdmin = address(chainAdmin);
     }
 
     function registerZKChain() internal {
@@ -371,7 +376,7 @@ contract RegisterZKChainScript is Script {
         if (diamondProxyAddress == address(0)) {
             revert("Diamond proxy address not found");
         }
-        config.newDiamondProxy = diamondProxyAddress;
+        output.diamondProxy = diamondProxyAddress;
         console.log("ZKChain diamond proxy deployed at:", diamondProxyAddress);
     }
 
@@ -387,7 +392,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function configureZkSyncStateTransition() internal {
-        IZKChain zkChain = IZKChain(config.newDiamondProxy);
+        IZKChain zkChain = IZKChain(output.diamondProxy);
 
         vm.startBroadcast(msg.sender);
         zkChain.setTokenMultiplier(
@@ -404,12 +409,12 @@ contract RegisterZKChainScript is Script {
     }
 
     function setPendingAdmin() internal {
-        IZKChain zkChain = IZKChain(config.newDiamondProxy);
+        IZKChain zkChain = IZKChain(output.diamondProxy);
 
         vm.startBroadcast(msg.sender);
-        zkChain.setPendingAdmin(config.chainAdmin);
+        zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
-        console.log("Owner for ", config.newDiamondProxy, "set to", config.chainAdmin);
+        console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
     }
 
     function deployLegacySharedBridge() internal {
@@ -439,7 +444,7 @@ contract RegisterZKChainScript is Script {
         require(correctLegacyBridgeImplAddr == legacySharedBridgeParams.implementationAddress, "Legacy bridge implementation address mismatch");
         require(correctProxyAddress == legacySharedBridgeParams.proxyAddress, "Legacy bridge proxy address mismatch");
 
-        config.l2LegacySharedBridge = correctProxyAddress;
+        output.l2LegacySharedBridge = correctProxyAddress;
     }
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
@@ -451,10 +456,12 @@ contract RegisterZKChainScript is Script {
     }
 
     function saveOutput(string memory outputPath) internal {
-        vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
-        vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
-        vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", config.l2LegacySharedBridge);
-        string memory toml = vm.serializeAddress("root", "governance_addr", config.governance);
+        vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
+        vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
+        vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
+        vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
+
+        string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
         string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
         console.log("Output saved at:", outputPath);

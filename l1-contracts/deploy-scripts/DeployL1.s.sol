@@ -49,7 +49,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -83,6 +83,7 @@ contract DeployL1Script is Script {
         address transparentProxyAdmin;
         address governance;
         address chainAdmin;
+        address accessControlRestrictionAddress;
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
@@ -178,7 +179,7 @@ contract DeployL1Script is Script {
 
         runInner(
             "/script-config/config-deploy-l1.toml", 
-            string.concat(vm.projectRoot(), "/script-out/output-deploy-l1.toml")
+            "/script-out/output-deploy-l1.toml"
         );
     }
 
@@ -425,15 +426,15 @@ contract DeployL1Script is Script {
 
     function deployChainAdmin() internal {
         bytes memory accessControlRestrictionBytecode = abi.encodePacked(
-            type(ChainAdmin).creationCode,
+            type(AccessControlRestriction).creationCode,
             abi.encode(uint256(0), config.ownerAddress)
         );
 
-        // TODO: restore restrictions
-        // address accessControlRestriction = deployViaCreate2(accessControlRestrictionBytecode);
-        // console.log("Access control restriction deployed at:", accessControlRestriction);
-        address[] memory restrictions = new address[](0);
-        // restrictions[0] = accessControlRestriction;
+        address accessControlRestriction = deployViaCreate2(accessControlRestrictionBytecode);
+        console.log("Access control restriction deployed at:", accessControlRestriction);
+        address[] memory restrictions = new address[](1);
+        restrictions[0] = accessControlRestriction;
+        addresses.accessControlRestrictionAddress = accessControlRestriction;
 
         bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(restrictions));
         address contractAddress = deployViaCreate2(bytecode);
@@ -1049,6 +1050,7 @@ contract DeployL1Script is Script {
 
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
         vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
+        vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", addresses.accessControlRestrictionAddress);
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
