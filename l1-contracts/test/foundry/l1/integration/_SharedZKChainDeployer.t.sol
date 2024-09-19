@@ -58,7 +58,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         zkChainIds.push(currentZKChainId);
         saveZKChainConfig(_getDefaultDescription(currentZKChainId, _baseToken, currentZKChainId));
         currentZKChainId++;
-        deployScript.run();
+        deployScript.runForTest();
     }
 
     function _getDefaultDescription(

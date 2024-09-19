@@ -50,7 +50,11 @@ contract GatewayPreparation is Script {
         initializeConfig();
     }
 
-    function initializeConfig() internal {
+    function _getL1GasPrice() internal virtual returns (uint256) {
+        return Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
+    }
+
+    function initializeConfig() internal virtual {
         deployerAddress = msg.sender;
         l1ChainId = block.chainid;
 
@@ -84,6 +88,8 @@ contract GatewayPreparation is Script {
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-preparation-l1.toml");
         vm.writeToml(toml, path);
     }
+
+    /// FIXME: include `GatewayTransactionFilterer` in the script
 
     /// @dev Requires the sender to be the owner of the contract
     function governanceRegisterGateway() public {
@@ -121,6 +127,7 @@ contract GatewayPreparation is Script {
         );
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
+            _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
             data,
@@ -150,6 +157,7 @@ contract GatewayPreparation is Script {
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDRESS));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+            _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
             Utils.MAX_PRIORITY_TX_GAS,
@@ -171,6 +179,7 @@ contract GatewayPreparation is Script {
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+            _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
             Utils.MAX_PRIORITY_TX_GAS,
@@ -189,8 +198,7 @@ contract GatewayPreparation is Script {
     /// @dev Calling this function requires private key to the admin of the chain
     function migrateChainToGateway(
         address chainAdmin,
-        uint256 chainId,
-        bytes32 adminOperationSalt
+        uint256 chainId
     ) public {
         initializeConfig();
 
@@ -217,6 +225,7 @@ contract GatewayPreparation is Script {
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
 
         bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
+            _getL1GasPrice(),
             chainAdmin,
             Utils.MAX_PRIORITY_TX_GAS,
             config.chainChainId,
@@ -244,6 +253,7 @@ contract GatewayPreparation is Script {
         bytes memory data = abi.encodeCall(IAdmin.setDAValidatorPair, (l1DAValidator, l2DAValidator));
 
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+            _getL1GasPrice(),
             chainAdmin,
             data,
             Utils.MAX_PRIORITY_TX_GAS,
@@ -268,6 +278,7 @@ contract GatewayPreparation is Script {
         bytes memory data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
 
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+            _getL1GasPrice(),
             chainAdmin,
             data,
             Utils.MAX_PRIORITY_TX_GAS,

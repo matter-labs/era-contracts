@@ -304,6 +304,7 @@ library Utils {
     }
 
     function prepareL1L2Transaction(
+        uint256 l1GasPrice,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
         uint256 l2Value,
@@ -314,10 +315,9 @@ library Utils {
         address l1SharedBridgeProxy
     ) internal returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
-        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
             2 + l2Value;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
@@ -334,6 +334,7 @@ library Utils {
     }
 
     function prepareL1L2TransactionTwoBridges(
+        uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
@@ -345,10 +346,9 @@ library Utils {
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
-        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
             2;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
@@ -382,6 +382,7 @@ library Utils {
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
         ) = prepareL1L2Transaction(
+                bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
                 l2Calldata,
                 l2GasLimit,
                 l2Value,
@@ -405,6 +406,7 @@ library Utils {
     }
 
     function runGovernanceL1L2DirectTransaction(
+        uint256 l1GasPrice,
         address governor,
         bytes32 salt,
         bytes memory l2Calldata,
@@ -419,6 +421,7 @@ library Utils {
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
         ) = prepareL1L2Transaction(
+                l1GasPrice,
                 l2Calldata,
                 l2GasLimit,
                 0,
@@ -458,6 +461,7 @@ library Utils {
     }
 
     function runGovernanceL1L2TwoBridgesTransaction(
+        uint256 l1GasPrice,
         address governor,
         bytes32 salt,
         uint256 l2GasLimit,
@@ -472,6 +476,7 @@ library Utils {
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
         ) = prepareL1L2TransactionTwoBridges(
+                l1GasPrice,
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,
@@ -533,6 +538,7 @@ library Utils {
     }
 
     function runAdminL1L2DirectTransaction(
+        uint256 gasPrice,
         address admin,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -546,6 +552,7 @@ library Utils {
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
         ) = prepareL1L2Transaction(
+                gasPrice,
                 l2Calldata,
                 l2GasLimit,
                 0,
@@ -579,6 +586,7 @@ library Utils {
 
 
     function runAdminL1L2TwoBridgesTransaction(
+        uint256 l1GasPrice,
         address admin,
         uint256 l2GasLimit,
         uint256 chainId,
@@ -592,6 +600,7 @@ library Utils {
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
         ) = prepareL1L2TransactionTwoBridges(
+                l1GasPrice,
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,

@@ -266,6 +266,10 @@ contract DeployL1Script is Script {
         return config.contracts.diamondCutData;
     }
 
+    function getCTMDeploymentTrackerAddress() public view returns (address) {
+        return addresses.bridgehub.ctmDeploymentTrackerProxy;
+    }
+
     function initializeConfig(string memory configPath) internal {
         string memory toml = vm.readFile(configPath);
 

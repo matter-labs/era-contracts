@@ -10,6 +10,8 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+
 
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
@@ -17,6 +19,8 @@ contract L1ContractDeployer is Test {
     address bridgehubProxyAddress;
     address bridgehubOwnerAddress;
     Bridgehub bridgeHub;
+
+    CTMDeploymentTracker ctmDeploymentTracker;
 
     L1AssetRouter public sharedBridge;
     L1Nullifier public l1Nullifier;
@@ -46,6 +50,8 @@ contract L1ContractDeployer is Test {
         address l1NativeTokenVaultProxyAddress = l1Script.getNativeTokenVaultProxyAddress();
         l1NativeTokenVault = L1NativeTokenVault(payable(l1NativeTokenVaultProxyAddress));
 
+        ctmDeploymentTracker = CTMDeploymentTracker(l1Script.getCTMDeploymentTrackerAddress());
+
         _acceptOwnership();
         _setEraBatch();
 
@@ -56,6 +62,7 @@ contract L1ContractDeployer is Test {
         vm.startPrank(bridgeHub.pendingOwner());
         bridgeHub.acceptOwnership();
         sharedBridge.acceptOwnership();
+        ctmDeploymentTracker.acceptOwnership();
         vm.stopPrank();
     }
 
