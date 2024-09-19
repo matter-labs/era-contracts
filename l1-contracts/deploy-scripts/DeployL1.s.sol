@@ -178,23 +178,14 @@ contract DeployL1Script is Script {
     function run() public {
         console.log("Deploying L1 contracts");
 
-        runInner(
-            "/script-config/config-deploy-l1.toml", 
-            "/script-out/output-deploy-l1.toml"
-        );
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
     }
 
     function runForTest() public {
-        runInner(
-            vm.envString("L1_CONFIG"),
-            vm.envString("L1_OUTPUT")
-        );
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
     }
 
-    function runInner(
-        string memory inputPath,
-        string memory outputPath
-    ) internal {
+    function runInner(string memory inputPath, string memory outputPath) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
@@ -1050,7 +1041,11 @@ contract DeployL1Script is Script {
 
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
         vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
-        vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", addresses.accessControlRestrictionAddress);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "access_control_restriction_addr",
+            addresses.accessControlRestrictionAddress
+        );
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
@@ -1096,15 +1091,21 @@ contract DeployL1Script is Script {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.sharedBridgeProxy,
-            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBeaconProxyBytecode()),
+            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readBeaconProxyBytecode()
+            ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AssetRouterBytecode()),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()),
+            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readL2AssetRouterBytecode()
+            ),
+            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
+            ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode())
         });
-        
+
         return abi.encode(data);
     }
 

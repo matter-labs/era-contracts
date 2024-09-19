@@ -64,7 +64,6 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
         address _l1SharedBridge,
-        address _l1Bridge,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
@@ -83,9 +82,9 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         l1SharedBridge = _l1SharedBridge;
 
         // The following statement is true only in freshly deployed environments. However,
-        // for those environments we do not need to deploy this contract at all. 
+        // for those environments we do not need to deploy this contract at all.
         // This check is primarily for local testing purposes.
-        if (l2TokenProxyBytecodeHash == bytes32(0) && address(l2TokenBeacon) == address(0) ){
+        if (l2TokenProxyBytecodeHash == bytes32(0) && address(l2TokenBeacon) == address(0)) {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;

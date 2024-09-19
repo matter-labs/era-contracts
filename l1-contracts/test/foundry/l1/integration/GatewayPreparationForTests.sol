@@ -20,9 +20,7 @@ contract GatewayPreparationForTests is GatewayPreparation {
         config.ctmDeploymentTracker = toml.readAddress(
             "$.deployed_addresses.bridgehub.ctm_deployment_tracker_proxy_addr"
         );
-        config.governance = toml.readAddress(
-            "$.deployed_addresses.governance_addr"
-        );
+        config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
 
         path = string.concat(root, vm.envString("GATEWAY_CONFIG"));
         toml = vm.readFile(path);
@@ -34,17 +32,17 @@ contract GatewayPreparationForTests is GatewayPreparation {
 
         config.gatewayChainAdmin = toml.readAddress("$.chain_admin_addr");
         config.gatewayChainProxyAdmin = toml.readAddress("$.chain_proxy_admin_addr");
-        config.gatewayAccessControlRestriction = toml.readAddress("$.deployed_addresses.access_control_restriction_addr");
+        config.gatewayAccessControlRestriction = toml.readAddress(
+            "$.deployed_addresses.access_control_restriction_addr"
+        );
 
         console.log("chain chain id = ", config.gatewayChainId);
-
 
         // This value is never checked in the integration tests
         config.gatewayDiamondCutData = hex"";
     }
-    
+
     function _getL1GasPrice() internal view override returns (uint256) {
         return 10;
     }
 }
-

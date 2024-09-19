@@ -77,7 +77,7 @@ contract RegisterZKChainScript is Script {
     }
 
     LegacySharedBridgeParams internal legacySharedBridgeParams;
-    
+
     Config internal config;
     Output internal output;
 
@@ -93,14 +93,13 @@ contract RegisterZKChainScript is Script {
         console.log("Deploying ZKChain");
 
         initializeConfigTest();
-        // TODO: Yes, it is the same as for prod since it is never read from down the line 
+        // TODO: Yes, it is the same as for prod since it is never read from down the line
         runInner(vm.envString("ZK_CHAIN_OUT"), false);
     }
 
     function runInner(string memory outputPath, bool initializeL2LegacyBridge) internal {
         string memory root = vm.projectRoot();
         outputPath = string.concat(root, outputPath);
-
 
         if (initializeL2LegacyBridge) {
             // This must be run before the chain is deployed
@@ -191,7 +190,6 @@ contract RegisterZKChainScript is Script {
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
 
-
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
 
@@ -220,7 +218,6 @@ contract RegisterZKChainScript is Script {
         return config.ownerAddress;
     }
 
-
     function checkTokenAddress() internal view {
         if (config.baseToken == address(0)) {
             revert("Token address is not set");
@@ -240,7 +237,7 @@ contract RegisterZKChainScript is Script {
 
     function setUpLegacySharedBridgeParams() internal {
         bytes memory implemementationConstructorParams = hex"";
-    
+
         address legacyBridgeImplementationAddress = L2ContractHelper.computeCreate2Address(
             msg.sender,
             "",
@@ -248,14 +245,15 @@ contract RegisterZKChainScript is Script {
             keccak256(implemementationConstructorParams)
         );
 
-        bytes memory proxyInitializationParams = abi.encodeCall(L2SharedBridgeLegacy.initialize, (
-            config.sharedBridgeProxy,
-            // TODO(EVM-745): Here we assume there is no legacy bridge for now
-            address(0),
-            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBeaconProxyBytecode()),
-            // This is not exactly correct, this should be ecosystem governance and not chain governance
-            msg.sender
-        ));
+        bytes memory proxyInitializationParams = abi.encodeCall(
+            L2SharedBridgeLegacy.initialize,
+            (
+                config.sharedBridgeProxy,
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBeaconProxyBytecode()),
+                // This is not exactly correct, this should be ecosystem governance and not chain governance
+                msg.sender
+            )
+        );
 
         bytes memory proxyConstructorParams = abi.encode(
             legacyBridgeImplementationAddress,
@@ -264,7 +262,6 @@ contract RegisterZKChainScript is Script {
             msg.sender,
             proxyInitializationParams
         );
-
 
         address proxyAddress = L2ContractHelper.computeCreate2Address(
             msg.sender,
@@ -458,7 +455,10 @@ contract RegisterZKChainScript is Script {
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
-        require(correctLegacyBridgeImplAddr == legacySharedBridgeParams.implementationAddress, "Legacy bridge implementation address mismatch");
+        require(
+            correctLegacyBridgeImplAddr == legacySharedBridgeParams.implementationAddress,
+            "Legacy bridge implementation address mismatch"
+        );
         require(correctProxyAddress == legacySharedBridgeParams.proxyAddress, "Legacy bridge proxy address mismatch");
 
         output.l2LegacySharedBridge = correctProxyAddress;

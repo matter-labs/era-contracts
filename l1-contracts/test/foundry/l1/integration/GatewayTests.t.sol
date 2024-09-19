@@ -97,7 +97,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
     }
 
     // This is a method to simplify porting the tests for now.
-    // Here we rely that the first restriction is the AccessControlRestriction 
+    // Here we rely that the first restriction is the AccessControlRestriction
     function _extractAccessControlRestriction(address admin) internal returns (address) {
         return ChainAdmin(payable(admin)).getRestrictions()[0];
     }

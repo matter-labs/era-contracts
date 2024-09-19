@@ -77,11 +77,18 @@ contract AcceptAdmin is Script {
         address diamondProxyAddress,
         address setter
     ) public {
-        AccessControlRestriction restriction = AccessControlRestriction(accessControlRestriction); 
+        AccessControlRestriction restriction = AccessControlRestriction(accessControlRestriction);
 
-        if (restriction.requiredRoles(diamondProxyAddress, IAdmin.setTokenMultiplier.selector) != SET_TOKEN_MULITPLIER_SETTER_ROLE) {
+        if (
+            restriction.requiredRoles(diamondProxyAddress, IAdmin.setTokenMultiplier.selector) !=
+            SET_TOKEN_MULITPLIER_SETTER_ROLE
+        ) {
             vm.startBroadcast();
-            restriction.setRequiredRoleForCall(diamondProxyAddress, IAdmin.setTokenMultiplier.selector, SET_TOKEN_MULITPLIER_SETTER_ROLE);
+            restriction.setRequiredRoleForCall(
+                diamondProxyAddress,
+                IAdmin.setTokenMultiplier.selector,
+                SET_TOKEN_MULITPLIER_SETTER_ROLE
+            );
             vm.stopBroadcast();
         }
 

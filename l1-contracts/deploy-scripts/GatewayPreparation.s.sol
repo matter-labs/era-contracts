@@ -44,7 +44,6 @@ contract GatewayPreparation is Script {
         address gatewayChainAdmin;
         address gatewayAccessControlRestriction;
         address gatewayChainProxyAdmin;
-
         bytes gatewayDiamondCutData;
     }
 
@@ -82,26 +81,24 @@ contract GatewayPreparation is Script {
         // the fact that all values are initialized
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),
-            ctmDeploymentTracker: toml.readAddress(
-                "$.ctm_deployment_tracker_proxy_addr"
-            ),
-            chainTypeManagerProxy: toml.readAddress(
-                "$.chain_type_manager_proxy_addr"
-            ),
+            ctmDeploymentTracker: toml.readAddress("$.ctm_deployment_tracker_proxy_addr"),
+            chainTypeManagerProxy: toml.readAddress("$.chain_type_manager_proxy_addr"),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
             gatewayChainId: toml.readUint("$.chain_chain_id"),
             governance: toml.readAddress("$.governance"),
             gatewayDiamondCutData: toml.readBytes("$.gateway_diamond_cut_data"),
             gatewayChainAdmin: toml.readAddress("$.chain_admin"),
-            gatewayAccessControlRestriction: toml.readAddress(
-                "$.access_control_restriction"
-            ),
+            gatewayAccessControlRestriction: toml.readAddress("$.access_control_restriction"),
             gatewayChainProxyAdmin: toml.readAddress("$.chain_proxy_admin")
         });
     }
 
     function saveOutput(Output memory output) internal {
-        vm.serializeAddress("root", "gateway_transaction_filterer_implementation", output.gatewayTransactionFiltererImplementation);
+        vm.serializeAddress(
+            "root",
+            "gateway_transaction_filterer_implementation",
+            output.gatewayTransactionFiltererImplementation
+        );
         vm.serializeAddress("root", "gateway_transaction_filterer_proxy", output.gatewayTransactionFiltererProxy);
         string memory toml = vm.serializeBytes32("root", "governance_l2_tx_hash", output.governanceL2TxHash);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-preparation-l1.toml");
@@ -118,7 +115,10 @@ contract GatewayPreparation is Script {
         saveOutput(output);
     }
 
-    function saveOutput(address gatewayTransactionFiltererImplementation, address gatewayTransactionFiltererProxy) internal {
+    function saveOutput(
+        address gatewayTransactionFiltererImplementation,
+        address gatewayTransactionFiltererProxy
+    ) internal {
         Output memory output = Output({
             governanceL2TxHash: bytes32(0),
             gatewayTransactionFiltererImplementation: gatewayTransactionFiltererImplementation,
@@ -134,10 +134,9 @@ contract GatewayPreparation is Script {
 
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
 
-        if(bridgehub.whitelistedSettlementLayers(config.gatewayChainId)) {
+        if (bridgehub.whitelistedSettlementLayers(config.gatewayChainId)) {
             console.log("Chain already whitelisted as settlement layer");
         } else {
-
             bytes memory data = abi.encodeCall(bridgehub.registerSettlementLayer, (config.gatewayChainId, true));
             Utils.executeUpgrade({
                 _governor: config.governance,
@@ -148,7 +147,6 @@ contract GatewayPreparation is Script {
                 _delay: 0
             });
             console.log("Gateway whitelisted as settlement layer");
-
         }
         // No tx has been executed, so we save an empty hash
         saveOutput(bytes32(0));
@@ -158,10 +156,7 @@ contract GatewayPreparation is Script {
     function governanceWhitelistGatewayCTM(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes memory data = abi.encodeCall(
-            IBridgehub.addChainTypeManager,
-            (gatewayCTMAddress)
-        );
+        bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (gatewayCTMAddress));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
             _getL1GasPrice(),
@@ -183,13 +178,16 @@ contract GatewayPreparation is Script {
         initializeConfig();
 
         bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetId(config.chainTypeManagerProxy);
-        
+
         // This should be equivalent to `config.chainTypeManagerProxy`, but we just double checking to ensure that
         // bridgehub was initialized correctly
         address ctmAddress = IBridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
         require(ctmAddress == config.chainTypeManagerProxy, "CTM asset id does not match the expected CTM address");
 
-        bytes memory secondBridgeData = abi.encodePacked(SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, abi.encode(assetId, L2_BRIDGEHUB_ADDRESS));
+        bytes memory secondBridgeData = abi.encodePacked(
+            SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
+            abi.encode(assetId, L2_BRIDGEHUB_ADDRESS)
+        );
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
             _getL1GasPrice(),
@@ -210,7 +208,10 @@ contract GatewayPreparation is Script {
     function registerAssetIdInBridgehub(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress));
+        bytes memory secondBridgeData = abi.encodePacked(
+            bytes1(0x01),
+            abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress)
+        );
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
             _getL1GasPrice(),
@@ -229,11 +230,7 @@ contract GatewayPreparation is Script {
     }
 
     /// @dev Calling this function requires private key to the admin of the chain
-    function migrateChainToGateway(
-        address chainAdmin,
-        address accessControlRestriction,
-        uint256 chainId
-    ) public {
+    function migrateChainToGateway(address chainAdmin, address accessControlRestriction, uint256 chainId) public {
         initializeConfig();
 
         // TODO(EVM-746): Use L2-based chain admin contract
@@ -248,11 +245,13 @@ contract GatewayPreparation is Script {
             return;
         }
 
-        bytes memory bridgehubData = abi.encode(BridgehubBurnCTMAssetData({
-            chainId: chainId,
-            ctmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
-            chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
-        }));
+        bytes memory bridgehubData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                chainId: chainId,
+                ctmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
+                chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
+            })
+        );
 
         // TODO: use constant for the 0x01
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
@@ -328,13 +327,9 @@ contract GatewayPreparation is Script {
 
         saveOutput(l2TxHash);
     }
-    
 
-    /// TODO(EVM-748): make that function support non-ETH based chains   
-    function supplyGatewayWallet(
-        address addr,
-        uint256 amount
-    ) public {
+    /// TODO(EVM-748): make that function support non-ETH based chains
+    function supplyGatewayWallet(address addr, uint256 amount) public {
         initializeConfig();
 
         Utils.runL1L2Transaction(
@@ -359,7 +354,7 @@ contract GatewayPreparation is Script {
         GatewayTransactionFilterer impl = new GatewayTransactionFilterer(
             IBridgehub(config.bridgehub),
             config.sharedBridgeProxy
-        );  
+        );
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
@@ -389,10 +384,7 @@ contract GatewayPreparation is Script {
         saveOutput(address(impl), address(proxy));
     }
 
-    function grantWhitelist(
-        address filtererProxy,
-        address addr
-    ) public {
+    function grantWhitelist(address filtererProxy, address addr) public {
         Utils.adminExecute({
             _admin: config.gatewayChainAdmin,
             _accessControlRestriction: config.gatewayAccessControlRestriction,

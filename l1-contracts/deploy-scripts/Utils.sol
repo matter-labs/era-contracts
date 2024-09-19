@@ -289,7 +289,8 @@ library Utils {
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
-            2 + l2Value;
+            2 +
+            l2Value;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
@@ -535,7 +536,14 @@ library Utils {
                 l1SharedBridgeProxy
             );
 
-        requiredValueToDeploy = approveBaseTokenAdmin(Bridgehub(bridgehubAddress), l1SharedBridgeProxy, admin, accessControlRestriction, chainId, requiredValueToDeploy);
+        requiredValueToDeploy = approveBaseTokenAdmin(
+            Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy,
+            admin,
+            accessControlRestriction,
+            chainId,
+            requiredValueToDeploy
+        );
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
             Bridgehub.requestL2TransactionDirect,
@@ -544,7 +552,13 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        adminExecute(admin, accessControlRestriction, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy);
+        adminExecute(
+            admin,
+            accessControlRestriction,
+            bridgehubAddress,
+            l2TransactionRequestDirectCalldata,
+            requiredValueToDeploy
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -555,7 +569,6 @@ library Utils {
         console.log("L2 Transaction hash is ");
         console.logBytes32(txHash);
     }
-
 
     function runAdminL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
@@ -598,7 +611,13 @@ library Utils {
 
         console.log("Executing transaction");
         vm.recordLogs();
-        adminExecute(admin, accessControlRestriction, bridgehubAddress, l2TransactionRequesCalldata, requiredValueToDeploy);
+        adminExecute(
+            admin,
+            accessControlRestriction,
+            bridgehubAddress,
+            l2TransactionRequesCalldata,
+            requiredValueToDeploy
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -633,7 +652,6 @@ library Utils {
             ethAmountToPass = amountToApprove;
         }
     }
-
 
     function extractPriorityOpFromLogs(
         address expectedDiamondProxyAddress,
@@ -703,7 +721,6 @@ library Utils {
         bytes memory bytecode = vm.parseJsonBytes(json, ".deployedBytecode.object");
         return bytecode;
     }
-
 
     function executeUpgrade(
         address _governor,

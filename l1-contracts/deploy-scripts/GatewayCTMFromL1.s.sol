@@ -17,10 +17,10 @@ import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS} from "./U
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 
-import { AdminFacet } from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import { ExecutorFacet } from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import { GettersFacet } from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import { MailboxFacet } from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
@@ -59,7 +59,6 @@ contract GatewayCTMFromL1 is Script {
         uint256 eraChainId;
         uint256 l1ChainId;
         bool testnetVerifier;
-
         bytes32 recursionNodeLevelVkHash;
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
@@ -69,18 +68,13 @@ contract GatewayCTMFromL1 is Script {
         uint256 diamondInitMaxL2GasPerBatch;
         uint256 diamondInitPriorityTxMaxPubdata;
         uint256 diamondInitMinimalL2GasPrice;
-
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
-
         uint256 priorityTxMaxGasLimit;
-
         bytes32 genesisRoot;
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
-
         uint256 latestProtocolVersion;
-
         bytes forceDeploymentsData;
     }
 
@@ -119,20 +113,15 @@ contract GatewayCTMFromL1 is Script {
         // the fact that all values are initialized
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),
-            ctmDeploymentTracker: toml.readAddress(
-                "$.ctm_deployment_tracker_proxy_addr"
-            ),
+            ctmDeploymentTracker: toml.readAddress("$.ctm_deployment_tracker_proxy_addr"),
             nativeTokenVault: toml.readAddress("$.native_token_vault_addr"),
-            chainTypeManagerProxy: toml.readAddress(
-                "$.chain_type_manager_proxy_addr"
-            ),
+            chainTypeManagerProxy: toml.readAddress("$.chain_type_manager_proxy_addr"),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
             chainChainId: toml.readUint("$.chain_chain_id"),
             governance: toml.readAddress("$.governance"),
             l1ChainId: toml.readUint("$.l1_chain_id"),
             eraChainId: toml.readUint("$.era_chain_id"),
             testnetVerifier: toml.readBool("$.testnet_verifier"),
-
             recursionNodeLevelVkHash: toml.readBytes32("$.recursion_node_level_vk_hash"),
             recursionLeafLevelVkHash: toml.readBytes32("$.recursion_leaf_level_vk_hash"),
             recursionCircuitsSetVksHash: toml.readBytes32("$.recursion_circuits_set_vks_hash"),
@@ -141,20 +130,16 @@ contract GatewayCTMFromL1 is Script {
             diamondInitMaxPubdataPerBatch: toml.readUint("$.diamond_init_max_pubdata_per_batch"),
             diamondInitMaxL2GasPerBatch: toml.readUint("$.diamond_init_max_l2_gas_per_batch"),
             diamondInitPriorityTxMaxPubdata: toml.readUint("$.diamond_init_priority_tx_max_pubdata"),
-
             diamondInitMinimalL2GasPrice: toml.readUint("$.diamond_init_minimal_l2_gas_price"),
             bootloaderHash: toml.readBytes32("$.bootloader_hash"),
             defaultAAHash: toml.readBytes32("$.default_aa_hash"),
             priorityTxMaxGasLimit: toml.readUint("$.priority_tx_max_gas_limit"),
-
             genesisRoot: toml.readBytes32("$.genesis_root"),
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
-
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
             forceDeploymentsData: toml.readBytes("$.force_deployments_data")
         });
-    
     }
 
     function saveOutput() internal {
@@ -170,13 +155,37 @@ contract GatewayCTMFromL1 is Script {
         );
         vm.serializeAddress("gateway_state_transition", "verifier_addr", output.gatewayStateTransition.verifier);
         vm.serializeAddress("gateway_state_transition", "admin_facet_addr", output.gatewayStateTransition.adminFacet);
-        vm.serializeAddress("gateway_state_transition", "mailbox_facet_addr", output.gatewayStateTransition.mailboxFacet);
-        vm.serializeAddress("gateway_state_transition", "executor_facet_addr", output.gatewayStateTransition.executorFacet);
-        vm.serializeAddress("gateway_state_transition", "getters_facet_addr", output.gatewayStateTransition.gettersFacet);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "mailbox_facet_addr",
+            output.gatewayStateTransition.mailboxFacet
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "executor_facet_addr",
+            output.gatewayStateTransition.executorFacet
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "getters_facet_addr",
+            output.gatewayStateTransition.gettersFacet
+        );
         vm.serializeAddress("gateway_state_transition", "diamond_init_addr", output.gatewayStateTransition.diamondInit);
-        vm.serializeAddress("gateway_state_transition", "genesis_upgrade_addr", output.gatewayStateTransition.genesisUpgrade);
-        vm.serializeAddress("gateway_state_transition", "default_upgrade_addr", output.gatewayStateTransition.defaultUpgrade);
-        vm.serializeAddress("gateway_state_transition", "validator_timelock_addr", output.gatewayStateTransition.validatorTimelock);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "genesis_upgrade_addr",
+            output.gatewayStateTransition.genesisUpgrade
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "default_upgrade_addr",
+            output.gatewayStateTransition.defaultUpgrade
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "validator_timelock_addr",
+            output.gatewayStateTransition.validatorTimelock
+        );
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",
@@ -195,35 +204,45 @@ contract GatewayCTMFromL1 is Script {
     /// @dev The sender may not have any privileges
     function deployGatewayContracts() public {
         output.multicall3 = _deployInternal(L2ContractsBytecodesLib.readMulticall3Bytecode(), hex"");
-        
+
         deployGatewayFacets();
 
         output.gatewayStateTransition.verifier = deployGatewayVerifier();
         output.gatewayStateTransition.validatorTimelock = deployValidatorTimelock();
-        output.gatewayStateTransition.genesisUpgrade = address(_deployInternal(L2ContractsBytecodesLib.readL1GenesisUpgradeBytecode(), hex""));
+        output.gatewayStateTransition.genesisUpgrade = address(
+            _deployInternal(L2ContractsBytecodesLib.readL1GenesisUpgradeBytecode(), hex"")
+        );
         console.log("Genesis upgrade deployed at", output.gatewayStateTransition.genesisUpgrade);
-        output.gatewayStateTransition.defaultUpgrade = address(_deployInternal(L2ContractsBytecodesLib.readDefaultUpgradeBytecode(), hex""));
+        output.gatewayStateTransition.defaultUpgrade = address(
+            _deployInternal(L2ContractsBytecodesLib.readDefaultUpgradeBytecode(), hex"")
+        );
         console.log("Default upgrade deployed at", output.gatewayStateTransition.defaultUpgrade);
-        output.gatewayStateTransition.diamondInit = address(_deployInternal(L2ContractsBytecodesLib.readDiamondInitBytecode(), hex""));
+        output.gatewayStateTransition.diamondInit = address(
+            _deployInternal(L2ContractsBytecodesLib.readDiamondInitBytecode(), hex"")
+        );
         console.log("Diamond init deployed at", output.gatewayStateTransition.diamondInit);
 
         deployGatewayChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
 
-        output.relayedSLDAValidator = _deployInternal(L2ContractsBytecodesLib.readRelayedSLDAValidatorBytecode(), hex"");
+        output.relayedSLDAValidator = _deployInternal(
+            L2ContractsBytecodesLib.readRelayedSLDAValidatorBytecode(),
+            hex""
+        );
     }
 
     function _deployInternal(bytes memory bytecode, bytes memory constructorargs) internal returns (address) {
-        return Utils.deployThroughL1({
-            bytecode: bytecode,
-            constructorargs: constructorargs,
-            create2salt: bytes32(0),
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: new bytes[](0),
-            chainId: config.chainChainId,
-            bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
-        });
+        return
+            Utils.deployThroughL1({
+                bytecode: bytecode,
+                constructorargs: constructorargs,
+                create2salt: bytes32(0),
+                l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                factoryDeps: new bytes[](0),
+                chainId: config.chainChainId,
+                bridgehubAddress: config.bridgehub,
+                l1SharedBridgeProxy: config.sharedBridgeProxy
+            });
     }
 
     function deployGatewayFacets() internal {
@@ -232,12 +251,17 @@ contract GatewayCTMFromL1 is Script {
         );
         console.log("Admin facet deployed at", adminFacet);
 
-        address mailboxFacet = address(_deployInternal(L2ContractsBytecodesLib.readMailboxFacetBytecode(), abi.encode(config.l1ChainId, config.eraChainId)));
+        address mailboxFacet = address(
+            _deployInternal(
+                L2ContractsBytecodesLib.readMailboxFacetBytecode(),
+                abi.encode(config.l1ChainId, config.eraChainId)
+            )
+        );
         console.log("Mailbox facet deployed at", mailboxFacet);
-        
+
         address executorFacet = address(_deployInternal(L2ContractsBytecodesLib.readExecutorFacetBytecode(), hex""));
         console.log("ExecutorFacet facet deployed at", executorFacet);
-        
+
         address gettersFacet = address(_deployInternal(L2ContractsBytecodesLib.readGettersFacetBytecode(), hex""));
         console.log("Getters facet deployed at", gettersFacet);
 
@@ -261,7 +285,12 @@ contract GatewayCTMFromL1 is Script {
         // address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         // TODO(EVM-745): eventually the governance should be moved to the governance contract
         // Note: we do not apply alias because the deployer is an EOA.
-        validatorTimelock = address(_deployInternal(L2ContractsBytecodesLib.readValidatorTimelockBytecode(), abi.encode(deployerAddress, 0, config.eraChainId)));
+        validatorTimelock = address(
+            _deployInternal(
+                L2ContractsBytecodesLib.readValidatorTimelockBytecode(),
+                abi.encode(deployerAddress, 0, config.eraChainId)
+            )
+        );
         console.log("Validator timelock deployed at", validatorTimelock);
     }
 
@@ -273,8 +302,13 @@ contract GatewayCTMFromL1 is Script {
         address dp = address(_deployInternal(L2ContractsBytecodesLib.readDiamondInitBytecode(), hex""));
         console.log("Dummy diamond proxy deployed at", dp);
 
-        output.gatewayStateTransition.chainTypeManagerImplementation = address(_deployInternal(L2ContractsBytecodesLib.readChainTypeManagerBytecode(), abi.encode(L2_BRIDGEHUB_ADDRESS)));
-        console.log("StateTransitionImplementation deployed at", output.gatewayStateTransition.chainTypeManagerImplementation);
+        output.gatewayStateTransition.chainTypeManagerImplementation = address(
+            _deployInternal(L2ContractsBytecodesLib.readChainTypeManagerBytecode(), abi.encode(L2_BRIDGEHUB_ADDRESS))
+        );
+        console.log(
+            "StateTransitionImplementation deployed at",
+            output.gatewayStateTransition.chainTypeManagerImplementation
+        );
 
         // TODO(EVM-745): eventually a proxy admin or something should be deplyoed here
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
@@ -354,7 +388,14 @@ contract GatewayCTMFromL1 is Script {
             protocolVersion: config.latestProtocolVersion
         });
 
-        output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(), abi.encode(output.gatewayStateTransition.chainTypeManagerImplementation, deployerAddress, abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))));
+        output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(
+            L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
+            abi.encode(
+                output.gatewayStateTransition.chainTypeManagerImplementation,
+                deployerAddress,
+                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+            )
+        );
 
         console.log("ChainTypeManagerProxy deployed at:", output.gatewayStateTransition.chainTypeManagerProxy);
         output.gatewayStateTransition.chainTypeManagerProxy = output.gatewayStateTransition.chainTypeManagerProxy;
@@ -365,15 +406,15 @@ contract GatewayCTMFromL1 is Script {
             ValidatorTimelock.setChainTypeManager,
             (IChainTypeManager(output.gatewayStateTransition.chainTypeManagerProxy))
         );
-        
+
         Utils.runL1L2Transaction({
-            l2Calldata: data, 
+            l2Calldata: data,
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             l2Value: 0,
-            factoryDeps: new bytes[](0), 
-            dstAddress: output.gatewayStateTransition.validatorTimelock, 
-            chainId: config.chainChainId, 
-            bridgehubAddress: config.bridgehub, 
+            factoryDeps: new bytes[](0),
+            dstAddress: output.gatewayStateTransition.validatorTimelock,
+            chainId: config.chainChainId,
+            bridgehubAddress: config.bridgehub,
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
