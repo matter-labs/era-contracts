@@ -59,7 +59,6 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
-    /// @param _l1Bridge The address of the legacy L1 Bridge contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
