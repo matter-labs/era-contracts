@@ -40,7 +40,7 @@ jobs:
 
       - name: Build l2 artifacts
         run: yarn l2 build
-      
+
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 

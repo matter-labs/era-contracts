@@ -1491,7 +1491,7 @@ export class Deployer {
       const l2SharedBridgeImplAddress = computeL2Create2Address(
         this.deployWallet.address,
         l2SharedBridgeImplementationBytecode,
-        '0x',
+        "0x",
         ethers.constants.HashZero
       );
 
@@ -1558,7 +1558,7 @@ export class Deployer {
     const l2SharedBridgeImplAddress = computeL2Create2Address(
       this.deployWallet.address,
       l2SharedBridgeImplementationBytecode,
-      '0x',
+      "0x",
       ethers.constants.HashZero
     );
     this.addresses.Bridges.L2LegacySharedBridgeImplementation = l2SharedBridgeImplAddress;
