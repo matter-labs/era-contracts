@@ -39,11 +39,15 @@ jobs:
       - name: Build l1 artifacts
         run: yarn l1 build
 
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -100,6 +104,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
