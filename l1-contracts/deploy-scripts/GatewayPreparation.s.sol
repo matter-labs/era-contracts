@@ -351,11 +351,13 @@ contract GatewayPreparation is Script {
     function deployAndSetGatewayTransactionFilterer() public {
         initializeConfig();
 
+        vm.broadcast();
         GatewayTransactionFilterer impl = new GatewayTransactionFilterer(
             IBridgehub(config.bridgehub),
             config.sharedBridgeProxy
         );
 
+        vm.broadcast();
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             config.gatewayChainProxyAdmin,
@@ -375,16 +377,28 @@ contract GatewayPreparation is Script {
             _value: 0
         });
 
-        grantWhitelist(address(proxy), config.gatewayChainAdmin);
-        grantWhitelist(address(proxy), config.sharedBridgeProxy);
-        grantWhitelist(address(proxy), config.ctmDeploymentTracker);
+        _grantWhitelist(address(proxy), config.gatewayChainAdmin);
+        _grantWhitelist(address(proxy), config.sharedBridgeProxy);
+        _grantWhitelist(address(proxy), config.ctmDeploymentTracker);
 
         // Then, we grant the whitelist to a few addresses
 
         saveOutput(address(impl), address(proxy));
     }
 
-    function grantWhitelist(address filtererProxy, address addr) public {
+    function grantWhitelist(address filtererProxy, address[] memory addresses) public {
+        initializeConfig();
+
+        for(uint256 i = 0; i < addresses.length; i++) {
+            if (GatewayTransactionFilterer(filtererProxy).whitelistedSenders(addresses[i])) {
+                console.log("Address already whitelisted: ", addresses[i]);
+            } else {
+                _grantWhitelist(filtererProxy, addresses[i]);
+            }
+        }
+    }
+    
+    function _grantWhitelist(address filtererProxy, address addr) internal {
         Utils.adminExecute({
             _admin: config.gatewayChainAdmin,
             _accessControlRestriction: config.gatewayAccessControlRestriction,
