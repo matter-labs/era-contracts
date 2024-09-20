@@ -58,7 +58,6 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
-            l1-contracts/lib
 
   lint:
     runs-on: ubuntu-latest
@@ -115,7 +114,6 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
-            l1-contracts/lib
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -149,6 +147,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -156,7 +155,6 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
-            l1-contracts/lib
 
       - name: Install foundry zksync
         run: |
@@ -199,6 +197,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -206,7 +205,6 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
-            l1-contracts/lib
 
       - name: Build L2 contracts
         run: yarn l2 build
@@ -266,6 +264,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -273,7 +272,6 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
-            l1-contracts/lib
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
