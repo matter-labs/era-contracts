@@ -5,6 +5,7 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {
@@ -37,5 +38,14 @@ contract createNewChainTest is ChainTypeManagerTest {
             _initData: abi.encode(abi.encode(initialDiamondCutData), bytes("")),
             _factoryDeps: new bytes[](0)
         });
+    }
+
+    function test_SuccessfulCreationOfNewChain() public {
+        address newChainAddress = createNewChain(getDiamondCutData(diamondInit));
+
+        address admin = IZKChain(newChainAddress).getAdmin();
+
+        assertEq(newChainAdmin, admin);
+        assertNotEq(newChainAddress, address(0));
     }
 }
