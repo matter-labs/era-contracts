@@ -49,6 +49,19 @@ struct StateTransitionDeployedAddresses {
     address diamondProxy;
 }
 
+/// @dev We need to use a struct instead of list of params to prevent stack too deep error
+struct PrepareL1L2TransactionParams {
+    uint256 l1GasPrice;
+    bytes l2Calldata;
+    uint256 l2GasLimit;
+    uint256 l2Value;
+    bytes[] factoryDeps;
+    address dstAddress;
+    uint256 chainId;
+    address bridgehubAddress;
+    address l1SharedBridgeProxy;
+}
+
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -275,32 +288,29 @@ library Utils {
     }
 
     function prepareL1L2Transaction(
-        uint256 l1GasPrice,
-        bytes memory l2Calldata,
-        uint256 l2GasLimit,
-        uint256 l2Value,
-        bytes[] memory factoryDeps,
-        address dstAddress,
-        uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
+        PrepareL1L2TransactionParams memory params
     ) internal returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
-        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        Bridgehub bridgehub = Bridgehub(params.bridgehubAddress);
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            bridgehub.l2TransactionBaseCost(
+                params.chainId,
+                params.l1GasPrice,
+                params.l2GasLimit,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+            ) *
             2 +
-            l2Value;
+            params.l2Value;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
-            chainId: chainId,
+            chainId: params.chainId,
             mintValue: requiredValueToDeploy,
-            l2Contract: dstAddress,
-            l2Value: l2Value,
-            l2Calldata: l2Calldata,
-            l2GasLimit: l2GasLimit,
+            l2Contract: params.dstAddress,
+            l2Value: params.l2Value,
+            l2Calldata: params.l2Calldata,
+            l2GasLimit: params.l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps: factoryDeps,
+            factoryDeps: params.factoryDeps,
             refundRecipient: msg.sender
         });
     }
@@ -354,15 +364,17 @@ library Utils {
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
         ) = prepareL1L2Transaction(
-                bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
-                l2Calldata,
-                l2GasLimit,
-                l2Value,
-                factoryDeps,
-                dstAddress,
-                chainId,
-                bridgehubAddress,
-                l1SharedBridgeProxy
+                PrepareL1L2TransactionParams({
+                    l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
+                    l2Calldata: l2Calldata,
+                    l2GasLimit: l2GasLimit,
+                    l2Value: l2Value,
+                    factoryDeps: factoryDeps,
+                    dstAddress: dstAddress,
+                    chainId: chainId,
+                    bridgehubAddress: bridgehubAddress,
+                    l1SharedBridgeProxy: l1SharedBridgeProxy
+                })
             );
 
         address baseTokenAddress = bridgehub.baseToken(chainId);
@@ -393,15 +405,17 @@ library Utils {
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
         ) = prepareL1L2Transaction(
-                l1GasPrice,
-                l2Calldata,
-                l2GasLimit,
-                0,
-                factoryDeps,
-                dstAddress,
-                chainId,
-                bridgehubAddress,
-                l1SharedBridgeProxy
+                PrepareL1L2TransactionParams({
+                    l1GasPrice: l1GasPrice,
+                    l2Calldata: l2Calldata,
+                    l2GasLimit: l2GasLimit,
+                    l2Value: 0,
+                    factoryDeps: factoryDeps,
+                    dstAddress: dstAddress,
+                    chainId: chainId,
+                    bridgehubAddress: bridgehubAddress,
+                    l1SharedBridgeProxy: l1SharedBridgeProxy
+                })
             );
 
         requiredValueToDeploy = approveBaseTokenGovernance(
@@ -525,15 +539,17 @@ library Utils {
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
         ) = prepareL1L2Transaction(
-                gasPrice,
-                l2Calldata,
-                l2GasLimit,
-                0,
-                factoryDeps,
-                dstAddress,
-                chainId,
-                bridgehubAddress,
-                l1SharedBridgeProxy
+                PrepareL1L2TransactionParams({
+                    l1GasPrice: gasPrice,
+                    l2Calldata: l2Calldata,
+                    l2GasLimit: l2GasLimit,
+                    l2Value: 0,
+                    factoryDeps: factoryDeps,
+                    dstAddress: dstAddress,
+                    chainId: chainId,
+                    bridgehubAddress: bridgehubAddress,
+                    l1SharedBridgeProxy: l1SharedBridgeProxy
+                })
             );
 
         requiredValueToDeploy = approveBaseTokenAdmin(
