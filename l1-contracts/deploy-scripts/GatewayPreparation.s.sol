@@ -389,7 +389,7 @@ contract GatewayPreparation is Script {
     function grantWhitelist(address filtererProxy, address[] memory addresses) public {
         initializeConfig();
 
-        for(uint256 i = 0; i < addresses.length; i++) {
+        for (uint256 i = 0; i < addresses.length; i++) {
             if (GatewayTransactionFilterer(filtererProxy).whitelistedSenders(addresses[i])) {
                 console.log("Address already whitelisted: ", addresses[i]);
             } else {
@@ -397,7 +397,7 @@ contract GatewayPreparation is Script {
             }
         }
     }
-    
+
     function _grantWhitelist(address filtererProxy, address addr) internal {
         Utils.adminExecute({
             _admin: config.gatewayChainAdmin,
