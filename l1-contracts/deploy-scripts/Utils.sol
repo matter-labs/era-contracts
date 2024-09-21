@@ -738,6 +738,15 @@ library Utils {
         return bytecode;
     }
 
+    function chainAdminMulticall(address _chainAdmin, address _target, bytes memory _data, uint256 _value) internal {
+        IChainAdmin chainAdmin = IChainAdmin(_chainAdmin);
+
+        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
+        calls[0] = IChainAdmin.Call({target: _target, value: _value, data: _data});
+        vm.broadcast();
+        chainAdmin.multicall(calls, true);
+    }
+
     function executeUpgrade(
         address _governor,
         bytes32 _salt,
