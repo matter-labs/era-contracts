@@ -905,7 +905,6 @@ contract DeployL1Script is Script {
 
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
-        sharedBridge.setPendingAdmin(addresses.chainAdmin);
 
         ChainTypeManager ctm = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         ctm.transferOwnership(addresses.governance);

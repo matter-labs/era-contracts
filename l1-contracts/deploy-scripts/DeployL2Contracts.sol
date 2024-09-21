@@ -106,7 +106,7 @@ contract DeployL2Script is Script {
 
     function saveOutput() internal {
         vm.serializeAddress("root", "l2_da_validator_address", deployed.l2DaValidatorAddress);
-        vm.serializeAddress("root", "multicall3", config.multicall3);
+        vm.serializeAddress("root", "multicall3", deployed.multicall3);
         vm.serializeAddress("root", "consensus_registry_implementation", deployed.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", deployed.consensusRegistryProxy);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", deployed.forceDeployUpgraderAddress);
@@ -171,8 +171,8 @@ contract DeployL2Script is Script {
         // Multicall3 doesn't have a constructor.
         bytes memory constructorData = "";
 
-        config.multicall3 = Utils.deployThroughL1({
-            bytecode: contracts.multicall3Bytecode,
+        deployed.multicall3 = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readMulticall3Bytecode(),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
