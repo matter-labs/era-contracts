@@ -239,6 +239,13 @@ library L2ContractsBytecodesLib {
             );
     }
 
+    function readValidiumL1DAValidatorBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json"
+            );
+    }
+
     /// @notice Reads the bytecode of the L2SharedBridgeLegacy contract.
     /// @return The bytecode of the L2SharedBridgeLegacy contract.
     function readL2LegacySharedBridgeBytecode() internal view returns (bytes memory) {

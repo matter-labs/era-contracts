@@ -83,7 +83,6 @@ contract GatewayCTMFromL1 is Script {
         address multicall3;
         bytes diamondCutData;
         address relayedSLDAValidator;
-        // TODO(EVM-747): for now zero, since the contract structure is not adapted to it
         address validiumDAValidator;
     }
 
@@ -229,6 +228,8 @@ contract GatewayCTMFromL1 is Script {
             L2ContractsBytecodesLib.readRelayedSLDAValidatorBytecode(),
             hex""
         );
+
+        output.validiumDAValidator = _deployInternal(L2ContractsBytecodesLib.readValidiumL1DAValidatorBytecode(), hex"");
     }
 
     function _deployInternal(bytes memory bytecode, bytes memory constructorargs) internal returns (address) {

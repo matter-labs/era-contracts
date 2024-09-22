@@ -28,11 +28,6 @@ address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03)
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
 address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
 
-struct DAContractBytecodes {
-    bytes rollupL1DAValidator;
-    bytes validiumL1DAValidator;
-}
-
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
     address chainTypeManagerProxy;
@@ -783,15 +778,10 @@ library Utils {
         vm.stopBroadcast();
     }
 
-    function readDAContractBytecodes() internal view returns (DAContractBytecodes memory bytecodes) {
-        bytecodes = DAContractBytecodes({
-            rollupL1DAValidator: readFoundryBytecode(
+    function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
+        bytecode  = readFoundryBytecode(
                 "/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json"
-            ),
-            validiumL1DAValidator: readFoundryBytecode(
-                "/../da-contracts/out/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json"
-            )
-        });
+            );
     }
 
     // add this to be excluded from coverage report
