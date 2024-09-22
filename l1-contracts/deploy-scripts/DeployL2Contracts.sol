@@ -34,6 +34,7 @@ contract DeployL2Script is Script {
         address forceDeployUpgraderAddress;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
+        address multicall3;
     }
 
     function run() public {
@@ -53,6 +54,7 @@ contract DeployL2Script is Script {
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
+        deployMulticall3();
 
         saveOutput();
     }
@@ -104,7 +106,7 @@ contract DeployL2Script is Script {
 
     function saveOutput() internal {
         vm.serializeAddress("root", "l2_da_validator_address", deployed.l2DaValidatorAddress);
-
+        vm.serializeAddress("root", "multicall3", deployed.multicall3);
         vm.serializeAddress("root", "consensus_registry_implementation", deployed.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", deployed.consensusRegistryProxy);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", deployed.forceDeployUpgraderAddress);
@@ -155,6 +157,22 @@ contract DeployL2Script is Script {
 
         deployed.consensusRegistryImplementation = Utils.deployThroughL1({
             bytecode: L2ContractsBytecodesLib.readConsensusRegistryBytecode(),
+            constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deployMulticall3() internal {
+        // Multicall3 doesn't have a constructor.
+        bytes memory constructorData = "";
+
+        deployed.multicall3 = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readMulticall3Bytecode(),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
