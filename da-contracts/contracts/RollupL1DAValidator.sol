@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
-import "forge-std/console.sol";
+
 import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
@@ -175,7 +175,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         bytes calldata _openingValueCommitmentProof
     ) internal view {
         bytes memory precompileInput = abi.encodePacked(_versionedHash, _openingPoint, _openingValueCommitmentProof);
-
+    
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
         // We verify that the point evaluation precompile call was successful by testing the latter 32 bytes of the
