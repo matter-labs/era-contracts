@@ -1490,14 +1490,12 @@ export class Deployer {
     const l1SharedBridge = this.defaultSharedBridge(this.deployWallet);
 
     if (isCurrentNetworkLocal()) {
-      const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
-
       const l2SharedBridgeImplementationBytecode = L2_SHARED_BRIDGE_IMPLEMENTATION.bytecode;
 
       const l2SharedBridgeImplAddress = computeL2Create2Address(
         this.deployWallet.address,
         l2SharedBridgeImplementationBytecode,
-        ethers.utils.defaultAbiCoder.encode(["uint256"], [eraChainId]),
+        "0x",
         ethers.constants.HashZero
       );
 
@@ -1506,7 +1504,6 @@ export class Deployer {
       const l2SharedBridgeInterface = new Interface(L2_SHARED_BRIDGE_IMPLEMENTATION.abi);
       const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
         l1SharedBridge.address,
-        this.addresses.Bridges.ERC20BridgeProxy,
         hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
         l2GovernorAddress,
       ]);
@@ -1565,7 +1562,7 @@ export class Deployer {
     const l2SharedBridgeImplAddress = computeL2Create2Address(
       this.deployWallet.address,
       l2SharedBridgeImplementationBytecode,
-      ethers.utils.defaultAbiCoder.encode(["uint256"], [eraChainId]),
+      "0x",
       ethers.constants.HashZero
     );
     this.addresses.Bridges.L2LegacySharedBridgeImplementation = l2SharedBridgeImplAddress;
@@ -1606,7 +1603,6 @@ export class Deployer {
     const l2SharedBridgeInterface = new Interface(L2_SHARED_BRIDGE_IMPLEMENTATION.abi);
     const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
       l1SharedBridge.address,
-      this.addresses.Bridges.ERC20BridgeProxy,
       hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
       l2GovernorAddress,
     ]);

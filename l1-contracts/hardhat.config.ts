@@ -41,9 +41,11 @@ export default {
       },
       evmVersion: "cancun",
     },
+    eraVersion: "1.0.1",
   },
   zksolc: {
     compilerSource: "binary",
+    version: "1.5.3",
     settings: {
       // compilerPath: getZksolcUrl(),
       enableEraVMExtensions: true,
