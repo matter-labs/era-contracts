@@ -359,40 +359,4 @@ library SystemContractHelper {
             revert FailedToChargeGas();
         }
     }
-
-    function mimicCall(
-        uint32 gasLimit,
-        address to,
-        address whoToMimic,
-        bytes memory data,
-        bool isConstructorCall,
-        bool isSystemCall
-    ) internal returns (bool success) {
-        address callAddr = MIMIC_CALL_CALL_ADDRESS;
-
-        uint32 dataStart;
-        assembly {
-            dataStart := add(data, 0x20)
-        }
-        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
-
-        // solhint-disable func-named-parameters
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            gasLimit,
-            // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.UseHeap,
-            isConstructorCall,
-            isSystemCall
-        );
-
-        // Doing the system call directly
-        assembly {
-            success := call(to, callAddr, 0, farCallAbi, whoToMimic, 0, 0)
-        }
-    }
 }

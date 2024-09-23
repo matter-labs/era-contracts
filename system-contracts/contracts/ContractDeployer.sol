@@ -532,15 +532,17 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             SystemContractHelper.setValueForNextFarCall(uint128(value));
         }
 
-        // In case of EVM contracts returnData is the new deployed code
-        bool success = SystemContractHelper.mimicCall(uint32(gasleft()), _newAddress, msg.sender, _input, true, false);
+        bool success = EfficientCall.rawMimicCall({
+            _gas: uint32(gasleft()),
+            _address: _newAddress,
+            _data: _input,
+            _whoToMimic: msg.sender,
+            _isConstructor: true,
+            _isSystem: false
+        });
 
         if (!success) {
-            assembly {
-                // Just propagate the error back
-                returndatacopy(0, 0, returndatasize())
-                revert(0, returndatasize())
-            }
+            EfficientCall.propagateRevert();
         }
 
         bytes32 codeHash = _getEvmCodeHash(_newAddress);

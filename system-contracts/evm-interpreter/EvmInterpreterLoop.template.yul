@@ -1272,11 +1272,10 @@ for { } true { } {
             revertWithGas(evmGasLeft)
         }
 
-        let offset, size, topic1
+        let offset, size
         popStackCheck(sp, evmGasLeft, 3)
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
-        topic1, sp := popStackItemWithoutCheck(sp)
 
         checkOverflow(offset, size, evmGasLeft)
         checkMemOverflowByOffset(add(offset, size), evmGasLeft)
@@ -1286,7 +1285,11 @@ for { } true { } {
         dynamicGas := add(dynamicGas, 375)
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
+        {   
+            let topic1
+            topic1, sp := popStackItemWithoutCheck(sp)
+            log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
+        }
         ip := add(ip, 1)
     }
     case 0xA2 { // OP_LOG2
@@ -1296,7 +1299,7 @@ for { } true { } {
         }
 
         let offset, size
-        popStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 4)
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
@@ -1310,7 +1313,6 @@ for { } true { } {
 
         {
             let topic1, topic2
-            popStackCheck(sp, evmGasLeft, 2)
             topic1, sp := popStackItemWithoutCheck(sp)
             topic2, sp := popStackItemWithoutCheck(sp)
             log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
@@ -1325,7 +1327,7 @@ for { } true { } {
         }
 
         let offset, size
-        popStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 5)
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
@@ -1339,7 +1341,6 @@ for { } true { } {
 
         {
             let topic1, topic2, topic3
-            popStackCheck(sp, evmGasLeft, 3)
             topic1, sp := popStackItemWithoutCheck(sp)
             topic2, sp := popStackItemWithoutCheck(sp)
             topic3, sp := popStackItemWithoutCheck(sp)
@@ -1355,7 +1356,7 @@ for { } true { } {
         }
 
         let offset, size
-        popStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 6)
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
@@ -1369,7 +1370,6 @@ for { } true { } {
 
         {
             let topic1, topic2, topic3, topic4
-            popStackCheck(sp, evmGasLeft, 4)
             topic1, sp := popStackItemWithoutCheck(sp)
             topic2, sp := popStackItemWithoutCheck(sp)
             topic3, sp := popStackItemWithoutCheck(sp)

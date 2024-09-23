@@ -14,7 +14,7 @@ import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
-import "./EvmGasManager.sol";
+import {IEvmGasManager} from "./interfaces/IEvmGasManager.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -85,7 +85,7 @@ address constant EVENT_WRITER_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x0d)
 ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
 
 IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(SYSTEM_CONTRACTS_OFFSET + 0x0f));
-EvmGasManager constant EVM_GAS_MANAGER = EvmGasManager(address(SYSTEM_CONTRACTS_OFFSET + 0x13));
+IEvmGasManager constant EVM_GAS_MANAGER = IEvmGasManager(address(SYSTEM_CONTRACTS_OFFSET + 0x13));
 
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)

@@ -1,7 +1,3 @@
-function SYSTEM_CONTRACTS_OFFSET() -> offset {
-    offset := 0x8000
-}
-
 function ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT() -> addr {
     addr := 0x0000000000000000000000000000000000008002
 }
@@ -14,10 +10,6 @@ function DEPLOYER_SYSTEM_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008006
 }
 
-function CODE_ADDRESS_CALL_ADDRESS() -> addr {
-    addr := 0x000000000000000000000000000000000000FFFE
-}
-
 function CODE_ORACLE_SYSTEM_CONTRACT() -> addr {
     addr := 0x0000000000000000000000000000000000008012
 }
@@ -26,12 +18,8 @@ function EVM_GAS_MANAGER_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008013
 }
 
-function CALLFLAGS_CALL_ADDRESS() -> addr {
-    addr := 0x000000000000000000000000000000000000FFEF
-}
-
 function DEBUG_SLOT_OFFSET() -> offset {
-    offset := mul(32, 32)
+    offset := mul(32, 32) // TODO cleanup
 }
 
 function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
@@ -72,6 +60,25 @@ function MAX_MEMORY_FRAME() -> max {
 
 function MAX_UINT() -> max_uint {
     max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+}
+
+// Essentially a NOP that will not get optimized away by the compiler
+function $llvm_NoInline_llvm$_unoptimized() {
+    pop(1)
+}
+
+function printHex(value) {
+    mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
+    mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
+    mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+    $llvm_NoInline_llvm$_unoptimized()
+}
+
+function printString(value) {
+    mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
+    mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
+    mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+    $llvm_NoInline_llvm$_unoptimized()
 }
 
 // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
@@ -211,21 +218,6 @@ function _getRawCodeHash(account) -> hash {
     hash := mload(0)
 }
 
-function _getCodeHash(account) -> hash {
-    // function getCodeHash(uint256 _input) external view override returns (bytes32)
-    mstore(0, 0xE03FE17700000000000000000000000000000000000000000000000000000000)
-    mstore(4, account)
-
-    let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-
-    if iszero(success) {
-        // This error should never happen
-        revert(0, 0)
-    }
-
-    hash := mload(0)
-}
-
 function getIsStaticFromCallFlags() -> isStatic {
     isStatic := verbatim_0i_1o("get_global::call_flags")
     isStatic := iszero(iszero(and(isStatic, 0x04)))
@@ -339,13 +331,6 @@ function getMax(a, b) -> max {
     max := b
     if gt(a, b) {
         max := a
-    }
-}
-
-function getMin(a, b) -> min {
-    min := b
-    if lt(a, b) {
-        min := a
     }
 }
 
@@ -504,13 +489,6 @@ function checkMemOverflow(location, evmGasLeft) {
     }
 }
 
-function checkMultipleOverflow(data1, data2, data3, evmGasLeft) {
-    checkOverflow(data1, data2, evmGasLeft)
-    checkOverflow(data1, data3, evmGasLeft)
-    checkOverflow(data2, data3, evmGasLeft)
-    checkOverflow(add(data1, data2), data3, evmGasLeft)
-}
-
 function checkOverflow(data1, data2, evmGasLeft) {
     if lt(add(data1, data2), data2) {
         revertWithGas(evmGasLeft)
@@ -540,25 +518,6 @@ function expandMemory(newSize) -> gasCost {
 
         mstore(MEM_OFFSET(), newSizeInWords)
     }
-}
-
-// Essentially a NOP that will not get optimized away by the compiler
-function $llvm_NoInline_llvm$_unoptimized() {
-    pop(1)
-}
-
-function printHex(value) {
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
-    mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
-    $llvm_NoInline_llvm$_unoptimized()
-}
-
-function printString(value) {
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
-    mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
-    $llvm_NoInline_llvm$_unoptimized()
 }
 
 function isSlotWarm(key) -> isWarm {
@@ -605,43 +564,6 @@ function warmSlot(key,currentValue) -> isWarm, originalValue {
     isWarm := mload(0)
     originalValue := mload(32)
 }
-
-function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
-    ret := 0x000000000000000000000000000000000000ffff
-}
-
-/// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
-/// @param addr The address to check
-function isEOA(addr) -> ret {
-    ret := 0
-    if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
-        ret := iszero(_getRawCodeHash(addr))
-    }
-}
-
-function incrementNonce(addr) {
-    mstore(0, 0x306395C600000000000000000000000000000000000000000000000000000000)
-    mstore(4, addr)
-
-    let farCallAbi := getFarCallABI(
-        0,
-        0,
-        0,
-        36,
-        gas(),
-        // Only rollup is supported for now
-        0,
-        0,
-        0,
-        1
-    )
-    let to := NONCE_HOLDER_SYSTEM_CONTRACT()
-    let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-
-    if iszero(result) {
-        revert(0, 0)
-    }
-} 
 
 function getFarCallABI(
     dataOffset,
@@ -1146,38 +1068,6 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
         extraCost := add(extraCost, precompileCost)
     }
     sp := pushStackItem(sp, success, evmGasLeft)
-}
-
-function getMessageCallGas (
-    _value,
-    _gas,
-    _gasLeft,
-    _memoryCost,
-    _extraGas
-) -> gasPlusExtra, gasPlusStipend {
-    let callStipend := 2300
-    if iszero(_value) {
-        callStipend := 0
-    }
-
-    switch lt(_gasLeft, add(_extraGas, _memoryCost))
-        case 0
-        {
-            let _gasTemp := sub(sub(_gasLeft, _extraGas), _memoryCost)
-            // From the Tangerine Whistle fork, gas is capped at all but one 64th (remaining_gas / 64)
-            // of the remaining gas of the current context. If a call tries to send more, the gas is 
-            // changed to match the maximum allowed.
-            let maxGasToPass := sub(_gasTemp, shr(6, _gasTemp)) // _gas >> 6 == _gas/64
-            if gt(_gas, maxGasToPass) {
-                _gas := maxGasToPass
-            }
-            gasPlusExtra := add(_gas, _extraGas)
-            gasPlusStipend := add(_gas, callStipend)
-        }
-        default {
-            gasPlusExtra := add(_gas, _extraGas)
-            gasPlusStipend := add(_gas, callStipend)
-        }
 }
 
 function _performStaticCall(

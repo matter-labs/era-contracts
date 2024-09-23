@@ -40,8 +40,6 @@ interface IContractDeployer {
 
     event AccountVersionUpdated(address indexed accountAddress, AccountAbstractionVersion aaVersion);
 
-    event EVMProxyHashUpdated(bytes32 indexed oldHash, bytes32 indexed newHash);
-
     function getNewAddressCreate2(
         address _sender,
         bytes32 _bytecodeHash,
