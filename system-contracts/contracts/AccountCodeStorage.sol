@@ -115,9 +115,8 @@ contract AccountCodeStorage is IAccountCodeStorage {
         // so set `keccak256("")` as a code hash. The EVM has the same behavior.
         else if (Utils.isContractConstructing(codeHash)) {
             codeHash = EMPTY_STRING_KECCAK;
-        }
-
-        if (Utils.isCodeHashEVM(codeHash)) {
+        } 
+        else if (Utils.isCodeHashEVM(codeHash)) {
             codeHash = DEPLOYER_SYSTEM_CONTRACT.evmCodeHash(account);
         }
 
