@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
-
+import {console} from "forge-std/console.sol";
 import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
@@ -74,6 +74,8 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // or there are values for both.
         // This is mostly a sanity check and it is not strictly required.
         for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
+            console.logBytes32(blobsLinearHashes[i]);
+            console.logBytes32(blobCommitments[i]);
             if (
                 (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] != bytes32(0)) ||
                 (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] == bytes32(0))

@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-
+import {console} from "forge-std/console.sol";
 import {L1DAValidatorOutput} from "../contracts/IL1DAValidator.sol";
 import {PubdataSource} from "../contracts/DAUtils.sol";
 import {RollupL1DAValidator} from "../contracts/RollupL1DAValidator.sol";
@@ -64,6 +64,26 @@ contract RollupL1DAValidatorTest is Test {
         vm.expectRevert("l1-da-validator/invalid-pubdata-source");
         validator.checkDA(0, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
+
+    function test_checkDABlobHashCommitmentError() public {
+        bytes memory pubdata = "verifydont";
+
+        bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
+        uint8 blobsProvided = 1;
+        uint256 maxBlobsSupported = 6;
+        bytes32 blobLinearHash = 0;
+        uint8 pubdataSource = uint8(PubdataSource.Calldata);
+        bytes memory l1DaInput = "verifydonttrustzkistheendgamemagicmoonmath";
+        bytes32 fullPubdataHash = keccak256(pubdata);
+     
+        bytes memory daInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided, blobLinearHash);
+        bytes32 l2DAValidatorOutputHash = keccak256(daInput);
+        bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
+
+        vm.expectRevert(abi.encodeWithSelector(BlobHashCommitmentError.selector, 0, true, false));
+        validator.checkDA(0, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
+    }
+
 
     function test_checkDA() public {
         bytes memory pubdata = "verifydont";
