@@ -51,6 +51,13 @@ function TEST_simple_transaction() {
     testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0xC350, "Invalid pubdata limit")
 }
 
+function TEST_simple_transaction2() {
+    // We'll test the transaction from 1.json
+    let txDataOffset := testing_txDataOffset(1)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0xC350, "Invalid pubdata limit")
+}
+
 function TEST_getTransactionUpfrontOverhead() {
     // For very large transactions it should be proportional to the memory,
     // but for small ones, the transaction slots are more important
@@ -108,4 +115,11 @@ function TEST_systemLogKeys() {
     testing_assertEq(chainedPriorityTxnHashLogKey, 3, "Invalid priority txn hash log key")
     testing_assertEq(numberOfLayer1TxsLogKey, 4, "Invalid num layer 1 txns log key")
     testing_assertEq(protocolUpgradeTxHashKey, 7, "Invalid protocol upgrade txn hash log key")
+}
+
+function TEST_execute_transaction() {
+    // We'll test the transaction from 0.json
+    let txDataOffset := testing_txDataOffset(0)
+    let innerTxDataOffset := add(txDataOffset, 0x20)
+    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0xC350, "Invalid pubdata limit")
 }

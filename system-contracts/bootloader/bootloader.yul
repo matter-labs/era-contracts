@@ -502,8 +502,8 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
-            function L2_NULLIFER_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000000800f // todo? 
+            function L2_NULLIFIER_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000010006 // todo? 
             }
 
             function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
@@ -716,6 +716,27 @@ object "Bootloader" {
                 debugLog("DATA_LENGTH", dataLength)
 
                 ret := keccak256(txDataOffset, dataLength)
+                // kl todo keep function as is, but create a modified function which skips the merkle proof
+            }
+
+            /// @dev Calculates the
+            function getXL2TxHashWithoutMerkleProof(txDataOffset) -> ret {
+                // Putting the correct value at the `txDataOffset` just in case, since
+                // the correctness of this value is not part of the system invariants.
+                // Note, that the correct ABI encoding of the Transaction structure starts with 0x20
+                mstore(txDataOffset, 32)
+
+                let innerTxDataOffset := add(txDataOffset, 32)
+                let dataLength := safeAdd(32, getDataLength(innerTxDataOffset), "qev 2")
+                let merkleProofPtr := getXL2MerkleProofPtr(innerTxDataOffset)
+                let merkleProofLength := mload(merkleProofPtr)
+                mstore(merkleProofPtr, 0)
+                debugLog("HASH_OFFSET", innerTxDataOffset)
+                debugLog("DATA_LENGTH", dataLength)
+                debugLog("merkleProofLength", merkleProofLength)
+
+                ret := keccak256(txDataOffset, sub(dataLength, merkleProofLength)) // kl todo we might have to use the rounded mPL here. 
+                mstore(merkleProofPtr, merkleProofLength)
             }
 
             /// @dev The purpose of this function is to make sure the operator
@@ -847,7 +868,7 @@ object "Bootloader" {
                 mstore(4, canonicalTxHash)
                 let success := call(
                     gas(),
-                    L2_NULLIFER_ADDR(),
+                    L2_NULLIFIER_ADDR(),
                     0,
                     0,
                     36,
@@ -868,53 +889,104 @@ object "Bootloader" {
                 }
             }
 
-            function getMerkleProofFromTxData(txDataOffset, merkleProofOffset) -> merkleProof {
-                // Read the length of the merkle proof
-                let proofLength := mload(merkleProofOffset)
+            // function getMerkleProofFromTxData(txDataOffset, merkleProofOffset) -> merkleProof {
+            //     // Read the length of the merkle proof
+            //     let proofLength := mload(merkleProofOffset)
                 
-                // Allocate memory for the merkle proof
-                merkleProof := mload(0x40)
-                mstore(0x40, add(merkleProof, add(proofLength, 32)))
+            //     // Allocate memory for the merkle proof
+            //     merkleProof := mload(0x40)
+            //     mstore(0x40, add(merkleProof, add(proofLength, 32)))
                 
-                // Store the length of the merkle proof
-                mstore(merkleProof, proofLength)
+            //     // Store the length of the merkle proof
+            //     mstore(merkleProof, proofLength)
                 
-                // Copy the merkle proof data
-                let sourcePos := add(merkleProofOffset, 32)
-                let destPos := add(merkleProof, 32)
-                for { let i := 0 } lt(i, proofLength) { i := add(i, 32) }
-                {
-                    mstore(add(destPos, i), mload(add(sourcePos, i)))
-                }
-            }
+            //     // Copy the merkle proof data
+            //     let sourcePos := add(merkleProofOffset, 32)
+            //     let destPos := add(merkleProof, 32)
+            //     for { let i := 0 } lt(i, proofLength) { i := add(i, 32) }
+            //     {
+            //         mstore(add(destPos, i), mload(add(sourcePos, i)))
+            //     }
+            // }
 
             function verifyXL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata) {
-                // Get the location of the merkle proof in the xl2 tx
-                let merkleProofOffset := getMerkleProofOffset(txDataOffset)
-                
+                let innerTxDataOffset := add(txDataOffset, 32)
                 // Get the merkle proof from the tx data
-                let merkleProof := getMerkleProofFromTxData(txDataOffset, merkleProofOffset)
-                
+                let merkleProofPtr := getXL2MerkleProofPtr(innerTxDataOffset)
+                debugLog("Verify XL2 Tx 1", mload(merkleProofPtr))
                 // Prepare the call to verify the XL2 transaction
-                mstore(0, {{RIGHT_PADDED_VERIFY_XL2_TX_SELECTOR}})
-                mstore(4, merkleProof)
-                
+                // note: a an empy space has been left for the selector. 
+                mstore(add(merkleProofPtr, 32), {{LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR}})
+                debugLog("Verify XL2 Tx 2", mload(merkleProofPtr))
+                debugLog("Verify XL2 Tx 3",  {{LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR}})
+                debugLog("Verify XL2 Tx 4", mload(add(merkleProofPtr, 32)))
+                debugLog("Verify XL2 Tx 4", mload(add(merkleProofPtr, 64)))
+                debugLog("Verify XL2 Tx 5", mload(add(merkleProofPtr, 96)))
+                debugLog("KL todo", 1)
+
                 let success := call(
                     gas(),
-                    L2_NULLIFER_ADDR(),
+                    BOOTLOADER_UTILITIES(),
                     0,
+                    add(merkleProofPtr, 60),
+                    // 68,
+                    sub(mload(merkleProofPtr), 28), // 4 bytes for selector + length of merkle proof
                     0,
-                    add(4, mload(merkleProof)), // 4 bytes for selector + length of merkle proof
-                    0,
-                    0
+                    64
                 )
-                
+                debugLog("KL todo 2", 1)
+                debugLog("kl todo", sub(mload(merkleProofPtr), 28))
+
                 if iszero(success) {
                     revertWithReason(
                         VERIFY_XL2_TX_FAILED_ERR_CODE(),
                         0
                     )
                 }
+                debugLog("KL todo 3", 1)
+
+                let returnDataSize := returndatasize()
+                let canonicalTxHash := 0
+                let messageRoot := 0
+
+                canonicalTxHash := mload(0)
+                messageRoot := mload(32)
+
+                debugLog("KL todo 4", canonicalTxHash)
+                let calculatedTxHash := getXL2TxHashWithoutMerkleProof(txDataOffset)
+                debugLog("KL todo 4.2", calculatedTxHash)
+                debugLog("KL todo 4.3", messageRoot)
+                // todo: require(calculatedTxHash == canonicalTxHash, "XL2: calculatedTxHash != canonicalTxHash");
+                let markAsExecutedDataPtr := 0 //mload(0x40) 
+                debugLog("KL todo 4", 5)
+
+                mstore(add(markAsExecutedDataPtr, 32), {{RIGHT_PADDED_MARK_AS_EXECUTED_SELECTOR}})
+                debugLog("KL todo 4", 6)
+
+                mstore(add(markAsExecutedDataPtr, 36), canonicalTxHash)
+                debugLog("KL todo 4", 7)
+
+                mstore(add(markAsExecutedDataPtr, 68), messageRoot)
+                debugLog("KL todo 5", 8)
+
+                let success := call(
+                    gas(),
+                    L2_NULLIFIER_ADDR(),
+                    0,
+                    add(32, markAsExecutedDataPtr),
+                    68, // 4 + 32 + 32
+                    0,
+                    0
+                )
+                debugLog("KL todo 6", 6)
+
+                if iszero(success) {
+                    revertWithReason(
+                        VERIFY_XL2_TX2_FAILED_ERR_CODE(),
+                        0
+                    )
+                }
+                debugLog("KL todo 7", 7)
             }
 
             /// @dev Saves the paymaster context and checks that the paymaster has returned the correct
@@ -3228,9 +3300,9 @@ object "Bootloader" {
             function validateTypedTxStructure(innerTxDataOffset) {
                 /// Some common checks for all transactions.
                 let reservedDynamicLength := getReservedDynamicBytesLength(innerTxDataOffset)
-                if gt(reservedDynamicLength, 0) {
-                    assertionError("non-empty reservedDynamic")
-                }
+                // if gt(reservedDynamicLength, 0) {
+                //     assertionError("non-empty reservedDynamic")
+                // }
                 let txType := getTxType(innerTxDataOffset)
                 switch txType
                     case 0 {
@@ -3455,6 +3527,16 @@ object "Bootloader" {
 
             function getReservedDynamicBytesLength(innerTxDataOffset) -> ret {
                 let ptr := getReservedDynamicPtr(innerTxDataOffset)
+                ret := lengthRoundedByWords(mload(ptr))
+            }
+
+            function getXL2MerkleProofPtr(innerTxDataOffset) -> ret {
+                ret := mload(add(innerTxDataOffset, 576)) // kl todo for now the reservedDynamicPtr is completely used up. 
+                ret := add(innerTxDataOffset, ret)
+            }
+
+            function getXL2MerkleProofLength(innerTxDataOffset) -> ret {
+                let ptr := getXL2MerkleProofPtr(innerTxDataOffset)
                 ret := lengthRoundedByWords(mload(ptr))
             }
 
@@ -3865,6 +3947,14 @@ object "Bootloader" {
 
             function MARK_AS_EXECUTED_ERR_CODE() -> ret {
                 ret := 30
+            }
+
+            function VERIFY_XL2_TX_FAILED_ERR_CODE() -> ret {
+                ret := 31
+            }
+
+            function VERIFY_XL2_TX2_FAILED_ERR_CODE() -> ret {
+                ret := 32
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes

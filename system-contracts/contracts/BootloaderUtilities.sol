@@ -329,4 +329,26 @@ contract BootloaderUtilities is IBootloaderUtilities {
                 )
             );
     }
+
+    struct ProofData {
+        bytes32 canonicalTxHash;
+        bytes32 messageRoot;
+    }
+
+    function calculateXL2MerkleProof(
+        bytes calldata _proofData
+    )
+        external
+        view
+        returns (
+            // uin256, uin256
+            bytes32 txHash,
+            bytes32 messageRoot
+        )
+    {
+        // (ProofData memory proofData ) = abi.decode(_proofData, (ProofData));
+        // kl todo verify the proof here, get return values
+        txHash = bytes32(uint256(0x01));
+        messageRoot = bytes32(uint256(0x02));
+    }
 }

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
+
+import {Unauthorized} from "./SystemContractErrors.sol";
+import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
 
 /**
  * @author Matter Labs
