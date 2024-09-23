@@ -8,7 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {StateTransitionDeployedAddresses, Utils, DAContractBytecodes, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
@@ -54,6 +54,7 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -380,13 +381,11 @@ contract DeployL1Script is Script {
     }
 
     function deployDAValidators() internal {
-        DAContractBytecodes memory daBytecodes = Utils.readDAContractBytecodes();
-
-        address contractAddress = deployViaCreate2(daBytecodes.rollupL1DAValidator);
+        address contractAddress = deployViaCreate2(Utils.readRollupDAValidatorBytecode());
         console.log("L1RollupDAValidator deployed at:", contractAddress);
         addresses.daAddresses.l1RollupDAValidator = contractAddress;
 
-        contractAddress = deployViaCreate2(daBytecodes.validiumL1DAValidator);
+        contractAddress = deployViaCreate2(type(ValidiumL1DAValidator).creationCode);
         console.log("L1ValidiumDAValidator deployed at:", contractAddress);
         addresses.daAddresses.l1ValidiumDAValidator = contractAddress;
     }
@@ -1058,7 +1057,7 @@ contract DeployL1Script is Script {
         vm.serializeAddress(
             "deployed_addresses",
             "validium_l1_da_validator_addr",
-            addresses.daAddresses.l1RollupDAValidator
+            addresses.daAddresses.l1ValidiumDAValidator
         );
 
         string memory deployedAddresses = vm.serializeAddress(

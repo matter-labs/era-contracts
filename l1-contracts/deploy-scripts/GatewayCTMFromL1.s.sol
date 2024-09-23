@@ -83,7 +83,6 @@ contract GatewayCTMFromL1 is Script {
         address multicall3;
         bytes diamondCutData;
         address relayedSLDAValidator;
-        // TODO(EVM-747): for now zero, since the contract structure is not adapted to it
         address validiumDAValidator;
     }
 
@@ -229,6 +228,11 @@ contract GatewayCTMFromL1 is Script {
             L2ContractsBytecodesLib.readRelayedSLDAValidatorBytecode(),
             hex""
         );
+
+        output.validiumDAValidator = _deployInternal(
+            L2ContractsBytecodesLib.readValidiumL1DAValidatorBytecode(),
+            hex""
+        );
     }
 
     function _deployInternal(bytes memory bytecode, bytes memory constructorargs) internal returns (address) {
@@ -273,9 +277,11 @@ contract GatewayCTMFromL1 is Script {
 
     function deployGatewayVerifier() internal returns (address verifier) {
         if (config.testnetVerifier) {
-            verifier = address(_deployInternal(L2ContractsBytecodesLib.readTestnetVerifierBytecode(), hex""));
+            verifier = address(
+                _deployInternal(L2ContractsBytecodesLib.readL2TestnetVerifierBytecode(), abi.encode(config.l1ChainId))
+            );
         } else {
-            verifier = address(_deployInternal(L2ContractsBytecodesLib.readVerifierBytecode(), hex""));
+            verifier = address(_deployInternal(L2ContractsBytecodesLib.readL2VerifierBytecode(), hex""));
         }
 
         console.log("Verifier deployed at", verifier);

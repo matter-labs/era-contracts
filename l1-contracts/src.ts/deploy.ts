@@ -78,7 +78,6 @@ import { ICTMDeploymentTrackerFactory } from "../typechain/ICTMDeploymentTracker
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
 import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
-import { ValidiumL1DAValidatorFactory } from "../../da-contracts/typechain/ValidiumL1DAValidatorFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -295,8 +294,8 @@ export class Deployer {
     let factory;
     if (contractName == "RollupL1DAValidator") {
       factory = new RollupL1DAValidatorFactory(this.deployWallet);
-    } else if (contractName == "ValidiumL1DAValidator") {
-      factory = new ValidiumL1DAValidatorFactory(this.deployWallet);
+    } else {
+      throw new Error(`Unknown DA contract name ${contractName}`);
     }
     return factory.getDeployTransaction().data;
   }
@@ -1755,14 +1754,12 @@ export class Deployer {
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
     }
-    const validiumValidatorBytecode = await this.loadFromDAFolder("ValidiumL1DAValidator");
     const validiumDAValidatorAddress = await this.deployViaCreate2(
       "ValidiumL1DAValidator",
       [],
       create2Salt,
       ethTxOptions,
-      undefined,
-      validiumValidatorBytecode
+      undefined
     );
 
     if (this.verbose) {
