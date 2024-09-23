@@ -78,7 +78,7 @@ import { ICTMDeploymentTrackerFactory } from "../typechain/ICTMDeploymentTracker
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
 import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
-import { ValidiumL1DAValidatorFactory } from "../../da-contracts/typechain/ValidiumL1DAValidatorFactory";
+import { ValidiumL1DAValidatorFactory } from "../typechain/ValidiumL1DAValidatorFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
