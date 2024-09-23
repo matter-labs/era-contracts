@@ -779,9 +779,7 @@ library Utils {
     }
 
     function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode  = readFoundryBytecode(
-                "/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json"
-            );
+        bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
     }
 
     // add this to be excluded from coverage report

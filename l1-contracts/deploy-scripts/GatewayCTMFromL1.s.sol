@@ -229,7 +229,10 @@ contract GatewayCTMFromL1 is Script {
             hex""
         );
 
-        output.validiumDAValidator = _deployInternal(L2ContractsBytecodesLib.readValidiumL1DAValidatorBytecode(), hex"");
+        output.validiumDAValidator = _deployInternal(
+            L2ContractsBytecodesLib.readValidiumL1DAValidatorBytecode(),
+            hex""
+        );
     }
 
     function _deployInternal(bytes memory bytecode, bytes memory constructorargs) internal returns (address) {
