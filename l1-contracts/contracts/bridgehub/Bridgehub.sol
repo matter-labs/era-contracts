@@ -584,28 +584,28 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (zkChain != address(0)) {
             canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
         } else {
-            L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
-                txType: INTEROP_OPERATION_TX_TYPE,
-                from: uint256(uint160(_request.sender)),
-                to: uint256(uint160(_request.contractL2)),
-                gasLimit: _request.l2GasLimit,
-                gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                maxFeePerGas: uint256(0), // todo change in the bootloader
-                maxPriorityFeePerGas: uint256(0),
-                paymaster: uint256(0),
-                nonce: uint256(0), //todo
-                value: _request.l2Value,
-                reserved: [_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
-                data: _request.l2Calldata,
-                signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
-                paymasterInput: new bytes(0),
-                reservedDynamic: new bytes(0)
-            });
-            /// Fixme this does not have a unique hash atm.
-            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
-            // solhint-disable-next-line func-named-parameters
-            emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
+            // L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
+            //     txType: INTEROP_OPERATION_TX_TYPE,
+            //     from: uint256(uint160(_request.sender)),
+            //     to: uint256(uint160(_request.contractL2)),
+            //     gasLimit: _request.l2GasLimit,
+            //     gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+            //     maxFeePerGas: uint256(0), // todo change in the bootloader
+            //     maxPriorityFeePerGas: uint256(0),
+            //     paymaster: uint256(0),
+            //     nonce: uint256(0), //todo
+            //     value: _request.l2Value,
+            //     reserved: [_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
+            //     data: _request.l2Calldata,
+            //     signature: new bytes(0),
+            //     factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
+            //     paymasterInput: new bytes(0),
+            //     reservedDynamic: new bytes(0)
+            // });
+            // /// Fixme this does not have a unique hash atm.
+            // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
+            // // solhint-disable-next-line func-named-parameters
+            // emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
         }
     }
 
