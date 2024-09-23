@@ -160,10 +160,7 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the L2 Verifier contract.
     /// @return The bytecode of the Verifier contract.
     function readL2VerifierBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/verifier/Verifier.sol/Verifier.json"
-            );
+        return Utils.readHardhatBytecode("/../l2-contracts/artifacts-zk/contracts/verifier/Verifier.sol/Verifier.json");
     }
 
     /// @notice Reads the bytecode of the Verifier contract.

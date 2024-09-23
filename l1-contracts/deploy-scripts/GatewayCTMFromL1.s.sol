@@ -277,7 +277,9 @@ contract GatewayCTMFromL1 is Script {
 
     function deployGatewayVerifier() internal returns (address verifier) {
         if (config.testnetVerifier) {
-            verifier = address(_deployInternal(L2ContractsBytecodesLib.readL2TestnetVerifierBytecode(), abi.encode(config.l1ChainId)));
+            verifier = address(
+                _deployInternal(L2ContractsBytecodesLib.readL2TestnetVerifierBytecode(), abi.encode(config.l1ChainId))
+            );
         } else {
             verifier = address(_deployInternal(L2ContractsBytecodesLib.readL2VerifierBytecode(), hex""));
         }
