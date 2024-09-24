@@ -48,7 +48,7 @@ export default {
     version: "1.5.3",
     settings: {
       // compilerPath: getZksolcUrl(),
-      enableEraVMExtensions: true,
+      isSystem: true,
     },
   },
   contractSizer: {
