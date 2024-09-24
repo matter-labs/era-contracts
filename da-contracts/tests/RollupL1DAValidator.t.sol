@@ -3,12 +3,12 @@
 pragma solidity 0.8.24;
 
 import {Test} from "../lib/forge-std/src/Test.sol";
-import {console} from "forge-std/console.sol";
+
 import {L1DAValidatorOutput} from "../contracts/IL1DAValidator.sol";
 import {PubdataSource} from "../contracts/DAUtils.sol";
 import {RollupL1DAValidator} from "../contracts/RollupL1DAValidator.sol";
 import {DummyRollupL1DAValidator} from "./DummyRollupL1DAValidator.sol";
-import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
+import {PubdataCommitmentsEmpty, PointEvalFailed2, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "../contracts/DAUtils.sol";
 import {Utils} from "./Utils.sol";
 
@@ -252,7 +252,7 @@ contract RollupL1DAValidatorTest is Test {
         bytes memory data = POINT_EVALUATION_PRECOMPILE_RESULT;
         (, uint256 result) = abi.decode(data, (uint256, uint256));
 
-        vm.expectRevert(abi.encodeWithSelector(PointEvalFailed.selector, result));
+        vm.expectRevert(PointEvalFailed2.selector);
         dummyValidator.mockPointEvaluationPrecompile(success, data, precompileInput);
     }
 

@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 import {Vm as vm} from "lib/forge-std/src/Vm.sol";
 import {RollupL1DAValidator} from "../contracts/RollupL1DAValidator.sol";
-import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
+import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, PointEvalFailed2, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "../contracts/DAUtils.sol";
 
 contract DummyRollupL1DAValidator is RollupL1DAValidator {
@@ -114,7 +114,7 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
         }
         (, uint256 result) = abi.decode(data, (uint256, uint256));
         if (result != BLS_MODULUS) {
-            revert PointEvalFailed(abi.encode(result));
+            revert PointEvalFailed2();
         }
     }
 }
