@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
-import {Vm as vm} from "lib/forge-std/src/Vm.sol";
+import {Test} from "../lib/forge-std/src/Test.sol";
 import {RollupL1DAValidator} from "../contracts/RollupL1DAValidator.sol";
 import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "../contracts/DAUtils.sol";
 
-contract DummyRollupL1DAValidator is RollupL1DAValidator {
+contract DummyRollupL1DAValidator is Test, RollupL1DAValidator {
     function getPublishedBlobCommitment(uint256 _index, bytes calldata _commitment) external view returns (bytes32) {
         return _getPublishedBlobCommitment(_index, _commitment);
     }
@@ -34,6 +34,12 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
         publishedBlobCommitments[blobCommitment] = true;
     }
 
+    // Those dummy functions had to be made because of difference in the types of openingPoint and blobClaimedValue,
+    // which changes the way we encode precompileInput for POINT_EVALUATION_PRECOMPILE_ADDR staticcall.
+    // Also had to mock one function because i did not find appropriate input values for pointEvaluationPrecompile
+    // that would success the staticcall but make it return incorrect value.
+    // Likewise i couldn't make getBlobVersionedHash function return hash that would make staticcall succeed.
+
     function dummyPublishBlobsTest(bytes calldata _pubdataCommitments) external {
         if (_pubdataCommitments.length == 0) {
             revert PubdataCommitmentsEmpty();
@@ -61,9 +67,6 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
             revert EmptyBlobVersionHash(_index);
         }
 
-        // First 16 bytes is the opening point. While we get the point as 16 bytes, the point evaluation precompile
-        // requires it to be 32 bytes. The blob commitment must use the opening point as 16 bytes though.
-
         blobVersionedHash = 0x01cf45213dd7b4716864d378f3c6d861467987e4d94b7f79a1f814a697e38637;
         bytes32 blobClaimedValue = bytes32(
             uint256(
@@ -85,7 +88,6 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
             _commitment[PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET + 32:PUBDATA_COMMITMENT_SIZE]
         );
 
-        // Take the hash of the versioned hash || opening point || claimed value
         return keccak256(abi.encodePacked(blobVersionedHash, _commitment[:PUBDATA_COMMITMENT_COMMITMENT_OFFSET]));
     }
 
@@ -104,8 +106,6 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
-        // We verify that the point evaluation precompile call was successful by testing the latter 32 bytes of the
-        // response is equal to BLS_MODULUS as defined in https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
         if (!success) {
             revert PointEvalCallFailed(precompileInput);
         }
@@ -115,7 +115,24 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
         }
     }
 
-    function mockPointEvaluationPrecompile(bool success, bytes calldata data, bytes calldata precompileInput) external {
+    function mockPointEvaluationPrecompile(        
+        bytes32 _versionedHash,
+        bytes32 _openingPoint,
+        bytes calldata _openingValueCommitmentProof
+    ) external {
+        bytes memory precompileInput = abi.encodePacked(
+            _versionedHash,
+            _openingPoint,
+            _openingValueCommitmentProof
+        );
+        bytes
+            memory POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000120073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff021a0003";
+
+        vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
+
+        bool success = true;
+        bytes memory data = POINT_EVALUATION_PRECOMPILE_RESULT;
+
         if (!success) {
             revert PointEvalCallFailed(precompileInput);
         }

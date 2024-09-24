@@ -246,18 +246,14 @@ contract RollupL1DAValidatorTest is Test {
 
         dummyValidator.dummyPublishBlobs(versionedHash);
 
-        bytes memory precompileInput = abi.encodePacked(versionedHash, openingPoint, openingValueCommitmentProof);
         bytes
             memory POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000120073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff021a0003";
 
-        vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
-
-        bool success = true;
         bytes memory data = POINT_EVALUATION_PRECOMPILE_RESULT;
         (, uint256 result) = abi.decode(data, (uint256, uint256));
 
         vm.expectRevert(abi.encodeWithSelector(PointEvalFailed.selector, abi.encode(result)));
-        dummyValidator.mockPointEvaluationPrecompile(success, data, precompileInput);
+        dummyValidator.mockPointEvaluationPrecompile(versionedHash, openingPoint, openingValueCommitmentProof);
     }
 
     function test_pointEvaluationPrecompile() public {
