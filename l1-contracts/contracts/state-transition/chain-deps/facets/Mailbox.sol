@@ -129,67 +129,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         TxStatus _status
     ) public view returns (bool) {}
 
-    function _parseProofMetadata(
-        bytes32[] calldata _proof
-    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
-        bytes32 proofMetadata = _proof[0];
-
-        // We support two formats of the proofs:
-        // 1. The old format, where `_proof` is just a plain Merkle proof.
-        // 2. The new format, where the first element of the `_proof` is encoded metadata, which consists of the following:
-        // - first byte: metadata version (0x01).
-        // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
-        // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
-        // - the rest of the bytes are zeroes.
-        //
-        // In the future the old version will be disabled, and only the new version will be supported.
-        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 29 bytes are zeroes.
-        // It is safe, since the elements of the proof are hashes and are unlikely to have 29 zero bytes in them.
-
-        // We shift left by 3 bytes = 24 bits to remove the top 24 bits of the metadata.
-        uint256 metadataAsUint256 = (uint256(proofMetadata) << 24);
-
-        if (metadataAsUint256 == 0) {
-            // It is the new version
-            bytes1 metadataVersion = bytes1(proofMetadata);
-            require(
-                uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION,
-                "Mailbox: unsupported proof metadata version"
-            );
-
-            proofStartIndex = 1;
-            logLeafProofLen = uint256(uint8(proofMetadata[1]));
-            batchLeafProofLen = uint256(uint8(proofMetadata[2]));
-        } else {
-            // It is the old version
-
-            // The entire proof is a merkle path
-            proofStartIndex = 0;
-            logLeafProofLen = _proof.length;
-            batchLeafProofLen = 0;
-        }
-    }
-
-    function extractSlice(
-        bytes32[] calldata _proof,
-        uint256 _left,
-        uint256 _right
-    ) internal pure returns (bytes32[] memory slice) {
-        slice = new bytes32[](_right - _left);
-        for (uint256 i = _left; i < _right; i = i.uncheckedInc()) {
-            slice[i - _left] = _proof[i];
-        }
-    }
-
-    /// @notice Extracts slice until the end of the array.
-    /// @dev It is used in one place in order to circumvent the stack too deep error.
-    function extractSliceUntilEnd(
-        bytes32[] calldata _proof,
-        uint256 _start
-    ) internal pure returns (bytes32[] memory slice) {
-        slice = extractSlice(_proof, _start, _proof.length);
-    }
-
     /// @inheritdoc IMailbox
     function proveL2LeafInclusion(
         uint256 _batchNumber,
@@ -206,84 +145,37 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        if (_proof.length == 0) {
-            revert MerklePathEmpty();
-        }
+        MessageHashing.ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(s.chainId, _batchNumber, _leafProofMask, _leaf, _proof);
 
-        uint256 ptr = 0;
-        bytes32 chainIdLeaf;
-        {
-            (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof);
-            ptr = proofStartIndex;
-
-            bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
-                extractSlice(_proof, ptr, ptr + logLeafProofLen),
-                _leafProofMask,
-                _leaf
-            );
-            ptr += logLeafProofLen;
-
-            // If the `batchLeafProofLen` is 0, then we assume that this is L1 contract of the top-level
-            // in the aggregation, i.e. the batch root is stored here on L1.
-            if (batchLeafProofLen == 0) {
-                // Double checking that the batch has been executed.
-                if (_batchNumber > s.totalBatchesExecuted) {
-                    revert BatchNotExecuted(_batchNumber);
-                }
-
-                bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
-                require(correctBatchRoot != bytes32(0), "local root is 0");
-                return correctBatchRoot == batchSettlementRoot;
+        // If the `batchLeafProofLen` is 0, then we assume that this is L1 contract of the top-level
+        // in the aggregation, i.e. the batch root is stored here on L1.
+        if (proofVerificationResult.batchLeafProofLen == 0) {
+            // Double checking that the batch has been executed.
+            if (_batchNumber > s.totalBatchesExecuted) {
+                revert BatchNotExecuted(_batchNumber);
             }
 
-            require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
-
-            // Now, we'll have to check that the Gateway included the message.
-            bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
-
-            uint256 batchLeafProofMask = uint256(bytes32(_proof[ptr]));
-            ++ptr;
-
-            bytes32 chainIdRoot = Merkle.calculateRootMemory(
-                extractSlice(_proof, ptr, ptr + batchLeafProofLen),
-                batchLeafProofMask,
-                batchLeafHash
-            );
-            ptr += batchLeafProofLen;
-
-            chainIdLeaf = MessageHashing.chainIdLeafHash(chainIdRoot, s.chainId);
+            bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
+            require(correctBatchRoot != bytes32(0), "local root is 0");
+            return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
 
-        uint256 settlementLayerBatchNumber;
-        uint256 settlementLayerBatchRootMask;
-        address settlementLayerAddress;
+        require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
 
-        // Preventing stack too deep error
-        {
-            // Now, we just need to double check whether this chainId leaf was present in the tree.
-            uint256 settlementLayerPackedBatchInfo = uint256(_proof[ptr]);
-            ++ptr;
-            settlementLayerBatchNumber = uint256(settlementLayerPackedBatchInfo >> 128);
-            settlementLayerBatchRootMask = uint256(settlementLayerPackedBatchInfo & ((1 << 128) - 1));
+        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
+        // to a chain's message root only if the chain has indeed executed its batch on top of it.
+        //
+        // We trust all chains whitelisted by the Bridgehub governance.
+        require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofVerificationResult.settlementLayerChainId), "Mailbox: wrong CTM");
+        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofVerificationResult.settlementLayerChainId);
 
-            uint256 settlementLayerChainId = uint256(_proof[ptr]);
-            ++ptr;
-
-            // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
-            // to a chain's message root only if the chain has indeed executed its batch on top of it.
-            //
-            // We trust all chains whitelisted by the Bridgehub governance.
-            require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId), "Mailbox: wrong CTM");
-
-            settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(settlementLayerChainId);
-        }
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
-                settlementLayerBatchNumber,
-                settlementLayerBatchRootMask,
-                chainIdLeaf,
-                extractSliceUntilEnd(_proof, ptr)
+                proofVerificationResult.settlementLayerBatchNumber,
+                proofVerificationResult.settlementLayerBatchRootMask,
+                proofVerificationResult.chainIdLeaf,
+                MessageHashing.extractSliceUntilEnd(_proof, proofVerificationResult.ptr)
             );
     }
 
