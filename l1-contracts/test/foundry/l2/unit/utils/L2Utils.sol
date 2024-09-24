@@ -7,9 +7,11 @@ import "forge-std/console.sol";
 
 import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -149,6 +151,23 @@ library L2Utils {
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(deployments);
+    }
+
+    function deploySharedBridgeLegacy(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _aliasedOwner,
+        address _l1SharedBridge,
+        bytes32 _l2TokenProxyBytecodeHash
+    ) internal returns (address) {
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+        
+        L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
+        console.log("bridge", address(bridge));
+        address proxyAdmin = address(0x1);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(bridge), proxyAdmin, abi.encodeWithSelector(L2SharedBridgeLegacy.initialize.selector, _l1SharedBridge, _l2TokenProxyBytecodeHash, _aliasedOwner));
+        console.log("proxy", address(proxy));
+        return address(proxy);
     }
 
     /// @notice Encodes the token data.

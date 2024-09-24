@@ -214,7 +214,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+    ) external {// onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
