@@ -40,7 +40,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         owner = makeAddr("owner");
         hyperchain = chainContractAddress.getHyperchain(chainId);
-        permRestriction = new PermanentRestriction(owner, bridgehub);
+        permRestriction = new PermanentRestriction(bridgehub);
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
@@ -49,7 +49,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_ownerAsAddressZero() public {
         vm.expectRevert(ZeroAddress.selector);
-        permRestriction = new PermanentRestriction(address(0), bridgehub);
+        permRestriction = new PermanentRestriction(bridgehub);
     }
 
     function test_allowAdminImplementation(bytes32 implementationHash) public {

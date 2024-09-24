@@ -50,11 +50,13 @@ import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
+
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -96,11 +98,17 @@ contract EcosystemUpgrade is Script {
         BridgesDeployedAddresses bridges;
         L1NativeTokenVaultAddresses vaults;
         DataAvailabilityDeployedAddresses daAddresses;
+        ExpectedL2DAValidators expectedL2DAValidators;
         address chainAdmin;
         address accessControlRestrictionAddress;
         address permanentRollupRestriction;
         address validatorTimelock;
         address create2Factory;
+    }
+
+    struct ExpectedL2DAValidators {
+        address expectedRollupL2DAValidator;
+        address expectedValidiumL2DAValidator;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -228,9 +236,13 @@ contract EcosystemUpgrade is Script {
         // setBridgehubParams();
 
         initializeGeneratedData();
+        initializeExpectedL2DAValidators();
 
         deployChainTypeManagerContract();
         setChainTypeManagerInValidatorTimelock();
+
+        deployPermanentRollupRestriction();
+
 
         saveOutput(outputPath);
     }
@@ -300,6 +312,21 @@ contract EcosystemUpgrade is Script {
         generatedData.forceDeploymentsData = prepareForceDeploymentsData();
     }
 
+    function initializeExpectedL2DAValidators() internal {
+        addresses.expectedL2DAValidators = ExpectedL2DAValidators({
+            expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
+                bytes32(0), 
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()), 
+                hex""
+            ),
+            expectedValidiumL2DAValidator: Utils.getL2AddressViaCreate2Factory(
+                bytes32(0), 
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode()), 
+                hex""
+            )
+        });
+    }
+
     function instantiateCreate2Factory() internal {
         address contractAddress;
 
@@ -356,6 +383,27 @@ contract EcosystemUpgrade is Script {
         contractAddress = deployViaCreate2(type(ValidiumL1DAValidator).creationCode);
         console.log("L1ValidiumDAValidator deployed at:", contractAddress);
         addresses.daAddresses.l1ValidiumDAValidator = contractAddress;
+    }
+
+    function deployPermanentRollupRestriction() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(PermanentRestriction).creationCode,
+            abi.encode(config.contracts.bridgehubProxyAddress)
+        );
+        address implementationAddress = deployViaCreate2(bytecode);
+
+        bytes memory proxyBytecode = abi.encodePacked(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(
+                implementationAddress,
+                config.contracts.transparentProxyAdmin,
+                abi.encodeCall(PermanentRestriction.initialize, (config.deployerAddress))
+            )
+        );
+
+        address proxyAddress = deployViaCreate2(proxyBytecode);
+        addresses.permanentRollupRestriction = proxyAddress;
+        // FIXME: supply restrictions
     }
 
     function deployValidatorTimelock() internal {
@@ -870,6 +918,9 @@ contract EcosystemUpgrade is Script {
             "recursion_node_level_vk_hash",
             config.contracts.recursionNodeLevelVkHash
         );
+
+        vm.serializeAddress("contracts_config", "expected_rollup_l2_da_validator", addresses.expectedL2DAValidators.expectedRollupL2DAValidator);
+        vm.serializeAddress("contracts_config", "expected_validium_l2_da_validator", addresses.expectedL2DAValidators.expectedValidiumL2DAValidator);
         vm.serializeBytes("contracts_config", "diamond_cut_data", generatedData.diamondCutData);
 
         string memory contractsConfig = vm.serializeBytes(
