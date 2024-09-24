@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 
 // 0x86bb51b8
 error AddressHasNoCode(address);
+// 0x2078a6a0
+error BatchNotExecuted(uint256 batchNumber);
 // 0xefce78c7
 error CallerMustBeBootloader();
 // 0xb7549616
@@ -66,6 +68,12 @@ error Keccak256InvalidReturnData();
 error L2BlockMustBeGreaterThanZero();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
+// 0x9bb54c35
+error MerkleIndexOutOfBounds();
+// 0x8e23ac1a
+error MerklePathEmpty();
+// 0x1c500385
+error MerklePathOutOfBounds();
 // 0xe90aded4
 error NonceAlreadyUsed(address account, uint256 nonce);
 // 0x45ac24a6

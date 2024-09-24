@@ -4137,6 +4137,7 @@ object "Bootloader" {
             //                      Main Transaction Processing
             ////////////////////////////////////////////////////////////////////////////
 
+            // function main() {
             /// @notice the address that will be the beneficiary of all the fees
             let OPERATOR_ADDRESS := mload(0)
 
@@ -4338,6 +4339,8 @@ object "Bootloader" {
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
 
             l1MessengerPublishingCall()
+            // }
+            // main()
         }
     }
 }

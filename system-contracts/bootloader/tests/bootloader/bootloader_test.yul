@@ -118,8 +118,14 @@ function TEST_systemLogKeys() {
 }
 
 function TEST_execute_transaction() {
-    // We'll test the transaction from 0.json
-    let txDataOffset := testing_txDataOffset(0)
+    // We'll test the transaction from 1.json
+    let txDataOffset := testing_txDataOffset(1)
     let innerTxDataOffset := add(txDataOffset, 0x20)
-    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0xC350, "Invalid pubdata limit")
+    let resultPtr := RESULT_START_PTR()
+    verifyXL2Tx(txDataOffset, resultPtr, 1, 800)
+}
+
+function TEST_execute_transaction2() {
+    // We'll test the transaction from 1.json
+    // main()
 }
