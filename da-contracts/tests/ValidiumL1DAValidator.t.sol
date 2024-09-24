@@ -9,7 +9,6 @@ import {L1DAValidatorOutput} from "../contracts/IL1DAValidator.sol";
 import {Utils} from "./Utils.sol";
 
 contract ValidiumL1DAValidatorTest is Test {
-
     ValidiumL1DAValidator internal validium;
 
     function setUp() public {

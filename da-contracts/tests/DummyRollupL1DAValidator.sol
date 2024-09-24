@@ -2,11 +2,10 @@
 pragma solidity 0.8.24;
 import {Vm as vm} from "lib/forge-std/src/Vm.sol";
 import {RollupL1DAValidator} from "../contracts/RollupL1DAValidator.sol";
-import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, PointEvalFailed2, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
+import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "../contracts/DAUtils.sol";
 
 contract DummyRollupL1DAValidator is RollupL1DAValidator {
-
     function getPublishedBlobCommitment(uint256 _index, bytes calldata _commitment) external view returns (bytes32) {
         return _getPublishedBlobCommitment(_index, _commitment);
     }
@@ -67,7 +66,14 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
 
         blobVersionedHash = 0x01cf45213dd7b4716864d378f3c6d861467987e4d94b7f79a1f814a697e38637;
         bytes32 blobClaimedValue = bytes32(
-            uint256(uint128(bytes16(_commitment[PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET + 16:PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET + 32])))
+            uint256(
+                uint128(
+                    bytes16(
+                        _commitment[PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET +
+                            16:PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET + 32]
+                    )
+                )
+            )
         );
 
         dummyPublishBlobs(blobVersionedHash);
@@ -89,7 +95,12 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
         bytes32 _blobClaimedValue,
         bytes calldata _openingValueCommitmentProof
     ) internal {
-        bytes memory precompileInput = abi.encodePacked(_versionedHash, _openingPoint, _blobClaimedValue, _openingValueCommitmentProof);
+        bytes memory precompileInput = abi.encodePacked(
+            _versionedHash,
+            _openingPoint,
+            _blobClaimedValue,
+            _openingValueCommitmentProof
+        );
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
@@ -104,17 +115,13 @@ contract DummyRollupL1DAValidator is RollupL1DAValidator {
         }
     }
 
-    function mockPointEvaluationPrecompile( 
-        bool success,
-        bytes calldata data,
-        bytes calldata precompileInput
-    ) external {
+    function mockPointEvaluationPrecompile(bool success, bytes calldata data, bytes calldata precompileInput) external {
         if (!success) {
             revert PointEvalCallFailed(precompileInput);
         }
         (, uint256 result) = abi.decode(data, (uint256, uint256));
         if (result != BLS_MODULUS) {
-            revert PointEvalFailed2();
+            revert PointEvalFailed(abi.encode(result));
         }
     }
 }

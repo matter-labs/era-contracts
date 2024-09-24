@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import {CalldataDA} from "../contracts/CalldataDA.sol";
 
 contract DummyCalldataDA is CalldataDA {
-
     function processL2RollupDAValidatorOutputHash(
         bytes32 _l2DAValidatorOutputHash,
         uint256 _maxBlobsSupported,

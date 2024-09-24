@@ -8,16 +8,15 @@ import {L1DAValidatorOutput} from "../contracts/IL1DAValidator.sol";
 import {PubdataSource} from "../contracts/DAUtils.sol";
 import {RollupL1DAValidator} from "../contracts/RollupL1DAValidator.sol";
 import {DummyRollupL1DAValidator} from "./DummyRollupL1DAValidator.sol";
-import {PubdataCommitmentsEmpty, PointEvalFailed2, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
+import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "../contracts/DAContractsErrors.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "../contracts/DAUtils.sol";
 import {Utils} from "./Utils.sol";
 
 contract RollupL1DAValidatorTest is Test {
-
     RollupL1DAValidator internal validator;
     DummyRollupL1DAValidator internal dummyValidator;
     bytes pubdataCommitments;
-    
+
     function setUp() public {
         validator = new RollupL1DAValidator();
         dummyValidator = new DummyRollupL1DAValidator();
@@ -60,7 +59,7 @@ contract RollupL1DAValidatorTest is Test {
         bytes32 l2DAValidatorOutputHash = keccak256(daInput);
 
         bytes memory operatorDAInput = abi.encodePacked(daInput, l1DaInput);
-        
+
         vm.expectRevert("l1-da-validator/invalid-pubdata-source");
         validator.checkDA(0, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
@@ -75,7 +74,7 @@ contract RollupL1DAValidatorTest is Test {
         uint8 pubdataSource = uint8(PubdataSource.Calldata);
         bytes memory l1DaInput = "verifydonttrustzkistheendgamemagicmoonmath";
         bytes32 fullPubdataHash = keccak256(pubdata);
-     
+
         bytes memory daInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided, blobLinearHash);
         bytes32 l2DAValidatorOutputHash = keccak256(daInput);
         bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
@@ -83,7 +82,6 @@ contract RollupL1DAValidatorTest is Test {
         vm.expectRevert(abi.encodeWithSelector(BlobHashCommitmentError.selector, 0, true, false));
         validator.checkDA(0, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
-
 
     function test_checkDA() public {
         bytes memory pubdata = "verifydont";
@@ -210,7 +208,11 @@ contract RollupL1DAValidatorTest is Test {
 
         dummyValidator.dummyPublishBlobs(totalL2PubdataHash);
 
-        bytes32[] memory blobsCommitments = dummyValidator.processBlobDA(blobsProvided, maxBlobsSupported, operatorDAInput);
+        bytes32[] memory blobsCommitments = dummyValidator.processBlobDA(
+            blobsProvided,
+            maxBlobsSupported,
+            operatorDAInput
+        );
 
         assertEq(blobsCommitments.length, maxBlobsSupported, "Invalid commitment length");
         assertEq(blobsCommitments[0], totalL2PubdataHash, "Invalid commitment 1");
@@ -227,14 +229,15 @@ contract RollupL1DAValidatorTest is Test {
     }
 
     function test_pointEvaluationPrecompilePointEvalFailed() public {
-        bytes memory commitment = hex"a572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e";
+        bytes
+            memory commitment = hex"a572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e";
         bytes32 openingPoint = 0x564c0a11a0f704f4fc3e8acfe0f8245f0ad1347b378fbf96e206da11a5d36306;
         bytes memory openingValueCommitmentProof = abi.encodePacked(
             bytes32(0x0000000000000000000000000000000000000000000000000000000000000002),
             hex"a572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e",
             hex"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
         );
-        
+
         bytes32 versionedHash = kzgToVersionHash(commitment);
 
         bytes32[] memory blobCommitments = new bytes32[](1);
@@ -244,27 +247,29 @@ contract RollupL1DAValidatorTest is Test {
         dummyValidator.dummyPublishBlobs(versionedHash);
 
         bytes memory precompileInput = abi.encodePacked(versionedHash, openingPoint, openingValueCommitmentProof);
-        bytes memory POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000120073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff021a0003";
-        
+        bytes
+            memory POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000120073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff021a0003";
+
         vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
 
         bool success = true;
         bytes memory data = POINT_EVALUATION_PRECOMPILE_RESULT;
         (, uint256 result) = abi.decode(data, (uint256, uint256));
 
-        vm.expectRevert(PointEvalFailed2.selector);
+        vm.expectRevert(abi.encodeWithSelector(PointEvalFailed.selector, abi.encode(result)));
         dummyValidator.mockPointEvaluationPrecompile(success, data, precompileInput);
     }
 
     function test_pointEvaluationPrecompile() public {
-        bytes memory commitment = hex"a572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e";
+        bytes
+            memory commitment = hex"a572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e";
         bytes32 openingPoint = 0x564c0a11a0f704f4fc3e8acfe0f8245f0ad1347b378fbf96e206da11a5d36306;
         bytes memory openingValueCommitmentProof = abi.encodePacked(
             bytes32(0x0000000000000000000000000000000000000000000000000000000000000002),
             hex"a572cbea904d67468808c8eb50a9450c9721db309128012543902d0ac358a62ae28f75bb8f1c7c42c39a8c5529bf0f4e",
             hex"c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
         );
-        
+
         bytes32 versionedHash = kzgToVersionHash(commitment);
 
         bytes32[] memory blobCommitments = new bytes32[](1);
@@ -290,7 +295,7 @@ contract RollupL1DAValidatorTest is Test {
 function kzgToVersionHash(bytes memory commitment) returns (bytes32 versionHash) {
     bytes memory versionedHash = new bytes(32);
     bytes32 commitmentHash = sha256(commitment);
-    
+
     versionedHash[0] = 0x01;
     for (uint8 i = 1; i < 32; i++) {
         versionedHash[i] = commitmentHash[i];

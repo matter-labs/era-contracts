@@ -74,8 +74,6 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // or there are values for both.
         // This is mostly a sanity check and it is not strictly required.
         for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
-            console.logBytes32(blobsLinearHashes[i]);
-            console.logBytes32(blobCommitments[i]);
             if (
                 (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] != bytes32(0)) ||
                 (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] == bytes32(0))
@@ -177,7 +175,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         bytes calldata _openingValueCommitmentProof
     ) internal view {
         bytes memory precompileInput = abi.encodePacked(_versionedHash, _openingPoint, _openingValueCommitmentProof);
-    
+
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
         // We verify that the point evaluation precompile call was successful by testing the latter 32 bytes of the

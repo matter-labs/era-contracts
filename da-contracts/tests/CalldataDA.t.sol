@@ -7,7 +7,6 @@ import {DummyCalldataDA} from "./DummyCalldataDA.sol";
 import {Utils} from "./Utils.sol";
 
 contract CalldataDATest is Test {
-
     DummyCalldataDA internal dummyCalldata;
     uint256 constant BLOB_SIZE_BYTES = 126_976;
     bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -134,14 +133,10 @@ contract CalldataDATest is Test {
         uint256 blobsProvided;
         bytes memory l1DaInput;
 
-        (stateDiffHash, fullPubdataHash, blobsLinearHash, blobsProvided, l1DaInput) = 
-            dummyCalldata.processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, maxBlobsSupported, operatorDAInput);
+        (stateDiffHash, fullPubdataHash, blobsLinearHash, blobsProvided, l1DaInput) = dummyCalldata
+            .processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, maxBlobsSupported, operatorDAInput);
 
-        bytes memory expectedl1DaInput = abi.encodePacked(
-            source,
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
+        bytes memory expectedl1DaInput = abi.encodePacked(source, defaultBlobCommitment, EMPTY_PREPUBLISHED_COMMITMENT);
 
         assertEq(uncompressedStateDiffHash, stateDiffHash, "Invalid state diff hash");
         assertEq(totalL2PubdataHash, fullPubdataHash, "Invalid full pubdata hash");

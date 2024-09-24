@@ -17,5 +17,3 @@ error NonEmptyBlobVersionHash(uint256 index);
 error PointEvalCallFailed(bytes);
 // 0x4daa985d
 error PointEvalFailed(bytes);
-
-error PointEvalFailed2();
