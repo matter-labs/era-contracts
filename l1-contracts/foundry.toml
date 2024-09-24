@@ -19,6 +19,8 @@ fs_permissions = [
     { access = "read", path = "./out" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read", path = "zkout" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
