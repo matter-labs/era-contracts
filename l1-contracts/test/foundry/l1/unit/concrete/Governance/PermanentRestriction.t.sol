@@ -1,6 +1,7 @@
 pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -22,11 +23,14 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     PermanentRestriction internal permRestriction;
+
+    address constant L2_FACTORY_ADDR = address(0);
 
     address internal owner;
     address internal hyperchain;
@@ -40,16 +44,32 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         owner = makeAddr("owner");
         hyperchain = chainContractAddress.getHyperchain(chainId);
-        permRestriction = new PermanentRestriction(owner, bridgehub);
+        (permRestriction, ) = _deployPermRestriction(
+            bridgehub,
+            L2_FACTORY_ADDR,
+            owner
+        );
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
         chainAdmin = new ChainAdmin(restrictions);
     }
 
+    function _deployPermRestriction(
+        IBridgehub _bridgehub,
+        address _l2AdminFactory,
+        address _owner
+    ) internal returns (PermanentRestriction proxy, PermanentRestriction impl) {
+        impl = new PermanentRestriction(_bridgehub, _l2AdminFactory);
+        TransparentUpgradeableProxy tup = new TransparentUpgradeableProxy(address(impl), address(uint160(1)), abi.encodeCall(PermanentRestriction.initialize, (_owner)));
+
+        proxy = PermanentRestriction(address(tup));
+    }
+
     function test_ownerAsAddressZero() public {
+        PermanentRestriction impl = new PermanentRestriction(bridgehub, L2_FACTORY_ADDR);
         vm.expectRevert(ZeroAddress.selector);
-        permRestriction = new PermanentRestriction(address(0), bridgehub);
+        new TransparentUpgradeableProxy(address(impl), address(uint160(1)), abi.encodeCall(PermanentRestriction.initialize, (address(0))));
     }
 
     function test_allowAdminImplementation(bytes32 implementationHash) public {
