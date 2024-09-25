@@ -232,7 +232,9 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
         uint256 chainId = IZKChain(_chain).getChainId();
-        if (BRIDGE_HUB.getZKChain(chainId) != _chain) {
+        // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
+        // is compatible with the legacy ones.
+        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
             revert NotAHyperchain(_chain);
         }
 
