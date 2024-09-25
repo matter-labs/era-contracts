@@ -41,8 +41,6 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         createNewChainBridgehub();
 
-        vm.stopPrank();
-
         owner = makeAddr("owner");
         hyperchain = chainContractAddress.getHyperchain(chainId);
         (permRestriction, ) = _deployPermRestriction(bridgehub, L2_FACTORY_ADDR, owner);
@@ -334,6 +332,34 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         permRestriction.tryGetNewAdminFromMigration(call); 
     }
 
+    function test_tryGetNewAdminFromMigrationRevertWhenIncorrectAssetId() public {
+        Call memory call = _encodeMigraationCall(
+            true,
+            true,
+            true,
+            true,
+            false,
+            address(0)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+        permRestriction.tryGetNewAdminFromMigration(call); 
+    }
+
+    function test_tryGetNewAdminFromMigrationShouldWorkCorrectly() public {
+        address l2Addr = makeAddr("l2Addr");
+        Call memory call = _encodeMigraationCall(
+            true,
+            true,
+            true,
+            true,
+            true,
+            l2Addr
+        );
+
+        address result = permRestriction.tryGetNewAdminFromMigration(call);
+        assertEq(result, l2Addr); 
+    }
 
     function createNewChainBridgehub() internal {
         bytes[] memory factoryDeps = new bytes[](0);
@@ -342,6 +368,13 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), new MessageRoot(bridgehub));
+        vm.stopPrank();
+
+        // ctm deployer address is 0 in this test
+        vm.startPrank(address(0));
+        bridgehub.setAssetHandlerAddress(bytes32(uint256(uint160(address(chainContractAddress)))), address(chainContractAddress));
+        vm.stopPrank();
+
         address l1Nullifier = makeAddr("l1Nullifier");
         address l2LegacySharedBridge = makeAddr("l2LegacySharedBridge");
         vm.mockCall(
@@ -354,6 +387,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
             abi.encode(l2LegacySharedBridge)
         );
+        vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(chainContractAddress),
@@ -363,5 +397,6 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             _initData: getCTMInitData(),
             _factoryDeps: factoryDeps
         });
+        vm.stopPrank();
     }
 }
