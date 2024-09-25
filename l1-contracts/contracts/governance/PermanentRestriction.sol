@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotWhitelisted, NotBridgehub, InvalidSelector, InvalidAddress, NotEnoughGas} from "../common/L1ContractErrors.sol";
+import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed, NotBridgehub, InvalidSelector, InvalidAddress, NotEnoughGas} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -18,6 +18,11 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 
+/// @dev We use try-catch to test whether some of the conditions should be checked.
+/// To avoid attacks based on teh 63/64 gas limitations, we ensure that each such call 
+/// has at least this amount.
+uint256 constant MIN_GAS_FOR_FALLABLE_CALL = 5_000_000; 
+
 /// @title PermanentRestriction contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -26,11 +31,6 @@ import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2StepUpgradeable {
-    /// @notice We use try-catch to test whether some of the conditions should be checked.
-    /// To avoid attacks based on teh 63/64 gas limitations, we ensure that each such call 
-    /// has at least this amount.
-    uint256 constant MIN_GAS_FOR_FALLABLE_CALL = 5_000_000; 
-
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
 
@@ -50,7 +50,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     mapping(bytes4 selector => bool isValidated) public validatedSelectors;
 
     /// @notice The mapping of whitelisted L2 admins.
-    mapping(address adminAddress => bool isWhitelisted) public whitelistedL2Admins;
+    mapping(address adminAddress => bool isWhitelisted) public allowedL2Admins;
 
     constructor(IBridgehub _bridgehub, address _l2AdminFactory) {
         BRIDGE_HUB = _bridgehub;
@@ -96,7 +96,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @param deploymentSalt The salt for the deployment.
     /// @param l2BytecodeHash The hash of the L2 bytecode.
     /// @param constructorInputHash The hash of the constructor data for the deployment.
-    function whitelistL2Admin(bytes32 deploymentSalt, bytes32 l2BytecodeHash, bytes32 constructorInputHash) external {
+    function allowL2Admin(bytes32 deploymentSalt, bytes32 l2BytecodeHash, bytes32 constructorInputHash) external {
         // We do not do any additional validations for constructor data or the bytecode,
         // we expect that only admins of the allowed format are to be deployed.
         address expectedAddress = L2ContractHelper.computeCreate2Address(
@@ -106,12 +106,12 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             constructorInputHash
         );
 
-        if (whitelistedL2Admins[expectedAddress]) {
+        if (allowedL2Admins[expectedAddress]) {
             revert AlreadyWhitelisted(expectedAddress);
         }
 
-        whitelistedL2Admins[expectedAddress] = true;
-        emit WhitelistL2Admin(expectedAddress, true);
+        allowedL2Admins[expectedAddress] = true;
+        emit AllowL2Admin(expectedAddress);
     }
 
     /// @inheritdoc IRestriction
@@ -131,8 +131,8 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     function _validateMigrationToL2(Call calldata _call) internal view {
         _ensureEnoughGas();
         try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
-            if (!whitelistedL2Admins[admin]) {
-                revert NotWhitelisted(admin);
+            if (!allowedL2Admins[admin]) {
+                revert NotAllowed(admin);
             }
         } catch {
             // It was not the migration call, so we do nothing

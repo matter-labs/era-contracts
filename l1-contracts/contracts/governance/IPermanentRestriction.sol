@@ -16,5 +16,5 @@ interface IPermanentRestriction {
     event SelectorValidationChanged(bytes4 indexed selector, bool isValidated);
 
     /// @notice Emitted when the L2 admin is whitelisted or not.
-    event WhitelistL2Admin(address indexed adminAddress, bool isWhitelisted);
+    event AllowL2Admin(address indexed adminAddress);
 }
