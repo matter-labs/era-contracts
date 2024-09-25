@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotWhitelisted, NotBridgehub, InvalidSelector, InvalidAddress} from "../common/L1ContractErrors.sol";
+import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotWhitelisted, NotBridgehub, InvalidSelector, InvalidAddress, NotEnoughGas} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -26,6 +26,11 @@ import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2StepUpgradeable {
+    /// @notice We use try-catch to test whether some of the conditions should be checked.
+    /// To avoid attacks based on teh 63/64 gas limitations, we ensure that each such call 
+    /// has at least this amount.
+    uint256 constant MIN_GAS_FOR_FALLABLE_CALL = 5_000_000; 
+
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
 
@@ -124,6 +129,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @dev Note that we do not need to validate the migration to the L1 layer as the admin
     /// is not changed in this case.
     function _validateMigrationToL2(Call calldata _call) internal view {
+        _ensureEnoughGas();
         try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
             if (!whitelistedL2Admins[admin]) {
                 revert NotWhitelisted(admin);
@@ -205,6 +211,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
     /// @param _chain The address of the chain.
     function _isAdminOfAChain(address _chain) internal view returns (bool) {
+        _ensureEnoughGas();
         (bool success, ) = address(this).staticcall(abi.encodeCall(this.tryCompareAdminOfAChain, (_chain, msg.sender)));
         return success;
     }
@@ -281,5 +288,11 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 
         return l2Admin;
+    }
+
+    function _ensureEnoughGas() internal view {
+        if (gasleft() < MIN_GAS_FOR_FALLABLE_CALL) {
+            revert NotEnoughGas();
+        }
     }
 }
