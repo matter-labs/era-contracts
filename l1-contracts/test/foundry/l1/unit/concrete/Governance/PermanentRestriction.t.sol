@@ -222,7 +222,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function _encodeMigraationCall(
-        bool correctTarget, 
+        bool correctTarget,
         bool correctSelector,
         bool correctSecondBridge,
         bool correctEncodingVersion,
@@ -258,9 +258,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         }
         outer.secondBridgeAddress = sharedBridge;
 
-
         uint8 encoding = correctEncodingVersion ? 1 : 12;
-        
+
         bytes32 chainAssetId = correctAssetId ? bridgehub.ctmAssetIdFromChainId(chainId) : bytes32(0);
 
         bytes memory bridgehubData = abi.encode(
@@ -277,100 +276,50 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenInvalidSelector() public {
-        Call memory call = _encodeMigraationCall(
-            false,
-            true,
-            true,
-            true,
-            true,
-            address(0)
-        );
+        Call memory call = _encodeMigraationCall(false, true, true, true, true, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(NotBridgehub.selector, address(0)));
-        permRestriction.tryGetNewAdminFromMigration(call); 
+        permRestriction.tryGetNewAdminFromMigration(call);
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenNotBridgehub() public {
-        Call memory call = _encodeMigraationCall(
-            true,
-            false,
-            true,
-            true,
-            true,
-            address(0)
-        );
+        Call memory call = _encodeMigraationCall(true, false, true, true, true, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, bytes4(0)));
-        permRestriction.tryGetNewAdminFromMigration(call); 
+        permRestriction.tryGetNewAdminFromMigration(call);
     }
 
-
     function test_tryGetNewAdminFromMigrationRevertWhenNotSharedBridge() public {
-        Call memory call = _encodeMigraationCall(
-            true,
-            true,
-            false,
-            true,
-            true,
-            address(0)
-        );
+        Call memory call = _encodeMigraationCall(true, true, false, true, true, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(InvalidAddress.selector, address(sharedBridge), address(0)));
-        permRestriction.tryGetNewAdminFromMigration(call); 
+        permRestriction.tryGetNewAdminFromMigration(call);
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenIncorrectEncoding() public {
-        Call memory call = _encodeMigraationCall(
-            true,
-            true,
-            true,
-            false,
-            true,
-            address(0)
-        );
+        Call memory call = _encodeMigraationCall(true, true, true, false, true, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(UnsupportedEncodingVersion.selector));
-        permRestriction.tryGetNewAdminFromMigration(call); 
+        permRestriction.tryGetNewAdminFromMigration(call);
     }
 
     function test_tryGetNewAdminFromMigrationRevertWhenIncorrectAssetId() public {
-        Call memory call = _encodeMigraationCall(
-            true,
-            true,
-            true,
-            true,
-            false,
-            address(0)
-        );
+        Call memory call = _encodeMigraationCall(true, true, true, true, false, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
-        permRestriction.tryGetNewAdminFromMigration(call); 
+        permRestriction.tryGetNewAdminFromMigration(call);
     }
 
     function test_tryGetNewAdminFromMigrationShouldWorkCorrectly() public {
         address l2Addr = makeAddr("l2Addr");
-        Call memory call = _encodeMigraationCall(
-            true,
-            true,
-            true,
-            true,
-            true,
-            l2Addr
-        );
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, l2Addr);
 
         address result = permRestriction.tryGetNewAdminFromMigration(call);
-        assertEq(result, l2Addr); 
+        assertEq(result, l2Addr);
     }
 
     function test_validateMigrationToL2RevertNotAllowed() public {
-        Call memory call = _encodeMigraationCall(
-            true,
-            true,
-            true,
-            true,
-            true,
-            address(0)
-        );
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(NotAllowed.selector, address(0)));
         permRestriction.validateCall(call, owner);
@@ -386,20 +335,9 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.AllowL2Admin(expectedAddress);
-        permRestriction.allowL2Admin(
-            bytes32(0),
-            bytes32(0),
-            bytes32(0)
-        );
+        permRestriction.allowL2Admin(bytes32(0), bytes32(0), bytes32(0));
 
-        Call memory call = _encodeMigraationCall(
-            true,
-            true,
-            true,
-            true,
-            true,
-            expectedAddress
-        );
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, expectedAddress);
 
         // Should not fail
         permRestriction.validateCall(call, owner);
@@ -407,14 +345,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_validateNotEnoughGas() public {
         address l2Addr = makeAddr("l2Addr");
-        Call memory call = _encodeMigraationCall(
-            true,
-            true,
-            true,
-            true,
-            true,
-            l2Addr
-        );
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, l2Addr);
 
         vm.expectRevert(abi.encodeWithSelector(NotEnoughGas.selector));
         permRestriction.validateCall{gas: MIN_GAS_FOR_FALLABLE_CALL}(call, address(0));
@@ -431,7 +362,10 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         // ctm deployer address is 0 in this test
         vm.startPrank(address(0));
-        bridgehub.setAssetHandlerAddress(bytes32(uint256(uint160(address(chainContractAddress)))), address(chainContractAddress));
+        bridgehub.setAssetHandlerAddress(
+            bytes32(uint256(uint160(address(chainContractAddress)))),
+            address(chainContractAddress)
+        );
         vm.stopPrank();
 
         address l1Nullifier = makeAddr("l1Nullifier");
