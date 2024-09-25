@@ -39,28 +39,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
     uint256 public constructorReturnGas;
 
-    modifier onlySystemEvm() {
-        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
-        require(SystemContractHelper.isSystemCall(), "This method require system call flag");
-        _;
-    }
-
-    function setDeployedCode(uint256 constructorGasLeft, bytes calldata paddedNewDeployedCode) external onlySystemEvm {
-        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
-
-        uint256 bytecodeLen = uint256(bytes32(paddedNewDeployedCode[:32]));
-        bytes memory trueBytecode = paddedNewDeployedCode[32:32 + bytecodeLen];
-
-        _setEvmCodeHash(msg.sender, keccak256(trueBytecode));
-        constructorReturnGas = constructorGasLeft;
-
-        // ToDO: use efficient call
-        KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedNewDeployedCode);
-
-        bytes32 codeHash = Utils.hashEVMBytecode(paddedNewDeployedCode);
-        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(msg.sender, codeHash);
-    }
-
     modifier onlySelf() {
         if (msg.sender != address(this)) {
             revert Unauthorized(msg.sender);
@@ -532,7 +510,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             SystemContractHelper.setValueForNextFarCall(uint128(value));
         }
 
-        bool success = EfficientCall.rawMimicCall({
+        bytes memory paddedBytecode = EfficientCall.mimicCall({
             _gas: uint32(gasleft()),
             _address: _newAddress,
             _data: _input,
@@ -541,13 +519,30 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             _isSystem: false
         });
 
-        if (!success) {
-            EfficientCall.propagateRevert();
+        uint256 _constructorReturnGas;
+        assembly {
+            let dataLen := mload(paddedBytecode)
+            _constructorReturnGas := mload(add(paddedBytecode, dataLen))
+            mstore(paddedBytecode, sub(dataLen, 0x20))
         }
 
-        bytes32 codeHash = _getEvmCodeHash(_newAddress);
-        require(codeHash != 0x0, "The code hash must be set after the constructor call");
-        emit ContractDeployed(_sender, codeHash, _newAddress);
+        // ToDO: use efficient call
+        bytes32 versionedCodeHash = Utils.hashEVMBytecode(paddedBytecode);
+
+        KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedBytecode);
+        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, versionedCodeHash);
+
+        bytes32 evmBytecodeHash;        
+        assembly {
+             let bytecodeLen := mload(add(paddedBytecode, 0x20))
+             evmBytecodeHash := keccak256(add(paddedBytecode, 0x40), bytecodeLen)
+        }
+
+        _setEvmCodeHash(_newAddress, evmBytecodeHash);
+
+        constructorReturnGas = _constructorReturnGas;
+
+        emit ContractDeployed(_sender, evmBytecodeHash, _newAddress);
     }
 
     function _setEvmCodeHash(address _address, bytes32 _hash) internal {
