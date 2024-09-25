@@ -43,14 +43,14 @@ contract EvmGasManager {
                 // function getRawCodeHash(address _address) public view returns (bytes32 codeHash)
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, _sender)
-            
+
                 let success := staticcall(gas(), to, 0, 36, 0, 32)
-            
+
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
-            
+
                 rawCodeHash := mload(0)
             }
 
