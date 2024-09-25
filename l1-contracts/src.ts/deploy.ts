@@ -297,7 +297,10 @@ export class Deployer {
       factory = new RollupL1DAValidatorFactory(this.deployWallet);
     } else if (contractName == "LayerNameL1DAValidator") {
       factory = new LayerNameL1DAValidatorFactory(this.deployWallet);
+    } else {
+      throw new Error(`Unknown DA contract name ${contractName}`);
     }
+
     return factory.getDeployTransaction().data;
   }
 
@@ -1486,14 +1489,12 @@ export class Deployer {
     const l1SharedBridge = this.defaultSharedBridge(this.deployWallet);
 
     if (isCurrentNetworkLocal()) {
-      const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
-
       const l2SharedBridgeImplementationBytecode = L2_SHARED_BRIDGE_IMPLEMENTATION.bytecode;
 
       const l2SharedBridgeImplAddress = computeL2Create2Address(
         this.deployWallet.address,
         l2SharedBridgeImplementationBytecode,
-        ethers.utils.defaultAbiCoder.encode(["uint256"], [eraChainId]),
+        "0x",
         ethers.constants.HashZero
       );
 
@@ -1502,7 +1503,6 @@ export class Deployer {
       const l2SharedBridgeInterface = new Interface(L2_SHARED_BRIDGE_IMPLEMENTATION.abi);
       const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
         l1SharedBridge.address,
-        this.addresses.Bridges.ERC20BridgeProxy,
         hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
         l2GovernorAddress,
       ]);
@@ -1561,7 +1561,7 @@ export class Deployer {
     const l2SharedBridgeImplAddress = computeL2Create2Address(
       this.deployWallet.address,
       l2SharedBridgeImplementationBytecode,
-      ethers.utils.defaultAbiCoder.encode(["uint256"], [eraChainId]),
+      "0x",
       ethers.constants.HashZero
     );
     this.addresses.Bridges.L2LegacySharedBridgeImplementation = l2SharedBridgeImplAddress;
@@ -1602,7 +1602,6 @@ export class Deployer {
     const l2SharedBridgeInterface = new Interface(L2_SHARED_BRIDGE_IMPLEMENTATION.abi);
     const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
       l1SharedBridge.address,
-      this.addresses.Bridges.ERC20BridgeProxy,
       hashL2Bytecode(L2_STANDARD_TOKEN_PROXY.bytecode),
       l2GovernorAddress,
     ]);
@@ -1759,14 +1758,16 @@ export class Deployer {
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
     }
+<<<<<<< HEAD
     const validiumValidatorBytecode = await this.loadFromDAFolder("LayerNameL1DAValidator");
+=======
+>>>>>>> d5afbdf878995b192fd0a1c1874cce1b5d73b7b9
     const validiumDAValidatorAddress = await this.deployViaCreate2(
       "LayerNameL1DAValidator",
       [],
       create2Salt,
       ethTxOptions,
-      undefined,
-      validiumValidatorBytecode
+      undefined
     );
 
     if (this.verbose) {

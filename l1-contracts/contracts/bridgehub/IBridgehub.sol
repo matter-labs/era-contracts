@@ -197,6 +197,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
+    function settlementLayer(uint256 _chainId) external view returns (uint256);
+
     // function finalizeMigrationToGateway(
     //     uint256 _chainId,
     //     address _baseToken,
