@@ -411,6 +411,8 @@ error AssetHandlerNotRegistered(bytes32 assetId);
 error NotBridgehub(address addr);
 // 0x2554babc
 error InvalidAddress(address expected, address actual);
+// 0xfa5cd00f
+error NotAllowed(address addr);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

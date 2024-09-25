@@ -7,9 +7,9 @@ import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "co
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
+import {PermanentRestriction, MIN_GAS_FOR_FALLABLE_CALL} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {InvalidAddress, UnsupportedEncodingVersion, InvalidSelector, NotBridgehub, ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {NotAllowed, NotEnoughGas, InvalidAddress, UnsupportedEncodingVersion, InvalidSelector, NotBridgehub, ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -25,6 +25,7 @@ import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
     ChainAdmin internal chainAdmin;
@@ -359,6 +360,64 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         address result = permRestriction.tryGetNewAdminFromMigration(call);
         assertEq(result, l2Addr); 
+    }
+
+    function test_validateMigrationToL2RevertNotAllowed() public {
+        Call memory call = _encodeMigraationCall(
+            true,
+            true,
+            true,
+            true,
+            true,
+            address(0)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(NotAllowed.selector, address(0)));
+        permRestriction.validateCall(call, owner);
+    }
+
+    function test_validateMigrationToL2() public {
+        address expectedAddress = L2ContractHelper.computeCreate2Address(
+            L2_FACTORY_ADDR,
+            bytes32(0),
+            bytes32(0),
+            bytes32(0)
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit IPermanentRestriction.AllowL2Admin(expectedAddress);
+        permRestriction.allowL2Admin(
+            bytes32(0),
+            bytes32(0),
+            bytes32(0)
+        );
+
+        Call memory call = _encodeMigraationCall(
+            true,
+            true,
+            true,
+            true,
+            true,
+            expectedAddress
+        );
+
+        // Should not fail
+        permRestriction.validateCall(call, owner);
+    }
+
+    function test_validateNotEnoughGas() public {
+        address l2Addr = makeAddr("l2Addr");
+        Call memory call = _encodeMigraationCall(
+            true,
+            true,
+            true,
+            true,
+            true,
+            l2Addr
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(NotEnoughGas.selector));
+        permRestriction.validateCall{gas: MIN_GAS_FOR_FALLABLE_CALL}(call, address(0));
     }
 
     function createNewChainBridgehub() internal {
