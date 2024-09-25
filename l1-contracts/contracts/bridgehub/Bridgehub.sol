@@ -26,7 +26,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
+import {MigrationPaused, AssetIdMismatch, AlreadyCurrentSettlementLayer, NotCurrentSettlementLayer, SettlementLayerNotRegistered, BridgehubOnL1, TokenNotRegistered, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -229,7 +229,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             return;
         }
         address token = __DEPRECATED_baseToken[_chainId];
-        require(token != address(0), "BH: token not set");
+        if (token == address(0)) {
+            revert TokenNotRegistered(token);
+        }
         baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
     }
 
@@ -449,7 +451,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         // Note: If the ZK chain with corresponding `chainId` is not yet created,
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
@@ -503,7 +505,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _request the request for the L2 transaction
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
             revert AddressTooLow(_request.secondBridgeAddress);
         }
@@ -580,32 +582,32 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) internal returns (bytes32 canonicalTxHash) {
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
-        address zkChain = zkChainMap.get(_chainId);
-        if (zkChain != address(0)) {
+        (bool registered, address zkChain) = zkChainMap.tryGet(_chainId);
+        if (registered) {
             canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
         } else {
-            // L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
-            //     txType: INTEROP_OPERATION_TX_TYPE,
-            //     from: uint256(uint160(_request.sender)),
-            //     to: uint256(uint160(_request.contractL2)),
-            //     gasLimit: _request.l2GasLimit,
-            //     gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-            //     maxFeePerGas: uint256(0), // todo change in the bootloader
-            //     maxPriorityFeePerGas: uint256(0),
-            //     paymaster: uint256(0),
-            //     nonce: uint256(0), //todo
-            //     value: _request.l2Value,
-            //     reserved: [_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
-            //     data: _request.l2Calldata,
-            //     signature: new bytes(0),
-            //     factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
-            //     paymasterInput: new bytes(0),
-            //     reservedDynamic: new bytes(0)
-            // });
-            // /// Fixme this does not have a unique hash atm.
-            // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
-            // // solhint-disable-next-line func-named-parameters
-            // emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
+            L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
+                txType: INTEROP_OPERATION_TX_TYPE,
+                from: uint256(uint160(_request.sender)),
+                to: uint256(uint160(_request.contractL2)),
+                gasLimit: _request.l2GasLimit,
+                gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                maxFeePerGas: uint256(0), // todo change in the bootloader
+                maxPriorityFeePerGas: uint256(0),
+                paymaster: uint256(0),
+                nonce: uint256(0), //todo
+                value: _request.l2Value,
+                reserved: [_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
+                data: _request.l2Calldata,
+                signature: new bytes(0),
+                factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
+                paymasterInput: new bytes(0),
+                reservedDynamic: new bytes(0)
+            });
+            /// Fixme this does not have a unique hash atm.
+            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
+            // solhint-disable-next-line func-named-parameters
+            emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
         }
     }
 
@@ -618,7 +620,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlySettlementLayerRelayedSender {
-        require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
+        if (L1_CHAIN_ID == block.chainid) {
+            revert BridgehubOnL1();
+        }
         address zkChain = zkChainMap.get(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
@@ -717,16 +721,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _originalCaller,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (bytes memory bridgehubMintData) {
-        require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
+        if (!whitelistedSettlementLayers[_settlementChainId]) {
+            revert SettlementLayerNotRegistered();
+        }
 
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        require(_assetId == ctmAssetIdFromChainId(bridgehubData.chainId), "BH: assetInfo 1");
-        require(settlementLayer[bridgehubData.chainId] == block.chainid, "BH: not current SL");
+        if (_assetId != ctmAssetIdFromChainId(bridgehubData.chainId)) {
+            revert AssetIdMismatch(_assetId, ctmAssetIdFromChainId(bridgehubData.chainId));
+        }
+        if (settlementLayer[bridgehubData.chainId] != block.chainid) {
+            revert NotCurrentSettlementLayer();
+        }
         settlementLayer[bridgehubData.chainId] = _settlementChainId;
 
         address zkChain = zkChainMap.get(bridgehubData.chainId);
-        require(zkChain != address(0), "BH: zkChain not registered");
-        require(_originalCaller == IZKChain(zkChain).getAdmin(), "BH: incorrect sender");
+        if (zkChain == address(0)) {
+            revert ChainIdNotRegistered(bridgehubData.chainId);
+        }
+        if (_originalCaller == IZKChain(zkChain).getAdmin()) {
+            revert Unauthorized(_originalCaller);
+        }
 
         bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeBurn(
             bridgehubData.chainId,
@@ -759,8 +773,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         BridgehubMintCTMAssetData memory bridgehubData = abi.decode(_bridgehubMintData, (BridgehubMintCTMAssetData));
 
         address ctm = ctmAssetIdToAddress[_assetId];
-        require(ctm != address(0), "BH: assetInfo 2");
-        require(settlementLayer[bridgehubData.chainId] != block.chainid, "BH: already current SL");
+        if (ctm == address(0)) {
+            revert AssetIdNotSupported(_assetId);
+        }
+        if (settlementLayer[bridgehubData.chainId] != block.chainid) {
+            revert AlreadyCurrentSettlementLayer();
+        }
 
         settlementLayer[bridgehubData.chainId] = block.chainid;
         chainTypeManager[bridgehubData.chainId] = ctm;
@@ -773,7 +791,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bool contractAlreadyDeployed = zkChain != address(0);
         if (!contractAlreadyDeployed) {
             zkChain = IChainTypeManager(ctm).forwardedBridgeMint(bridgehubData.chainId, bridgehubData.ctmData);
-            require(zkChain != address(0), "BH: chain not registered");
+            if (zkChain == address(0)) {
+                revert ChainIdNotRegistered(bridgehubData.chainId);
+            }
             _registerNewZKChain(bridgehubData.chainId, zkChain);
             messageRoot.addNewChain(bridgehubData.chainId);
         }

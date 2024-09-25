@@ -332,7 +332,13 @@ contract GatewayPreparation is Script {
     function supplyGatewayWallet(address addr, uint256 amount) public {
         initializeConfig();
 
-        bytes32 l2TxHash = Utils.supplyChainWallet(addr, amount, config.gatewayChainId, config.bridgehub, config.sharedBridgeProxy);
+        bytes32 l2TxHash = Utils.supplyChainWallet(
+            addr,
+            amount,
+            config.gatewayChainId,
+            config.bridgehub,
+            config.sharedBridgeProxy
+        );
 
         // We record L2 tx hash only for governance operations
         saveOutput(bytes32(0));

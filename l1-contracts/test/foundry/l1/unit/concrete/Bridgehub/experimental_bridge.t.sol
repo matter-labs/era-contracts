@@ -1237,7 +1237,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             secondBridgeAddress,
-            abi.encodeWithSelector(IL1AssetRouter.bridgehubDeposit.selector),
+            abi.encodeWithSelector(IAssetRouterBase.bridgehubDeposit.selector),
             abi.encode(request)
         );
 
@@ -1309,7 +1309,7 @@ contract ExperimentalBridgeTest is Test {
             address(secondBridgeAddressValue),
             l2TxnReq2BridgeOut.secondBridgeValue,
             abi.encodeWithSelector(
-                IL1AssetRouter.bridgehubDeposit.selector,
+                IAssetRouterBase.bridgehubDeposit.selector,
                 l2TxnReq2BridgeOut.chainId,
                 randomCaller,
                 l2TxnReq2BridgeOut.l2Value,

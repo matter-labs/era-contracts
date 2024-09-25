@@ -161,11 +161,20 @@ library L2Utils {
         bytes32 _l2TokenProxyBytecodeHash
     ) internal returns (address) {
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
-        
+
         L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
         console.log("bridge", address(bridge));
         address proxyAdmin = address(0x1);
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(bridge), proxyAdmin, abi.encodeWithSelector(L2SharedBridgeLegacy.initialize.selector, _l1SharedBridge, _l2TokenProxyBytecodeHash, _aliasedOwner));
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(bridge),
+            proxyAdmin,
+            abi.encodeWithSelector(
+                L2SharedBridgeLegacy.initialize.selector,
+                _l1SharedBridge,
+                _l2TokenProxyBytecodeHash,
+                _aliasedOwner
+            )
+        );
         console.log("proxy", address(proxy));
         return address(proxy);
     }

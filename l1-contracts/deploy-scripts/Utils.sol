@@ -390,7 +390,13 @@ library Utils {
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
-    function supplyChainWallet(address addr, uint256 amount, uint256 chainId, address bridgehubAddress, address l1SharedBridgeProxy) public returns (bytes32 txHash) {
+    function supplyChainWallet(
+        address addr,
+        uint256 amount,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) public returns (bytes32 txHash) {
         runL1L2Transaction({
             l2Calldata: hex"",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,

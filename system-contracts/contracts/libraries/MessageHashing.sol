@@ -89,12 +89,11 @@ library MessageHashing {
             revert MerklePathEmpty();
         }
 
-        (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = MessageHashing.parseProofMetadata(_proof);
+        (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = MessageHashing
+            .parseProofMetadata(_proof);
         result.ptr = proofStartIndex;
 
         {
-
-
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
                 extractSlice(_proof, result.ptr, result.ptr + logLeafProofLen),
                 _leafProofMask,

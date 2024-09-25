@@ -60,7 +60,13 @@ contract L2Erc20BridgeTest is Test {
         }
 
         L2Utils.initSystemContracts();
-        address l2SharedBridge = L2Utils.deploySharedBridgeLegacy(L1_CHAIN_ID, ERA_CHAIN_ID, ownerWallet, l1BridgeWallet, beaconProxyBytecodeHash);
+        address l2SharedBridge = L2Utils.deploySharedBridgeLegacy(
+            L1_CHAIN_ID,
+            ERA_CHAIN_ID,
+            ownerWallet,
+            l1BridgeWallet,
+            beaconProxyBytecodeHash
+        );
         L2Utils.forceDeployAssetRouter(L1_CHAIN_ID, ERA_CHAIN_ID, ownerWallet, l1BridgeWallet, l2SharedBridge);
         L2Utils.forceDeployNativeTokenVault({
             _l1ChainId: L1_CHAIN_ID,

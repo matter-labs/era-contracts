@@ -145,7 +145,13 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        MessageHashing.ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(s.chainId, _batchNumber, _leafProofMask, _leaf, _proof);
+        MessageHashing.ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
+            s.chainId,
+            _batchNumber,
+            _leafProofMask,
+            _leaf,
+            _proof
+        );
 
         // If the `batchLeafProofLen` is 0, then we assume that this is L1 contract of the top-level
         // in the aggregation, i.e. the batch root is stored here on L1.
@@ -166,9 +172,13 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         // to a chain's message root only if the chain has indeed executed its batch on top of it.
         //
         // We trust all chains whitelisted by the Bridgehub governance.
-        require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofVerificationResult.settlementLayerChainId), "Mailbox: wrong CTM");
-        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofVerificationResult.settlementLayerChainId);
-
+        require(
+            IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofVerificationResult.settlementLayerChainId),
+            "Mailbox: wrong CTM"
+        );
+        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(
+            proofVerificationResult.settlementLayerChainId
+        );
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
