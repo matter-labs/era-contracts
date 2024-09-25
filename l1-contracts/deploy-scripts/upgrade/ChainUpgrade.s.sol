@@ -31,6 +31,7 @@ contract ChainUpgrade  is Script {
 
         // FIXME: From ecosystem, maybe move to a different struct
         address expectedRollupL2DAValidator;
+        address expectedL2GatewayUpgrade;
         address expectedValidiumL2DAValidator;
         address permanentRollupRestriction;
 
@@ -68,6 +69,7 @@ contract ChainUpgrade  is Script {
         // - Deploying new chain admin 
         
         deployNewL2DAValidator();
+        deployL2GatewayUpgrade();
         deployNewChainAdmin();
         governanceMoveToNewChainAdmin();
 
@@ -99,6 +101,7 @@ contract ChainUpgrade  is Script {
 
         config.expectedRollupL2DAValidator = toml.readAddress("$.contracts_config.expected_rollup_l2_da_validator");
         config.expectedValidiumL2DAValidator = toml.readAddress("$.contracts_config.expected_validium_l2_da_validator");
+        config.expectedL2GatewayUpgrade = toml.readAddress("$.contracts_config.expected_l2_gateway_upgrade");
         config.permanentRollupRestriction = toml.readAddress("$.deployed_addresses.permanent_rollup_restriction");
 
         toml = vm.readFile(ecosystemInputPath);
@@ -131,6 +134,21 @@ contract ChainUpgrade  is Script {
         require(expectedL2DAValidator == config.expectedRollupL2DAValidator, "Invalid L2DAValidator address");
 
         output.l2DAValidator = expectedL2DAValidator;
+    }
+
+    function deployL2GatewayUpgrade() internal {
+        address expectedGatewayUpgrade = Utils.deployThroughL1Deterministic({
+            bytecode: L2ContractsBytecodesLib.readGatewayUpgradeBytecode(),
+            constructorargs: hex"",
+            create2salt: bytes32(0),
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainChainId,
+            bridgehubAddress: config.bridgehubProxyAddress,
+            l1SharedBridgeProxy: config.oldSharedBridgeProxyAddress
+        });
+        // FIXME: for now this script only works with rollup chains
+        require(expectedGatewayUpgrade == config.expectedL2GatewayUpgrade, "Invalid L2Gateway address");
     }
 
     function deployNewChainAdmin() internal {

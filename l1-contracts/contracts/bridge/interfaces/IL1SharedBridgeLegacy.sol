@@ -8,12 +8,12 @@ pragma solidity 0.8.24;
 interface IL1SharedBridgeLegacy {
     function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
-    event LegacyDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed l2DepositTxHash,
-        address indexed from,
-        address to,
-        address l1Asset,
-        uint256 amount
-    );
+    // event LegacyDepositInitiated(
+    //     uint256 indexed chainId,
+    //     bytes32 indexed l2DepositTxHash,
+    //     address indexed from,
+    //     address to,
+    //     address l1Asset,
+    //     uint256 amount
+    // );
 }

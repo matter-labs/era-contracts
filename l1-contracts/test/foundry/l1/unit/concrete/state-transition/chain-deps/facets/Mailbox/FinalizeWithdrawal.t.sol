@@ -40,9 +40,7 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
     }
 
     function test_success_withdrawal(uint256 amount) public {
-        address baseTokenBridge = makeAddr("baseTokenBridge");
         utilsFacet.util_setChainId(eraChainId);
-        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
 
         address l1Receiver = makeAddr("receiver");
         address l1Token = address(1);

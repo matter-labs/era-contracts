@@ -16,6 +16,7 @@ import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interf
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol"; 
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
@@ -56,6 +57,16 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol"; 
+
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+
+import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 
 
 struct FixedForceDeploymentsData {
@@ -98,17 +109,19 @@ contract EcosystemUpgrade is Script {
         BridgesDeployedAddresses bridges;
         L1NativeTokenVaultAddresses vaults;
         DataAvailabilityDeployedAddresses daAddresses;
-        ExpectedL2DAValidators expectedL2DAValidators;
+        ExpectedL2Addresses expectedL2Addresses;
         address chainAdmin;
         address accessControlRestrictionAddress;
         address permanentRollupRestriction;
         address validatorTimelock;
+        address gatewayUpgrade;
         address create2Factory;
     }
 
-    struct ExpectedL2DAValidators {
+    struct ExpectedL2Addresses {
         address expectedRollupL2DAValidator;
         address expectedValidiumL2DAValidator;
+        address expectedL2GatewayUpgrade;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -137,7 +150,6 @@ contract EcosystemUpgrade is Script {
         address sharedBridgeProxy;
         address sharedBridgeImplementation;
         address l1NullifierImplementation;
-        address l1NullifierProxy;
         address bridgedStandardERC20Implementation;
         address bridgedTokenBeacon;
     }
@@ -213,6 +225,7 @@ contract EcosystemUpgrade is Script {
         deployVerifier();
         deployDefaultUpgrade();
         deployGenesisUpgrade();
+        deployGatewayUpgrade();
 
         deployDAValidators();
         deployValidatorTimelock();
@@ -236,19 +249,164 @@ contract EcosystemUpgrade is Script {
         // setBridgehubParams();
 
         initializeGeneratedData();
-        initializeExpectedL2DAValidators();
+        initializeExpectedL2Addresses();
 
         deployChainTypeManagerContract();
         setChainTypeManagerInValidatorTimelock();
 
         deployPermanentRollupRestriction();
 
+        updateOwners();
 
         saveOutput(outputPath);
     }
 
     function run() public {
         console.log("Deploying L1 contracts");
+    }
+
+    function provideAcceptOwnershipCalls() public returns (Call[] memory calls) {
+        console.log("Providing accept ownership calls");
+
+        calls = new Call[](4);
+        calls[0] = Call({
+            target: addresses.permanentRollupRestriction,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ()),
+            value: 0
+        });
+        calls[1] = Call({
+            target: addresses.validatorTimelock,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ()),
+            value: 0
+        });
+        calls[2] = Call({
+            target: addresses.bridges.sharedBridgeProxy,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ()),
+            value: 0
+        });
+        calls[3] = Call({
+            target: addresses.bridgehub.ctmDeploymentTrackerProxy,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ()),
+            value: 0
+        });
+    }
+
+    function getOwnerAddress() public returns (address) {
+        return config.ownerAddress;
+    }
+
+    function _getFacetCutsForDeletion() internal returns (Diamond.FacetCut[] memory facetCuts) {
+        IZKChain.Facet[] memory facets = IZKChain(config.contracts.eraDiamondProxy).facets();
+
+        // Freezability does not matter when deleting, so we just put false everywhere
+        facetCuts = new Diamond.FacetCut[](facets.length);
+        for (uint i = 0; i < facets.length; i++) {
+            facetCuts[i] = Diamond.FacetCut({
+                facet: facets[i].addr,
+                action: Diamond.Action.Remove,
+                isFreezable: false,
+                selectors: facets[i].selectors
+            });
+        }
+    }
+
+    function _composeUpgradeTx() internal returns (L2CanonicalTransaction memory transaction) {
+        transaction = L2CanonicalTransaction({
+            // FIXME: dont use hardcoded values
+            txType: 254,
+            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
+            to: uint256(uint160(address(L2_COMPLEX_UPGRADER_ADDR))),
+            gasLimit: 72_000_000,
+            gasPerPubdataByteLimit: 800,
+            maxFeePerGas: 0,
+            maxPriorityFeePerGas: 0,
+            paymaster: uint256(uint160(address(0))),
+            nonce: 25,
+            value: 0,
+            reserved: [uint256(0),uint256(0),uint256(0),uint256(0)],
+            // Note, that the data is empty, it will be fully composed inside the `GatewayUpgrade` contract
+            data: new bytes(0),
+            signature: new bytes(0),
+            // All factory deps should've been published before
+            factoryDeps: new uint256[](0),
+            paymasterInput: new bytes(0),
+            // Reserved dynamic type for the future use-case. Using it should be avoided,
+            // But it is still here, just in case we want to enable some additional functionality
+            reservedDynamic: new bytes(0)
+        });
+    }
+
+    function getChainUpgradeInfo() public {
+        Diamond.FacetCut[] memory deletedFacets = _getFacetCutsForDeletion();
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](deletedFacets.length + 4);
+        for (uint i = 0; i < deletedFacets.length; i++) {
+            facetCuts[i] = deletedFacets[i];
+        }
+        facetCuts[deletedFacets.length] = Diamond.FacetCut({
+            facet: addresses.stateTransition.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        facetCuts[deletedFacets.length + 1] = Diamond.FacetCut({
+            facet: addresses.stateTransition.gettersFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
+        });
+        facetCuts[deletedFacets.length + 2] = Diamond.FacetCut({
+            facet: addresses.stateTransition.mailboxFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+        });
+        facetCuts[deletedFacets.length + 3] = Diamond.FacetCut({
+            facet: addresses.stateTransition.executorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
+        });
+
+        VerifierParams memory verifierParams = VerifierParams({
+            recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
+            recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
+            recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
+        });
+
+        // TODO: we should fill this one up completely, but it is straightforward
+        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+        address ctmDeployer = addresses.bridgehub.ctmDeploymentTrackerProxy;
+
+        GatewayUpgradeEncodedInput memory gateUpgradeInput = GatewayUpgradeEncodedInput({
+            baseForceDeployments: baseForceDeployments,
+            ctmDeployer: ctmDeployer,
+            fixedForceDeploymentsData: generatedData.forceDeploymentsData,
+            l2GatewayUpgrade: addresses.expectedL2Addresses.expectedL2GatewayUpgrade
+        });
+
+        bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput); 
+
+        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: _composeUpgradeTx(),
+            factoryDeps: new bytes[](0),
+            bootloaderHash: config.contracts.bootloaderHash,
+            defaultAccountHash: config.contracts.defaultAAHash,
+            verifier: addresses.stateTransition.verifier,
+            verifierParams: verifierParams,
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: postUpgradeCalldata,
+            // FIXME: TBH, I am not sure if even should even put any time there, 
+            // but we may
+            upgradeTimestamp: 0,
+            newProtocolVersion: 0x1900000000
+        });
+
+        Diamond.DiamondCutData memory upgradeCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: addresses.gatewayUpgrade,
+            initCalldata: abi.encode(proposedUpgrade)
+        });
     }
 
     function initializeConfig(string memory configPath) internal {
@@ -312,8 +470,8 @@ contract EcosystemUpgrade is Script {
         generatedData.forceDeploymentsData = prepareForceDeploymentsData();
     }
 
-    function initializeExpectedL2DAValidators() internal {
-        addresses.expectedL2DAValidators = ExpectedL2DAValidators({
+    function initializeExpectedL2Addresses() internal {
+        addresses.expectedL2Addresses = ExpectedL2Addresses({
             expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0), 
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()), 
@@ -322,6 +480,11 @@ contract EcosystemUpgrade is Script {
             expectedValidiumL2DAValidator: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0), 
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode()), 
+                hex""
+            ),
+            expectedL2GatewayUpgrade: Utils.getL2AddressViaCreate2Factory(
+                bytes32(0), 
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()), 
                 hex""
             )
         });
@@ -373,6 +536,13 @@ contract EcosystemUpgrade is Script {
         address contractAddress = deployViaCreate2(bytecode);
         console.log("GenesisUpgrade deployed at:", contractAddress);
         addresses.stateTransition.genesisUpgrade = contractAddress;
+    }
+
+    function deployGatewayUpgrade() internal {
+        bytes memory bytecode = abi.encodePacked(type(GatewayUpgrade).creationCode);
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("GatewayUpgrade deployed at:", contractAddress);
+        addresses.gatewayUpgrade = contractAddress;
     }
 
     function deployDAValidators() internal {
@@ -531,84 +701,45 @@ contract EcosystemUpgrade is Script {
         addresses.stateTransition.chainTypeManagerImplementation = contractAddress;
     }
 
-    function deployChainTypeManagerProxy() internal {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: addresses.stateTransition.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: addresses.stateTransition.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: addresses.stateTransition.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
-        });
+    // function deployChainTypeManagerProxy() internal {
+        
 
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
-        });
+    //     DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
+    //         verifier: IVerifier(addresses.stateTransition.verifier),
+    //         verifierParams: verifierParams,
+    //         l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
+    //         l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+    //         priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
+    //         feeParams: feeParams,
+    //         blobVersionedHashRetriever: config.contracts.blobVersionedHashRetriever
+    //     });
 
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
-            batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
-            maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
-            maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
-            priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
-            minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
-        });
+    //     Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+    //         facetCuts: facetCuts,
+    //         initAddress: addresses.stateTransition.diamondInit,
+    //         initCalldata: abi.encode(initializeData)
+    //     });
 
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(addresses.stateTransition.verifier),
-            verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
-            priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-            feeParams: feeParams,
-            blobVersionedHashRetriever: config.contracts.blobVersionedHashRetriever
-        });
+    //     generatedData.diamondCutData = abi.encode(diamondCut);
 
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: addresses.stateTransition.diamondInit,
-            initCalldata: abi.encode(initializeData)
-        });
+    //     ChainCreationParams memory chainCreationParams = ChainCreationParams({
+    //         genesisUpgrade: addresses.stateTransition.genesisUpgrade,
+    //         genesisBatchHash: config.contracts.genesisRoot,
+    //         genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+    //         genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+    //         diamondCut: diamondCut,
+    //         forceDeploymentsData: generatedData.forceDeploymentsData
+    //     });
 
-        generatedData.diamondCutData = abi.encode(diamondCut);
+    //     ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
+    //         owner: msg.sender,
+    //         validatorTimelock: addresses.validatorTimelock,
+    //         chainCreationParams: chainCreationParams,
+    //         protocolVersion: config.contracts.latestProtocolVersion
+    //     });
 
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: addresses.stateTransition.genesisUpgrade,
-            genesisBatchHash: config.contracts.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            forceDeploymentsData: generatedData.forceDeploymentsData
-        });
-
-        ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: msg.sender,
-            validatorTimelock: addresses.validatorTimelock,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: config.contracts.latestProtocolVersion
-        });
-
-        // TODO: somehow use the data generated here
-    }
+    //     // TODO: somehow use the data generated here
+    // }
 
     // function registerChainTypeManager() internal {
     //     Bridgehub bridgehub = Bridgehub(config.contracts.bridgehubProxyAddress);
@@ -801,29 +932,24 @@ contract EcosystemUpgrade is Script {
         // });
     }
 
-    // function updateOwners() internal {
-    //     vm.startBroadcast(msg.sender);
+    function updateOwners() internal {
+        vm.startBroadcast(msg.sender);
 
-    //     ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-    //     validatorTimelock.transferOwnership(config.ownerAddress);
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
+        validatorTimelock.transferOwnership(config.ownerAddress);
 
-    //     Bridgehub bridgehub = Bridgehub(config.contracts.bridgehubProxyAddress);
-    //     bridgehub.transferOwnership(config.ownerAddress);
-    //     bridgehub.setPendingAdmin(addresses.chainAdmin);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        sharedBridge.transferOwnership(config.ownerAddress);
 
-    //     L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
-    //     sharedBridge.transferOwnership(config.ownerAddress);
+        CTMDeploymentTracker ctmDeploymentTracker = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
+        ctmDeploymentTracker.transferOwnership(config.ownerAddress);
 
-    //     ChainTypeManager ctm = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
-    //     ctm.transferOwnership(config.ownerAddress);
-    //     ctm.setPendingAdmin(addresses.chainAdmin);
+        PermanentRestriction permanentRestriction = PermanentRestriction(addresses.permanentRollupRestriction);
+        permanentRestriction.transferOwnership(config.ownerAddress);
 
-    //     CTMDeploymentTracker ctmDeploymentTracker = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-    //     ctmDeploymentTracker.transferOwnership(config.ownerAddress);
-
-    //     vm.stopBroadcast();
-    //     console.log("Owners updated");
-    // }
+        vm.stopBroadcast();
+        console.log("Owners updated");
+    }
 
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
@@ -919,8 +1045,9 @@ contract EcosystemUpgrade is Script {
             config.contracts.recursionNodeLevelVkHash
         );
 
-        vm.serializeAddress("contracts_config", "expected_rollup_l2_da_validator", addresses.expectedL2DAValidators.expectedRollupL2DAValidator);
-        vm.serializeAddress("contracts_config", "expected_validium_l2_da_validator", addresses.expectedL2DAValidators.expectedValidiumL2DAValidator);
+        vm.serializeAddress("contracts_config", "expected_rollup_l2_da_validator", addresses.expectedL2Addresses.expectedRollupL2DAValidator);
+        vm.serializeAddress("contracts_config", "expected_validium_l2_da_validator", addresses.expectedL2Addresses.expectedValidiumL2DAValidator);
+        vm.serializeAddress("contracts_config", "expected_l2_gateway_upgrade", addresses.expectedL2Addresses.expectedL2GatewayUpgrade);
         vm.serializeBytes("contracts_config", "diamond_cut_data", generatedData.diamondCutData);
 
         string memory contractsConfig = vm.serializeBytes(

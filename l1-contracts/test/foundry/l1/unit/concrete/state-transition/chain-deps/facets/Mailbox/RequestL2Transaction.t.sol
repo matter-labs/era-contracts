@@ -122,7 +122,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
     function test_RevertWhen_bridgePaused(uint256 randomValue) public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
-        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
+        // utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
 
         uint256 l2GasLimit = 1000000;
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
@@ -137,7 +137,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
     function test_success_requestL2Transaction(uint256 randomValue) public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
-        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
+        // utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
 
         uint256 l2GasLimit = 1000000;
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);

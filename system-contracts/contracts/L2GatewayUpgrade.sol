@@ -12,20 +12,24 @@ import {GatewayUpgrade} from "./GatewayUpgrade.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
-/// @notice The contract that can be used for deterministic contract deployment.
-contract L2GenesisUpgrade is IL2GenesisUpgrade, GatewayUpgrade {
-    function genesisUpgrade(
-        uint256 _chainId,
+/// @notice The contract that is used for facilitating the upgrade of the L2
+/// to the protocol version that supports gateway
+/// @dev This contract is neither predeployed nor a system contract. It is located
+/// in this folder due to very overlaping functionality with `L2GenesisUpgrade` and
+/// faciliating reusage of the code.
+/// @dev During the ugprade, it will be delegate-called by the `ComplexUpgrader` contract.
+contract L2GatewayUpgrade is GatewayUpgrade {
+    function upgrade(
+        ForceDeployment[] calldata _forceDeployments,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
     ) external payable {
-        // solhint-disable-next-line gas-custom-errors
-        require(_chainId != 0, "Invalid chainId");
-        ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
+        // Firstly, we force deploy the main set of contracts. 
+        // Those will be deployed without any contract invocation.
+        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(_forceDeployments);
 
+        // Secondly, we perform the more complex deployment of the gateway contracts. 
         performGatewayContractsInit(_ctmDeployer, _fixedForceDeploymentsData, _additionalForceDeploymentsData);
-        
-        emit UpgradeComplete(_chainId);
     }
 }
