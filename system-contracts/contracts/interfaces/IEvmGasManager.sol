@@ -10,7 +10,5 @@ interface IEvmGasManager {
 
     function pushEVMFrame(uint256 _passGas, bool _isStatic) external;
 
-    function consumeEvmFrame() external returns (uint256 passGas, bool isStatic);
-
-    function popEVMFrame() external;
+    function consumeEvmFrame() external returns (uint256 passGas, uint256 auxData);
 }
