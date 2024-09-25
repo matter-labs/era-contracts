@@ -14,6 +14,7 @@ import {IRestriction} from "./IRestriction.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
@@ -234,7 +235,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         // Note, that we do not use an explicit call here to ensure that the function does not panic in case of
         // incorrect `_chain` address.
-        (bool success, bytes memory data) = _chain.staticcall(abi.encodeWithSelector(IZKChain.getChainId.selector));
+        (bool success, bytes memory data) = _chain.staticcall(abi.encodeWithSelector(IGetters.getChainId.selector));
         if (!success || data.length < 32) {
             revert NotAHyperchain(_chain);
         }
