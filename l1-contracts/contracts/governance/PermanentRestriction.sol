@@ -29,7 +29,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
 
-    /// @notice The address of the L2 admin factory that should be used to deploy the chain admins 
+    /// @notice The address of the L2 admin factory that should be used to deploy the chain admins
     /// for chains that migrated on top of an L2 settlement layer.
     /// @dev If this contract is deployed on L2, this address is 0.
     /// @dev This address is expected to be the same on all L2 chains.
@@ -47,15 +47,12 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice The mapping of whitelisted L2 admins.
     mapping(address adminAddress => bool isWhitelisted) public whitelistedL2Admins;
 
-    constructor(
-        IBridgehub _bridgehub, 
-        address _l2AdminFactory
-    ) {
+    constructor(IBridgehub _bridgehub, address _l2AdminFactory) {
         BRIDGE_HUB = _bridgehub;
         L2_ADMIN_FACTORY = _l2AdminFactory;
     }
 
-    function initialize(address _initialOwner) initializer external {
+    function initialize(address _initialOwner) external initializer {
         // solhint-disable-next-line gas-custom-errors, reason-string
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
@@ -89,25 +86,21 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         emit SelectorValidationChanged(_selector, _isValidated);
     }
-    
+
     /// @notice Whitelists a certain L2 admin.
     /// @param deploymentSalt The salt for the deployment.
     /// @param l2BytecodeHash The hash of the L2 bytecode.
     /// @param constructorInputHash The hash of the constructor data for the deployment.
-    function whitelistL2Admin(
-        bytes32 deploymentSalt,
-        bytes32 l2BytecodeHash, 
-        bytes32 constructorInputHash
-    ) external {
-        // We do not do any additional validations for constructor data or the bytecode, 
+    function whitelistL2Admin(bytes32 deploymentSalt, bytes32 l2BytecodeHash, bytes32 constructorInputHash) external {
+        // We do not do any additional validations for constructor data or the bytecode,
         // we expect that only admins of the allowed format are to be deployed.
         address expectedAddress = L2ContractHelper.computeCreate2Address(
-            L2_ADMIN_FACTORY, 
-            deploymentSalt, 
-            l2BytecodeHash, 
+            L2_ADMIN_FACTORY,
+            deploymentSalt,
+            l2BytecodeHash,
             constructorInputHash
         );
-        
+
         if (whitelistedL2Admins[expectedAddress]) {
             revert AlreadyWhitelisted(expectedAddress);
         }
@@ -128,13 +121,11 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
     /// @notice Validates the migration to an L2 settlement layer.
     /// @param _call The call data.
-    /// @dev Note that we do not need to validate the migration to the L1 layer as the admin 
+    /// @dev Note that we do not need to validate the migration to the L1 layer as the admin
     /// is not changed in this case.
-    function _validateMigrationToL2(
-        Call calldata _call
-    ) internal view {
+    function _validateMigrationToL2(Call calldata _call) internal view {
         try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
-            if(!whitelistedL2Admins[admin]) {
+            if (!whitelistedL2Admins[admin]) {
                 revert NotWhitelisted(admin);
             }
         } catch {
@@ -259,7 +250,10 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         address sharedBridge = BRIDGE_HUB.sharedBridge();
 
-        L2TransactionRequestTwoBridgesOuter memory request = abi.decode(_call.data[4:], (L2TransactionRequestTwoBridgesOuter));
+        L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
+            _call.data[4:],
+            (L2TransactionRequestTwoBridgesOuter)
+        );
 
         if (request.secondBridgeAddress != sharedBridge) {
             revert InvalidAddress(request.secondBridgeAddress, sharedBridge);
@@ -285,7 +279,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         BridgehubBurnCTMAssetData memory burnData = abi.decode(bridgehubData, (BridgehubBurnCTMAssetData));
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
-        
+
         return l2Admin;
-    } 
+    }
 }
