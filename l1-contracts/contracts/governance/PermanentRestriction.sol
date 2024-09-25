@@ -256,7 +256,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         );
 
         if (request.secondBridgeAddress != sharedBridge) {
-            revert InvalidAddress(request.secondBridgeAddress, sharedBridge);
+            revert InvalidAddress(sharedBridge, request.secondBridgeAddress);
         }
 
         bytes memory secondBridgeData = request.secondBridgeCalldata;
