@@ -3,12 +3,13 @@ pragma solidity 0.8.24;
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {InvalidAddress, UnsupportedEncodingVersion, InvalidSelector, NotBridgehub, ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -220,6 +221,119 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         permRestriction.validateCall(call, owner);
         vm.stopPrank();
     }
+
+    function _encodeMigraationCall(
+        bool correctTarget, 
+        bool correctSelector,
+        bool correctSecondBridge,
+        bool correctEncodingVersion,
+        bool correctAssetId,
+        address l2Admin
+    ) internal returns (Call memory call) {
+        if (!correctTarget) {
+            call.target = address(0);
+            return call;
+        }
+        call.target = address(bridgehub);
+
+        if (!correctSelector) {
+            call.data = hex"00000000";
+            return call;
+        }
+
+        L2TransactionRequestTwoBridgesOuter memory outer = L2TransactionRequestTwoBridgesOuter({
+            chainId: chainId,
+            mintValue: 0,
+            l2Value: 0,
+            l2GasLimit: 0,
+            l2GasPerPubdataByteLimit: 0,
+            refundRecipient: address(0),
+            secondBridgeAddress: address(0),
+            secondBridgeValue: 0,
+            secondBridgeCalldata: hex""
+        });
+        if (!correctSecondBridge) {
+            call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+            // 0 is not correct second bridge
+            return call;
+        }
+        outer.secondBridgeAddress = sharedBridge;
+
+
+        uint8 encoding = correctEncodingVersion ? 1 : 12;
+        
+        bytes32 chainAssetId = correctAssetId ? bridgehub.ctmAssetIdFromChainId(chainId) : bytes32(0);
+
+        bytes memory bridgehubData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                // Gateway chain id, we do not need it
+                chainId: 0,
+                ctmData: abi.encode(l2Admin, hex""),
+                chainData: abi.encode(IZKChain(IBridgehub(bridgehub).getZKChain(chainId)).getProtocolVersion())
+            })
+        );
+        outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
+
+        call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+    }
+
+    function test_tryGetNewAdminFromMigrationRevertWhenInvalidSelector() public {
+        Call memory call = _encodeMigraationCall(
+            false,
+            true,
+            true,
+            true,
+            true,
+            address(0)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(NotBridgehub.selector, address(0)));
+        permRestriction.tryGetNewAdminFromMigration(call); 
+    }
+
+    function test_tryGetNewAdminFromMigrationRevertWhenNotBridgehub() public {
+        Call memory call = _encodeMigraationCall(
+            true,
+            false,
+            true,
+            true,
+            true,
+            address(0)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, bytes4(0)));
+        permRestriction.tryGetNewAdminFromMigration(call); 
+    }
+
+
+    function test_tryGetNewAdminFromMigrationRevertWhenNotSharedBridge() public {
+        Call memory call = _encodeMigraationCall(
+            true,
+            true,
+            false,
+            true,
+            true,
+            address(0)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(InvalidAddress.selector, address(sharedBridge), address(0)));
+        permRestriction.tryGetNewAdminFromMigration(call); 
+    }
+
+    function test_tryGetNewAdminFromMigrationRevertWhenIncorrectEncoding() public {
+        Call memory call = _encodeMigraationCall(
+            true,
+            true,
+            true,
+            false,
+            true,
+            address(0)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(UnsupportedEncodingVersion.selector));
+        permRestriction.tryGetNewAdminFromMigration(call); 
+    }
+
 
     function createNewChainBridgehub() internal {
         bytes[] memory factoryDeps = new bytes[](0);
