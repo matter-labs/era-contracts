@@ -93,7 +93,9 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
 
         bytes32 hash = Utils.hashEVMBytecode(bytecode);
 
-        if (getMarker(hash) == 0) {
+        bool isCodeUnknown = getMarker(hash) == 0;
+
+        if (isCodeUnknown) {
             // ToDO: use efficient call
             L1_MESSENGER_CONTRACT.sendToL1(bytecode);
 
@@ -102,6 +104,6 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
             }
         }
 
-        emit MarkedAsKnown(hash, getMarker(hash) == 0);
+        emit MarkedAsKnown(hash, isCodeUnknown);
     }
 }

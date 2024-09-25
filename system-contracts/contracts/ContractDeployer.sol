@@ -36,8 +36,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
-
-    uint256 public constructorReturnGas;
+    uint256 private constant CONSTRUCTOR_RETURN_GAS_SLOT = 1;
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
@@ -48,6 +47,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
     function evmCodeHash(address _address) external view returns (bytes32 _hash) {
         _hash = _getEvmCodeHash(_address);
+    }
+
+    function constructorReturnGas() external view returns (uint256 returnGas) {
+        assembly {
+            returnGas := tload(CONSTRUCTOR_RETURN_GAS_SLOT)
+        }
     }
 
     /// @notice Returns information about a certain account.
@@ -488,8 +493,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // To be removed in the future
         require(_input.length > 0);
 
-        constructorReturnGas = 0;
-
         uint256 value = msg.value;
         // 1. Transfer the balance to the new address on the constructor call.
         if (value > 0) {
@@ -519,10 +522,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             _isSystem: false
         });
 
-        uint256 _constructorReturnGas;
+        uint256 constructorReturnGas;
         assembly {
             let dataLen := mload(paddedBytecode)
-            _constructorReturnGas := mload(add(paddedBytecode, dataLen))
+            constructorReturnGas := mload(add(paddedBytecode, dataLen))
             mstore(paddedBytecode, sub(dataLen, 0x20))
         }
 
@@ -540,7 +543,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         _setEvmCodeHash(_newAddress, evmBytecodeHash);
 
-        constructorReturnGas = _constructorReturnGas;
+        assembly {
+            tstore(CONSTRUCTOR_RETURN_GAS_SLOT, constructorReturnGas)
+        }
 
         emit ContractDeployed(_sender, evmBytecodeHash, _newAddress);
     }
