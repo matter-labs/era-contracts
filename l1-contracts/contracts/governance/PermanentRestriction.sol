@@ -2,9 +2,12 @@
 
 pragma solidity 0.8.24;
 
-import {CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation} from "../common/L1ContractErrors.sol";
+import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotWhitelisted, NotBridgehub, InvalidSelector, InvalidAddress} from "../common/L1ContractErrors.sol";
 
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
 import {IRestriction} from "./IRestriction.sol";
@@ -22,9 +25,18 @@ import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 /// properties are preserved forever.
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
-contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2Step {
+contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2StepUpgradeable {
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
+
+    /// @notice The address of the L2 admin factory that should be used to deploy the chain admins 
+    /// for chains that migrated on top of an L2 settlement layer.
+    /// @dev If this contract is deployed on L2, this address is 0.
+    /// @dev This address is expected to be the same on all L2 chains.
+    address public immutable L2_ADMIN_FACTORY;
+
+    /// @notice The bytecode hash of the L2 chain admin contract.
+    bytes32 public immutable L2_CHAIN_ADMIN_BYTECODE_HASH;
 
     /// @notice The mapping of the allowed admin implementations.
     mapping(bytes32 implementationCodeHash => bool isAllowed) public allowedAdminImplementations;
@@ -35,9 +47,20 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice The mapping of the validated selectors.
     mapping(bytes4 selector => bool isValidated) public validatedSelectors;
 
-    constructor(address _initialOwner, IBridgehub _bridgehub) {
-        BRIDGE_HUB = _bridgehub;
+    /// @notice The mapping of whitelisted L2 admins.
+    mapping(address adminAddress => bool isWhitelisted) public whitelistedL2Admins;
 
+    constructor(
+        IBridgehub _bridgehub, 
+        address _l2AdminFactory,
+        bytes32 _l2ChainAdminBytecodeHash
+    ) {
+        BRIDGE_HUB = _bridgehub;
+        L2_ADMIN_FACTORY = _l2AdminFactory;
+        L2_CHAIN_ADMIN_BYTECODE_HASH = _l2ChainAdminBytecodeHash;
+    }
+
+    function initialize(address _initialOwner) initializer external {
         // solhint-disable-next-line gas-custom-errors, reason-string
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
@@ -71,6 +94,27 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         emit SelectorValidationChanged(_selector, _isValidated);
     }
+    
+    /// @notice Whitelists a certain L2 admin.
+    /// @param deploymentSalt The salt for the deployment.
+    /// @param constructorInputHash The hash of the constructor data for the deployment.
+    function whitelistL2Admin(bytes32 deploymentSalt, bytes32 constructorInputHash) external {
+        // We do not do any additional validations for constructor data, 
+        // we expect that only admins of the allowed format are to be deployed.
+        address expectedAddress = L2ContractHelper.computeCreate2Address(
+            L2_ADMIN_FACTORY, 
+            deploymentSalt, 
+            L2_CHAIN_ADMIN_BYTECODE_HASH, 
+            constructorInputHash
+        );
+        
+        if (whitelistedL2Admins[expectedAddress]) {
+            revert AlreadyWhitelisted(expectedAddress);
+        }
+
+        whitelistedL2Admins[expectedAddress] = true;
+        emit WhitelistL2Admin(expectedAddress, true);
+    }
 
     /// @inheritdoc IRestriction
     function validateCall(
@@ -78,7 +122,24 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         address // _invoker
     ) external view override {
         _validateAsChainAdmin(_call);
+        _validateMigrationToL2(_call);
         _validateRemoveRestriction(_call);
+    }
+
+    /// @notice Validates the migration to an L2 settlement layer.
+    /// @param _call The call data.
+    /// @dev Note that we do not need to validate the migration to the L1 layer as the admin 
+    /// is not changed in this case.
+    function _validateMigrationToL2(
+        Call calldata _call
+    ) internal view {
+        try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
+            if(!whitelistedL2Admins[admin]) {
+                revert NotWhitelisted(admin);
+            }
+        } catch {
+            // It was not the migration call, so we do nothing
+        }
     }
 
     /// @notice Validates the call as the chain admin
@@ -183,4 +244,48 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             revert NotAnAdmin(admin, _potentialAdmin);
         }
     }
+
+    /// @notice Tries to get the new admin from the migration.
+    /// @param _call The call data.
+    /// @dev This function reverts if the provided call was not a migration call.
+    function tryGetNewAdminFromMigration(Call calldata _call) external view returns (address) {
+        if (_call.target != address(BRIDGE_HUB)) {
+            revert NotBridgehub(_call.target);
+        }
+
+        if (bytes4(_call.data[:4]) != IBridgehub.requestL2TransactionTwoBridges.selector) {
+            revert InvalidSelector(bytes4(_call.data[:4]));
+        }
+
+        address sharedBridge = BRIDGE_HUB.sharedBridge();
+
+        L2TransactionRequestTwoBridgesOuter memory request = abi.decode(_call.data[4:], (L2TransactionRequestTwoBridgesOuter));
+
+        if (request.secondBridgeAddress != sharedBridge) {
+            revert InvalidAddress(request.secondBridgeAddress, sharedBridge);
+        }
+
+        bytes memory secondBridgeData = request.secondBridgeCalldata;
+        if (secondBridgeData[0] != NEW_ENCODING_VERSION) {
+            revert UnsupportedEncodingVersion();
+        }
+        bytes memory encodedData = new bytes(secondBridgeData.length - 1);
+        assembly {
+            mcopy(add(encodedData, 0x20), add(secondBridgeData, 0x21), mload(encodedData))
+        }
+
+        (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
+        // We will just check that the chainAssetId is a valid chainAssetId.
+        // For now, for simplicity, we do not check that the admin is exactly the admin
+        // of this chain.
+        address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(chainAssetId);
+        if (ctmAddress == address(0)) {
+            revert ZeroAddress();
+        }
+
+        BridgehubBurnCTMAssetData memory burnData = abi.decode(bridgehubData, (BridgehubBurnCTMAssetData));
+        (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
+        
+        return l2Admin;
+    } 
 }
