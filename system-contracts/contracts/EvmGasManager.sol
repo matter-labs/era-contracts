@@ -118,14 +118,14 @@ contract EvmGasManager {
         2. callee calls consumeEvmFrame to get the gas and determine if a call is static, frame is marked as used
     */
 
-    function pushEVMFrame(uint256 passGas, bool isStatic) external onlySystemEvm {
+    function pushEVMFrame(uint256 passGas, bool isStatic) external payable onlySystemEvm {
         assembly {
             tstore(EVM_GAS_SLOT, passGas)
             tstore(EVM_AUX_DATA_SLOT, or(isStatic, EVM_ACTIVE_FRAME_FLAG))
         }
     }
 
-    function consumeEvmFrame() external onlySystemEvm returns (uint256 passGas, uint256 auxDataRes) {
+    function consumeEvmFrame() external payable onlySystemEvm returns (uint256 passGas, uint256 auxDataRes) {
         assembly {
             let auxData := tload(EVM_AUX_DATA_SLOT)
             let isFrameActive := and(auxData, EVM_ACTIVE_FRAME_FLAG)

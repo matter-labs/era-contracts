@@ -8,7 +8,7 @@ interface IEvmGasManager {
 
     function warmSlot(uint256 _slot, uint256 _currentValue) external payable returns (bool, uint256);
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) external;
+    function pushEVMFrame(uint256 _passGas, bool _isStatic) external payable;
 
-    function consumeEvmFrame() external returns (uint256 passGas, uint256 auxData);
+    function consumeEvmFrame() external payable returns (uint256 passGas, uint256 auxData);
 }
