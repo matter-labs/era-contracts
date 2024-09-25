@@ -8,6 +8,7 @@ import {Utils} from "./libraries/Utils.sol";
 
 import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {SystemCallFlagRequired, CallerMustBeEvmContract} from "./SystemContractErrors.sol";
 
 // We consider all the contracts (including system ones) as warm.
 uint160 constant PRECOMPILES_END = 0xffff;
@@ -23,28 +24,47 @@ uint256 constant EVM_ACTIVE_FRAME_FLAG = 1 << 1;
 
 contract EvmGasManager {
     modifier onlySystemEvm() {
-        require(SystemContractHelper.isSystemCall(), "This method requires system call flag");
+        if (!SystemContractHelper.isSystemCall()) {
+            revert SystemCallFlagRequired();
+        }
 
         // cache use is safe since we do not support SELFDESTRUCT
-        uint256 transient_slot = IS_ACCOUNT_EVM_PREFIX | uint256(uint160(msg.sender));
+        uint256 _sender = uint256(uint160(msg.sender));
+        uint256 transient_slot = IS_ACCOUNT_EVM_PREFIX | _sender;
         bool isEVM;
         assembly {
             isEVM := tload(transient_slot)
         }
 
         if (!isEVM) {
-            bytes32 bytecodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(msg.sender);
-            isEVM = Utils.isCodeHashEVM(bytecodeHash);
+            address to = address(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT);
+            bytes32 rawCodeHash;
+            assembly {
+                // function getRawCodeHash(address _address) public view returns (bytes32 codeHash)
+                mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
+                mstore(4, _sender)
+            
+                let success := staticcall(gas(), to, 0, 36, 0, 32)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            
+                rawCodeHash := mload(0)
+            }
+
+            isEVM = Utils.isCodeHashEVM(rawCodeHash);
             if (isEVM) {
-                if (!Utils.isContractConstructing(bytecodeHash)) {
+                if (!Utils.isContractConstructing(rawCodeHash)) {
                     assembly {
                         tstore(transient_slot, isEVM)
                     }
                 }
+            } else {
+                revert CallerMustBeEvmContract();
             }
         }
-
-        require(isEVM, "only system evm");
         _;
     }
 
