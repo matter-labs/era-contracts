@@ -44,11 +44,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         owner = makeAddr("owner");
         hyperchain = chainContractAddress.getHyperchain(chainId);
-        (permRestriction, ) = _deployPermRestriction(
-            bridgehub,
-            L2_FACTORY_ADDR,
-            owner
-        );
+        (permRestriction, ) = _deployPermRestriction(bridgehub, L2_FACTORY_ADDR, owner);
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
@@ -61,7 +57,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         address _owner
     ) internal returns (PermanentRestriction proxy, PermanentRestriction impl) {
         impl = new PermanentRestriction(_bridgehub, _l2AdminFactory);
-        TransparentUpgradeableProxy tup = new TransparentUpgradeableProxy(address(impl), address(uint160(1)), abi.encodeCall(PermanentRestriction.initialize, (_owner)));
+        TransparentUpgradeableProxy tup = new TransparentUpgradeableProxy(
+            address(impl),
+            address(uint160(1)),
+            abi.encodeCall(PermanentRestriction.initialize, (_owner))
+        );
 
         proxy = PermanentRestriction(address(tup));
     }
@@ -69,7 +69,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     function test_ownerAsAddressZero() public {
         PermanentRestriction impl = new PermanentRestriction(bridgehub, L2_FACTORY_ADDR);
         vm.expectRevert(ZeroAddress.selector);
-        new TransparentUpgradeableProxy(address(impl), address(uint160(1)), abi.encodeCall(PermanentRestriction.initialize, (address(0))));
+        new TransparentUpgradeableProxy(
+            address(impl),
+            address(uint160(1)),
+            abi.encodeCall(PermanentRestriction.initialize, (address(0)))
+        );
     }
 
     function test_allowAdminImplementation(bytes32 implementationHash) public {
