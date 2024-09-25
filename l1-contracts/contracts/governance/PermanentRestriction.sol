@@ -35,9 +35,6 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @dev This address is expected to be the same on all L2 chains.
     address public immutable L2_ADMIN_FACTORY;
 
-    /// @notice The bytecode hash of the L2 chain admin contract.
-    bytes32 public immutable L2_CHAIN_ADMIN_BYTECODE_HASH;
-
     /// @notice The mapping of the allowed admin implementations.
     mapping(bytes32 implementationCodeHash => bool isAllowed) public allowedAdminImplementations;
 
@@ -52,12 +49,10 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
     constructor(
         IBridgehub _bridgehub, 
-        address _l2AdminFactory,
-        bytes32 _l2ChainAdminBytecodeHash
+        address _l2AdminFactory
     ) {
         BRIDGE_HUB = _bridgehub;
         L2_ADMIN_FACTORY = _l2AdminFactory;
-        L2_CHAIN_ADMIN_BYTECODE_HASH = _l2ChainAdminBytecodeHash;
     }
 
     function initialize(address _initialOwner) initializer external {
@@ -97,14 +92,19 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     
     /// @notice Whitelists a certain L2 admin.
     /// @param deploymentSalt The salt for the deployment.
+    /// @param l2BytecodeHash The hash of the L2 bytecode.
     /// @param constructorInputHash The hash of the constructor data for the deployment.
-    function whitelistL2Admin(bytes32 deploymentSalt, bytes32 constructorInputHash) external {
-        // We do not do any additional validations for constructor data, 
+    function whitelistL2Admin(
+        bytes32 deploymentSalt,
+        bytes32 l2BytecodeHash, 
+        bytes32 constructorInputHash
+    ) external {
+        // We do not do any additional validations for constructor data or the bytecode, 
         // we expect that only admins of the allowed format are to be deployed.
         address expectedAddress = L2ContractHelper.computeCreate2Address(
             L2_ADMIN_FACTORY, 
             deploymentSalt, 
-            L2_CHAIN_ADMIN_BYTECODE_HASH, 
+            l2BytecodeHash, 
             constructorInputHash
         );
         
