@@ -19,7 +19,7 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 
 /// @dev We use try-catch to test whether some of the conditions should be checked.
-/// To avoid attacks based on teh 63/64 gas limitations, we ensure that each such call
+/// To avoid attacks based on the 63/64 gas limitations, we ensure that each such call
 /// has at least this amount.
 uint256 constant MIN_GAS_FOR_FALLABLE_CALL = 5_000_000;
 
