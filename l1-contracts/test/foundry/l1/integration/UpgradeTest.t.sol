@@ -65,9 +65,8 @@ contract UpgradeTest is Test {
         console.log("Upgrading Era");
 
         // Now, the admin of the Era needs to call the upgrade function.
-        // We do not include calls that ensure that the server is ready for the sake of brevity.
-        // FIXME: the upgrade does not yet change the timelock, please fix it.
-        // FIXME: we do not yet upgrade the L2 legacy bridge, please fix it.
+        // Note, that the step below also updated ValidatorTimelock so the server needs to be ready for that.
+        // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
         chainUpgrade.upgradeChain(
             generateUpgradeData.getOldProtocolVersion(),
             generateUpgradeData.getChainUpgradeInfo()

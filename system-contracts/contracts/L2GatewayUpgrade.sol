@@ -9,6 +9,9 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {IL2GenesisUpgrade, FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 
 import {GatewayUpgrade} from "./GatewayUpgrade.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -31,5 +34,42 @@ contract L2GatewayUpgrade is GatewayUpgrade {
 
         // Secondly, we perform the more complex deployment of the gateway contracts. 
         performGatewayContractsInit(_ctmDeployer, _fixedForceDeploymentsData, _additionalForceDeploymentsData);
+
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
+            _additionalForceDeploymentsData,
+            (ZKChainSpecificForceDeploymentsData)
+        );
+
+        address l2LegacyBridgeAddress = additionalForceDeploymentsData.l2LegacySharedBridge;
+        
+        if (l2LegacyBridgeAddress != address(0)) {
+            FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
+                _fixedForceDeploymentsData,
+                (FixedForceDeploymentsData)
+            );
+
+            // Firstly, upgrade the legacy L2SharedBridge
+            bytes memory bridgeUpgradeData = abi.encodeCall(
+                ITransparentUpgradeableProxy.upgradeTo,
+                (fixedForceDeploymentsData.l2SharedBridgeLegacyImpl)
+            );
+            SystemContractHelper.mimicCallWithPropagatedRevert(
+                l2LegacyBridgeAddress,
+                fixedForceDeploymentsData.l2BridgeProxyOwnerAddress,
+                bridgeUpgradeData
+            );
+
+            // Secondly, upgrade the tokens
+            UpgradeableBeacon upgradableBeacon = IL2SharedBridgeLegacy(l2LegacyBridgeAddress).l2TokenBeacon();
+            bytes memory beaconUpgradeData = abi.encodeCall(
+                UpgradeableBeacon.upgradeTo,
+                (fixedForceDeploymentsData.l2BridgedStandardERC20Impl)
+            );
+            SystemContractHelper.mimicCallWithPropagatedRevert(
+                address(upgradableBeacon),
+                fixedForceDeploymentsData.l2BridgedStandardERC20ProxyOwnerAddress,
+                beaconUpgradeData
+            );
+        }
     }
 }

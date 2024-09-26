@@ -80,6 +80,10 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    address l2SharedBridgeLegacyImpl;
+    address l2BridgedStandardERC20Impl;
+    address l2BridgeProxyOwnerAddress;
+    address l2BridgedStandardERC20ProxyOwnerAddress;
 }
 
 // A subset of the ones used for tests
@@ -124,6 +128,8 @@ contract EcosystemUpgrade is Script {
         address expectedValidiumL2DAValidator;
         address expectedL2GatewayUpgrade;
         address expectedL2AdminFactory;
+        address l2SharedBridgeLegacyImpl;
+        address l2BridgedStandardERC20Impl;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -204,6 +210,8 @@ contract EcosystemUpgrade is Script {
         address transparentProxyAdmin;
         address eraDiamondProxy;
         address blobVersionedHashRetriever;
+        address l2BridgeProxyOwnerAddress;
+        address l2BridgedStandardERC20ProxyOwnerAddress;
     }
 
     struct TokensConfig {
@@ -553,6 +561,8 @@ contract EcosystemUpgrade is Script {
         config.contracts.oldValidatorTimelock = toml.readAddress("$.contracts.old_validator_timelock");
         // FIXME: value stored there is incorrect at the moment, figure out the correct value
         config.contracts.blobVersionedHashRetriever = toml.readAddress("$.contracts.blob_versioned_hash_retriever");
+        config.contracts.l2BridgeProxyOwnerAddress = toml.readAddress("$.contracts.l2_bridge_proxy_owner_address");
+        config.contracts.l2BridgedStandardERC20ProxyOwnerAddress = toml.readAddress("$.contracts.l2_bridged_standard_erc20_proxy_owner_address");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
@@ -576,6 +586,16 @@ contract EcosystemUpgrade is Script {
             expectedL2GatewayUpgrade: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0), 
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()), 
+                hex""
+            ),
+            l2SharedBridgeLegacyImpl: Utils.getL2AddressViaCreate2Factory(
+                bytes32(0), 
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()), 
+                hex""
+            ),
+            l2BridgedStandardERC20Impl: Utils.getL2AddressViaCreate2Factory(
+                bytes32(0), 
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readStandardERC20Bytecode()), 
                 hex""
             ),
             // FIXME
@@ -1205,7 +1225,11 @@ contract EcosystemUpgrade is Script {
             l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode())
+            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            l2SharedBridgeLegacyImpl: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
+            l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
+            l2BridgeProxyOwnerAddress: config.contracts.l2BridgeProxyOwnerAddress,
+            l2BridgedStandardERC20ProxyOwnerAddress: config.contracts.l2BridgedStandardERC20ProxyOwnerAddress
         });
 
         return abi.encode(data);

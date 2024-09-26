@@ -30,6 +30,8 @@ era_diamond_proxy = "0x32400084c286cf3e17e7b677ea9583e60a000324"
 blob_versioned_hash_retriever = "0x0000000000000000000000000000000000000001"
 legacy_erc20_bridge_address = "0x57891966931eb4bb6fb81430e6ce0a03aabde063"
 old_validator_timelock = "0x5D8ba173Dc6C3c90C8f7C04C9288BeF5FDbAd06E"
+l2_bridge_proxy_owner_address = "0x0000000000000000000000000000000000000001"
+l2_bridged_standard_erc20_proxy_owner_address = "0x0000000000000000000000000000000000000001"
 
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"

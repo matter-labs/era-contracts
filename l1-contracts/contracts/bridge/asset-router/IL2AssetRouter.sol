@@ -18,6 +18,14 @@ interface IL2AssetRouter {
 
     function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external;
 
+    function finalizeDepositLegacyBridge(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) external;
+
     /// @dev Used to set the assedAddress for a given assetId.
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetAddress) external;
