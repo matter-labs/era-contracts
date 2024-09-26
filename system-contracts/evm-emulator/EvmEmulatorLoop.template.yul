@@ -1090,7 +1090,8 @@ for { } true { } {
         ip := add(ip, 32)
     }
     case 0x80 { // OP_DUP1 
-        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 1, stackHead)
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+        sp, stackHead := pushStackItem(sp, stackHead, evmGasLeft, stackHead)
         ip := add(ip, 1)
     }
     case 0x81 { // OP_DUP2
