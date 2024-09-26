@@ -38,7 +38,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         vm.stopPrank();
 
-        owner = makeAddr("owner");
+        owner = address(0);
         hyperchain = chainContractAddress.getHyperchain(chainId);
         permRestriction = new PermanentRestriction(bridgehub);
         restriction = new AccessControlRestriction(0, owner);

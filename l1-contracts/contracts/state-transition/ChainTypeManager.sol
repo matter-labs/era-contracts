@@ -383,7 +383,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             bytes32(uint256(uint160(_admin))),
             bytes32(uint256(uint160(validatorTimelock))),
             _baseTokenAssetId,
-            bytes32(uint256(uint160(_sharedBridge))),
             storedBatchZero,
             diamondCut.initCalldata
         );

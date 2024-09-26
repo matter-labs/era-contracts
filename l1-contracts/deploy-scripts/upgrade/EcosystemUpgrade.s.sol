@@ -919,23 +919,8 @@ contract EcosystemUpgrade is Script {
 
         vm.broadcast(msg.sender);
         sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
-        // vm.broadcast(msg.sender);
-        // l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
-        // vm.broadcast(msg.sender);
-        // l1Nullifier.setL1AssetRouter(addresses.bridges.sharedBridgeProxy);
-
         vm.broadcast(msg.sender);
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
-
-        // bytes memory data = abi.encodeCall(sharedBridge.setNativeTokenVault, (IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy)));
-        // Utils.executeUpgrade({
-        //     _governor: ownable.owner(),
-        //     _salt: bytes32(0),
-        //     _target: addresses.bridges.sharedBridgeProxy,
-        //     _data: data,
-        //     _value: 0,
-        //     _delay: 0
-        // });
     }
 
     function updateOwners() internal {

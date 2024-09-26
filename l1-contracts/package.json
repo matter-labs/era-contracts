@@ -58,7 +58,7 @@
     "clean": "hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean",
     "clean:foundry": "forge clean",
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
-    "test:foundry": "forge test --ffi --match-path 'test/foundry/l1/*'",
+    "test:foundry": "forge test --ffi --match-path 'test/foundry/l1/*' --no-match-test 'test_MainnetFork'",
     "test:zkfoundry": "forge test --zksync --match-path 'test/foundry/l2/*'",
     "test:mainnet-upgrade-fork": "forge test --match-test test_MainnetFork --ffi --rpc-url $INFURA_MAINNET",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
