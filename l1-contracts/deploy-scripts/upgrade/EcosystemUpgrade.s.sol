@@ -67,6 +67,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
+import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -115,12 +116,14 @@ contract EcosystemUpgrade is Script {
         address validatorTimelock;
         address gatewayUpgrade;
         address create2Factory;
+        address transitionaryOwner;
     }
 
     struct ExpectedL2Addresses {
         address expectedRollupL2DAValidator;
         address expectedValidiumL2DAValidator;
         address expectedL2GatewayUpgrade;
+        address expectedL2AdminFactory;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -255,6 +258,8 @@ contract EcosystemUpgrade is Script {
         setChainTypeManagerInValidatorTimelock();
 
         deployPermanentRollupRestriction();
+
+        deployTransitionaryOwner();
 
         updateOwners();
 
@@ -568,7 +573,14 @@ contract EcosystemUpgrade is Script {
                 bytes32(0), 
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()), 
                 hex""
-            )
+            ),
+            // FIXME
+            expectedL2AdminFactory: address(0)
+            // expectedL2AdminFactory: Utils.getL2AddressViaCreate2Factory(
+            //     bytes32(0), 
+            //     L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()), 
+            //     hex""
+            // )
         });
     }
 
@@ -640,7 +652,7 @@ contract EcosystemUpgrade is Script {
     function deployPermanentRollupRestriction() internal {
         bytes memory bytecode = abi.encodePacked(
             type(PermanentRestriction).creationCode,
-            abi.encode(config.contracts.bridgehubProxyAddress)
+            abi.encode(config.contracts.bridgehubProxyAddress, addresses.expectedL2Addresses.expectedL2AdminFactory)
         );
         address implementationAddress = deployViaCreate2(bytecode);
 
@@ -923,20 +935,30 @@ contract EcosystemUpgrade is Script {
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
+    function deployTransitionaryOwner() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(TransitionaryOwner).creationCode,
+            abi.encode(config.ownerAddress)
+        );
+
+        addresses.transitionaryOwner = deployViaCreate2(bytecode);
+    }
+
+    function _moveGovernanceToOwner(address target) internal {
+        Ownable2StepUpgradeable(target).transferOwnership(addresses.transitionaryOwner);
+        TransitionaryOwner(addresses.transitionaryOwner).claimOwnershipAndGiveToGoverance(target);
+    }
+
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-        validatorTimelock.transferOwnership(config.ownerAddress);
-
-        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
-        sharedBridge.transferOwnership(config.ownerAddress);
-
-        CTMDeploymentTracker ctmDeploymentTracker = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        ctmDeploymentTracker.transferOwnership(config.ownerAddress);
-
-        PermanentRestriction permanentRestriction = PermanentRestriction(addresses.permanentRollupRestriction);
-        permanentRestriction.transferOwnership(config.ownerAddress);
+        // Note, that it will take some time for the governance to sign the "acceptOwnership" transaction,
+        // in order to avoid any possibilty of the front-run, we will temporarily give the ownership to the 
+        // contract that can only transfer ownership to the governance.
+        _moveGovernanceToOwner(addresses.validatorTimelock);
+        _moveGovernanceToOwner(addresses.bridges.sharedBridgeProxy);
+        _moveGovernanceToOwner(addresses.bridgehub.ctmDeploymentTrackerProxy);
+        _moveGovernanceToOwner(addresses.permanentRollupRestriction);
 
         vm.stopBroadcast();
         console.log("Owners updated");

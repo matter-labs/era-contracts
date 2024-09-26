@@ -30,6 +30,7 @@ contract UpgradeTest is Test {
     function test_MainnetFork() public {
         console.log("Preparing ecosystem contracts");
         // Firstly, we deploy all the contracts. 
+        // FIXME: use temporary contract an owner to prevent front-running
         generateUpgradeData.prepareEcosystemContracts(
             ECOSYSTEM_INPUT,
             ECOSYSTEM_OUTPUT
@@ -39,7 +40,6 @@ contract UpgradeTest is Test {
         // and also updated the chain admin.
         // IMPORTANT: for erc20-based chains with token multiplier setter
         // this should be coordinated with the server.
-        // FIXME: use temporary contract an owner to prevent front-running
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(
             ECOSYSTEM_INPUT,

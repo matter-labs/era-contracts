@@ -161,7 +161,6 @@ contract ChainUpgrade  is Script {
             bridgehubAddress: config.bridgehubProxyAddress,
             l1SharedBridgeProxy: config.oldSharedBridgeProxyAddress
         });
-        // FIXME: for now this script only works with rollup chains
         require(expectedGatewayUpgrade == config.expectedL2GatewayUpgrade, "Invalid L2Gateway address");
     }
 

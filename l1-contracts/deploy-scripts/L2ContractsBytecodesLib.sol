@@ -268,4 +268,13 @@ library L2ContractsBytecodesLib {
                 "/../system-contracts/artifacts-zk/contracts-preprocessed/L2GatewayUpgrade.sol/L2GatewayUpgrade.json"
             );
     }
+
+    // /// @notice Reads the bytecode of the L2GatewayUpgrade contract.
+    // /// @return The bytecode of the L2GatewayUpgrade contract.
+    // function readL2AdminFactoryBytecode() internal view returns (bytes memory) {
+    //     return
+    //         Utils.readHardhatBytecode(
+    //             "/../l1-contracts/artifacts-zk/contracts/governance/L2SharedBridgeLegacy.sol/L2SharedBridgeLegacy.json"
+    //         );
+    // }
 }
