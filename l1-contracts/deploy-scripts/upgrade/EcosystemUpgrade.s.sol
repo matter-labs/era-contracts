@@ -6,7 +6,7 @@ pragma solidity 0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -193,6 +193,7 @@ contract EcosystemUpgrade is Script {
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
 
+        address legacyErc20BridgeAddress;
         address bridgehubProxyAddress;
         address oldSharedBridgeProxyAddress;
         address stateTransitionManagerAddress;
@@ -347,7 +348,7 @@ contract EcosystemUpgrade is Script {
         // Just retrieved it from the contract
         uint256 PREVIOUS_PROTOCOL_VERSION = getOldProtocolVersion();
         // TODO: Is it ok to provide a deadline here?
-        uint256 DEADLINE = 0;
+        uint256 DEADLINE = type(uint256).max;
         uint256 NEW_PROTOCOL_VERSION = getNewProtocolVersion();
         Call memory call = Call({
             target: config.contracts.stateTransitionManagerAddress,
@@ -432,6 +433,63 @@ contract EcosystemUpgrade is Script {
         });
     }
 
+    function getStage2UpgradeCalls() public returns (Call[] memory calls) {
+        calls = new Call[](9);
+
+        // We need to firstly update all the contracts
+        calls[0] = Call({
+            target: config.contracts.transparentProxyAdmin,
+            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(payable(config.contracts.stateTransitionManagerAddress)), addresses.stateTransition.chainTypeManagerImplementation)),
+            value: 0
+        });
+        calls[1] = Call({
+            target: config.contracts.transparentProxyAdmin,
+            data: abi.encodeCall(ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(payable(config.contracts.bridgehubProxyAddress)), addresses.bridgehub.bridgehubImplementation, abi.encodeCall(Bridgehub.initializeV2, ()))),
+            value: 0
+        });
+        calls[2] = Call({
+            target: config.contracts.transparentProxyAdmin,
+            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(payable(config.contracts.oldSharedBridgeProxyAddress)), addresses.bridges.l1NullifierImplementation)),
+            value: 0
+        });
+        calls[3] = Call({
+            target: config.contracts.transparentProxyAdmin,
+            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(payable(config.contracts.legacyErc20BridgeAddress)), addresses.bridges.erc20BridgeImplementation)),
+            value: 0
+        });
+
+        // Now, updating chain creation params
+        calls[4] = Call({
+            target: config.contracts.stateTransitionManagerAddress,
+            data: abi.encodeCall(ChainTypeManager.setChainCreationParams, (prepareNewChainCreationParams())),
+            value: 0
+        });
+        calls[5] = Call({
+            target: config.contracts.stateTransitionManagerAddress,
+            data: abi.encodeCall(ChainTypeManager.setValidatorTimelock, (addresses.validatorTimelock)),
+            value: 0
+        });
+
+        // Now, we need to update the bridgehub
+        calls[6] = Call({
+            target: config.contracts.bridgehubProxyAddress,
+            data: abi.encodeCall(Bridgehub.setAddresses, (addresses.bridges.sharedBridgeProxy, CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy), MessageRoot(addresses.bridgehub.messageRootProxy))),
+            value: 0
+        });
+
+        // Setting the necessary params for the L1Nullifier contract
+        calls[7] = Call({
+            target: config.contracts.oldSharedBridgeProxyAddress,
+            data: abi.encodeCall(L1Nullifier.setL1NativeTokenVault, (L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy)))),
+            value: 0
+        });
+        calls[8] = Call({
+            target: config.contracts.oldSharedBridgeProxyAddress,
+            data: abi.encodeCall(L1Nullifier.setL1AssetRouter, (addresses.bridges.sharedBridgeProxy)),
+            value: 0
+        });
+    }
+
     function initializeConfig(string memory configPath) internal {
         string memory toml = vm.readFile(configPath);
 
@@ -483,6 +541,7 @@ contract EcosystemUpgrade is Script {
         config.contracts.oldSharedBridgeProxyAddress = toml.readAddress("$.contracts.old_shared_bridge_proxy_address");
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
         config.contracts.eraDiamondProxy = toml.readAddress("$.contracts.era_diamond_proxy");
+        config.contracts.legacyErc20BridgeAddress = toml.readAddress("$.contracts.legacy_erc20_bridge_address");
         // FIXME: value stored there is incorrect at the moment, figure out the correct value
         config.contracts.blobVersionedHashRetriever = toml.readAddress("$.contracts.blob_versioned_hash_retriever");
 
@@ -724,74 +783,6 @@ contract EcosystemUpgrade is Script {
         addresses.stateTransition.chainTypeManagerImplementation = contractAddress;
     }
 
-    // function deployChainTypeManagerProxy() internal {
-        
-
-    //     DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-    //         verifier: IVerifier(addresses.stateTransition.verifier),
-    //         verifierParams: verifierParams,
-    //         l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
-    //         l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
-    //         priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-    //         feeParams: feeParams,
-    //         blobVersionedHashRetriever: config.contracts.blobVersionedHashRetriever
-    //     });
-
-    //     Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-    //         facetCuts: facetCuts,
-    //         initAddress: addresses.stateTransition.diamondInit,
-    //         initCalldata: abi.encode(initializeData)
-    //     });
-
-    //     generatedData.diamondCutData = abi.encode(diamondCut);
-
-    //     ChainCreationParams memory chainCreationParams = ChainCreationParams({
-    //         genesisUpgrade: addresses.stateTransition.genesisUpgrade,
-    //         genesisBatchHash: config.contracts.genesisRoot,
-    //         genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
-    //         genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-    //         diamondCut: diamondCut,
-    //         forceDeploymentsData: generatedData.forceDeploymentsData
-    //     });
-
-    //     ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-    //         owner: msg.sender,
-    //         validatorTimelock: addresses.validatorTimelock,
-    //         chainCreationParams: chainCreationParams,
-    //         protocolVersion: config.contracts.latestProtocolVersion
-    //     });
-
-    //     // TODO: somehow use the data generated here
-    // }
-
-    // function registerChainTypeManager() internal {
-    //     Bridgehub bridgehub = Bridgehub(config.contracts.bridgehubProxyAddress);
-    //     vm.startBroadcast(msg.sender);
-    //     bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
-    //     console.log("ChainTypeManager registered");
-    //     CTMDeploymentTracker ctmDT = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-    //     // vm.startBroadcast(msg.sender);
-    //     L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
-    //     sharedBridge.setAssetDeploymentTracker(
-    //         bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
-    //         address(ctmDT)
-    //     );
-    //     console.log("CTM DT whitelisted");
-
-    //     ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);
-    //     vm.stopBroadcast();
-    //     console.log("CTM registered in CTMDeploymentTracker");
-
-    //     bytes32 assetId = bridgehub.ctmAssetId(addresses.stateTransition.chainTypeManagerProxy);
-    //     // console.log(address(bridgehub.ctmDeployer()), addresses.bridgehub.ctmDeploymentTrackerProxy);
-    //     // console.log(address(bridgehub.ctmDeployer().BRIDGE_HUB()), config.contracts.bridgehubProxyAddress);
-    //     console.log(
-    //         "CTM in router 1",
-    //         sharedBridge.assetHandlerAddress(assetId),
-    //         bridgehub.ctmAssetIdToAddress(assetId)
-    //     );
-    // }
-
     function setChainTypeManagerInValidatorTimelock() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
         vm.broadcast(msg.sender);
@@ -802,6 +793,7 @@ contract EcosystemUpgrade is Script {
     function deploySharedBridgeContracts() internal {
         deploySharedBridgeImplementation();
         deploySharedBridgeProxy();
+        setL1LegacyBridge();
     }
 
     function deployL1NullifierContracts() internal {
@@ -848,19 +840,10 @@ contract EcosystemUpgrade is Script {
         addresses.bridges.sharedBridgeProxy = contractAddress;
     }
 
-    // function setBridgehubParams() internal {
-    //     Bridgehub bridgehub = Bridgehub(config.contracts.bridgehubProxyAddress);
-    //     vm.startBroadcast(msg.sender);
-    //     bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
-    //     // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
-    //     bridgehub.setAddresses(
-    //         addresses.bridges.sharedBridgeProxy,
-    //         ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-    //         IMessageRoot(addresses.bridgehub.messageRootProxy)
-    //     );
-    //     vm.stopBroadcast();
-    //     console.log("SharedBridge registered");
-    // }
+    function setL1LegacyBridge() internal {
+        vm.broadcast(msg.sender);
+        L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress));
+    }
 
     function deployErc20BridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
@@ -972,6 +955,74 @@ contract EcosystemUpgrade is Script {
 
         vm.stopBroadcast();
         console.log("Owners updated");
+    }
+
+    function prepareNewChainCreationParams() internal returns (ChainCreationParams memory chainCreationParams) {
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: addresses.stateTransition.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: addresses.stateTransition.gettersFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
+        });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: addresses.stateTransition.mailboxFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+        });
+        facetCuts[3] = Diamond.FacetCut({
+            facet: addresses.stateTransition.executorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
+        });
+
+        VerifierParams memory verifierParams = VerifierParams({
+            recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
+            recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
+            recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
+        });
+
+        FeeParams memory feeParams = FeeParams({
+            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
+            batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
+            maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
+            maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
+            priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
+            minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
+        });
+
+        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
+            verifier: IVerifier(addresses.stateTransition.verifier),
+            verifierParams: verifierParams,
+            l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
+            l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+            priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
+            feeParams: feeParams,
+            blobVersionedHashRetriever: config.contracts.blobVersionedHashRetriever
+        });
+
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: addresses.stateTransition.diamondInit,
+            initCalldata: abi.encode(initializeData)
+        });
+
+        chainCreationParams = ChainCreationParams({
+            genesisUpgrade: addresses.stateTransition.genesisUpgrade,
+            genesisBatchHash: config.contracts.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+            diamondCut: diamondCut,
+            forceDeploymentsData: generatedData.forceDeploymentsData
+        });
     }
 
     function saveOutput(string memory outputPath) internal {

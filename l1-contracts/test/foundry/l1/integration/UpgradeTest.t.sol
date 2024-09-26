@@ -39,6 +39,7 @@ contract UpgradeTest is Test {
         // and also updated the chain admin.
         // IMPORTANT: for erc20-based chains with token multiplier setter
         // this should be coordinated with the server.
+        // FIXME: use temporary contract an owner to prevent front-running
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(
             ECOSYSTEM_INPUT,
@@ -53,9 +54,6 @@ contract UpgradeTest is Test {
         // Stage 1 of the upgrade:
         // - accept all the ownerships of the contracts
         // - set the new upgrade data for chains + update validator timelock.
-
-        // FIXME: how do we prevent the initial owner from front-running and changing
-        // the address of the new owner?
         Call[] memory stage1Calls = mergeCalls(
             generateUpgradeData.provideAcceptOwnershipCalls(),
             generateUpgradeData.provideSetNewVersionUpgradeCall()
@@ -69,10 +67,27 @@ contract UpgradeTest is Test {
 
         // Now, the admin of the Era needs to call the upgrade function.
         // We do not include calls that ensure that the server is ready for the sake of brevity.
+        // FIXME: the upgrade does not yet change the timelock, please fix it.
+        // FIXME: we do not yet upgrade the L2 legacy bridge, please fix it.
         chainUpgrade.upgradeChain(
             generateUpgradeData.getOldProtocolVersion(),
             generateUpgradeData.getChainUpgradeInfo()
         );
+
+        // TODO: here we should include tests that depoists work for upgraded chains
+        // including era specific deposit/withdraw functions
+        // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
+
+        // This does not affect the tests, but for visibility that we will wait for 7 days.
+        vm.warp(7 days);
+
+        console.log("Starting stage2 of the upgrade!");
+        governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());
+
+        // TODO: here we should have tests that the bridging works for the previously deployed chains
+        // and that it does not work for those that did not upgrade.
+        // TODO: test that creation of new chains works under new conditions.
+        // TODO: if not hard, include test for deploying a gateway and migrating Era to it.
     }
 
     /// @dev This is a contract that is used for additional visibility of transactions
