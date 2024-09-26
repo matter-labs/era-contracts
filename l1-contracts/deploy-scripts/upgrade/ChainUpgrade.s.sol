@@ -13,6 +13,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 interface LegacyChainAdmin {
     function owner() external view returns (address);
@@ -74,6 +75,19 @@ contract ChainUpgrade  is Script {
         governanceMoveToNewChainAdmin();
 
         saveOutput(outputPath);
+    }
+
+    function upgradeChain(
+        uint256 oldProtocolVersion, 
+        Diamond.DiamondCutData memory upgradeCutData
+    ) public {
+        Utils.adminExecute(
+            output.chainAdmin, 
+            output.accessControlRestriction, 
+            config.chainDiamondProxyAddress, 
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            0
+        );
     }
     
     function initializeConfig(

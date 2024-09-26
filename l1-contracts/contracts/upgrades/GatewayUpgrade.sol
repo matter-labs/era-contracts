@@ -83,8 +83,6 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
-        // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(this), "GatewayUpgrade: upgradeExternal");
         super.upgrade(_proposedUpgrade);
     }
 }

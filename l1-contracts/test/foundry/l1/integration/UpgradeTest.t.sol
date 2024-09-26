@@ -28,6 +28,7 @@ contract UpgradeTest is Test {
     }
 
     function test_MainnetFork() public {
+        console.log("Preparing ecosystem contracts");
         // Firstly, we deploy all the contracts. 
         generateUpgradeData.prepareEcosystemContracts(
             ECOSYSTEM_INPUT,
@@ -38,6 +39,7 @@ contract UpgradeTest is Test {
         // and also updated the chain admin.
         // IMPORTANT: for erc20-based chains with token multiplier setter
         // this should be coordinated with the server.
+        console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(
             ECOSYSTEM_INPUT,
             ECOSYSTEM_OUTPUT,
@@ -45,15 +47,32 @@ contract UpgradeTest is Test {
             CHAIN_OUTPUT
         );
 
+        console.log("Starting stage1 of the upgrade!");
         // Now, some time has passed and we are ready to start the upgrade of the 
         // ecosystem.
         // Stage 1 of the upgrade:
         // - accept all the ownerships of the contracts
-        // - set the new upgrade data for chains
+        // - set the new upgrade data for chains + update validator timelock.
 
         // FIXME: how do we prevent the initial owner from front-running and changing
         // the address of the new owner?
-        governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.provideAcceptOwnershipCalls());
+        Call[] memory stage1Calls = mergeCalls(
+            generateUpgradeData.provideAcceptOwnershipCalls(),
+            generateUpgradeData.provideSetNewVersionUpgradeCall()
+        );
+
+        governanceMulticall(generateUpgradeData.getOwnerAddress(), stage1Calls);
+
+        console.log("Stage1 is done, now all the chains have to upgrade to the new version");
+
+        console.log("Upgrading Era");
+
+        // Now, the admin of the Era needs to call the upgrade function.
+        // We do not include calls that ensure that the server is ready for the sake of brevity.
+        chainUpgrade.upgradeChain(
+            generateUpgradeData.getOldProtocolVersion(),
+            generateUpgradeData.getChainUpgradeInfo()
+        );
     }
 
     /// @dev This is a contract that is used for additional visibility of transactions
@@ -70,5 +89,15 @@ contract UpgradeTest is Test {
         }
 
         vm.stopBroadcast();
+    }
+
+    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
+        result = new Call[](a.length + b.length);
+        for (uint256 i = 0; i < a.length; i++) {
+            result[i] = a[i];
+        }
+        for (uint256 i = 0; i < b.length; i++) {
+            result[a.length + i] = b[i];
+        }
     }
 }

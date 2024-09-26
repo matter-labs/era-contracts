@@ -68,7 +68,6 @@ import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 
-
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -302,7 +301,7 @@ contract EcosystemUpgrade is Script {
         facetCuts = new Diamond.FacetCut[](facets.length);
         for (uint i = 0; i < facets.length; i++) {
             facetCuts[i] = Diamond.FacetCut({
-                facet: facets[i].addr,
+                facet: address(0),
                 action: Diamond.Action.Remove,
                 isFreezable: false,
                 selectors: facets[i].selectors
@@ -336,7 +335,31 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function getChainUpgradeInfo() public {
+    function getNewProtocolVersion() public returns (uint256) {
+        return 0x1900000000;
+    }
+
+    function getOldProtocolVersion() public returns (uint256) {
+        return 0x1800000002;
+    }
+
+    function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
+        // Just retrieved it from the contract
+        uint256 PREVIOUS_PROTOCOL_VERSION = getOldProtocolVersion();
+        // TODO: Is it ok to provide a deadline here?
+        uint256 DEADLINE = 0;
+        uint256 NEW_PROTOCOL_VERSION = getNewProtocolVersion();
+        Call memory call = Call({
+            target: config.contracts.stateTransitionManagerAddress,
+            data: abi.encodeCall(ChainTypeManager.setNewVersionUpgrade, (getChainUpgradeInfo(), PREVIOUS_PROTOCOL_VERSION, DEADLINE, NEW_PROTOCOL_VERSION)),
+            value: 0
+        });
+
+        calls = new Call[](1);
+        calls[0] = call;
+    }
+
+    function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData)  {
         Diamond.FacetCut[] memory deletedFacets = _getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](deletedFacets.length + 4);
@@ -402,10 +425,10 @@ contract EcosystemUpgrade is Script {
             newProtocolVersion: 0x1900000000
         });
 
-        Diamond.DiamondCutData memory upgradeCutData = Diamond.DiamondCutData({
+        upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: addresses.gatewayUpgrade,
-            initCalldata: abi.encode(proposedUpgrade)
+            initCalldata: abi.encodeCall(GatewayUpgrade.upgrade, (proposedUpgrade))
         });
     }
 
