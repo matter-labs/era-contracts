@@ -1758,10 +1758,6 @@ export class Deployer {
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
     }
-<<<<<<< HEAD
-    const validiumValidatorBytecode = await this.loadFromDAFolder("LayerNameL1DAValidator");
-=======
->>>>>>> d5afbdf878995b192fd0a1c1874cce1b5d73b7b9
     const validiumDAValidatorAddress = await this.deployViaCreate2(
       "LayerNameL1DAValidator",
       [],
