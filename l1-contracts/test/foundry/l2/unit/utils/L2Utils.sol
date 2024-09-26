@@ -5,15 +5,31 @@ pragma solidity ^0.8.20;
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
+struct SystemContractsArgs {
+    uint256 l1ChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    address legacySharedBridge;
+    address l2TokenBeacon;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedOwner;
+    bool contractsDeployedAlready;
+}
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -23,6 +39,7 @@ library L2Utils {
 
     string internal constant L2_ASSET_ROUTER_PATH = "./zkout/L2AssetRouter.sol/L2AssetRouter.json";
     string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json";
+    string internal constant BRIDGEHUB_PATH = "./zkout/Bridgehub.sol/Bridgehub.json";
 
     /// @notice Returns the bytecode of a given era contract from a `zkout` folder.
     function readEraBytecode(string memory _filename) internal returns (bytes memory bytecode) {
@@ -54,9 +71,33 @@ library L2Utils {
      * @dev Initializes the system contracts.
      * @dev It is a hack needed to make the tests be able to call system contracts directly.
      */
-    function initSystemContracts() internal {
+    function initSystemContracts(SystemContractsArgs memory _args) internal {
         bytes memory contractDeployerBytecode = readSystemContractsBytecode("ContractDeployer");
         vm.etch(DEPLOYER_SYSTEM_CONTRACT, contractDeployerBytecode);
+        forceDeploySystemContracts(_args);
+    }
+
+    function forceDeploySystemContracts(
+        SystemContractsArgs memory _args
+    ) internal {
+        forceDeployBridgehub(_args.l1ChainId, _args.eraChainId, _args.aliasedOwner, _args.l1AssetRouter, _args.legacySharedBridge);
+        forceDeployAssetRouter(_args.l1ChainId, _args.eraChainId, _args.aliasedOwner,_args.l1AssetRouter, _args.legacySharedBridge);
+        forceDeployNativeTokenVault(_args.l1ChainId, _args.aliasedOwner, _args.l2TokenProxyBytecodeHash, _args.legacySharedBridge, _args.l2TokenBeacon, _args.contractsDeployedAlready);
+    }
+
+    function forceDeployBridgehub(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _aliasedOwner,
+        address _l1AssetRouter,
+        address _legacySharedBridge
+    ) internal {
+        new Bridgehub(_l1ChainId, _aliasedOwner, 100);
+        forceDeployWithConstructor("Bridgehub", L2_BRIDGEHUB_ADDR, abi.encode(_l1ChainId, _aliasedOwner, 100));
+        Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
+        address l1CTMDeployer = address(0x1);
+        vm.prank(_aliasedOwner);
+        bridgehub.setAddresses(L2_ASSET_ROUTER_ADDR, ICTMDeploymentTracker(l1CTMDeployer), IMessageRoot(L2_MESSAGE_ROOT_ADDR));
     }
 
     /// @notice Deploys the L2AssetRouter contract.
@@ -76,22 +117,8 @@ library L2Utils {
         {
             new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner);
         }
+        forceDeployWithConstructor("L2AssetRouter", L2_ASSET_ROUTER_ADDR, abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner));
 
-        bytes memory bytecode = readEraBytecode("L2AssetRouter");
-
-        bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
-
-        IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
-        deployments[0] = IContractDeployer.ForceDeployment({
-            bytecodeHash: bytecodehash,
-            newAddress: L2_ASSET_ROUTER_ADDR,
-            callConstructor: true,
-            value: 0,
-            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner)
-        });
-
-        vm.prank(L2_FORCE_DEPLOYER_ADDR);
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(deployments);
     }
 
     /// @notice Deploys the L2NativeTokenVault contract.
@@ -123,32 +150,55 @@ library L2Utils {
                 _baseTokenAssetId: ethAssetId
             });
         }
+        forceDeployWithConstructor("L2NativeTokenVault", L2_NATIVE_TOKEN_VAULT_ADDR, abi.encode(_l1ChainId, _aliasedOwner, _l2TokenProxyBytecodeHash, _legacySharedBridge, _l2TokenBeacon, _contractsDeployedAlready, address(0), ethAssetId));
+    }
 
-        bytes memory bytecode = readEraBytecode("L2NativeTokenVault");
+    function forceDeployWithConstructor(
+        string memory _contractName,
+        address _address,
+        bytes memory _constuctorArgs
+    ) public {
+        bytes memory bytecode = readEraBytecode(_contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
         deployments[0] = IContractDeployer.ForceDeployment({
             bytecodeHash: bytecodehash,
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
+            newAddress: _address,
             callConstructor: true,
             value: 0,
-            // solhint-disable-next-line func-named-parameters
-            input: abi.encode(
-                _l1ChainId,
-                _aliasedOwner,
-                _l2TokenProxyBytecodeHash,
-                _legacySharedBridge,
-                _l2TokenBeacon,
-                _contractsDeployedAlready,
-                address(0),
-                ethAssetId
-            )
+            input: _constuctorArgs
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(deployments);
+    }
+
+    function deploySharedBridgeLegacy(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _aliasedOwner,
+        address _l1SharedBridge,
+        bytes32 _l2TokenProxyBytecodeHash
+    ) internal returns (address) {
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+
+        L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
+        console.log("bridge", address(bridge));
+        address proxyAdmin = address(0x1);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(bridge),
+            proxyAdmin,
+            abi.encodeWithSelector(
+                L2SharedBridgeLegacy.initialize.selector,
+                _l1SharedBridge,
+                _l2TokenProxyBytecodeHash,
+                _aliasedOwner
+            )
+        );
+        console.log("proxy", address(proxy));
+        return address(proxy);
     }
 
     /// @notice Encodes the token data.
