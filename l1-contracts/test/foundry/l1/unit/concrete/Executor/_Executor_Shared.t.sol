@@ -150,6 +150,8 @@ contract ExecutorTest is Test {
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 
+        dummyBridgehub.setSharedBridge(address(sharedBridge));
+
         vm.mockCall(
             address(messageRoot),
             abi.encodeWithSelector(MessageRoot.addChainBatchRoot.selector, 9, 1, bytes32(0)),

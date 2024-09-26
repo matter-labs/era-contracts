@@ -153,11 +153,6 @@ contract ChainTypeManagerTest is Test {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
-        address sharedBridge_ = bridgehub.sharedBridge();
-        address legacySharedBridge_ = L1AssetRouter(sharedBridge).l2BridgeAddress(chainId);
-
-        console.log("legacySharedBridge_", legacySharedBridge_);
-
         vm.stopPrank();
         vm.startPrank(address(bridgehub));
 
