@@ -196,6 +196,7 @@ contract EcosystemUpgrade is Script {
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
 
+        address oldValidatorTimelock;
         address legacyErc20BridgeAddress;
         address bridgehubProxyAddress;
         address oldSharedBridgeProxyAddress;
@@ -411,7 +412,9 @@ contract EcosystemUpgrade is Script {
             baseForceDeployments: baseForceDeployments,
             ctmDeployer: ctmDeployer,
             fixedForceDeploymentsData: generatedData.forceDeploymentsData,
-            l2GatewayUpgrade: addresses.expectedL2Addresses.expectedL2GatewayUpgrade
+            l2GatewayUpgrade: addresses.expectedL2Addresses.expectedL2GatewayUpgrade,
+            oldValidatorTimelock: config.contracts.oldValidatorTimelock,
+            newValidatorTimelock: addresses.validatorTimelock
         });
 
         bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput); 
@@ -547,6 +550,7 @@ contract EcosystemUpgrade is Script {
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
         config.contracts.eraDiamondProxy = toml.readAddress("$.contracts.era_diamond_proxy");
         config.contracts.legacyErc20BridgeAddress = toml.readAddress("$.contracts.legacy_erc20_bridge_address");
+        config.contracts.oldValidatorTimelock = toml.readAddress("$.contracts.old_validator_timelock");
         // FIXME: value stored there is incorrect at the moment, figure out the correct value
         config.contracts.blobVersionedHashRetriever = toml.readAddress("$.contracts.blob_versioned_hash_retriever");
 

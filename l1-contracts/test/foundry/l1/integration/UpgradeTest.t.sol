@@ -30,7 +30,6 @@ contract UpgradeTest is Test {
     function test_MainnetFork() public {
         console.log("Preparing ecosystem contracts");
         // Firstly, we deploy all the contracts. 
-        // FIXME: use temporary contract an owner to prevent front-running
         generateUpgradeData.prepareEcosystemContracts(
             ECOSYSTEM_INPUT,
             ECOSYSTEM_OUTPUT

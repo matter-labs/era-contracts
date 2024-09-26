@@ -28,6 +28,8 @@ struct GatewayUpgradeEncodedInput {
     address ctmDeployer;
     bytes fixedForceDeploymentsData;
     address l2GatewayUpgrade;
+    address oldValidatorTimelock;
+    address newValidatorTimelock;
 }
 
 /// @author Matter Labs
@@ -52,6 +54,8 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
 
         s.baseTokenAssetId = baseTokenAssetId;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
+        s.validators[encodedInput.oldValidatorTimelock] = false;
+        s.validators[encodedInput.newValidatorTimelock] = true;
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
         address sharedBridge = bridgehub.sharedBridge();
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
