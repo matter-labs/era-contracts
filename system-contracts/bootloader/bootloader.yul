@@ -922,7 +922,6 @@ object "Bootloader" {
                 debugLog("Verify XL2 Tx 4", mload(add(merkleProofPtr, 32)))
                 debugLog("Verify XL2 Tx 4", mload(add(merkleProofPtr, 64)))
                 debugLog("Verify XL2 Tx 5", mload(add(merkleProofPtr, 96)))
-                debugLog("KL todo", 1)
 
                 let success := call(
                     gas(),
@@ -934,7 +933,6 @@ object "Bootloader" {
                     0,
                     64
                 )
-                debugLog("KL todo 2", 1)
                 debugLog("kl todo", sub(mload(merkleProofPtr), 28))
 
                 if iszero(success) {

@@ -10,6 +10,16 @@ import {UncheckedMath} from "./UncheckedMath.sol";
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
 
+struct ProofVerificationResult {
+    uint256 settlementLayerChainId;
+    uint256 settlementLayerBatchNumber;
+    uint256 settlementLayerBatchRootMask;
+    uint256 batchLeafProofLen;
+    bytes32 batchSettlementRoot;
+    bytes32 chainIdLeaf;
+    uint256 ptr;
+}
+
 library MessageHashing {
     using UncheckedMath for uint256;
 
@@ -28,7 +38,7 @@ library MessageHashing {
     }
 
     function parseProofMetadata(
-        bytes32[] calldata _proof
+        bytes32[] memory _proof
     ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
         bytes32 proofMetadata = _proof[0];
 
@@ -68,22 +78,12 @@ library MessageHashing {
         }
     }
 
-    struct ProofVerificationResult {
-        uint256 settlementLayerChainId;
-        uint256 settlementLayerBatchNumber;
-        uint256 settlementLayerBatchRootMask;
-        uint256 batchLeafProofLen;
-        bytes32 batchSettlementRoot;
-        bytes32 chainIdLeaf;
-        uint256 ptr;
-    }
-
     function hashProof(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
-        bytes32[] calldata _proof
+        bytes32[] memory _proof
     ) internal pure returns (ProofVerificationResult memory result) {
         if (_proof.length == 0) {
             revert MerklePathEmpty();
@@ -147,7 +147,7 @@ library MessageHashing {
     }
 
     function extractSlice(
-        bytes32[] calldata _proof,
+        bytes32[] memory _proof,
         uint256 _left,
         uint256 _right
     ) internal pure returns (bytes32[] memory slice) {
@@ -160,7 +160,7 @@ library MessageHashing {
     /// @notice Extracts slice until the end of the array.
     /// @dev It is used in one place in order to circumvent the stack too deep error.
     function extractSliceUntilEnd(
-        bytes32[] calldata _proof,
+        bytes32[] memory _proof,
         uint256 _start
     ) internal pure returns (bytes32[] memory slice) {
         slice = extractSlice(_proof, _start, _proof.length);

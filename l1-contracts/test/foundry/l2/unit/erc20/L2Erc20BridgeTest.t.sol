@@ -18,7 +18,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-import {L2Utils} from "../utils/L2Utils.sol";
+import {L2Utils, SystemContractsArgs} from "../utils/L2Utils.sol";
 
 contract L2Erc20BridgeTest is Test {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -59,7 +59,6 @@ contract L2Erc20BridgeTest is Test {
             beaconProxyBytecodeHash := extcodehash(beaconProxy)
         }
 
-        L2Utils.initSystemContracts();
         address l2SharedBridge = L2Utils.deploySharedBridgeLegacy(
             L1_CHAIN_ID,
             ERA_CHAIN_ID,
@@ -67,15 +66,17 @@ contract L2Erc20BridgeTest is Test {
             l1BridgeWallet,
             beaconProxyBytecodeHash
         );
-        L2Utils.forceDeployAssetRouter(L1_CHAIN_ID, ERA_CHAIN_ID, ownerWallet, l1BridgeWallet, l2SharedBridge);
-        L2Utils.forceDeployNativeTokenVault({
-            _l1ChainId: L1_CHAIN_ID,
-            _aliasedOwner: ownerWallet,
-            _l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
-            _legacySharedBridge: l2SharedBridge,
-            _l2TokenBeacon: address(beacon),
-            _contractsDeployedAlready: true
-        });
+        L2Utils.initSystemContracts(SystemContractsArgs({
+            l1ChainId: L1_CHAIN_ID,
+            eraChainId: ERA_CHAIN_ID,
+            l1AssetRouter: L2_ASSET_ROUTER_ADDR,
+            legacySharedBridge: l2SharedBridge,
+            l2TokenBeacon: address(beacon),
+            l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
+            aliasedOwner: ownerWallet,
+            contractsDeployedAlready: true
+        }));
+
     }
 
     function performDeposit(address depositor, address receiver, uint256 amount) internal {

@@ -10,6 +10,16 @@ import {UncheckedMath} from "./UncheckedMath.sol";
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
 
+struct ProofVerificationResult {
+    uint256 settlementLayerChainId;
+    uint256 settlementLayerBatchNumber;
+    uint256 settlementLayerBatchRootMask;
+    uint256 batchLeafProofLen;
+    bytes32 batchSettlementRoot;
+    bytes32 chainIdLeaf;
+    uint256 ptr;
+}
+
 library MessageHashing {
     using UncheckedMath for uint256;
 
@@ -66,16 +76,6 @@ library MessageHashing {
             logLeafProofLen = _proof.length;
             batchLeafProofLen = 0;
         }
-    }
-
-    struct ProofVerificationResult {
-        uint256 settlementLayerChainId;
-        uint256 settlementLayerBatchNumber;
-        uint256 settlementLayerBatchRootMask;
-        uint256 batchLeafProofLen;
-        bytes32 batchSettlementRoot;
-        bytes32 chainIdLeaf;
-        uint256 ptr;
     }
 
     function hashProof(

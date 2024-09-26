@@ -16,7 +16,7 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
+import {MessageHashing, ProofVerificationResult} from "../../../common/libraries/MessageHashing.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
@@ -145,7 +145,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        MessageHashing.ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
+        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
             s.chainId,
             _batchNumber,
             _leafProofMask,

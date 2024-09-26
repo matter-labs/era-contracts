@@ -11,7 +11,6 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -456,7 +455,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) { // kl todo 
                 if (msg.value != _request.mintValue) {
                     revert MsgValueMismatch(_request.mintValue, msg.value);
                 }
@@ -467,7 +466,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
+            IAssetRouterBase(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -513,7 +512,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) { // kl todo 
                 if (msg.value != _request.mintValue + _request.secondBridgeValue) {
                     revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
                 }
@@ -524,9 +523,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 }
                 baseTokenMsgValue = 0;
             }
-
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IAssetRouterBase(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -535,7 +533,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IAssetRouterBase(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -563,7 +561,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+        IAssetRouterBase(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
             _request.chainId,
             outputRequest.txDataHash,
             canonicalTxHash
