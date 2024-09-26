@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {Test} from "forge-std/Test.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -24,6 +25,9 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
@@ -46,6 +50,15 @@ contract ChainTypeManagerTest is Test {
 
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
+        vm.prank(governor);
+        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeCall(L1AssetRouter.l2BridgeAddress, (chainId)),
+            abi.encode(makeAddr("l2BridgeAddress"))
+        );
+
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
@@ -140,6 +153,11 @@ contract ChainTypeManagerTest is Test {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
+        address sharedBridge_ = bridgehub.sharedBridge();
+        address legacySharedBridge_ = L1AssetRouter(sharedBridge).l2BridgeAddress(chainId);
+
+        console.log("legacySharedBridge_", legacySharedBridge_);
+
         vm.stopPrank();
         vm.startPrank(address(bridgehub));
 
