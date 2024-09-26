@@ -85,25 +85,31 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
         }
     }
 
-    function publishEVMBytecode(bytes calldata bytecode) external onlyCallFrom(address(DEPLOYER_SYSTEM_CONTRACT)) {
+    function publishEVMBytecode(
+        bytes calldata paddedBytecode
+    ) external payable onlyCallFrom(address(DEPLOYER_SYSTEM_CONTRACT)) returns (bytes32) {
         /*
             TODO: ensure that it is properly padded, etc.
             To preserve EVM compatibility, we can not emit any events here.
         */
 
-        bytes32 hash = Utils.hashEVMBytecode(bytecode);
+        // ToDO: use efficient call
+        bytes32 vesionedBytecodeHash = Utils.hashEVMBytecode(paddedBytecode);
 
-        bool isCodeUnknown = getMarker(hash) == 0;
-
-        if (isCodeUnknown) {
+        if (getMarker(vesionedBytecodeHash) == 0) {
             // ToDO: use efficient call
-            L1_MESSENGER_CONTRACT.sendToL1(bytecode);
+            L1_MESSENGER_CONTRACT.sendToL1(paddedBytecode);
 
             assembly {
-                sstore(hash, 1)
+                sstore(vesionedBytecodeHash, 1)
             }
+
+            emit MarkedAsKnown(vesionedBytecodeHash, true);
         }
 
-        emit MarkedAsKnown(hash, isCodeUnknown);
+        assembly {
+            mstore(0x0, vesionedBytecodeHash)
+            return(0x0, 0x20)
+        }
     }
 }

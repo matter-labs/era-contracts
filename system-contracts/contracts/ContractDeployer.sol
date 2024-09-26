@@ -28,13 +28,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
 
-    enum EvmContractState {
-        None,
-        ConstructorPending,
-        ConstructorCalled,
-        Deployed
-    }
-
     uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
     uint256 private constant CONSTRUCTOR_RETURN_GAS_SLOT = 1;
 
@@ -379,24 +372,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         });
     }
 
-    function convertToConstructorEVMInput(bytes calldata _input) internal pure returns (bytes memory) {
-        // With how the contracts work, the calldata to the constructor must be an ABI-encoded `bytes`.
-        // This means that it should also contain offset as well as length
-        uint256 _fullLength = _input.length;
-        bytes memory extendedInput = new bytes(_input.length + 64);
-
-        assembly {
-            // "Offset" for the calldata
-            mstore(add(extendedInput, 0x20), 0x20)
-            // "Length"
-            mstore(add(extendedInput, 0x40), _fullLength)
-
-            calldatacopy(add(extendedInput, 0x60), _input.offset, _fullLength)
-        }
-
-        return extendedInput;
-    }
-
     /// @notice Deploy a certain bytecode on the address.
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _aaVersion The version of the account abstraction protocol to use.
@@ -529,16 +504,13 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             mstore(paddedBytecode, sub(dataLen, 0x20))
         }
 
-        // ToDO: use efficient call
-        bytes32 versionedCodeHash = Utils.hashEVMBytecode(paddedBytecode);
-
-        KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedBytecode);
+        bytes32 versionedCodeHash = KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedBytecode);
         ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, versionedCodeHash);
 
-        bytes32 evmBytecodeHash;        
+        bytes32 evmBytecodeHash;
         assembly {
-             let bytecodeLen := mload(add(paddedBytecode, 0x20))
-             evmBytecodeHash := keccak256(add(paddedBytecode, 0x40), bytecodeLen)
+            let bytecodeLen := mload(add(paddedBytecode, 0x20))
+            evmBytecodeHash := keccak256(add(paddedBytecode, 0x40), bytecodeLen)
         }
 
         _setEvmCodeHash(_newAddress, evmBytecodeHash);
