@@ -782,6 +782,10 @@ library Utils {
         bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
     }
 
+    function readValidiumDAValidatorBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/LayerNameL1DAValidator.sol/LayerNameL1DAValidator.json");
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }

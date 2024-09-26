@@ -54,7 +54,6 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
-import {LayerNameL1DAValidator} from "../../da-contracts/contracts/da-layers/LayerNameL1DAValidator.sol";
 
     struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -385,7 +384,7 @@ contract DeployL1Script is Script {
         console.log("L1RollupDAValidator deployed at:", contractAddress);
         addresses.daAddresses.l1RollupDAValidator = contractAddress;
 
-        contractAddress = deployViaCreate2(type(LayerNameL1DAValidator).creationCode);
+        contractAddress = deployViaCreate2(Utils.readValidiumDAValidatorBytecode());
         console.log("L1ValidiumDAValidator deployed at:", contractAddress);
         addresses.daAddresses.l1ValidiumDAValidator = contractAddress;
     }
