@@ -252,7 +252,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             }
             _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (_depositAmount != amount) {
-                revert ValueMismatch(amount, msg.value);
+                revert ValueMismatch(_depositAmount, amount);
             }
         } else {
             // The Bridgehub also checks this, but we want to be sure
