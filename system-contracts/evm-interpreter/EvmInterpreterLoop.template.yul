@@ -1402,8 +1402,9 @@ for { } true { } {
         size, sp := popStackItemWithoutCheck(sp)
 
         checkOverflow(offset,size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset,size), evmGasLeft)
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+        checkMemOverflowByOffset(add(offset,size), evmGasLeft)
 
         returnLen := size
         
