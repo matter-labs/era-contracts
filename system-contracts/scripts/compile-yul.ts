@@ -24,7 +24,7 @@ export async function compileYul(paths: CompilerPaths, file: string) {
 
   const zksolcLocation = await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
   await spawn(
-    `${zksolcLocation} ${paths.absolutePathSources}/${file} --solc ${solcCompilerPath} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
+    `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
   );
 }
 
