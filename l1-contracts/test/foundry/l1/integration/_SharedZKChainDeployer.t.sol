@@ -13,6 +13,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
+import {Config as ChainConfig} from "deploy-scripts/RegisterZKChain.s.sol";
+
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 
@@ -28,6 +30,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
     }
+
+    ChainConfig internal eraConfig;
 
     uint256 currentZKChainId = 10;
     uint256 eraZKChainId = 9;
@@ -47,6 +51,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         vm.warp(100);
         deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
+        eraConfig = deployScript.getConfig();
     }
 
     function _deployZKChain(address _baseToken) internal {

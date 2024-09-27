@@ -39,8 +39,6 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
-import {DeployedAddresses} from "deploy-scripts/DeployL1.s.sol";
-
 contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -244,6 +242,12 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
     }
 
     function test_migrateBackChain() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
         migrateBackChain();
     }
 
@@ -256,7 +260,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         bridgehub.registerSettlementLayer(gatewayChainId, true);
         vm.stopBroadcast();
 
-        bytes32 baseTokenAssetId = keccak256("baseTokenAssetId");
+        bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
 
         uint256 currentChainId = block.chainid;
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
@@ -277,15 +281,13 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
             abi.encode(chainTypeManager.protocolVersion())
         );
 
-        // bytes memory initialDiamondCut = getInitialDiamondCutData();
-        // gatewayScript.
         gatewayScript.finishMigrateChainFromGateway(migratingChain, migratingChainId, gatewayChainId);
 
         vm.chainId(currentChainId);
 
-        assertEq(bridgehub.baseTokenAssetId(mintChainId), baseTokenAssetId);
-        IZKChain mintedZKChain = IZKChain(bridgehub.getZKChain(mintChainId));
-        assertEq(mintedZKChain.getBaseTokenAssetId(), baseTokenAssetId);
+        assertEq(bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
+        IZKChain migratingChainContract = IZKChain(bridgehub.getZKChain(migratingChainId));
+        assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
     }
 
     // add this to be excluded from coverage report

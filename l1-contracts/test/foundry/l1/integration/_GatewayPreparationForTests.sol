@@ -35,6 +35,7 @@ contract GatewayPreparationForTests is GatewayPreparation {
         config.gatewayAccessControlRestriction = toml.readAddress(
             "$.deployed_addresses.access_control_restriction_addr"
         );
+        config.l1NullifierProxy = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
 
         console.log("chain chain id = ", config.gatewayChainId);
 

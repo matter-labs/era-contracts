@@ -32,6 +32,21 @@ import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
+// solhint-disable-next-line gas-struct-packing
+struct Config {
+    address bridgehub;
+    address ctmDeploymentTracker;
+    address chainTypeManagerProxy;
+    address sharedBridgeProxy;
+    address governance;
+    uint256 gatewayChainId;
+    address gatewayChainAdmin;
+    address gatewayAccessControlRestriction;
+    address gatewayChainProxyAdmin;
+    address l1NullifierProxy;
+    bytes gatewayDiamondCutData;
+}
+
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayPreparation is Script {
     using stdToml for string;
@@ -41,21 +56,6 @@ contract GatewayPreparation is Script {
 
     address deployerAddress;
     uint256 l1ChainId;
-
-    // solhint-disable-next-line gas-struct-packing
-    struct Config {
-        address bridgehub;
-        address ctmDeploymentTracker;
-        address chainTypeManagerProxy;
-        address sharedBridgeProxy;
-        address governance;
-        uint256 gatewayChainId;
-        address gatewayChainAdmin;
-        address gatewayAccessControlRestriction;
-        address gatewayChainProxyAdmin;
-        address l1NullifierProxy;
-        bytes gatewayDiamondCutData;
-    }
 
     struct Output {
         bytes32 governanceL2TxHash;
@@ -335,7 +335,7 @@ contract GatewayPreparation is Script {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(migratingChainId);
-        IChainTypeManager ctm = IChainTypeManager(bridgehub.chainTypeManager(migratingChainId));
+        IChainTypeManager ctm = IChainTypeManager(config.chainTypeManagerProxy);
 
         bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
         bytes memory ctmData = abi.encode(
