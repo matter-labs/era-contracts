@@ -585,4 +585,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
     }
+
+    /// @notice Legacy read method, which forwards the call to L1Nullifier to check if withdrawal was finalized
+    function isWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex
+    ) external view returns (bool) {
+        return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
+    }
 }

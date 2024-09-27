@@ -610,7 +610,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // The data is expected to be at least 36 bytes long to contain assetId.
             require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length
             // slither-disable-next-line unused-return
-            (, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
+            (, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
