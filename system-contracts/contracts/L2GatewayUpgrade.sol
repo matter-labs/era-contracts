@@ -7,7 +7,7 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 
-import {GatewayUpgrade} from "./GatewayUpgrade.sol";
+import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
@@ -20,7 +20,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 /// in this folder due to very overlaping functionality with `L2GenesisUpgrade` and
 /// faciliating reusage of the code.
 /// @dev During the ugprade, it will be delegate-called by the `ComplexUpgrader` contract.
-contract L2GatewayUpgrade is GatewayUpgrade {
+contract L2GatewayUpgrade {
     function upgrade(
         ForceDeployment[] calldata _forceDeployments,
         address _ctmDeployer,
@@ -32,7 +32,11 @@ contract L2GatewayUpgrade is GatewayUpgrade {
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(_forceDeployments);
 
         // Secondly, we perform the more complex deployment of the gateway contracts.
-        performGatewayContractsInit(_ctmDeployer, _fixedForceDeploymentsData, _additionalForceDeploymentsData);
+        L2GatewayUpgradeHelper.performGatewayContractsInit(
+            _ctmDeployer,
+            _fixedForceDeploymentsData,
+            _additionalForceDeploymentsData
+        );
 
         ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
             _additionalForceDeploymentsData,

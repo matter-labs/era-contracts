@@ -7,7 +7,7 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 
-abstract contract GatewayUpgrade {
+library L2GatewayUpgradeHelper {
     function performGatewayContractsInit(
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
