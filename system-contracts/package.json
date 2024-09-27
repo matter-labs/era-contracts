@@ -63,6 +63,7 @@
     "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
+    "preprocess:interpreter": "rm -f ./contracts/EvmInterpreter.yul && yarn ts-node scripts/preprocess-interpreter.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",

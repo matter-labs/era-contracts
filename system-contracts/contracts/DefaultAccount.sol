@@ -139,6 +139,12 @@ contract DefaultAccount is IAccount {
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
 
+        // TODO: if possible, maybe implement some way to avoid memory copying here.
+        if ((_transaction.reserved[1] != 0) && (to == address(0))) {
+            DEPLOYER_SYSTEM_CONTRACT.createEVM{value: value}(data);
+            return;
+        }
+
         // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
         bool isSystemCall;
         if (to == address(DEPLOYER_SYSTEM_CONTRACT) && data.length >= 4) {

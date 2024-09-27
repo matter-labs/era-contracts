@@ -12,7 +12,7 @@ import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
 
-const COMPILER_VERSION = "1.3.18";
+const COMPILER_VERSION = "1.5.0";
 const IS_COMPILER_PRE_RELEASE = true;
 const CONTRACTS_DIR = "contracts-preprocessed";
 const BOOTLOADER_DIR = "bootloader";

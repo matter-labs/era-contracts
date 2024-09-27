@@ -45,6 +45,7 @@ contract ExecuteUpgradeTest is AdminTest {
             factoryDeps: new bytes[](0),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
+            evmSimulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: hex"",

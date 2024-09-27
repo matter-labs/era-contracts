@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// solhint-disable reason-string, gas-custom-errors
+
 pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
@@ -33,6 +35,7 @@ struct ProposedUpgrade {
     bytes[] factoryDeps;
     bytes32 bootloaderHash;
     bytes32 defaultAccountHash;
+    bytes32 evmSimulatorHash;
     address verifier;
     VerifierParams verifierParams;
     bytes l1ContractsUpgradeCalldata;
@@ -53,6 +56,8 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Сhanges to the bytecode that is used in L2 as a default account
     event NewL2DefaultAccountBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
+
+    event NewL2EvmSimulatorBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
 
     /// @notice Verifier address changed
     event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
@@ -79,7 +84,12 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
-        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
+        _setBaseSystemContracts(
+            _proposedUpgrade.bootloaderHash,
+            _proposedUpgrade.defaultAccountHash,
+            _proposedUpgrade.evmSimulatorHash,
+            isPatchOnly
+        );
 
         txHash = _setL2SystemContractUpgrade(
             _proposedUpgrade.l2ProtocolUpgradeTx,
@@ -113,6 +123,26 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // Change the default account bytecode hash
         s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
         emit NewL2DefaultAccountBytecodeHash(previousDefaultAccountBytecodeHash, _l2DefaultAccountBytecodeHash);
+    }
+
+    /// @notice Change default account bytecode hash, that is used on L2
+    /// @param _l2EvmSimulatorBytecodeHash The hash of default account L2 bytecode
+    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed
+    function _setL2EvmSimulatorBytecodeHash(bytes32 _l2EvmSimulatorBytecodeHash, bool _patchOnly) private {
+        if (_l2EvmSimulatorBytecodeHash == bytes32(0)) {
+            return;
+        }
+
+        require(!_patchOnly, "Patch only upgrade can not set new default account");
+
+        L2ContractHelper.validateBytecodeHash(_l2EvmSimulatorBytecodeHash);
+
+        // Save previous value into the stack to put it into the event later
+        bytes32 previousL2EvmSimulatorBytecodeHash = s.l2EvmSimulatorBytecodeHash;
+
+        // Change the default account bytecode hash
+        s.l2EvmSimulatorBytecodeHash = _l2EvmSimulatorBytecodeHash;
+        emit NewL2EvmSimulatorBytecodeHash(previousL2EvmSimulatorBytecodeHash, _l2EvmSimulatorBytecodeHash);
     }
 
     /// @notice Change bootloader bytecode hash, that is used on L2
@@ -185,9 +215,15 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @param _bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
     /// @param _defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
     /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
-    function _setBaseSystemContracts(bytes32 _bootloaderHash, bytes32 _defaultAccountHash, bool _patchOnly) internal {
+    function _setBaseSystemContracts(
+        bytes32 _bootloaderHash,
+        bytes32 _defaultAccountHash,
+        bytes32 _evmSimulatorHash,
+        bool _patchOnly
+    ) internal {
         _setL2BootloaderBytecodeHash(_bootloaderHash, _patchOnly);
         _setL2DefaultAccountBytecodeHash(_defaultAccountHash, _patchOnly);
+        _setL2EvmSimulatorBytecodeHash(_evmSimulatorHash, _patchOnly);
     }
 
     /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed

@@ -14,6 +14,7 @@ import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
+import {IEvmGasManager} from "./interfaces/IEvmGasManager.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -34,6 +35,7 @@ address constant ECADD_SYSTEM_CONTRACT = address(0x06);
 address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 address constant ECPAIRING_SYSTEM_CONTRACT = address(0x08);
 
+address constant CODE_ORACLE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x12);
 
 /// @dev The number of gas that need to be spent for a single byte of pubdata regardless of the pubdata price.
 /// This variable is used to ensure the following:
@@ -83,6 +85,7 @@ address constant EVENT_WRITER_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x0d)
 ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
 
 IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(SYSTEM_CONTRACTS_OFFSET + 0x0f));
+IEvmGasManager constant EVM_GAS_MANAGER = IEvmGasManager(address(SYSTEM_CONTRACTS_OFFSET + 0x13));
 
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
@@ -101,6 +104,9 @@ bytes32 constant CREATE2_PREFIX = 0x2020dba91b30cc0006188af794c2fb30dd8520db7e2c
 /// @dev Prefix used during derivation of account addresses using CREATE
 /// @dev keccak256("zksyncCreate")
 bytes32 constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
+
+/// @dev Prefix used during derivation of account addresses using CREATE2 within the EVM
+bytes1 constant CREATE2_EVM_PREFIX = 0xff;
 
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;

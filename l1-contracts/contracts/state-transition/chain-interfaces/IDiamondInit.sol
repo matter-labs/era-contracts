@@ -36,6 +36,7 @@ struct InitializeData {
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
+    bytes32 l2EvmSimulatorBytecodeHash;
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;
@@ -53,6 +54,7 @@ struct InitializeDataNewChain {
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
+    bytes32 l2EvmSimulatorBytecodeHash;
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;

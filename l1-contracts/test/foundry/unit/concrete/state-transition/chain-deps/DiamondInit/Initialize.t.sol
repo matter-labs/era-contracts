@@ -100,6 +100,7 @@ contract InitializeTest is DiamondInitTest {
         );
         assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), initializeData.l2BootloaderBytecodeHash);
         assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), initializeData.l2DefaultAccountBytecodeHash);
+        assertEq(utilsFacet.util_getL2EvmSimulatorBytecodeHash(), initializeData.l2EvmSimulatorBytecodeHash);
         assertEq(utilsFacet.util_getPriorityTxMaxGasLimit(), initializeData.priorityTxMaxGasLimit);
         assertEq(
             keccak256(abi.encode(utilsFacet.util_getFeeParams())),

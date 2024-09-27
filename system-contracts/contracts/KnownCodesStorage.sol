@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
+import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {Unauthorized, MalformedBytecode, BytecodeError} from "./SystemContractErrors.sol";
 
 /**
@@ -83,5 +83,25 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
         if (Utils.bytecodeLenInWords(_bytecodeHash) % 2 == 0) {
             revert MalformedBytecode(BytecodeError.NumberOfWords);
         }
+    }
+
+    function publishEVMBytecode(bytes calldata bytecode) external onlyCallFrom(address(DEPLOYER_SYSTEM_CONTRACT)) {
+        /*
+            TODO: ensure that it is properly padded, etc.
+            To preserve EVM compatibility, we can not emit any events here.
+        */
+
+        bytes32 hash = Utils.hashEVMBytecode(bytecode);
+
+        if (getMarker(hash) == 0) {
+            // ToDO: use efficient call
+            L1_MESSENGER_CONTRACT.sendToL1(bytecode);
+
+            assembly {
+                sstore(hash, 1)
+            }
+        }
+
+        emit MarkedAsKnown(hash, getMarker(hash) == 0);
     }
 }

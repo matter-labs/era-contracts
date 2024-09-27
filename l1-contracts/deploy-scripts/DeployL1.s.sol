@@ -120,6 +120,7 @@ contract DeployL1Script is Script {
         bytes diamondCutData;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
+        bytes32 evmSimulatorHash;
     }
 
     struct TokensConfig {
@@ -442,6 +443,7 @@ contract DeployL1Script is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+            l2EvmSimulatorBytecodeHash: config.contracts.evmSimulatorHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever

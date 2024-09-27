@@ -75,9 +75,12 @@ contract ExecutorProofTest is Test {
     /// This test is based on a block generated in a local system.
     function test_Hashes() public {
         utilsFacet.util_setL2DefaultAccountBytecodeHash(
-            0x0100065d134a862a777e50059f5e0fbe68b583f3617a67820f7edda0d7f253a0
+            0x0100058d1abd41a9984b37939862f99c18237dc6951c3d5a3d81593c798a8f81
         );
-        utilsFacet.util_setL2BootloaderBytecodeHash(0x010009416e909e0819593a9806bbc841d25c5cdfed3f4a1523497c6814e5194a);
+        utilsFacet.util_setL2EvmSimulatorBytecodeHash(
+            0x01000f196acd122635a752fcb275be0cc95fd3bba348c1d0908a517fe316418e
+        );
+        utilsFacet.util_setL2BootloaderBytecodeHash(0x010008ddde4acc465cde1c420883701caadb41954567c0b4e3a0d1093a7afde7);
         utilsFacet.util_setZkPorterAvailability(false);
 
         IExecutor.CommitBatchInfo memory nextBatch = IExecutor.CommitBatchInfo({
@@ -86,7 +89,7 @@ contract ExecutorProofTest is Test {
             // ignored
             timestamp: 100,
             indexRepeatedStorageChanges: 84,
-            newStateRoot: 0x9cf7bb72401a56039ca097cabed20a72221c944ed9b0e515c083c04663ab45a6,
+            newStateRoot: 0x1df8761352f4d39602beaf619e6b7a96111d3a54550bcf21f2623860cf3ed3d8,
             // ignored
             numberOfLayer1Txs: 10,
             // ignored
@@ -118,12 +121,16 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0xa1dcde434352cda8e331e721232ff2d457d4074efae1e3d06ef5b10ffada0c9a,
+            0x3073bec0e225ab1e393420a8458f386b76f6e7ba784a2fbcc0ea24a6fd6a32a1,
             "nextCommitment computation failed"
         );
 
-        bytes32 prevCommitment = 0x6ebf945305689a8c3ac993df7f002d41d311a762cd6bf39bb054ead8d1f54404;
+        bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0xAC7931F2C11013FC24963E41B86E5325A79F1150350CB41E4F0876A7, "getBatchProofPublicInput");
+        assertEq(
+            result,
+            4788207466353486800513567418370563062194355012625279630180492433957,
+            "getBatchProofPublicInput"
+        );
     }
 }

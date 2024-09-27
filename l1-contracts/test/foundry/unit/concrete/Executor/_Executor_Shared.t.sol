@@ -67,7 +67,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](29);
+        bytes4[] memory selectors = new bytes4[](30);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getAdmin.selector;
         selectors[2] = getters.getPendingAdmin.selector;
@@ -83,20 +83,21 @@ contract ExecutorTest is Test {
         selectors[12] = getters.storedBatchHash.selector;
         selectors[13] = getters.getL2BootloaderBytecodeHash.selector;
         selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = getters.getVerifierParams.selector;
-        selectors[16] = getters.isDiamondStorageFrozen.selector;
-        selectors[17] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = getters.isEthWithdrawalFinalized.selector;
-        selectors[19] = getters.facets.selector;
-        selectors[20] = getters.facetFunctionSelectors.selector;
-        selectors[21] = getters.facetAddresses.selector;
-        selectors[22] = getters.facetAddress.selector;
-        selectors[23] = getters.isFunctionFreezable.selector;
-        selectors[24] = getters.isFacetFreezable.selector;
-        selectors[25] = getters.getTotalBatchesCommitted.selector;
-        selectors[26] = getters.getTotalBatchesVerified.selector;
-        selectors[27] = getters.getTotalBatchesExecuted.selector;
-        selectors[28] = getters.storedBlockHash.selector;
+        selectors[15] = getters.getL2EvmSimulatorBytecodeHash.selector;
+        selectors[16] = getters.getVerifierParams.selector;
+        selectors[17] = getters.isDiamondStorageFrozen.selector;
+        selectors[18] = getters.getPriorityTxMaxGasLimit.selector;
+        selectors[19] = getters.isEthWithdrawalFinalized.selector;
+        selectors[20] = getters.facets.selector;
+        selectors[21] = getters.facetFunctionSelectors.selector;
+        selectors[22] = getters.facetAddresses.selector;
+        selectors[23] = getters.facetAddress.selector;
+        selectors[24] = getters.isFunctionFreezable.selector;
+        selectors[25] = getters.isFacetFreezable.selector;
+        selectors[26] = getters.getTotalBatchesCommitted.selector;
+        selectors[27] = getters.getTotalBatchesVerified.selector;
+        selectors[28] = getters.getTotalBatchesExecuted.selector;
+        selectors[29] = getters.storedBlockHash.selector;
         return selectors;
     }
 
@@ -177,6 +178,7 @@ contract ExecutorTest is Test {
             }),
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
+            l2EvmSimulatorBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams(),
             blobVersionedHashRetriever: blobVersionedHashRetriever

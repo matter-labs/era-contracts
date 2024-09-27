@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {EfficientCall} from "./EfficientCall.sol";
+import {RLPEncoder} from "./RLPEncoder.sol";
 import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
 
 /**
@@ -43,9 +44,23 @@ library Utils {
         return uint24(_x);
     }
 
+    function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
+        // TODO: use constants for that
+        return (uint8(_bytecodeHash[0]) == 2);
+    }
+
     /// @return codeLength The bytecode length in bytes
     function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLength) {
-        codeLength = bytecodeLenInWords(_bytecodeHash) << 5; // _bytecodeHash * 32
+        // TODO: use constants for that
+
+        if (uint8(_bytecodeHash[0]) == 1) {
+            codeLength = bytecodeLenInWords(_bytecodeHash) << 5; // _bytecodeHash * 32
+        } else if (uint8(_bytecodeHash[0]) == 2) {
+            // TODO: maybe rename the function
+            codeLength = bytecodeLenInWords(_bytecodeHash);
+        } else {
+            codeLength = 0;
+        }
     }
 
     /// @return codeLengthInWords The bytecode length in machine words
@@ -109,5 +124,50 @@ library Utils {
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
         // Setting the length
         hashedBytecode = hashedBytecode | bytes32(lengthInWords << 224);
+    }
+
+    // the real max supported number is 2^16, but we'll stick to evm convention
+    uint256 internal constant MAX_EVM_BYTECODE_LENGTH = (2 ** 16) - 1;
+
+    function hashEVMBytecode(bytes memory _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
+        // solhint-disable gas-custom-errors
+        require(_bytecode.length <= MAX_EVM_BYTECODE_LENGTH, "po");
+
+        hashedEVMBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
+        // Setting the version of the hash
+        hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(2 << 248)));
+        hashedEVMBytecode = hashedEVMBytecode | bytes32(_bytecode.length << 224);
+    }
+
+    /// @notice Calculates the address of a deployed contract via create2 on the EVM
+    /// @param _sender The account that deploys the contract.
+    /// @param _salt The create2 salt.
+    /// @param _bytecodeHash The hash of the init code of the new contract.
+    /// @return newAddress The derived address of the account.
+    function getNewAddressCreate2EVM(
+        address _sender,
+        bytes32 _salt,
+        bytes32 _bytecodeHash
+    ) internal pure returns (address newAddress) {
+        bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), _sender, _salt, _bytecodeHash));
+
+        newAddress = address(uint160(uint256(hash)));
+    }
+
+    /// @notice Calculates the address of a deployed contract via create
+    /// @param _sender The account that deploys the contract.
+    /// @param _senderNonce The deploy nonce of the sender's account.
+    function getNewAddressCreateEVM(address _sender, uint256 _senderNonce) internal pure returns (address newAddress) {
+        bytes memory addressEncoded = RLPEncoder.encodeAddress(_sender);
+        bytes memory nonceEncoded = RLPEncoder.encodeUint256(_senderNonce);
+
+        uint256 listLength = addressEncoded.length + nonceEncoded.length;
+        bytes memory listLengthEncoded = RLPEncoder.encodeListLen(uint64(listLength));
+
+        bytes memory digest = bytes.concat(listLengthEncoded, addressEncoded, nonceEncoded);
+
+        bytes32 hash = keccak256(digest);
+        newAddress = address(uint160(uint256(hash)));
     }
 }

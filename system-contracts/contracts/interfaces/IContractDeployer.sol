@@ -88,4 +88,14 @@ interface IContractDeployer {
 
     /// @notice Can be called by an account to update its nonce ordering
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external;
+
+    function createEVM(bytes calldata _initCode) external payable returns (address newAddress);
+
+    function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable returns (address);
+
+    function evmCodeHash(address) external view returns (bytes32);
+
+    function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external;
+
+    function constructorReturnGas() external view returns (uint256);
 }

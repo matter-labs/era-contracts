@@ -16,4 +16,6 @@ interface IKnownCodesStorage {
     function markBytecodeAsPublished(bytes32 _bytecodeHash) external;
 
     function getMarker(bytes32 _hash) external view returns (uint256);
+
+    function publishEVMBytecode(bytes calldata bytecode) external;
 }

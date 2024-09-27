@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
+// 0xbe4bf9e4
+error CallerMustBeEvmContract();
 // 0xb7549616
 error CallerMustBeForceDeployer();
 // 0x9eedbd2b

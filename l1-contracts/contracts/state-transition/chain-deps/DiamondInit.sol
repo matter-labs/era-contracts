@@ -62,6 +62,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.__DEPRECATED_verifierParams = _initializeData.verifierParams;
         s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
+        s.l2EvmSimulatorBytecodeHash = _initializeData.l2EvmSimulatorBytecodeHash;
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
