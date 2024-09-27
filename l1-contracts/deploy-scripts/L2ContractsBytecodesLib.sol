@@ -269,12 +269,37 @@ library L2ContractsBytecodesLib {
             );
     }
 
-    // /// @notice Reads the bytecode of the L2GatewayUpgrade contract.
-    // /// @return The bytecode of the L2GatewayUpgrade contract.
-    // function readL2AdminFactoryBytecode() internal view returns (bytes memory) {
-    //     return
-    //         Utils.readHardhatBytecode(
-    //             "/../l1-contracts/artifacts-zk/contracts/governance/L2SharedBridgeLegacy.sol/L2SharedBridgeLegacy.json"
-    //         );
-    // }
+    /// @notice Reads the bytecode of the L2GatewayUpgrade contract.
+    /// @return The bytecode of the L2GatewayUpgrade contract.
+    function readL2AdminFactoryBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/governance/L2AdminFactory.sol/L2AdminFactory.json"
+            );
+    }
+
+    function readProxyAdminBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol/ProxyAdmin.json"
+            );
+    }
+
+    /// @notice Reads the bytecode of the L2GatewayUpgrade contract.
+    /// @return The bytecode of the L2GatewayUpgrade contract.
+    function readPermanentRestrictionBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/governance/PermanentRestriction.sol/PermanentRestriction.json"
+            );
+    }
+
+    /// @notice Reads the bytecode of the L2ProxyAdminDeployer contract.
+    /// @return The bytecode of the L2ProxyAdminDeployer contract.
+    function readProxyAdminDeployerBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/governance/L2ProxyAdminDeployer.sol/L2ProxyAdminDeployer.json"
+            );
+    }
 }

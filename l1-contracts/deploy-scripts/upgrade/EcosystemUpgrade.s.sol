@@ -127,9 +127,16 @@ contract EcosystemUpgrade is Script {
         address expectedRollupL2DAValidator;
         address expectedValidiumL2DAValidator;
         address expectedL2GatewayUpgrade;
-        address expectedL2AdminFactory;
         address l2SharedBridgeLegacyImpl;
         address l2BridgedStandardERC20Impl;
+
+        // In reality, the following addresses need to be
+        // deployed only on a settlement layer, i.e. the Gateway.
+        address expectedL2ProxyAdminDeployer;
+        address expectedL2ProxyAdmin;
+        address expectedL2AdminFactory;
+        address expectedL2PermanentRestrictionImpl;
+        address expectedL2PermanentRestrictionProxy;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -572,6 +579,36 @@ contract EcosystemUpgrade is Script {
     }
 
     function initializeExpectedL2Addresses() internal {
+        address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
+
+        address expectedL2ProxyAdminDeployer = Utils.getL2AddressViaCreate2Factory(
+            bytes32(0), 
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readProxyAdminDeployerBytecode()), 
+            abi.encode(aliasedGovernance)
+        );
+        address expectedL2ProxyAdmin = L2ContractHelper.computeCreate2Address(
+            expectedL2ProxyAdminDeployer,
+            bytes32(0),
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readProxyAdminBytecode()),
+            keccak256(hex"")
+        );
+
+        address permanentRestrictionImpl = Utils.getL2AddressViaCreate2Factory(
+            bytes32(0), 
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readPermanentRestrictionBytecode()), 
+            // Note that for L2 deployments the L2AdminFactory is 0.
+            abi.encode(L2_BRIDGEHUB_ADDRESS, address(0))
+        );
+
+        address permanentRestrictionProxy = Utils.getL2AddressViaCreate2Factory(
+            bytes32(0), 
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode()),
+            abi.encode(permanentRestrictionImpl, expectedL2ProxyAdmin, abi.encodeCall(PermanentRestriction.initialize, (aliasedGovernance)))
+        );
+
+        address[] memory requiredL2Restrictions = new address[](1);
+        requiredL2Restrictions[0] = permanentRestrictionProxy; 
+
         addresses.expectedL2Addresses = ExpectedL2Addresses({
             expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0), 
@@ -598,13 +635,15 @@ contract EcosystemUpgrade is Script {
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readStandardERC20Bytecode()), 
                 hex""
             ),
-            // FIXME
-            expectedL2AdminFactory: address(0)
-            // expectedL2AdminFactory: Utils.getL2AddressViaCreate2Factory(
-            //     bytes32(0), 
-            //     L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()), 
-            //     hex""
-            // )
+            expectedL2ProxyAdminDeployer: expectedL2ProxyAdminDeployer,
+            expectedL2ProxyAdmin: expectedL2ProxyAdmin,
+            expectedL2AdminFactory: Utils.getL2AddressViaCreate2Factory(
+                bytes32(0), 
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AdminFactoryBytecode()), 
+                abi.encode(requiredL2Restrictions)
+            ),
+            expectedL2PermanentRestrictionImpl: permanentRestrictionImpl,
+            expectedL2PermanentRestrictionProxy: permanentRestrictionProxy
         });
     }
 
