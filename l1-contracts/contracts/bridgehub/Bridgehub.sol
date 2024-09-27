@@ -366,7 +366,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
-            _assetRouter: assetRouter,
             _admin: _admin,
             _initData: _initData,
             _factoryDeps: _factoryDeps

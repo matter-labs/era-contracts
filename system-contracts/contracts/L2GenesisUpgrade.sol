@@ -2,11 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {DEPLOYER_SYSTEM_CONTRACT, SYSTEM_CONTEXT_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR} from "./Constants.sol";
-import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
-import {IL2GenesisUpgrade, FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
+import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 
 import {GatewayUpgrade} from "./GatewayUpgrade.sol";
 

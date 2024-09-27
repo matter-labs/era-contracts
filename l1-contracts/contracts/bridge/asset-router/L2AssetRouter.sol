@@ -215,13 +215,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _amount,
         bytes calldata _data
     ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
-        _translateLegacyFinalizeDeposit(
-            _l1Sender,
-            _l2Receiver,
-            _l1Token,
-            _amount,
-            _data
-        );
+        _translateLegacyFinalizeDeposit({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+
+        });
     }
 
     function finalizeDepositLegacyBridge(
@@ -231,13 +232,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _amount,
         bytes calldata _data
     ) external onlyLegacyBridge {
-        _translateLegacyFinalizeDeposit(
-            _l1Sender,
-            _l2Receiver,
-            _l1Token,
-            _amount,
-            _data
-        );
+        _translateLegacyFinalizeDeposit({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
     }
 
     function _translateLegacyFinalizeDeposit(

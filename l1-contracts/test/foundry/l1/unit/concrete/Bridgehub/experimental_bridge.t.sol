@@ -788,7 +788,6 @@ contract ExperimentalBridgeTest is Test {
                 mockCTM.createNewChain.selector,
                 chainId,
                 tokenAssetId,
-                sharedBridgeAddress,
                 admin,
                 mockInitCalldata,
                 factoryDeps

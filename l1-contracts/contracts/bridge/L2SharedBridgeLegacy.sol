@@ -16,7 +16,7 @@ import {IL2AssetRouter} from "./asset-router/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./ntv/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../common/L1ContractErrors.sol";
+import {InvalidCaller, ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -120,19 +120,17 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         bytes calldata _data
     ) external {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
-        require(
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
-            "mq"
-        );
+        if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge && AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge) {
+            revert InvalidCaller(msg.sender);
+        }
 
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge(
-            _l1Sender,
-            _l2Receiver,
-            _l1Token,
-            _amount,
-            _data
-        );
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
 
 
         address l2Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(_l1Token);

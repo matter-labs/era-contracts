@@ -11,14 +11,14 @@ struct ZKChainSpecificForceDeploymentsData {
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
-    address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
+    bytes32 l2TokenProxyBytecodeHash;
     bytes32 bridgehubBytecodeHash;
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    address l1AssetRouter;
+    address aliasedL1Governance;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     address l2BridgeProxyOwnerAddress;

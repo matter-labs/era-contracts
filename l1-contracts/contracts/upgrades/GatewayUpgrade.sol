@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
-
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -17,7 +15,6 @@ import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IL2GatewayUpgrade} from "../state-transition/l2-deps/IL2GatewayUpgrade.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 
@@ -26,10 +23,10 @@ import {GatewayHelper} from "./GatewayHelper.sol";
 struct GatewayUpgradeEncodedInput {
     IL2ContractDeployer.ForceDeployment[] baseForceDeployments;
     address ctmDeployer;
-    bytes fixedForceDeploymentsData;
     address l2GatewayUpgrade;
     address oldValidatorTimelock;
     address newValidatorTimelock;
+    bytes fixedForceDeploymentsData;
 }
 
 /// @author Matter Labs
@@ -57,9 +54,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         s.validators[encodedInput.oldValidatorTimelock] = false;
         s.validators[encodedInput.newValidatorTimelock] = true;
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
-        address sharedBridge = bridgehub.sharedBridge();
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
-        address l2LegacyBridge = IL1SharedBridgeLegacy(sharedBridge).l2BridgeAddress(s.chainId);
 
         bytes memory gatewayUpgradeCalldata = abi.encodeCall(
             IL2GatewayUpgrade.upgrade,
