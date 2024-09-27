@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-error NotChainStm(address msgSender, address chainTypeManager);
+error NotChainCTM(address msgSender, address chainTypeManager);
 
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 
@@ -14,13 +14,13 @@ error ChainAlreadyPresent();
 
 error ChainIdAlreadyPresent();
 
-error ChainNotPresentInSTM();
+error ChainNotPresentInCTM();
 
 error AssetIdAlreadyRegistered();
 
 error NotCtmDeployer(address sender, address l1CtmDeployer);
 
-error CtmNotRegistered();
+error CTMNotRegistered();
 
 error ChainIdMustNotMatchCurrentChainId(uint256 chainId, uint256 blockChainId);
 
@@ -34,7 +34,7 @@ error NotInGatewayMode();
 
 error SLNotWhitelisted();
 
-error AssetInfo1(bytes32 assetId, bytes32 assetIdFromChainId);
+error IncorrectChainAsset(bytes32 assetId, bytes32 assetIdFromChainId);
 
 error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
 

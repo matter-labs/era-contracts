@@ -14,7 +14,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
-import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithExecuted, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -268,7 +268,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 protocolVersion = abi.decode(_data, (uint256));
 
         uint256 currentProtocolVersion = s.protocolVersion;
-        // uint256 protocolVersion = stm.protocolVersion();
 
         if (currentProtocolVersion != protocolVersion) {
             revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
@@ -396,7 +395,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
-            revert VerifiedIsNotConsistentWithExecuted(
+            revert ExecutedIsNotConsistentWithVerified(
                 commitment.totalBatchesExecuted,
                 commitment.totalBatchesVerified
             );

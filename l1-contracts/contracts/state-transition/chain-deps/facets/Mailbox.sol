@@ -30,7 +30,7 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
-import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, MailboxWrongStateTransitionManager, NotSettlementLayers, NotHyperchain} from "../../L1StateTransitionErrors.sol";
+import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -280,7 +280,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             //
             // We trust all chains whitelisted by the Bridgehub governance.
             if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId)) {
-                revert MailboxWrongStateTransitionManager();
+                revert NotSettlementLayer();
             }
 
             settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(settlementLayerChainId);
@@ -380,7 +380,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         uint64 _expirationTimestamp
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
-            revert NotSettlementLayers();
+            revert NotSettlementLayer();
         }
         if (IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();

@@ -20,17 +20,13 @@ error InvalidNumberOfBatchHashes(uint256 batchHashesLength, uint256 expected);
 
 error PriorityQueueNotReady();
 
-error VerifiedIsNotConsistentWithExecuted(uint256 totalBatchesExecuted, uint256 totalBatchesVerified);
-
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 
 error LocalRootIsZero();
 
 error LocalRootMustBeZero();
 
-error MailboxWrongStateTransitionManager();
-
-error NotSettlementLayers();
+error NotSettlementLayer
 
 error NotHyperchain();
 
@@ -74,7 +70,7 @@ error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initia
 
 error ZeroChainId();
 
-error SyncLayerNotRegistered();
+error SettlementLayerNotRegistered();
 
 error AdminZero();
 

@@ -19,7 +19,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
-import {InitialForceDeploymentMismatch, ZeroChainId, SyncLayerNotRegistered, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {InitialForceDeploymentMismatch, ZeroChainId, SettlementLayerNotRegisteredsteredstered, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -447,9 +447,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             revert ZeroChainId();
         }
 
-        // Currently, we require that the sync layer is deployed by the same STM.
+        // Currently, we require that the sync layer is deployed by the same CTM.
         if (getZKChain(_newSettlementLayerChainId) == address(0)) {
-            revert SyncLayerNotRegistered();
+            revert SettlementLayerNotRegisteredsteredstered();
         }
 
         IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
@@ -463,7 +463,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         bytes calldata _data
     ) external view override onlyBridgehub returns (bytes memory ctmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
-        // happens. The correctness of it will be checked on the STM on the new settlement layer.
+        // happens. The correctness of it will be checked on the CTM on the new settlement layer.
         (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
         if (_newSettlementLayerAdmin == address(0)) {
             revert AdminZero();
@@ -471,9 +471,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
-        address zkChain = getZKChain(_chainId);
-        if (IZKChain(zkChain).getProtocolVersion() != protocolVersion) {
-            revert OutdatedProtocolVersion(IZKChain(zkChain).getProtocolVersion(), protocolVersion);
+        address chainProtocolVersion = IZKChain(getZKChain(_chainId)).getProtocolVersion();
+        if (chainProtocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(chainProtocolVersion, protocolVersion);
         }
 
         return

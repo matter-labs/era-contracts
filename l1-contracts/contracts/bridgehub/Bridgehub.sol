@@ -23,7 +23,7 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {NotChainStm, NotL1, NotRelayedSender, NotAssetRouter, TokenNotSet, ChainAlreadyPresent, ChainIdAlreadyPresent, ChainNotPresentInSTM, NotCtmDeployer, CtmNotRegistered, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, AssetInfo1, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
+import {NotChainCTM, NotL1, NotRelayedSender, NotAssetRouter, TokenNotSet, ChainAlreadyPresent, ChainIdAlreadyPresent, ChainNotPresentInCTM, NotCtmDeployer, CTMNotRegistered, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAsset, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
 import {NoCTMForAssetId, MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -108,9 +108,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlyChainSTM(uint256 _chainId) {
+    modifier onlyChainCTM(uint256 _chainId) {
         if (msg.sender != chainTypeManager[_chainId]) {
-            revert NotChainStm(msg.sender, chainTypeManager[_chainId]);
+            revert NotChainCTM(msg.sender, chainTypeManager[_chainId]);
         }
         _;
     }
@@ -240,7 +240,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         /// Note we have to do this before CTM is upgraded.
         address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
         if (chainAddress == address(0)) {
-            revert ChainNotPresentInSTM();
+            revert ChainNotPresentInCTM();
         }
         _registerNewZKChain(_chainId, chainAddress);
     }
@@ -319,7 +319,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert NotCtmDeployer(sender, address(l1CtmDeployer));
         }
         if (!chainTypeManagerIsRegistered[_assetAddress]) {
-            revert CtmNotRegistered();
+            revert CTMNotRegistered();
         }
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
@@ -696,7 +696,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         if (_assetId != ctmAssetIdFromChainId(bridgehubData.chainId)) {
-            revert AssetInfo1(_assetId, ctmAssetIdFromChainId(bridgehubData.chainId));
+            revert IncorrectChainAsset(_assetId, ctmAssetIdFromChainId(bridgehubData.chainId));
         }
         if (settlementLayer[bridgehubData.chainId] != block.chainid) {
             revert NotCurrentSL(settlementLayer[bridgehubData.chainId], block.chainid);
@@ -732,7 +732,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
-    /// @param _assetId the assetId of the chain's STM
+    /// @param _assetId the assetId of the chain's CTM
     /// @param _bridgehubMintData the data for the mint
     function bridgeMint(
         uint256, // originChainId

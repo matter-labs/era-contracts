@@ -14,7 +14,7 @@ import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
-import {OnlyBridgehub, CtmNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, CTMNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
@@ -67,7 +67,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
-            revert CtmNotRegistered();
+            revert CTMNotRegistered();
         }
         L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
         BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
