@@ -7926,8 +7926,8 @@ zksync-ethers@^5.0.0:
     ethers "~5.7.0"
 
 zksync-ethers@^5.9.0:
-  version "5.9.0"
-  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.9.0.tgz#96dc29e4eaaf0aa70d927886fd6e1e4c545786e3"
-  integrity sha512-VnRUesrBcPBmiTYTAp+WreIazK2qCIJEHE7j8BiK+cDApHzjAfIXX+x8SXXJpG1npGJANxiJKnPwA5wjGZtCRg==
+  version "5.9.2"
+  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.9.2.tgz#1c5f34cb25ac0b040fd1a6118f2ba1c2c3bda090"
+  integrity sha512-Y2Mx6ovvxO6UdC2dePLguVzvNToOY8iLWeq5ne+jgGSJxAi/f4He/NF6FNsf6x1aWX0o8dy4Df8RcOQXAkj5qw==
   dependencies:
     ethers "~5.7.0"
