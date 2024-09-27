@@ -15,38 +15,6 @@ object "EVMInterpreter" {
             copyActivePtrData(bytecodeOffset, 0, size)
         }
 
-        // Note that this function modifies EVM memory and does not restore it. It is expected that
-        // it is the last called function during execution.
-        function setDeployedCode(gasLeft, offset, len) {
-            // This error should never be triggered
-            // require(offset > 100, "Offset too small");
-
-            mstore(sub(offset, 100), 0xD9EB76B200000000000000000000000000000000000000000000000000000000)
-            mstore(sub(offset, 96), gasLeft)
-            mstore(sub(offset, 64), 0x40)
-            mstore(sub(offset, 32), len)
-
-            let farCallAbi := getFarCallABI(
-                0,
-                0,
-                sub(offset, 100),
-                add(len, 100),
-                gas(),
-                // Only rollup is supported for now
-                0,
-                0,
-                0,
-                1
-            )
-            let to := DEPLOYER_SYSTEM_CONTRACT()
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        }
-
         function padBytecode(offset, len) -> blobOffset, blobLen {
             blobOffset := sub(offset, 32)
             let trueLastByte := add(offset, len)
@@ -2910,7 +2878,9 @@ object "EVMInterpreter" {
 
         offset, len := padBytecode(offset, len)
 
-        setDeployedCode(gasToReturn, offset, len)
+        mstore(add(offset, len), gasToReturn)
+
+        verbatim_2i_0o("return_deployed", offset, add(len, 32))
     }
     object "EVMInterpreter_deployed" {
         code {
