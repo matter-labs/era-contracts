@@ -86,7 +86,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
             if (IL2AssetRouter.setAssetHandlerAddress.selector == l2TxSelector) {
                 (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, address));
-                return _checkSTMAssetId(decodedAssetId);
+                return _checkCTMAssetId(decodedAssetId);
             }
 
             if (
@@ -97,13 +97,13 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
             }
 
             (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
-            return _checkSTMAssetId(decodedAssetId);
+            return _checkCTMAssetId(decodedAssetId);
         }
 
         return whitelistedSenders[sender];
     }
 
-    function _checkSTMAssetId(bytes32 assetId) internal view returns (bool) {
+    function _checkCTMAssetId(bytes32 assetId) internal view returns (bool) {
         address stmAddress = BRIDGE_HUB.ctmAssetIdToAddress(assetId);
         return stmAddress != address(0);
     }

@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {OperatorDAInputTooSmall, InvalidBlobsHashes, InvalidNumberOfBlobs, InvalidL2DAOutputHash, OnlyOneBlobWithCalldata, PubdataTooSmall, PubdataTooLong, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
+
 // solhint-disable gas-custom-errors, reason-string
 
 /// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
@@ -44,26 +46,34 @@ abstract contract CalldataDA {
         // - Then, there are linear hashes of the published blobs, 32 bytes each.
 
         // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
-        require(_operatorDAInput.length >= BLOB_DATA_OFFSET, "too small");
+        if (_operatorDAInput.length < BLOB_DATA_OFFSET) {
+            revert OperatorDAInputTooSmall(_operatorDAInput.length, BLOB_DATA_OFFSET);
+        }
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);
         fullPubdataHash = bytes32(_operatorDAInput[32:64]);
         blobsProvided = uint256(uint8(_operatorDAInput[64]));
 
-        require(blobsProvided <= _maxBlobsSupported, "invalid number of blobs");
+        if (blobsProvided > _maxBlobsSupported) {
+            revert InvalidNumberOfBlobs(blobsProvided, _maxBlobsSupported);
+        }
 
         // Note that the API of the contract requires that the returned blobs linear hashes have length of
         // the `_maxBlobsSupported`
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
-        require(_operatorDAInput.length >= BLOB_DATA_OFFSET + 32 * blobsProvided, "invalid blobs hashes");
+        if (_operatorDAInput.length < BLOB_DATA_OFFSET + 32 * blobsProvided) {
+            revert InvalidBlobsHashes(_operatorDAInput.length, BLOB_DATA_OFFSET + 32 * blobsProvided);
+        }
 
         _cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
 
         uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
         // Now, we need to double check that the provided input was indeed returned by the L2 DA validator.
-        require(keccak256(_operatorDAInput[:ptr]) == _l2DAValidatorOutputHash, "invalid l2 DA output hash");
+        if (keccak256(_operatorDAInput[:ptr]) != _l2DAValidatorOutputHash) {
+            revert InvalidL2DAOutputHash(_l2DAValidatorOutputHash);
+        }
 
         // The rest of the output was provided specifically by the operator
         l1DaInput = _operatorDAInput[ptr:];
@@ -81,8 +91,12 @@ abstract contract CalldataDA {
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
     ) internal pure virtual returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
-        require(_blobsProvided == 1, "only one blob with calldata");
-        require(_pubdataInput.length >= BLOB_COMMITMENT_SIZE, "pubdata too small");
+        if (_blobsProvided != 1) {
+            revert OnlyOneBlobWithCalldata();
+        }
+        if (_pubdataInput.length < BLOB_COMMITMENT_SIZE) {
+            revert PubdataTooSmall(_pubdataInput.length, BLOB_COMMITMENT_SIZE);
+        }
 
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
@@ -91,8 +105,12 @@ abstract contract CalldataDA {
 
         _pubdata = _pubdataInput[:_pubdataInput.length - BLOB_COMMITMENT_SIZE];
 
-        require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
-        require(_fullPubdataHash == keccak256(_pubdata), "wp");
+        if (_pubdata.length > BLOB_SIZE_BYTES) {
+            revert PubdataTooLong(_pubdata.length, BLOB_SIZE_BYTES);
+        }
+        if (_fullPubdataHash != keccak256(_pubdata)) {
+            revert InvalidPubdataHash();
+        }
         blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - BLOB_COMMITMENT_SIZE:_pubdataInput.length]);
     }
 

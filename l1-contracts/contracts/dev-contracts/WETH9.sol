@@ -60,8 +60,7 @@ contract WETH9 {
 
     function transferFrom(address src, address dst, uint256 wad) public returns (bool) {
         require(balanceOf[src] >= wad, "weth9, 2");
-
-        if (src != msg.sender && allowance[src][msg.sender] != type(uint256).max) {
+        if (src != msg.sender || allowance[src][msg.sender] != type(uint256).max) {
             require(allowance[src][msg.sender] >= wad, "weth9, 3");
             allowance[src][msg.sender] -= wad;
         }
