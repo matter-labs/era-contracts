@@ -368,7 +368,7 @@ object "EVMInterpreter" {
         }
         
         function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-            // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
+            // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
             mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
         
             let farCallAbi := getFarCallABI(
@@ -393,11 +393,12 @@ object "EVMInterpreter" {
         
             returndatacopy(0,0,64)
         
-            passGas := mload(0)
-            isStatic := mload(32)
+            let auxData := mload(32)
+            callerEVM := gt(auxData, 1)
         
-            if iszero(eq(passGas, INF_PASS_GAS())) {
-                callerEVM := true
+            if callerEVM {
+                isStatic := and(auxData, 1)
+                passGas := mload(0)
             }
         }
         
@@ -774,33 +775,6 @@ object "EVMInterpreter" {
             }
         }
         
-        function _popEVMFrame() {
-            // function popEVMFrame() external
-        
-             let farCallAbi := getFarCallABI(
-                0,
-                0,
-                0,
-                4,
-                gas(),
-                // Only rollup is supported for now
-                0,
-                0,
-                0,
-                1
-            )
-        
-            let to := EVM_GAS_MANAGER_CONTRACT()
-        
-            mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
-        
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        }
-        
         // Each evm gas is 5 zkEVM one
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
@@ -941,7 +915,6 @@ object "EVMInterpreter" {
                 success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
         
                 frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-                _popEVMFrame()
             }
         
             let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -998,7 +971,6 @@ object "EVMInterpreter" {
                     _pushEVMFrame(gasToPassNew, isStatic)
                     success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
                     frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                    _popEVMFrame()
                 }
             }
             default {
@@ -1139,8 +1111,6 @@ object "EVMInterpreter" {
         
             let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
         
-            _popEVMFrame()
-        
             let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
             switch iszero(precompileCost)
             case 1 {
@@ -1182,7 +1152,6 @@ object "EVMInterpreter" {
                 success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
         
                 _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
-                _popEVMFrame()
             }
         }
         
@@ -1271,8 +1240,6 @@ object "EVMInterpreter" {
         
             let gasUsed := sub(gasForTheCall, gasLeft)
             evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
-        
-            _popEVMFrame()
         
             let back
         
@@ -3235,7 +3202,7 @@ object "EVMInterpreter" {
             }
             
             function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-                // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
+                // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
                 mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
             
                 let farCallAbi := getFarCallABI(
@@ -3260,11 +3227,12 @@ object "EVMInterpreter" {
             
                 returndatacopy(0,0,64)
             
-                passGas := mload(0)
-                isStatic := mload(32)
+                let auxData := mload(32)
+                callerEVM := gt(auxData, 1)
             
-                if iszero(eq(passGas, INF_PASS_GAS())) {
-                    callerEVM := true
+                if callerEVM {
+                    isStatic := and(auxData, 1)
+                    passGas := mload(0)
                 }
             }
             
@@ -3641,33 +3609,6 @@ object "EVMInterpreter" {
                 }
             }
             
-            function _popEVMFrame() {
-                // function popEVMFrame() external
-            
-                 let farCallAbi := getFarCallABI(
-                    0,
-                    0,
-                    0,
-                    4,
-                    gas(),
-                    // Only rollup is supported for now
-                    0,
-                    0,
-                    0,
-                    1
-                )
-            
-                let to := EVM_GAS_MANAGER_CONTRACT()
-            
-                mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
-            
-                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            }
-            
             // Each evm gas is 5 zkEVM one
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
@@ -3808,7 +3749,6 @@ object "EVMInterpreter" {
                     success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
             
                     frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-                    _popEVMFrame()
                 }
             
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -3865,7 +3805,6 @@ object "EVMInterpreter" {
                         _pushEVMFrame(gasToPassNew, isStatic)
                         success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
                         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                        _popEVMFrame()
                     }
                 }
                 default {
@@ -4006,8 +3945,6 @@ object "EVMInterpreter" {
             
                 let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
             
-                _popEVMFrame()
-            
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                 switch iszero(precompileCost)
                 case 1 {
@@ -4049,7 +3986,6 @@ object "EVMInterpreter" {
                     success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
             
                     _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
-                    _popEVMFrame()
                 }
             }
             
@@ -4138,8 +4074,6 @@ object "EVMInterpreter" {
             
                 let gasUsed := sub(gasForTheCall, gasLeft)
                 evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
-            
-                _popEVMFrame()
             
                 let back
             
