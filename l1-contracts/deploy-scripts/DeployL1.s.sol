@@ -69,110 +69,111 @@ struct FixedForceDeploymentsData {
     bytes32 messageRootBytecodeHash;
 }
 
+// solhint-disable-next-line gas-struct-packing
+struct DeployedAddresses {
+    BridgehubDeployedAddresses bridgehub;
+    StateTransitionDeployedAddresses stateTransition;
+    BridgesDeployedAddresses bridges;
+    L1NativeTokenVaultAddresses vaults;
+    DataAvailabilityDeployedAddresses daAddresses;
+    address transparentProxyAdmin;
+    address governance;
+    address chainAdmin;
+    address accessControlRestrictionAddress;
+    address blobVersionedHashRetriever;
+    address validatorTimelock;
+    address create2Factory;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct L1NativeTokenVaultAddresses {
+    address l1NativeTokenVaultImplementation;
+    address l1NativeTokenVaultProxy;
+}
+
+struct DataAvailabilityDeployedAddresses {
+    address l1RollupDAValidator;
+    address l1ValidiumDAValidator;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct BridgehubDeployedAddresses {
+    address bridgehubImplementation;
+    address bridgehubProxy;
+    address ctmDeploymentTrackerImplementation;
+    address ctmDeploymentTrackerProxy;
+    address messageRootImplementation;
+    address messageRootProxy;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct BridgesDeployedAddresses {
+    address erc20BridgeImplementation;
+    address erc20BridgeProxy;
+    address sharedBridgeImplementation;
+    address sharedBridgeProxy;
+    address l1NullifierImplementation;
+    address l1NullifierProxy;
+    address bridgedStandardERC20Implementation;
+    address bridgedTokenBeacon;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct Config {
+    uint256 l1ChainId;
+    address deployerAddress;
+    uint256 eraChainId;
+    address ownerAddress;
+    bool testnetVerifier;
+    ContractsConfig contracts;
+    TokensConfig tokens;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct ContractsConfig {
+    bytes32 create2FactorySalt;
+    address create2FactoryAddr;
+    address multicall3Addr;
+    uint256 validatorTimelockExecutionDelay;
+    bytes32 genesisRoot;
+    uint256 genesisRollupLeafIndex;
+    bytes32 genesisBatchCommitment;
+    uint256 latestProtocolVersion;
+    bytes32 recursionNodeLevelVkHash;
+    bytes32 recursionLeafLevelVkHash;
+    bytes32 recursionCircuitsSetVksHash;
+    uint256 priorityTxMaxGasLimit;
+    PubdataPricingMode diamondInitPubdataPricingMode;
+    uint256 diamondInitBatchOverheadL1Gas;
+    uint256 diamondInitMaxPubdataPerBatch;
+    uint256 diamondInitMaxL2GasPerBatch;
+    uint256 diamondInitPriorityTxMaxPubdata;
+    uint256 diamondInitMinimalL2GasPrice;
+    address governanceSecurityCouncilAddress;
+    uint256 governanceMinDelay;
+    uint256 maxNumberOfChains;
+    bytes diamondCutData;
+    bytes32 bootloaderHash;
+    bytes32 defaultAAHash;
+}
+
+struct TokensConfig {
+    address tokenWethAddress;
+}
+
 contract DeployL1Script is Script {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
-    // solhint-disable-next-line gas-struct-packing
-    struct DeployedAddresses {
-        BridgehubDeployedAddresses bridgehub;
-        StateTransitionDeployedAddresses stateTransition;
-        BridgesDeployedAddresses bridges;
-        L1NativeTokenVaultAddresses vaults;
-        DataAvailabilityDeployedAddresses daAddresses;
-        address transparentProxyAdmin;
-        address governance;
-        address chainAdmin;
-        address accessControlRestrictionAddress;
-        address blobVersionedHashRetriever;
-        address validatorTimelock;
-        address create2Factory;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct L1NativeTokenVaultAddresses {
-        address l1NativeTokenVaultImplementation;
-        address l1NativeTokenVaultProxy;
-    }
-
-    struct DataAvailabilityDeployedAddresses {
-        address l1RollupDAValidator;
-        address l1ValidiumDAValidator;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct BridgehubDeployedAddresses {
-        address bridgehubImplementation;
-        address bridgehubProxy;
-        address ctmDeploymentTrackerImplementation;
-        address ctmDeploymentTrackerProxy;
-        address messageRootImplementation;
-        address messageRootProxy;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct BridgesDeployedAddresses {
-        address erc20BridgeImplementation;
-        address erc20BridgeProxy;
-        address sharedBridgeImplementation;
-        address sharedBridgeProxy;
-        address l1NullifierImplementation;
-        address l1NullifierProxy;
-        address bridgedStandardERC20Implementation;
-        address bridgedTokenBeacon;
-    }
-
-    // solhint-disable-next-line gas-struct-packing
-    struct Config {
-        uint256 l1ChainId;
-        address deployerAddress;
-        uint256 eraChainId;
-        address ownerAddress;
-        bool testnetVerifier;
-        ContractsConfig contracts;
-        TokensConfig tokens;
-    }
 
     // solhint-disable-next-line gas-struct-packing
     struct GeneratedData {
         bytes forceDeploymentsData;
     }
 
-    // solhint-disable-next-line gas-struct-packing
-    struct ContractsConfig {
-        bytes32 create2FactorySalt;
-        address create2FactoryAddr;
-        address multicall3Addr;
-        uint256 validatorTimelockExecutionDelay;
-        bytes32 genesisRoot;
-        uint256 genesisRollupLeafIndex;
-        bytes32 genesisBatchCommitment;
-        uint256 latestProtocolVersion;
-        bytes32 recursionNodeLevelVkHash;
-        bytes32 recursionLeafLevelVkHash;
-        bytes32 recursionCircuitsSetVksHash;
-        uint256 priorityTxMaxGasLimit;
-        PubdataPricingMode diamondInitPubdataPricingMode;
-        uint256 diamondInitBatchOverheadL1Gas;
-        uint256 diamondInitMaxPubdataPerBatch;
-        uint256 diamondInitMaxL2GasPerBatch;
-        uint256 diamondInitPriorityTxMaxPubdata;
-        uint256 diamondInitMinimalL2GasPrice;
-        address governanceSecurityCouncilAddress;
-        uint256 governanceMinDelay;
-        uint256 maxNumberOfChains;
-        bytes diamondCutData;
-        bytes32 bootloaderHash;
-        bytes32 defaultAAHash;
-    }
-
-    struct TokensConfig {
-        address tokenWethAddress;
-    }
-
-    Config internal config;
+    Config public config;
     GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
 
@@ -184,6 +185,18 @@ contract DeployL1Script is Script {
 
     function runForTest() public {
         runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+    }
+
+    function runForL2Test() public {
+        runL2Inner(vm.envString("L2_CONFIG"), vm.envString("L2_OUTPUT"));
+    }
+
+    function getAddresses() public view returns (DeployedAddresses memory) {
+        return addresses;
+    }
+
+    function getConfig() public view returns (Config memory) {
+        return config;
     }
 
     function runInner(string memory inputPath, string memory outputPath) internal {
@@ -232,36 +245,16 @@ contract DeployL1Script is Script {
         saveOutput(outputPath);
     }
 
-    function getBridgehubProxyAddress() public view returns (address) {
-        return addresses.bridgehub.bridgehubProxy;
-    }
+    function runL2Inner(string memory inputPath, string memory outputPath) internal {
+        string memory root = vm.projectRoot();
+        inputPath = string.concat(root, inputPath);
+        outputPath = string.concat(root, outputPath);
 
-    function getSharedBridgeProxyAddress() public view returns (address) {
-        return addresses.bridges.sharedBridgeProxy;
-    }
+        initializeConfig(inputPath);
 
-    function getNativeTokenVaultProxyAddress() public view returns (address) {
-        return addresses.vaults.l1NativeTokenVaultProxy;
-    }
-
-    function getL1NullifierProxyAddress() public view returns (address) {
-        return addresses.bridges.l1NullifierProxy;
-    }
-
-    function getOwnerAddress() public view returns (address) {
-        return config.ownerAddress;
-    }
-
-    function getCTM() public view returns (address) {
-        return addresses.stateTransition.chainTypeManagerProxy;
-    }
-
-    function getInitialDiamondCutData() public view returns (bytes memory) {
-        return config.contracts.diamondCutData;
-    }
-
-    function getCTMDeploymentTrackerAddress() public view returns (address) {
-        return addresses.bridgehub.ctmDeploymentTrackerProxy;
+        // instantiateCreate2Factory();
+        // deployIfNeededMulticall3();
+        deployChainTypeManagerContract();
     }
 
     function initializeConfig(string memory configPath) internal {

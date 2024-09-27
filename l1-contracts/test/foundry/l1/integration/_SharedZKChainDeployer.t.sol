@@ -163,7 +163,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address _bridgeHub
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
-            l1Script.getInitialDiamondCutData(),
+            ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
         bytes memory initData;

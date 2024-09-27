@@ -509,7 +509,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.mockCall(
-            bridgehubProxyAddress,
+            bridgeHubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
@@ -565,7 +565,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.mockCall(
-            bridgehubProxyAddress,
+            bridgeHubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
@@ -643,7 +643,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     function getAddressesToExclude() public returns (address[] memory) {
-        addressesToExclude.push(bridgehubProxyAddress);
+        addressesToExclude.push(bridgeHubProxyAddress);
         addressesToExclude.push(address(sharedBridge));
 
         for (uint256 i = 0; i < users.length; i++) {
