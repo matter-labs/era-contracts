@@ -11,22 +11,21 @@ import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
-import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IL2GatewayUpgrade} from "../state-transition/l2-deps/IL2GatewayUpgrade.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 
 import {GatewayHelper} from "./GatewayHelper.sol";
 
+// solhint-disable-next-line gas-struct-packing
 struct GatewayUpgradeEncodedInput {
     IL2ContractDeployer.ForceDeployment[] baseForceDeployments;
+    bytes fixedForceDeploymentsData;
     address ctmDeployer;
     address l2GatewayUpgrade;
     address oldValidatorTimelock;
     address newValidatorTimelock;
-    bytes fixedForceDeploymentsData;
 }
 
 /// @author Matter Labs
@@ -45,7 +44,10 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
-        GatewayUpgradeEncodedInput memory encodedInput = abi.decode(_proposedUpgrade.postUpgradeCalldata, (GatewayUpgradeEncodedInput));
+        GatewayUpgradeEncodedInput memory encodedInput = abi.decode(
+            _proposedUpgrade.postUpgradeCalldata,
+            (GatewayUpgradeEncodedInput)
+        );
 
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.__DEPRECATED_baseToken);
 
@@ -53,7 +55,6 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
         s.validators[encodedInput.oldValidatorTimelock] = false;
         s.validators[encodedInput.newValidatorTimelock] = true;
-        IBridgehub bridgehub = IBridgehub(s.bridgehub);
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
 
         bytes memory gatewayUpgradeCalldata = abi.encodeCall(
@@ -66,11 +67,11 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
             )
         );
 
-        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(IComplexUpgrader.upgrade, (
-            encodedInput.l2GatewayUpgrade,
-            gatewayUpgradeCalldata
-        ));
-        
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (encodedInput.l2GatewayUpgrade, gatewayUpgradeCalldata)
+        );
+
         // slither-disable-next-line controlled-delegatecall
         (bool success, ) = THIS_ADDRESS.delegatecall(
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)

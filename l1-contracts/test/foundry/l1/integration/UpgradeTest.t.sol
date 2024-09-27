@@ -12,13 +12,11 @@ import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 
 string constant ECOSYSTEM_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-config/mainnet.toml";
-string constant ECOSYSTEM_OUTPUT  = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
+string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
 string constant CHAIN_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-config/mainnet-era.toml";
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-era.toml";
 
-
 contract UpgradeTest is Test {
-
     EcosystemUpgrade generateUpgradeData;
     ChainUpgrade chainUpgrade;
 
@@ -29,26 +27,18 @@ contract UpgradeTest is Test {
 
     function test_MainnetFork() public {
         console.log("Preparing ecosystem contracts");
-        // Firstly, we deploy all the contracts. 
-        generateUpgradeData.prepareEcosystemContracts(
-            ECOSYSTEM_INPUT,
-            ECOSYSTEM_OUTPUT
-        );
+        // Firstly, we deploy all the contracts.
+        generateUpgradeData.prepareEcosystemContracts(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
 
         // For chain, we have deployed the DA validator contracts
         // and also updated the chain admin.
         // IMPORTANT: for erc20-based chains with token multiplier setter
         // this should be coordinated with the server.
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(
-            ECOSYSTEM_INPUT,
-            ECOSYSTEM_OUTPUT,
-            CHAIN_INPUT,
-            CHAIN_OUTPUT
-        );
+        chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
         console.log("Starting stage1 of the upgrade!");
-        // Now, some time has passed and we are ready to start the upgrade of the 
+        // Now, some time has passed and we are ready to start the upgrade of the
         // ecosystem.
         // Stage 1 of the upgrade:
         // - accept all the ownerships of the contracts
@@ -94,7 +84,7 @@ contract UpgradeTest is Test {
         // How the governance is implemented is out of scope here
         vm.startBroadcast(governanceAddr);
 
-        for(uint256 i = 0; i < calls.length; i++) {
+        for (uint256 i = 0; i < calls.length; i++) {
             Call memory call = calls[i];
 
             (bool success, bytes memory data) = payable(call.target).call{value: call.value}(call.data);

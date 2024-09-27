@@ -16,7 +16,7 @@ import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interf
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol"; 
+import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
@@ -60,7 +60,7 @@ import {ValidiumL1DAValidator} from "contracts/state-transition/data-availabilit
 import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol"; 
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
@@ -129,7 +129,6 @@ contract EcosystemUpgrade is Script {
         address expectedL2GatewayUpgrade;
         address l2SharedBridgeLegacyImpl;
         address l2BridgedStandardERC20Impl;
-
         // In reality, the following addresses need to be
         // deployed only on a settlement layer, i.e. the Gateway.
         address expectedL2ProxyAdminDeployer;
@@ -208,7 +207,6 @@ contract EcosystemUpgrade is Script {
         uint256 maxNumberOfChains;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
-
         address oldValidatorTimelock;
         address legacyErc20BridgeAddress;
         address bridgehubProxyAddress;
@@ -229,16 +227,13 @@ contract EcosystemUpgrade is Script {
     GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
 
-    function prepareEcosystemContracts(
-        string memory configPath,
-        string memory outputPath
-    ) public {
+    function prepareEcosystemContracts(string memory configPath, string memory outputPath) public {
         string memory root = vm.projectRoot();
         configPath = string.concat(root, configPath);
         outputPath = string.concat(root, outputPath);
 
         initializeConfig(configPath);
-        
+
         instantiateCreate2Factory();
 
         deployVerifier();
@@ -344,7 +339,7 @@ contract EcosystemUpgrade is Script {
             paymaster: uint256(uint160(address(0))),
             nonce: 25,
             value: 0,
-            reserved: [uint256(0),uint256(0),uint256(0),uint256(0)],
+            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
             // Note, that the data is empty, it will be fully composed inside the `GatewayUpgrade` contract
             data: new bytes(0),
             signature: new bytes(0),
@@ -373,7 +368,10 @@ contract EcosystemUpgrade is Script {
         uint256 NEW_PROTOCOL_VERSION = getNewProtocolVersion();
         Call memory call = Call({
             target: config.contracts.stateTransitionManagerAddress,
-            data: abi.encodeCall(ChainTypeManager.setNewVersionUpgrade, (getChainUpgradeInfo(), PREVIOUS_PROTOCOL_VERSION, DEADLINE, NEW_PROTOCOL_VERSION)),
+            data: abi.encodeCall(
+                ChainTypeManager.setNewVersionUpgrade,
+                (getChainUpgradeInfo(), PREVIOUS_PROTOCOL_VERSION, DEADLINE, NEW_PROTOCOL_VERSION)
+            ),
             value: 0
         });
 
@@ -381,7 +379,7 @@ contract EcosystemUpgrade is Script {
         calls[0] = call;
     }
 
-    function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData)  {
+    function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData) {
         Diamond.FacetCut[] memory deletedFacets = _getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](deletedFacets.length + 4);
@@ -420,7 +418,9 @@ contract EcosystemUpgrade is Script {
         });
 
         // TODO: we should fill this one up completely, but it is straightforward
-        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = new IL2ContractDeployer.ForceDeployment[](
+            0
+        );
         address ctmDeployer = addresses.bridgehub.ctmDeploymentTrackerProxy;
 
         GatewayUpgradeEncodedInput memory gateUpgradeInput = GatewayUpgradeEncodedInput({
@@ -432,7 +432,7 @@ contract EcosystemUpgrade is Script {
             newValidatorTimelock: addresses.validatorTimelock
         });
 
-        bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput); 
+        bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput);
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(),
@@ -443,7 +443,7 @@ contract EcosystemUpgrade is Script {
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: postUpgradeCalldata,
-            // FIXME: TBH, I am not sure if even should even put any time there, 
+            // FIXME: TBH, I am not sure if even should even put any time there,
             // but we may
             upgradeTimestamp: 0,
             newProtocolVersion: 0x1900000000
@@ -462,22 +462,47 @@ contract EcosystemUpgrade is Script {
         // We need to firstly update all the contracts
         calls[0] = Call({
             target: config.contracts.transparentProxyAdmin,
-            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(payable(config.contracts.stateTransitionManagerAddress)), addresses.stateTransition.chainTypeManagerImplementation)),
+            data: abi.encodeCall(
+                ProxyAdmin.upgrade,
+                (
+                    ITransparentUpgradeableProxy(payable(config.contracts.stateTransitionManagerAddress)),
+                    addresses.stateTransition.chainTypeManagerImplementation
+                )
+            ),
             value: 0
         });
         calls[1] = Call({
             target: config.contracts.transparentProxyAdmin,
-            data: abi.encodeCall(ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(payable(config.contracts.bridgehubProxyAddress)), addresses.bridgehub.bridgehubImplementation, abi.encodeCall(Bridgehub.initializeV2, ()))),
+            data: abi.encodeCall(
+                ProxyAdmin.upgradeAndCall,
+                (
+                    ITransparentUpgradeableProxy(payable(config.contracts.bridgehubProxyAddress)),
+                    addresses.bridgehub.bridgehubImplementation,
+                    abi.encodeCall(Bridgehub.initializeV2, ())
+                )
+            ),
             value: 0
         });
         calls[2] = Call({
             target: config.contracts.transparentProxyAdmin,
-            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(payable(config.contracts.oldSharedBridgeProxyAddress)), addresses.bridges.l1NullifierImplementation)),
+            data: abi.encodeCall(
+                ProxyAdmin.upgrade,
+                (
+                    ITransparentUpgradeableProxy(payable(config.contracts.oldSharedBridgeProxyAddress)),
+                    addresses.bridges.l1NullifierImplementation
+                )
+            ),
             value: 0
         });
         calls[3] = Call({
             target: config.contracts.transparentProxyAdmin,
-            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(payable(config.contracts.legacyErc20BridgeAddress)), addresses.bridges.erc20BridgeImplementation)),
+            data: abi.encodeCall(
+                ProxyAdmin.upgrade,
+                (
+                    ITransparentUpgradeableProxy(payable(config.contracts.legacyErc20BridgeAddress)),
+                    addresses.bridges.erc20BridgeImplementation
+                )
+            ),
             value: 0
         });
 
@@ -496,14 +521,24 @@ contract EcosystemUpgrade is Script {
         // Now, we need to update the bridgehub
         calls[6] = Call({
             target: config.contracts.bridgehubProxyAddress,
-            data: abi.encodeCall(Bridgehub.setAddresses, (addresses.bridges.sharedBridgeProxy, CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy), MessageRoot(addresses.bridgehub.messageRootProxy))),
+            data: abi.encodeCall(
+                Bridgehub.setAddresses,
+                (
+                    addresses.bridges.sharedBridgeProxy,
+                    CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
+                    MessageRoot(addresses.bridgehub.messageRootProxy)
+                )
+            ),
             value: 0
         });
 
         // Setting the necessary params for the L1Nullifier contract
         calls[7] = Call({
             target: config.contracts.oldSharedBridgeProxyAddress,
-            data: abi.encodeCall(L1Nullifier.setL1NativeTokenVault, (L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy)))),
+            data: abi.encodeCall(
+                L1Nullifier.setL1NativeTokenVault,
+                (L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy)))
+            ),
             value: 0
         });
         calls[8] = Call({
@@ -559,7 +594,9 @@ contract EcosystemUpgrade is Script {
         config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
 
-        config.contracts.stateTransitionManagerAddress = toml.readAddress("$.contracts.state_transition_manager_address");
+        config.contracts.stateTransitionManagerAddress = toml.readAddress(
+            "$.contracts.state_transition_manager_address"
+        );
         config.contracts.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
         config.contracts.oldSharedBridgeProxyAddress = toml.readAddress("$.contracts.old_shared_bridge_proxy_address");
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
@@ -569,7 +606,9 @@ contract EcosystemUpgrade is Script {
         // FIXME: value stored there is incorrect at the moment, figure out the correct value
         config.contracts.blobVersionedHashRetriever = toml.readAddress("$.contracts.blob_versioned_hash_retriever");
         config.contracts.l2BridgeProxyOwnerAddress = toml.readAddress("$.contracts.l2_bridge_proxy_owner_address");
-        config.contracts.l2BridgedStandardERC20ProxyOwnerAddress = toml.readAddress("$.contracts.l2_bridged_standard_erc20_proxy_owner_address");
+        config.contracts.l2BridgedStandardERC20ProxyOwnerAddress = toml.readAddress(
+            "$.contracts.l2_bridged_standard_erc20_proxy_owner_address"
+        );
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
@@ -582,8 +621,8 @@ contract EcosystemUpgrade is Script {
         address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
 
         address expectedL2ProxyAdminDeployer = Utils.getL2AddressViaCreate2Factory(
-            bytes32(0), 
-            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readProxyAdminDeployerBytecode()), 
+            bytes32(0),
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readProxyAdminDeployerBytecode()),
             abi.encode(aliasedGovernance)
         );
         address expectedL2ProxyAdmin = L2ContractHelper.computeCreate2Address(
@@ -594,52 +633,56 @@ contract EcosystemUpgrade is Script {
         );
 
         address permanentRestrictionImpl = Utils.getL2AddressViaCreate2Factory(
-            bytes32(0), 
-            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readPermanentRestrictionBytecode()), 
+            bytes32(0),
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readPermanentRestrictionBytecode()),
             // Note that for L2 deployments the L2AdminFactory is 0.
             abi.encode(L2_BRIDGEHUB_ADDRESS, address(0))
         );
 
         address permanentRestrictionProxy = Utils.getL2AddressViaCreate2Factory(
-            bytes32(0), 
+            bytes32(0),
             L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode()),
-            abi.encode(permanentRestrictionImpl, expectedL2ProxyAdmin, abi.encodeCall(PermanentRestriction.initialize, (aliasedGovernance)))
+            abi.encode(
+                permanentRestrictionImpl,
+                expectedL2ProxyAdmin,
+                abi.encodeCall(PermanentRestriction.initialize, (aliasedGovernance))
+            )
         );
 
         address[] memory requiredL2Restrictions = new address[](1);
-        requiredL2Restrictions[0] = permanentRestrictionProxy; 
+        requiredL2Restrictions[0] = permanentRestrictionProxy;
 
         addresses.expectedL2Addresses = ExpectedL2Addresses({
             expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), 
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()), 
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
                 hex""
             ),
             expectedValidiumL2DAValidator: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), 
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode()), 
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode()),
                 hex""
             ),
             expectedL2GatewayUpgrade: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), 
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()), 
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()),
                 hex""
             ),
             l2SharedBridgeLegacyImpl: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), 
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()), 
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()),
                 hex""
             ),
             l2BridgedStandardERC20Impl: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), 
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readStandardERC20Bytecode()), 
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readStandardERC20Bytecode()),
                 hex""
             ),
             expectedL2ProxyAdminDeployer: expectedL2ProxyAdminDeployer,
             expectedL2ProxyAdmin: expectedL2ProxyAdmin,
             expectedL2AdminFactory: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), 
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AdminFactoryBytecode()), 
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AdminFactoryBytecode()),
                 abi.encode(requiredL2Restrictions)
             ),
             expectedL2PermanentRestrictionImpl: permanentRestrictionImpl,
@@ -908,7 +951,11 @@ contract EcosystemUpgrade is Script {
         bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeImplementation, config.contracts.transparentProxyAdmin, initCalldata)
+            abi.encode(
+                addresses.bridges.sharedBridgeImplementation,
+                config.contracts.transparentProxyAdmin,
+                initCalldata
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("SharedBridgeProxy deployed at:", contractAddress);
@@ -917,7 +964,9 @@ contract EcosystemUpgrade is Script {
 
     function setL1LegacyBridge() internal {
         vm.broadcast(msg.sender);
-        L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress));
+        L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(
+            L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress)
+        );
     }
 
     function deployErc20BridgeImplementation() internal {
@@ -982,7 +1031,11 @@ contract EcosystemUpgrade is Script {
         );
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.vaults.l1NativeTokenVaultImplementation, config.contracts.transparentProxyAdmin, initCalldata)
+            abi.encode(
+                addresses.vaults.l1NativeTokenVaultImplementation,
+                config.contracts.transparentProxyAdmin,
+                initCalldata
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("L1NativeTokenVaultProxy deployed at:", contractAddress);
@@ -1016,7 +1069,7 @@ contract EcosystemUpgrade is Script {
         vm.startBroadcast(msg.sender);
 
         // Note, that it will take some time for the governance to sign the "acceptOwnership" transaction,
-        // in order to avoid any possibilty of the front-run, we will temporarily give the ownership to the 
+        // in order to avoid any possibilty of the front-run, we will temporarily give the ownership to the
         // contract that can only transfer ownership to the governance.
         _moveGovernanceToOwner(addresses.validatorTimelock);
         _moveGovernanceToOwner(addresses.bridges.sharedBridgeProxy);
@@ -1127,7 +1180,11 @@ contract EcosystemUpgrade is Script {
         vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
         vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
-        string memory stateTransition = vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        string memory stateTransition = vm.serializeAddress(
+            "state_transition",
+            "default_upgrade_addr",
+            addresses.stateTransition.defaultUpgrade
+        );
 
         vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
@@ -1189,9 +1246,21 @@ contract EcosystemUpgrade is Script {
             config.contracts.recursionNodeLevelVkHash
         );
 
-        vm.serializeAddress("contracts_config", "expected_rollup_l2_da_validator", addresses.expectedL2Addresses.expectedRollupL2DAValidator);
-        vm.serializeAddress("contracts_config", "expected_validium_l2_da_validator", addresses.expectedL2Addresses.expectedValidiumL2DAValidator);
-        vm.serializeAddress("contracts_config", "expected_l2_gateway_upgrade", addresses.expectedL2Addresses.expectedL2GatewayUpgrade);
+        vm.serializeAddress(
+            "contracts_config",
+            "expected_rollup_l2_da_validator",
+            addresses.expectedL2Addresses.expectedRollupL2DAValidator
+        );
+        vm.serializeAddress(
+            "contracts_config",
+            "expected_validium_l2_da_validator",
+            addresses.expectedL2Addresses.expectedValidiumL2DAValidator
+        );
+        vm.serializeAddress(
+            "contracts_config",
+            "expected_l2_gateway_upgrade",
+            addresses.expectedL2Addresses.expectedL2GatewayUpgrade
+        );
         vm.serializeBytes("contracts_config", "diamond_cut_data", generatedData.diamondCutData);
 
         string memory contractsConfig = vm.serializeBytes(

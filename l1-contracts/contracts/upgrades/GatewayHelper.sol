@@ -3,11 +3,11 @@
 pragma solidity 0.8.24;
 
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol"; 
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
-import { ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-import { ZKChainStorage } from "../state-transition/chain-deps/ZKChainStorage.sol";
+import {ZKChainStorage} from "../state-transition/chain-deps/ZKChainStorage.sol";
 
 library GatewayHelper {
     function getZKChainSpecificForceDeploymentsData(ZKChainStorage storage s) internal view returns (bytes memory) {

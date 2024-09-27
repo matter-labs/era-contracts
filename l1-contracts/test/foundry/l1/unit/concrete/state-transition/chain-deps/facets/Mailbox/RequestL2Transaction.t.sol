@@ -25,14 +25,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(l1SharedBridge);
-        vm.mockCall(
-            bridgehub,
-            abi.encodeCall(
-                Bridgehub.sharedBridge,
-                ()
-            ),
-            abi.encode(baseTokenBridgeAddress)
-        );
+        vm.mockCall(bridgehub, abi.encodeCall(Bridgehub.sharedBridge, ()), abi.encode(baseTokenBridgeAddress));
 
         tempAddress = makeAddr("temp");
         tempBytesArr = new bytes[](0);

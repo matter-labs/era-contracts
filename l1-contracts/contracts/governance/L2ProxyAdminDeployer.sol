@@ -8,10 +8,10 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The contract that deterministically deploys a ProxyAdmin, while 
+/// @notice The contract that deterministically deploys a ProxyAdmin, while
 /// ensuring that its owner is the aliased governance contract
 contract L2ProxyAdminDeployer {
-    address immutable public PROXY_ADMIN_ADDRESS; 
+    address public immutable PROXY_ADMIN_ADDRESS;
 
     constructor(address _aliasedGovernance) {
         ProxyAdmin admin = new ProxyAdmin{salt: bytes32(0)}();

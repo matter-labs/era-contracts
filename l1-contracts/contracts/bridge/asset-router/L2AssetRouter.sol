@@ -221,7 +221,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             _l1Token: _l1Token,
             _amount: _amount,
             _data: _data
-
         });
     }
 

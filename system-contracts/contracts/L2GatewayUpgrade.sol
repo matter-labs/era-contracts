@@ -5,8 +5,7 @@ pragma solidity 0.8.24;
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {ISystemContext} from "./interfaces/ISystemContext.sol";
-import {IL2GenesisUpgrade, FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
+import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 
 import {GatewayUpgrade} from "./GatewayUpgrade.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -28,11 +27,11 @@ contract L2GatewayUpgrade is GatewayUpgrade {
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
     ) external payable {
-        // Firstly, we force deploy the main set of contracts. 
+        // Firstly, we force deploy the main set of contracts.
         // Those will be deployed without any contract invocation.
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(_forceDeployments);
 
-        // Secondly, we perform the more complex deployment of the gateway contracts. 
+        // Secondly, we perform the more complex deployment of the gateway contracts.
         performGatewayContractsInit(_ctmDeployer, _fixedForceDeploymentsData, _additionalForceDeploymentsData);
 
         ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
@@ -41,7 +40,7 @@ contract L2GatewayUpgrade is GatewayUpgrade {
         );
 
         address l2LegacyBridgeAddress = additionalForceDeploymentsData.l2LegacySharedBridge;
-        
+
         if (l2LegacyBridgeAddress != address(0)) {
             FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
                 _fixedForceDeploymentsData,

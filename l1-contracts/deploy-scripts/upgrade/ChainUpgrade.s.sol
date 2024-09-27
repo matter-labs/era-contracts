@@ -19,9 +19,9 @@ interface LegacyChainAdmin {
     function owner() external view returns (address);
 }
 
-contract ChainUpgrade  is Script {
+contract ChainUpgrade is Script {
     using stdToml for string;
-    
+
     struct ChainConfig {
         address deployerAddress;
         address ownerAddress;
@@ -29,13 +29,11 @@ contract ChainUpgrade  is Script {
         address chainDiamondProxyAddress;
         bool validiumMode;
         bool permanentRollup;
-
         // FIXME: From ecosystem, maybe move to a different struct
         address expectedRollupL2DAValidator;
         address expectedL2GatewayUpgrade;
         address expectedValidiumL2DAValidator;
         address permanentRollupRestriction;
-
         address bridgehubProxyAddress;
         address oldSharedBridgeProxyAddress;
     }
@@ -67,8 +65,8 @@ contract ChainUpgrade  is Script {
         checkCorrectOwnerAddress();
         // Preparation of chain consists of two parts:
         // - Deploying l2 da validator
-        // - Deploying new chain admin 
-        
+        // - Deploying new chain admin
+
         deployNewL2DAValidator();
         deployL2GatewayUpgrade();
         deployNewChainAdmin();
@@ -77,29 +75,25 @@ contract ChainUpgrade  is Script {
         saveOutput(outputPath);
     }
 
-    function upgradeChain(
-        uint256 oldProtocolVersion, 
-        Diamond.DiamondCutData memory upgradeCutData
-    ) public {
+    function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
         Utils.adminExecute(
-            output.chainAdmin, 
-            output.accessControlRestriction, 
-            config.chainDiamondProxyAddress, 
+            output.chainAdmin,
+            output.accessControlRestriction,
+            config.chainDiamondProxyAddress,
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             0
         );
     }
-    
+
     function initializeConfig(
         string memory configPath,
         string memory ecosystemInputPath,
         string memory ecosystemOutputPath
     ) internal {
         config.deployerAddress = msg.sender;
-        
+
         // Grab config from output of l1 deployment
         string memory toml = vm.readFile(configPath);
-
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
@@ -110,7 +104,7 @@ contract ChainUpgrade  is Script {
         config.validiumMode = toml.readBool("$.chain.validium_mode");
         config.chainDiamondProxyAddress = toml.readAddress("$.chain.diamond_proxy_address");
         config.permanentRollup = toml.readBool("$.chain.permanent_rollup");
-        
+
         toml = vm.readFile(ecosystemOutputPath);
 
         config.expectedRollupL2DAValidator = toml.readAddress("$.contracts_config.expected_rollup_l2_da_validator");
@@ -129,7 +123,6 @@ contract ChainUpgrade  is Script {
         address currentAdminOwner = LegacyChainAdmin(currentChainAdmin).owner();
 
         require(currentAdminOwner == config.ownerAddress, "Only the owner of the chain admin can call this function");
-
     }
 
     function deployNewL2DAValidator() internal {
@@ -167,7 +160,7 @@ contract ChainUpgrade  is Script {
     function deployNewChainAdmin() internal {
         AccessControlRestriction accessControlRestriction = new AccessControlRestriction(0, config.ownerAddress);
 
-        address[] memory restrictions;    
+        address[] memory restrictions;
         if (config.permanentRollup) {
             restrictions = new address[](2);
             restrictions[0] = address(accessControlRestriction);
@@ -182,17 +175,21 @@ contract ChainUpgrade  is Script {
         output.accessControlRestriction = address(accessControlRestriction);
     }
 
-    /// @dev The caller of this function needs to be the owner of the chain admin 
-    /// of the 
+    /// @dev The caller of this function needs to be the owner of the chain admin
+    /// of the
     function governanceMoveToNewChainAdmin() internal {
         // Firstly, we need to call the legacy chain admin to transfer the ownership to the new chain admin
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: config.chainDiamondProxyAddress, value: 0, data: abi.encodeCall(IAdmin.setPendingAdmin, (output.chainAdmin))});
+        calls[0] = Call({
+            target: config.chainDiamondProxyAddress,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setPendingAdmin, (output.chainAdmin))
+        });
 
         vm.startBroadcast(config.ownerAddress);
         ChainAdmin(payable(currentChainAdmin)).multicall(calls, true);
         vm.stopBroadcast();
-    
+
         // Now we need to accept the adminship
         Utils.adminExecute({
             _admin: output.chainAdmin,
@@ -211,6 +208,5 @@ contract ChainUpgrade  is Script {
         string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
         console.log("Output saved at:", outputPath);
-
     }
 }

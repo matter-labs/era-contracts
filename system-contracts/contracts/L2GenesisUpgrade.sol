@@ -23,7 +23,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade, GatewayUpgrade {
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
 
         performGatewayContractsInit(_ctmDeployer, _fixedForceDeploymentsData, _additionalForceDeploymentsData);
-        
+
         emit UpgradeComplete(_chainId);
     }
 }

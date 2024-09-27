@@ -402,16 +402,12 @@ library SystemContractHelper {
         }
     }
 
-    /// @notice Performs a `mimicCall` to an address, while ensuring that the call 
+    /// @notice Performs a `mimicCall` to an address, while ensuring that the call
     /// was successful
     /// @param _to The address to call.
     /// @param _whoToMimic The address to mimic.
     /// @param _data The data to pass to the call.
-    function mimicCallWithPropagatedRevert(
-        address _to,
-        address _whoToMimic,
-        bytes memory _data
-    ) internal {
+    function mimicCallWithPropagatedRevert(address _to, address _whoToMimic, bytes memory _data) internal {
         (bool success, bytes memory returnData) = mimicCall(_to, _whoToMimic, _data);
         if (!success) {
             // Propagate revert reason

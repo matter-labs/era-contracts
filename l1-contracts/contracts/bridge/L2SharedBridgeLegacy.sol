@@ -120,7 +120,10 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         bytes calldata _data
     ) external {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
-        if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge && AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge) {
+        if (
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
+        ) {
             revert InvalidCaller(msg.sender);
         }
 
@@ -131,7 +134,6 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             _amount: _amount,
             _data: _data
         });
-
 
         address l2Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(_l1Token);
 

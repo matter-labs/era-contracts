@@ -8,11 +8,11 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The contract that is used a temporary owner for Ownable2Step contracts until the 
+/// @notice The contract that is used a temporary owner for Ownable2Step contracts until the
 /// governance can accept the ownership
 contract TransitionaryOwner {
     address public immutable GOVERNANCE_ADDRESS;
-    
+
     constructor(address _goveranceAddress) {
         GOVERNANCE_ADDRESS = _goveranceAddress;
     }

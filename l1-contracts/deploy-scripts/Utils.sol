@@ -245,11 +245,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal returns (address) {
-        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(
-            create2salt,
-            bytecode,
-            constructorargs
-        );
+        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
 
         address contractAddress = L2ContractHelper.computeCreate2Address(
             msg.sender,
@@ -278,12 +274,13 @@ library Utils {
         bytes32 bytecodeHash,
         bytes memory constructorArgs
     ) internal view returns (address) {
-        return L2ContractHelper.computeCreate2Address(
-            L2_CREATE2_FACTORY_ADDRESS,
-            create2Salt,
-            bytecodeHash,
-            keccak256(constructorArgs)
-        );
+        return
+            L2ContractHelper.computeCreate2Address(
+                L2_CREATE2_FACTORY_ADDRESS,
+                create2Salt,
+                bytecodeHash,
+                keccak256(constructorArgs)
+            );
     }
 
     function getDeploymentCalldata(
@@ -293,18 +290,10 @@ library Utils {
     ) internal view returns (bytes32 bytecodeHash, bytes memory data) {
         bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
 
-        data = abi.encodeWithSignature(
-            "create2(bytes32,bytes32,bytes)",
-            create2Salt,
-            bytecodeHash,
-            constructorArgs
-        );
+        data = abi.encodeWithSignature("create2(bytes32,bytes32,bytes)", create2Salt, bytecodeHash, constructorArgs);
     }
 
-    function appendArray(
-        bytes[] memory array,
-        bytes memory element
-    ) internal pure returns (bytes[] memory) {
+    function appendArray(bytes[] memory array, bytes memory element) internal pure returns (bytes[] memory) {
         uint256 arrayLength = array.length;
         bytes[] memory newArray = new bytes[](arrayLength + 1);
         for (uint256 i = 0; i < arrayLength; ++i) {
@@ -313,7 +302,7 @@ library Utils {
         newArray[arrayLength] = element;
         return newArray;
     }
-    
+
     /**
      * @dev Deploy l2 contracts through l1, while using built-in L2 Create2Factory contract.
      */
@@ -327,20 +316,12 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal returns (address) {
-        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(
-            create2salt,
-            bytecode,
-            constructorargs
-        );
+        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
 
-        address contractAddress = getL2AddressViaCreate2Factory(
-            create2salt,
-            bytecodeHash,
-            constructorargs
-        );
+        address contractAddress = getL2AddressViaCreate2Factory(create2salt, bytecodeHash, constructorargs);
 
         bytes[] memory _factoryDeps = appendArray(factoryDeps, bytecode);
-        
+
         runL1L2Transaction({
             l2Calldata: deployData,
             l2GasLimit: l2GasLimit,
