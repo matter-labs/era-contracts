@@ -13,12 +13,12 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 contract TransitionaryOwner {
     address public immutable GOVERNANCE_ADDRESS;
 
-    constructor(address _goveranceAddress) {
-        GOVERNANCE_ADDRESS = _goveranceAddress;
+    constructor(address _governanceAddress) {
+        GOVERNANCE_ADDRESS = _governanceAddress;
     }
 
     /// @notice Claims that ownership of a contract and transfers it to the governance
-    function claimOwnershipAndGiveToGoverance(address target) external {
+    function claimOwnershipAndGiveToGovernanceeee(address target) external {
         Ownable2Step(target).acceptOwnership();
         Ownable2Step(target).transferOwnership(GOVERNANCE_ADDRESS);
     }

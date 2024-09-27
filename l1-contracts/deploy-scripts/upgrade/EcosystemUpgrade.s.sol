@@ -1062,14 +1062,14 @@ contract EcosystemUpgrade is Script {
 
     function _moveGovernanceToOwner(address target) internal {
         Ownable2StepUpgradeable(target).transferOwnership(addresses.transitionaryOwner);
-        TransitionaryOwner(addresses.transitionaryOwner).claimOwnershipAndGiveToGoverance(target);
+        TransitionaryOwner(addresses.transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
     }
 
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
         // Note, that it will take some time for the governance to sign the "acceptOwnership" transaction,
-        // in order to avoid any possibilty of the front-run, we will temporarily give the ownership to the
+        // in order to avoid any possibility of the front-run, we will temporarily give the ownership to the
         // contract that can only transfer ownership to the governance.
         _moveGovernanceToOwner(addresses.validatorTimelock);
         _moveGovernanceToOwner(addresses.bridges.sharedBridgeProxy);

@@ -17,9 +17,9 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 /// @notice The contract that is used for facilitating the upgrade of the L2
 /// to the protocol version that supports gateway
 /// @dev This contract is neither predeployed nor a system contract. It is located
-/// in this folder due to very overlaping functionality with `L2GenesisUpgrade` and
-/// faciliating reusage of the code.
-/// @dev During the ugprade, it will be delegate-called by the `ComplexUpgrader` contract.
+/// in this folder due to very overlapping functionality with `L2GenesisUpgrade` and
+/// facilitating reusage of the code.
+/// @dev During the upgrade, it will be delegate-called by the `ComplexUpgrader` contract.
 contract L2GatewayUpgrade {
     function upgrade(
         ForceDeployment[] calldata _forceDeployments,
