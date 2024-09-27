@@ -18,7 +18,7 @@ contract TransitionaryOwner {
     }
 
     /// @notice Claims that ownership of a contract and transfers it to the governance
-    function claimOwnershipAndGiveToGovernanceeee(address target) external {
+    function claimOwnershipAndGiveToGovernance(address target) external {
         Ownable2Step(target).acceptOwnership();
         Ownable2Step(target).transferOwnership(GOVERNANCE_ADDRESS);
     }
