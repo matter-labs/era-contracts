@@ -40,6 +40,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
+    // slither-disable-next-line uninitialized-state
     address public override l1Bridge;
 
     modifier onlyNTV() {
