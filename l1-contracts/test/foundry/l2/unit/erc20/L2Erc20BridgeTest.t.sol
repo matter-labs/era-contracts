@@ -66,17 +66,18 @@ contract L2Erc20BridgeTest is Test {
             l1BridgeWallet,
             beaconProxyBytecodeHash
         );
-        L2Utils.initSystemContracts(SystemContractsArgs({
-            l1ChainId: L1_CHAIN_ID,
-            eraChainId: ERA_CHAIN_ID,
-            l1AssetRouter: L2_ASSET_ROUTER_ADDR,
-            legacySharedBridge: l2SharedBridge,
-            l2TokenBeacon: address(beacon),
-            l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
-            aliasedOwner: ownerWallet,
-            contractsDeployedAlready: true
-        }));
-
+        L2Utils.initSystemContracts(
+            SystemContractsArgs({
+                l1ChainId: L1_CHAIN_ID,
+                eraChainId: ERA_CHAIN_ID,
+                l1AssetRouter: L2_ASSET_ROUTER_ADDR,
+                legacySharedBridge: l2SharedBridge,
+                l2TokenBeacon: address(beacon),
+                l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
+                aliasedOwner: ownerWallet,
+                contractsDeployedAlready: true
+            })
+        );
     }
 
     function performDeposit(address depositor, address receiver, uint256 amount) internal {

@@ -22,12 +22,12 @@ contract GatewayPreparationForTests is GatewayPreparation {
         );
         config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
 
-        path = string.concat(root, vm.envString("GATEWAY_CONFIG"));
+        path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_CONFIG"));
         toml = vm.readFile(path);
 
         config.gatewayChainId = toml.readUint("$.chain.chain_chain_id");
 
-        path = string.concat(root, vm.envString("GATEWAY_OUTPUT"));
+        path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));
         toml = vm.readFile(path);
 
         config.gatewayChainAdmin = toml.readAddress("$.chain_admin_addr");

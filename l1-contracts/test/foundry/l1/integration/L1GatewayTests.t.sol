@@ -180,7 +180,12 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         {
             IZKChain chain = IZKChain(bridgehub.getZKChain(migratingChainId));
             bytes memory chainData = abi.encode(chain.getProtocolVersion());
-            bytes memory ctmData = abi.encode(address(1), msg.sender, chainTypeManager.protocolVersion(), ecosystemConfig.contracts.diamondCutData);
+            bytes memory ctmData = abi.encode(
+                address(1),
+                msg.sender,
+                chainTypeManager.protocolVersion(),
+                ecosystemConfig.contracts.diamondCutData
+            );
             BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
                 chainId: migratingChainId,
                 ctmData: ctmData,
@@ -254,7 +259,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         bytes32 baseTokenAssetId = keccak256("baseTokenAssetId");
 
         uint256 currentChainId = block.chainid;
-        // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId. 
+        // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
             address(bridgeHub),
@@ -274,11 +279,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
 
         // bytes memory initialDiamondCut = getInitialDiamondCutData();
         // gatewayScript.
-        gatewayScript.finishMigrateChainFromGateway(
-            migratingChain,
-            migratingChainId,
-            gatewayChainId
-        );
+        gatewayScript.finishMigrateChainFromGateway(migratingChain, migratingChainId, gatewayChainId);
 
         vm.chainId(currentChainId);
 

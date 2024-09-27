@@ -77,12 +77,29 @@ library L2Utils {
         forceDeploySystemContracts(_args);
     }
 
-    function forceDeploySystemContracts(
-        SystemContractsArgs memory _args
-    ) internal {
-        forceDeployBridgehub(_args.l1ChainId, _args.eraChainId, _args.aliasedOwner, _args.l1AssetRouter, _args.legacySharedBridge);
-        forceDeployAssetRouter(_args.l1ChainId, _args.eraChainId, _args.aliasedOwner,_args.l1AssetRouter, _args.legacySharedBridge);
-        forceDeployNativeTokenVault(_args.l1ChainId, _args.aliasedOwner, _args.l2TokenProxyBytecodeHash, _args.legacySharedBridge, _args.l2TokenBeacon, _args.contractsDeployedAlready);
+    function forceDeploySystemContracts(SystemContractsArgs memory _args) internal {
+        forceDeployBridgehub(
+            _args.l1ChainId,
+            _args.eraChainId,
+            _args.aliasedOwner,
+            _args.l1AssetRouter,
+            _args.legacySharedBridge
+        );
+        forceDeployAssetRouter(
+            _args.l1ChainId,
+            _args.eraChainId,
+            _args.aliasedOwner,
+            _args.l1AssetRouter,
+            _args.legacySharedBridge
+        );
+        forceDeployNativeTokenVault(
+            _args.l1ChainId,
+            _args.aliasedOwner,
+            _args.l2TokenProxyBytecodeHash,
+            _args.legacySharedBridge,
+            _args.l2TokenBeacon,
+            _args.contractsDeployedAlready
+        );
     }
 
     function forceDeployBridgehub(
@@ -97,7 +114,11 @@ library L2Utils {
         Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
         address l1CTMDeployer = address(0x1);
         vm.prank(_aliasedOwner);
-        bridgehub.setAddresses(L2_ASSET_ROUTER_ADDR, ICTMDeploymentTracker(l1CTMDeployer), IMessageRoot(L2_MESSAGE_ROOT_ADDR));
+        bridgehub.setAddresses(
+            L2_ASSET_ROUTER_ADDR,
+            ICTMDeploymentTracker(l1CTMDeployer),
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+        );
     }
 
     /// @notice Deploys the L2AssetRouter contract.
@@ -117,8 +138,11 @@ library L2Utils {
         {
             new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner);
         }
-        forceDeployWithConstructor("L2AssetRouter", L2_ASSET_ROUTER_ADDR, abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner));
-
+        forceDeployWithConstructor(
+            "L2AssetRouter",
+            L2_ASSET_ROUTER_ADDR,
+            abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner)
+        );
     }
 
     /// @notice Deploys the L2NativeTokenVault contract.
@@ -150,7 +174,20 @@ library L2Utils {
                 _baseTokenAssetId: ethAssetId
             });
         }
-        forceDeployWithConstructor("L2NativeTokenVault", L2_NATIVE_TOKEN_VAULT_ADDR, abi.encode(_l1ChainId, _aliasedOwner, _l2TokenProxyBytecodeHash, _legacySharedBridge, _l2TokenBeacon, _contractsDeployedAlready, address(0), ethAssetId));
+        forceDeployWithConstructor(
+            "L2NativeTokenVault",
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encode(
+                _l1ChainId,
+                _aliasedOwner,
+                _l2TokenProxyBytecodeHash,
+                _legacySharedBridge,
+                _l2TokenBeacon,
+                _contractsDeployedAlready,
+                address(0),
+                ethAssetId
+            )
+        );
     }
 
     function forceDeployWithConstructor(

@@ -22,6 +22,15 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayPreparation is Script {
@@ -44,6 +53,7 @@ contract GatewayPreparation is Script {
         address gatewayChainAdmin;
         address gatewayAccessControlRestriction;
         address gatewayChainProxyAdmin;
+        address l1NullifierProxy;
         bytes gatewayDiamondCutData;
     }
 
@@ -70,7 +80,7 @@ contract GatewayPreparation is Script {
         l1ChainId = block.chainid;
 
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/gateway-preparation-l1.toml");
+        string memory path = string.concat(root, vm.envString("GATEWAY_PREPARATION_L1_CONFIG"));
         string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
@@ -89,7 +99,8 @@ contract GatewayPreparation is Script {
             gatewayDiamondCutData: toml.readBytes("$.gateway_diamond_cut_data"),
             gatewayChainAdmin: toml.readAddress("$.chain_admin"),
             gatewayAccessControlRestriction: toml.readAddress("$.access_control_restriction"),
-            gatewayChainProxyAdmin: toml.readAddress("$.chain_proxy_admin")
+            gatewayChainProxyAdmin: toml.readAddress("$.chain_proxy_admin"),
+            l1NullifierProxy: toml.readAddress("$.l1_nullifier_proxy")
         });
     }
 
@@ -240,7 +251,7 @@ contract GatewayPreparation is Script {
 
         uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
         if (currentSettlementLayer == config.gatewayChainId) {
-            console.log("Chain already whitelisted as settlement layer");
+            console.log("Chain already using gateway as its settlement layer");
             saveOutput(bytes32(0));
             return;
         }
@@ -270,6 +281,95 @@ contract GatewayPreparation is Script {
         );
 
         saveOutput(l2TxHash);
+    }
+
+    /// @dev Calling this function requires private key to the admin of the chain
+    function startMigrateChainFromGateway(
+        address chainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
+        initializeConfig();
+
+        bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
+
+        uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
+        // if (currentSettlementLayer == config.l1ChainId) {
+        //     console.log("Chain already using L1 as its settlement layer");
+        //     saveOutput(bytes32(0));
+        //     return;
+        // }
+
+        // if (currentSettlementLayer == address(0)) {
+        //     console.log("Chain has never used Gateway as its settlement layer");
+        //     saveOutput(bytes32(0));
+        //     return;
+        // }
+
+        // bytes memory bridgehubData = abi.encode(
+        //     BridgehubBurnCTMAssetData({
+        //         chainId: chainId,
+        //         ctmData: abi.encode(chainAdmin, config.diamondCutData),
+        //         chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
+        //     })
+        // );
+
+        // L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
+        // l2AssetRouter.withdraw(
+        //     ctmAssetId,
+        //     bridgehubBurnData
+        // );
+
+        // saveOutput(l2TxHash);
+    }
+
+    function finishMigrateChainFromGateway(
+        IZKChain migratingChain,
+        uint256 migratingChainId,
+        uint256 gatewayChainId
+    ) public {
+        initializeConfig();
+
+        // TODO(EVM-746): Use L2-based chain admin contract
+        // address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(migratingChainId);
+        IChainTypeManager ctm = IChainTypeManager(bridgehub.chainTypeManager(migratingChainId));
+
+        bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
+        bytes memory ctmData = abi.encode(
+            baseTokenAssetId,
+            msg.sender,
+            ctm.protocolVersion(),
+            config.gatewayDiamondCutData
+        );
+        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
+            chainId: migratingChainId,
+            baseTokenAssetId: baseTokenAssetId,
+            ctmData: ctmData,
+            chainData: chainData
+        });
+        bytes memory bridgehubMintData = abi.encode(data);
+
+        L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
+
+        l1Nullifier.finalizeDeposit(
+            FinalizeL1DepositParams({
+                chainId: migratingChainId,
+                l2BatchNumber: 1,
+                l2MessageIndex: 1,
+                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2TxNumberInBatch: 1,
+                message: abi.encodePacked(
+                    IAssetRouterBase.finalizeDeposit.selector,
+                    gatewayChainId,
+                    assetId,
+                    bridgehubMintData
+                ),
+                merkleProof: new bytes32[](0)
+            })
+        );
     }
 
     /// @dev Calling this function requires private key to the admin of the chain

@@ -14,7 +14,6 @@ import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DeployedAddresses, Config} from "deploy-scripts/DeployL1.s.sol";
 
-
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
 
@@ -45,7 +44,10 @@ contract L1ContractDeployer is Test {
             "ZK_CHAIN_OUT",
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
-        vm.setEnv("GATEWAY_PREPARATION_L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml");
+        vm.setEnv(
+            "GATEWAY_PREPARATION_L1_CONFIG",
+            "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
+        );
 
         l1Script = new DeployL1Script();
         l1Script.runForTest();

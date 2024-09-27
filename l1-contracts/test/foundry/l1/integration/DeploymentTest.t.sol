@@ -93,7 +93,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function test_bridgeHubSetter() public {
         uint256 chainId = zkChainIds[0];
-        // IChainTypeManager chainTypeManager = IChainTypeManager(bridgeHub.chainTypeManager(chainId));
         uint256 randomChainId = 123456;
 
         vm.mockCall(
@@ -129,7 +128,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
-            
+
             vm.startBroadcast(owner);
             bridgeHub.addChainTypeManager(stmAddr);
             bridgeHub.addTokenAssetId(baseTokenAssetId);
