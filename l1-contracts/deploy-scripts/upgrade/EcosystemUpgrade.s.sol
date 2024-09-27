@@ -244,7 +244,7 @@ contract EcosystemUpgrade is Script {
         deployDAValidators();
         deployValidatorTimelock();
 
-        // FIXME: restore
+        // TODO: restore
         // deployChainAdmin();
         deployBridgehubImplementation();
         deployMessageRootContract();
@@ -258,9 +258,6 @@ contract EcosystemUpgrade is Script {
         deployErc20BridgeImplementation();
 
         deployCTMDeploymentTracker();
-
-        // TODO: the following wont work as the owner is the governance
-        // setBridgehubParams();
 
         initializeGeneratedData();
         initializeExpectedL2Addresses();
