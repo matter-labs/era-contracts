@@ -25,19 +25,19 @@ error RemovingPermanentRestriction();
 error UnallowedImplementation(bytes32 implementationHash);
 // 0x1ff9d522
 error AddressAlreadyUsed(address addr);
-//
+// 0x0dfb42bf
 error AddressAlreadySet(address addr);
 // 0x86bb51b8
 error AddressHasNoCode(address);
-//
+// 0x1f73225f
 error AddressMismatch(address expected, address supplied);
 // 0x1eee5481
 error AddressTooLow(address);
-//
+// 0x5e85ae73
 error AmountMustBeGreaterThanZero();
-//
+// 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
-//
+// 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 //
 error AssetIdAlreadyRegistered();
@@ -95,8 +95,6 @@ error DepositDoesNotExist();
 error DepositExists();
 // 0x79cacff1
 error DepositFailed();
-// 0xae08e4af
-error DepositIncorrectAmount(uint256 expectedAmt, uint256 providedAmt);
 // 0x0e7ee319
 error DiamondAlreadyFrozen();
 // 0x682dabb4
@@ -407,6 +405,12 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
+// 0x10f30e75
+error NotBridgehub(address addr);
+// 0x2554babc
+error InvalidAddress(address expected, address actual);
+// 0xfa5cd00f
+error NotAllowed(address addr);
 
 error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);
 
@@ -419,6 +423,8 @@ error MerkleWrongIndex(uint256 index, uint256 maxNodeNumber);
 error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
 
 error NoCTMForAssetId(bytes32 assetId);
+
+error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

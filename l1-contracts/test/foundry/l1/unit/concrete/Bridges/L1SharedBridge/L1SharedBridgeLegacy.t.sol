@@ -39,7 +39,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.prank(l1ERC20BridgeAddress);
 
         sharedBridge.depositLegacyErc20Bridge({
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _l2Receiver: bob,
             _l1Token: address(token),
             _amount: amount,
@@ -94,7 +94,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
             message: message,
             merkleProof: merkleProof
         });
-        l1Nullifier.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        l1Nullifier.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
@@ -146,6 +146,6 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
             message: message,
             merkleProof: merkleProof
         });
-        l1Nullifier.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        l1Nullifier.finalizeDeposit(finalizeWithdrawalParams);
     }
 }

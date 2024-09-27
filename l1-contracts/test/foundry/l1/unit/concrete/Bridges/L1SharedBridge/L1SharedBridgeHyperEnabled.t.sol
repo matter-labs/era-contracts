@@ -23,7 +23,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         sharedBridge.bridgehubDepositBaseToken{value: amount}({
             _chainId: chainId,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _amount: amount
         });
     }
@@ -39,7 +39,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         sharedBridge.bridgehubDepositBaseToken({
             _chainId: chainId,
             _assetId: tokenAssetId,
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _amount: amount
         });
     }
@@ -60,7 +60,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
         sharedBridge.bridgehubDeposit{value: amount}({
             _chainId: chainId,
-            _prevMsgSender: alice,
+            _originalCaller: alice,
             _value: amount,
             _data: abi.encode(ETH_TOKEN_ADDRESS, amount, bob)
         });

@@ -17,6 +17,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -75,6 +76,7 @@ contract L1AssetRouterTest is Test {
 
     address owner;
     address admin;
+    address proxyAdmin;
     address zkSync;
     address alice;
     address bob;
@@ -101,6 +103,7 @@ contract L1AssetRouterTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         admin = makeAddr("admin");
+        proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
@@ -130,7 +133,7 @@ contract L1AssetRouterTest is Test {
         });
         TransparentUpgradeableProxy l1NullifierProxy = new TransparentUpgradeableProxy(
             address(l1NullifierImpl),
-            admin,
+            proxyAdmin,
             abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
         );
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
@@ -143,7 +146,7 @@ contract L1AssetRouterTest is Test {
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
-            admin,
+            proxyAdmin,
             abi.encodeWithSelector(L1AssetRouter.initialize.selector, owner)
         );
         sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
@@ -156,7 +159,7 @@ contract L1AssetRouterTest is Test {
         address tokenBeacon = makeAddr("tokenBeacon");
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
-            admin,
+            proxyAdmin,
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
@@ -166,15 +169,16 @@ contract L1AssetRouterTest is Test {
         vm.prank(owner);
         l1Nullifier.setL1NativeTokenVault(nativeTokenVault);
         vm.prank(owner);
-        l1Nullifier.setL1Erc20Bridge(l1ERC20BridgeAddress);
+        l1Nullifier.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress));
         vm.prank(owner);
-        sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(l1ERC20BridgeAddress));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
         sharedBridge.setNativeTokenVault(INativeTokenVault(address(nativeTokenVault)));
         vm.prank(address(nativeTokenVault));
         nativeTokenVault.registerToken(address(token));
         nativeTokenVault.registerEthToken();
+        vm.prank(owner);
 
         vm.store(
             address(sharedBridge),
@@ -277,7 +281,7 @@ contract L1AssetRouterTest is Test {
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
             .target(address(l1Nullifier))
-            .sig(l1Nullifier.__DEPRECATED_chainBalance.selector)
+            .sig(l1Nullifier.chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);

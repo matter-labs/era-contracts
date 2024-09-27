@@ -20,6 +20,7 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
@@ -116,11 +117,22 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-        uint256 nullifierChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
+        uint256 nullifierChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
         originChainId[assetId] = block.chainid;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
+    }
+
+    /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
+    /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
+    function bridgeCheckCounterpartAddress(
+        uint256,
+        bytes32,
+        address,
+        address _assetHandlerAddressOnCounterpart
+    ) external view override onlyAssetRouter {
+        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -130,7 +142,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function _bridgeBurnNativeToken(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         // solhint-disable-next-line no-unused-vars
         bool _depositChecked,
         bytes calldata _data
@@ -140,12 +152,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
             _assetId,
             _depositAmount,
-            _prevMsgSender
+            _originalCaller
         );
         _bridgeMintData = super._bridgeBurnNativeToken({
             _chainId: _chainId,
             _assetId: _assetId,
-            _prevMsgSender: _prevMsgSender,
+            _originalCaller: _originalCaller,
             _depositChecked: depositChecked,
             _data: _data
         });

@@ -166,16 +166,16 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256 _chainId,
         uint256,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory _bridgeMintData) {
         if (originChainId[_assetId] != block.chainid) {
-            _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
+            _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _originalCaller, _data);
         } else {
             _bridgeMintData = _bridgeBurnNativeToken({
                 _chainId: _chainId,
                 _assetId: _assetId,
-                _prevMsgSender: _prevMsgSender,
+                _originalCaller: _originalCaller,
                 _depositChecked: false,
                 _data: _data
             });
@@ -185,7 +185,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     function _bridgeBurnBridgedToken(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) internal returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _receiver) = abi.decode(_data, (uint256, address));
@@ -195,12 +195,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
 
         address bridgedToken = tokenAddress[_assetId];
-        IBridgedStandardToken(bridgedToken).bridgeBurn(_prevMsgSender, _amount);
+        IBridgedStandardToken(bridgedToken).bridgeBurn(_originalCaller, _amount);
 
         emit BridgeBurn({
             chainId: _chainId,
             assetId: _assetId,
-            sender: _prevMsgSender,
+            sender: _originalCaller,
             receiver: _receiver,
             amount: _amount
         });
@@ -223,7 +223,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
-            _prevMsgSender: _prevMsgSender,
+            _originalCaller: _originalCaller,
             _l2Receiver: _receiver,
             _l1Token: originToken,
             _amount: _amount,
@@ -234,7 +234,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     function _bridgeBurnNativeToken(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         bool _depositChecked,
         bytes calldata _data
     ) internal virtual returns (bytes memory _bridgeMintData) {
@@ -252,17 +252,17 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             }
             _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (_depositAmount != amount) {
-                revert ValueMismatch(amount, msg.value);
+                revert ValueMismatch(_depositAmount, amount);
             }
         } else {
             // The Bridgehub also checks this, but we want to be sure
             if (msg.value != 0) {
                 revert NonEmptyMsgValue();
             }
-            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             amount = _depositAmount;
+            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (!_depositChecked) {
-                uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(nativeToken), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+                uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
                 // The token has non-standard transfer logic
                 if (amount != expectedDepositAmount) {
                     revert TokensWithFeesNotSupported();
@@ -279,7 +279,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             erc20Metadata = getERC20Getters(nativeToken, originChainId[_assetId]);
         }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
-            _prevMsgSender: _prevMsgSender,
+            _originalCaller: _originalCaller,
             _l2Receiver: _receiver,
             _l1Token: nativeToken,
             _amount: amount,
@@ -289,7 +289,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         emit BridgeBurn({
             chainId: _chainId,
             assetId: _assetId,
-            sender: _prevMsgSender,
+            sender: _originalCaller,
             receiver: _receiver,
             amount: amount
         });

@@ -255,14 +255,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function forwardedBridgeBurn(
         address _settlementLayer,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
         if (s.settlementLayer != address(0)) {
             revert AlreadyMigrated();
         }
-        if (_prevMsgSender != s.admin) {
-            revert NotChainAdmin(_prevMsgSender, s.admin);
+        if (_originalCaller != s.admin) {
+            revert NotChainAdmin(_originalCaller, s.admin);
         }
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_data, (uint256));

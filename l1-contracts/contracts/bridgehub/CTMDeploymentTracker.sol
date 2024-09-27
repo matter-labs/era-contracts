@@ -16,6 +16,9 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
 import {OnlyBridgehub, CtmNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
 
+/// @dev The encoding version of the data.
+bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
@@ -25,9 +28,6 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
-
-    /// @dev The encoding version of the data.
-    bytes1 internal constant ENCODING_VERSION = 0x01;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -39,9 +39,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyOwnerViaRouter(address _prevMsgSender) {
+    modifier onlyOwnerViaRouter(address _originalCaller) {
         // solhint-disable-next-line gas-custom-errors
-        if (msg.sender != address(L1_ASSET_ROUTER) || _prevMsgSender != owner()) {
+        if (msg.sender != address(L1_ASSET_ROUTER) || _originalCaller != owner()) {
             revert NotOwnerViaRouter(msg.sender);
         }
         _;
@@ -84,12 +84,12 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
     /// @param _chainId the chainId of the chain
-    /// @param _prevMsgSender the previous message sender
+    /// @param _originalCaller the previous message sender
     /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 _chainId,
-        address _prevMsgSender,
+        address _originalCaller,
         uint256,
         bytes calldata _data
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
@@ -100,11 +100,11 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         }
         // solhint-disable-next-line gas-custom-errors
 
-        if (_prevMsgSender != owner()) {
-            revert NotOwner(_prevMsgSender, owner());
+        if (_originalCaller != owner()) {
+            revert NotOwner(_originalCaller, owner());
         }
         bytes1 encodingVersion = _data[0];
-        require(encodingVersion == ENCODING_VERSION, "CTMDT: wrong encoding version");
+        require(encodingVersion == CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION, "CTMDT: wrong encoding version");
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
         request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
@@ -115,14 +115,14 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
-    /// @param _prevMsgSender the address that called the Router
+    /// @param _originalCaller the address that called the Router
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
     function bridgeCheckCounterpartAddress(
         uint256,
         bytes32,
-        address _prevMsgSender,
+        address _originalCaller,
         address _assetHandlerAddressOnCounterpart
-    ) external view override onlyOwnerViaRouter(_prevMsgSender) {
+    ) external view override onlyOwnerViaRouter(_originalCaller) {
         if (_assetHandlerAddressOnCounterpart != L2_BRIDGEHUB_ADDR) {
             revert WrongCounterPart(_assetHandlerAddressOnCounterpart, L2_BRIDGEHUB_ADDR);
         }

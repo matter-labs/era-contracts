@@ -22,10 +22,6 @@ import {ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, De
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Disable the initialization to prevent Parity hack.
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
 
@@ -57,19 +53,16 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         _;
     }
 
-    constructor(uint256 _eraChainId) {
-        ERA_CHAIN_ID = _eraChainId;
+    constructor() {
         _disableInitializers();
     }
 
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
-    /// @param _l1Bridge The address of the legacy L1 Bridge contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
         address _l1SharedBridge,
-        address _l1Bridge,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
@@ -87,17 +80,14 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
         l1SharedBridge = _l1SharedBridge;
 
-        if (block.chainid != ERA_CHAIN_ID) {
+        // The following statement is true only in freshly deployed environments. However,
+        // for those environments we do not need to deploy this contract at all.
+        // This check is primarily for local testing purposes.
+        if (l2TokenProxyBytecodeHash == bytes32(0) && address(l2TokenBeacon) == address(0)) {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
-        } else {
-            if (_l1Bridge == address(0)) {
-                revert ZeroAddress();
-            }
-            l1Bridge = _l1Bridge;
-            // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
     }
 

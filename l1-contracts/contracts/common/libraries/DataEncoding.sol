@@ -14,26 +14,26 @@ import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
  */
 library DataEncoding {
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
-    /// @param _prevMsgSender The address which initiated the transfer.
+    /// @param _originalCaller The address which initiated the transfer.
     /// @param _l2Receiver The address which to receive tokens on remote chain.
     /// @param _l1Token The transferred token address.
     /// @param _amount The amount of token to be transferred.
     /// @param _erc20Metadata The transferred token metadata.
     /// @return The encoded bridgeMint data
     function encodeBridgeMintData(
-        address _prevMsgSender,
+        address _originalCaller,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
         bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encode(_prevMsgSender, _l2Receiver, _l1Token, _amount, _erc20Metadata);
+        return abi.encode(_originalCaller, _l2Receiver, _l1Token, _amount, _erc20Metadata);
     }
 
     /// @notice Function decoding transfer data previously encoded with this library.
     /// @param _bridgeMintData The encoded bridgeMint data
-    /// @return _prevMsgSender The address which initiated the transfer.
+    /// @return _originalCaller The address which initiated the transfer.
     /// @return _l2Receiver The address which to receive tokens on remote chain.
     /// @return _parsedL1Token The transferred token address.
     /// @return _amount The amount of token to be transferred.
@@ -44,14 +44,14 @@ library DataEncoding {
         internal
         pure
         returns (
-            address _prevMsgSender,
+            address _originalCaller,
             address _l2Receiver,
             address _parsedL1Token,
             uint256 _amount,
             bytes memory _erc20Metadata
         )
     {
-        (_prevMsgSender, _l2Receiver, _parsedL1Token, _amount, _erc20Metadata) = abi.decode(
+        (_originalCaller, _l2Receiver, _parsedL1Token, _amount, _erc20Metadata) = abi.decode(
             _bridgeMintData,
             (address, address, address, uint256, bytes)
         );
@@ -93,14 +93,14 @@ library DataEncoding {
 
     /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
     /// @param _encodingVersion EncodingVersion.
-    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _originalCaller The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _nativeTokenVault The address of the token, only used if the encoding version is legacy.
     /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
     /// @return txDataHash The resulting encoded transaction data hash.
     function encodeTxDataHash(
         bytes1 _encodingVersion,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes32 _assetId,
         address _nativeTokenVault,
         bytes memory _transferData
@@ -108,11 +108,13 @@ library DataEncoding {
         if (_encodingVersion == LEGACY_ENCODING_VERSION) {
             address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_prevMsgSender, tokenAddress, depositAmount));
+            txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
         } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.
             // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
-            txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_prevMsgSender, _assetId, _transferData)));
+            txDataHash = keccak256(
+                bytes.concat(_encodingVersion, abi.encode(_originalCaller, _assetId, _transferData))
+            );
         } else {
             revert UnsupportedEncodingVersion();
         }

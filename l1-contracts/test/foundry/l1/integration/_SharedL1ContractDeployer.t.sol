@@ -5,12 +5,12 @@ import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
-import {GenerateForceDeploymentsData} from "deploy-scripts/GenerateForceDeploymentsData.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
@@ -19,28 +19,28 @@ contract L1ContractDeployer is Test {
     address bridgehubOwnerAddress;
     Bridgehub bridgeHub;
 
+    CTMDeploymentTracker ctmDeploymentTracker;
+
     L1AssetRouter public sharedBridge;
     L1Nullifier public l1Nullifier;
     L1NativeTokenVault public l1NativeTokenVault;
 
     DeployL1Script l1Script;
-    GenerateForceDeploymentsData forceDeploymentsScript;
 
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
-            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
         );
         vm.setEnv(
-            "FORCE_DEPLOYMENTS_CONFIG",
-            "/test/foundry/l1/integration/deploy-scripts/script-config/generate-force-deployments-data.toml"
+            "ZK_CHAIN_OUT",
+            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
-        forceDeploymentsScript = new GenerateForceDeploymentsData();
+
         l1Script = new DeployL1Script();
-        forceDeploymentsScript.run();
-        l1Script.run();
+        l1Script.runForTest();
 
         bridgehubProxyAddress = l1Script.getBridgehubProxyAddress();
         bridgeHub = Bridgehub(bridgehubProxyAddress);
@@ -54,6 +54,8 @@ contract L1ContractDeployer is Test {
         address l1NativeTokenVaultProxyAddress = l1Script.getNativeTokenVaultProxyAddress();
         l1NativeTokenVault = L1NativeTokenVault(payable(l1NativeTokenVaultProxyAddress));
 
+        ctmDeploymentTracker = CTMDeploymentTracker(l1Script.getCTMDeploymentTrackerAddress());
+
         _acceptOwnership();
         _setEraBatch();
 
@@ -64,6 +66,7 @@ contract L1ContractDeployer is Test {
         vm.startPrank(bridgeHub.pendingOwner());
         bridgeHub.acceptOwnership();
         sharedBridge.acceptOwnership();
+        ctmDeploymentTracker.acceptOwnership();
         vm.stopPrank();
     }
 
@@ -91,7 +94,7 @@ contract L1ContractDeployer is Test {
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
             .target(address(l1Nullifier))
-            .sig(l1Nullifier.__DEPRECATED_chainBalance.selector)
+            .sig(l1Nullifier.chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);

@@ -34,6 +34,7 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
 contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -41,7 +42,11 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
     address[] public l2ContractAddresses;
 
     uint256 migratingChainId = 10;
+    IZKChain migratingChain;
+
     uint256 gatewayChainId = 11;
+    IZKChain gatewayChain;
+
     uint256 mintChainId = 12;
 
     // generate MAX_USERS addresses and append it to users array
@@ -85,35 +90,55 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
 
         vm.deal(Ownable(l1Script.getBridgehubProxyAddress()).owner(), 100000000000000000000000000000000000);
         vm.deal(l1Script.getOwnerAddress(), 100000000000000000000000000000000000);
-        IZKChain chain = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(migratingChainId));
-        IZKChain chain2 = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(gatewayChainId));
-        vm.deal(chain.getAdmin(), 100000000000000000000000000000000000);
-        vm.deal(chain2.getAdmin(), 100000000000000000000000000000000000);
+        migratingChain = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(migratingChainId));
+        gatewayChain = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(gatewayChainId));
+        vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
+        vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
         // vm.deal(l1Script.getBridgehubProxyAddress(), 100000000000000000000000000000000000);
+    }
+
+    // This is a method to simplify porting the tests for now.
+    // Here we rely that the first restriction is the AccessControlRestriction
+    function _extractAccessControlRestriction(address admin) internal returns (address) {
+        return ChainAdmin(payable(admin)).getRestrictions()[0];
     }
 
     function setUp() public {
         prepare();
     }
 
+    function _setUpGatewayWithFilterer() internal {
+        gatewayScript.governanceRegisterGateway();
+        gatewayScript.deployAndSetGatewayTransactionFilterer();
+    }
+
     //
     function test_registerGateway() public {
-        gatewayScript.registerGateway();
+        _setUpGatewayWithFilterer();
     }
 
     //
     function test_moveChainToGateway() public {
-        gatewayScript.registerGateway();
-        gatewayScript.moveChainToGateway();
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
         // require(bridgehub.settlementLayer())
     }
 
     function test_l2Registration() public {
-        gatewayScript.registerGateway();
-        gatewayScript.moveChainToGateway();
-        gatewayScript.registerL2Contracts();
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
+        gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
+        gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
     }
 
     function test_finishMoveChain() public {
@@ -147,8 +172,12 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
     }
 
     function test_recoverFromFailedChainMigration() public {
-        gatewayScript.registerGateway();
-        gatewayScript.moveChainToGateway();
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
 
         // Setup
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
@@ -219,7 +248,8 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
     }
 
     function test_registerAlreadyDeployedZKChain() public {
-        gatewayScript.registerGateway();
+        gatewayScript.governanceRegisterGateway();
+
         IChainTypeManager stm = IChainTypeManager(l1Script.getCTM());
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         address owner = Ownable(address(bridgeHub)).owner();

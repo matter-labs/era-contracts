@@ -36,19 +36,30 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployEra() internal {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
+        );
+        vm.setEnv(
+            "ZK_CHAIN_OUT",
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
-
         deployScript = new RegisterZKChainScript();
         saveZKChainConfig(_getDefaultDescription(eraZKChainId, ETH_TOKEN_ADDRESS, eraZKChainId));
         vm.warp(100);
-        deployScript.run();
+        deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
     }
 
     function _deployZKChain(address _baseToken) internal {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
+            string.concat(
+                "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-",
+                Strings.toString(currentZKChainId),
+                ".toml"
+            )
+        );
+        vm.setEnv(
+            "ZK_CHAIN_OUT",
             string.concat(
                 "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
                 Strings.toString(currentZKChainId),
@@ -58,7 +69,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         zkChainIds.push(currentZKChainId);
         saveZKChainConfig(_getDefaultDescription(currentZKChainId, _baseToken, currentZKChainId));
         currentZKChainId++;
-        deployScript.run();
+        deployScript.runForTest();
     }
 
     function _getDefaultDescription(

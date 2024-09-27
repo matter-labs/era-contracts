@@ -278,7 +278,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice asset id can represent any token contract with the appropriate interface/functionality
     /// @param _baseTokenAssetId asset id of base token to be registered
-    function addTokenAssetId(bytes32 _baseTokenAssetId) external onlyOwner {
+    function addTokenAssetId(bytes32 _baseTokenAssetId) external onlyOwnerOrAdmin {
         if (assetIdIsRegistered[_baseTokenAssetId]) {
             revert AssetIdAlreadyRegistered();
         }
@@ -681,13 +681,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
     /// @param _assetId the assetId of the migrating chain's CTM
-    /// @param _prevMsgSender the previous message sender
+    /// @param _originalCaller the message sender initiated a set of calls that leads to bridge burn
     /// @param _data the data for the migration
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256, // msgValue
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (bytes memory bridgehubMintData) {
         if (!whitelistedSettlementLayers[_settlementChainId]) {
@@ -707,8 +707,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (zkChain == address(0)) {
             revert HyperchainNotRegistered();
         }
-        if (_prevMsgSender != IZKChain(zkChain).getAdmin()) {
-            revert IncorrectSender(_prevMsgSender, IZKChain(zkChain).getAdmin());
+        if (_originalCaller != IZKChain(zkChain).getAdmin()) {
+            revert IncorrectSender(_originalCaller, IZKChain(zkChain).getAdmin());
         }
 
         bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeBurn(
@@ -717,7 +717,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             zkChainMap.get(_settlementChainId),
-            _prevMsgSender,
+            _originalCaller,
             bridgehubData.chainData
         );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
@@ -794,7 +794,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IZKChain(getZKChain(bridgehubData.chainId)).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubData.chainId,
             _assetInfo: _assetId,
-            _prevMsgSender: _depositSender,
+            _originalCaller: _depositSender,
             _chainData: bridgehubData.chainData
         });
     }

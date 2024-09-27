@@ -35,5 +35,3 @@ error PubdataLengthTooBig(uint256 pubdataLength, uint256 blobSizeBytes);
 error InvalidPubdataHash(bytes32 fullPubdataHash, bytes32 pubdata);
 
 error BlobCommitmentNotPublished();
-
-error ValL1DAWrongInputLength(uint256 operatorDAInputLength, uint256 expected);

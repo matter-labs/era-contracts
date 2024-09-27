@@ -32,14 +32,14 @@ interface IAssetHandler {
     /// @param _chainId the chainId that the message will be sent to
     /// @param _msgValue the msg.value of the L2 transaction. For now it is always 0.
     /// @param _assetId the assetId of the asset being bridged
-    /// @param _prevMsgSender the original caller of the Bridgehub,
+    /// @param _originalCaller the original caller of the
     /// @param _data the actual data specified for the function
     /// @return _bridgeMintData The calldata used by counterpart asset handler to unlock tokens for recipient.
     function bridgeBurn(
         uint256 _chainId,
         uint256 _msgValue,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _originalCaller,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 }

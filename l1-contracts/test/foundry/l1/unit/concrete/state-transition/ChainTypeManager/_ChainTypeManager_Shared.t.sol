@@ -10,13 +10,15 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {L1GenesisUpgrade as GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
@@ -24,22 +26,26 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
-    GenesisUpgrade internal genesisUpgradeContract;
+    L1GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
+    RollupL1DAValidator internal rollupL1DAValidator;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
     address internal constant admin = address(0x2020202);
     address internal constant baseToken = address(0x3030303);
     address internal constant sharedBridge = address(0x4040404);
     address internal constant validator = address(0x5050505);
+    address internal constant l1Nullifier = address(0x6060606);
     address internal newChainAdmin;
     uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
     bytes internal forceDeploymentsData = hex"";
+    uint256 eraChainId = 9;
 
     Diamond.FacetCut[] internal facetCuts;
 
@@ -50,7 +56,7 @@ contract ChainTypeManagerTest is Test {
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
-        genesisUpgradeContract = new GenesisUpgrade();
+        genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
             Diamond.FacetCut({
@@ -122,6 +128,8 @@ contract ChainTypeManagerTest is Test {
         );
         chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
 
+        rollupL1DAValidator = new RollupL1DAValidator();
+
         vm.stopPrank();
         vm.startPrank(governor);
     }
@@ -141,6 +149,18 @@ contract ChainTypeManagerTest is Test {
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
         vm.stopPrank();
         vm.startPrank(address(bridgehub));
+
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
+            abi.encode(l1Nullifier)
+        );
+
+        vm.mockCall(
+            address(l1Nullifier),
+            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
+            abi.encode(l1Nullifier)
+        );
 
         return
             chainContractAddress.createNewChain({
