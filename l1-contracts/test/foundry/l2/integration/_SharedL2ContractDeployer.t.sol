@@ -31,7 +31,10 @@ contract L2ContractDeployer is DeployUtils {
 
     function deployL2Contracts() public {
         string memory root = vm.projectRoot();
-        string memory inputPath = string.concat(root, "/script-config/config-deploy-l1.toml");
+        string memory inputPath = string.concat(
+            root,
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
+        );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
         deployGenesisUpgrade();
