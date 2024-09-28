@@ -39,7 +39,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
-contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
+contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -288,6 +288,15 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         assertEq(bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
         IZKChain migratingChainContract = IZKChain(bridgehub.getZKChain(migratingChainId));
         assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
+    }
+
+    /// to increase coverage, properly tested in L2GatewayTests
+    function test_forwardToL3OnGateway() public {
+        _setUpGatewayWithFilterer();
+        vm.chainId(12345);
+        vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
+        bridgeHub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
+        vm.stopBroadcast();
     }
 
     // add this to be excluded from coverage report
