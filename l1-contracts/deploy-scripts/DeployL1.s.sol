@@ -503,7 +503,7 @@ contract DeployL1Script is Script, DeployUtils {
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
         bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
-    
+
         string memory root = vm.projectRoot();
         string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
 
@@ -515,7 +515,11 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
         vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
-        string memory toml =  vm.serializeBytes("diamond_selectors", "executor_facet_selectors", executorFacetSelectorsBytes);
+        string memory toml = vm.serializeBytes(
+            "diamond_selectors",
+            "executor_facet_selectors",
+            executorFacetSelectorsBytes
+        );
 
         vm.writeToml(toml, outputPath);
     }

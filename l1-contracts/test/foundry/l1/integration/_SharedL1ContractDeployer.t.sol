@@ -69,7 +69,6 @@ contract L1ContractDeployer is Test {
         bridgeHubOwnerAddress = bridgeHub.owner();
     }
 
-
     function _acceptOwnership() private {
         vm.startPrank(bridgeHub.pendingOwner());
         bridgeHub.acceptOwnership();

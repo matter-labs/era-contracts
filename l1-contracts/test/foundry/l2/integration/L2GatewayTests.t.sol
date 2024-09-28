@@ -29,7 +29,10 @@ import {SystemContractsArgs} from "../unit/utils/L2Utils.sol";
 import {L2ContractDeployer} from "./_SharedL2ContractDeployer.t.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-contract L2GatewayTests is Test, L2ContractDeployer { // is L1ContractDeployer, ZKChainDeployer, TokenDeployer {
+contract L2GatewayTests is
+    Test,
+    L2ContractDeployer // is L1ContractDeployer, ZKChainDeployer, TokenDeployer {
+{
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
     // It is a bit easier to use EOA and it is sufficient for the tests.
     address internal l1BridgeWallet = address(1);
@@ -101,7 +104,10 @@ contract L2GatewayTests is Test, L2ContractDeployer { // is L1ContractDeployer, 
         vm.prank(ownerWallet);
         l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-        l2Bridgehub.setAssetHandlerAddress(bytes32(uint256(uint160(l1CTM))), address(addresses.stateTransition.chainTypeManagerProxy));
+        l2Bridgehub.setAssetHandlerAddress(
+            bytes32(uint256(uint160(l1CTM))),
+            address(addresses.stateTransition.chainTypeManagerProxy)
+        );
         chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
     }
 
@@ -112,7 +118,6 @@ contract L2GatewayTests is Test, L2ContractDeployer { // is L1ContractDeployer, 
     function test_forwardToL3OnGateway() public {
         // todo fix this test
         // finalizeDeposit();
-
         // IBridgehub bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
         // vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         // bridgehub.forwardTransactionOnGateway(ERA_CHAIN_ID, bytes32(0), 0);
@@ -126,7 +131,6 @@ contract L2GatewayTests is Test, L2ContractDeployer { // is L1ContractDeployer, 
         //     chainTypeManager.protocolVersion(),
         //     config.contracts.diamondCutData
         // );
-
         // BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
         //     chainId: ERA_CHAIN_ID,
         //     baseTokenAssetId: baseTokenAssetId,

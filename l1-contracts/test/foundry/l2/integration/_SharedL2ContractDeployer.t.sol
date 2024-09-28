@@ -18,11 +18,13 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
 import {L2Utils} from "../unit/utils/L2Utils.sol";
 
-
 contract L2ContractDeployer is DeployUtils {
     using stdToml for string;
 
-    function deployViaCreate2(bytes memory creationCode, bytes memory constructorArgs) internal override returns (address) {
+    function deployViaCreate2(
+        bytes memory creationCode,
+        bytes memory constructorArgs
+    ) internal override returns (address) {
         console.log("Deploying via create2 L2");
         return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, config.contracts.create2FactorySalt);
     }

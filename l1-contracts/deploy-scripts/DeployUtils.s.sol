@@ -225,8 +225,16 @@ contract DeployUtils is Script {
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
 
-    function deployViaCreate2(bytes memory creationCode, bytes memory constructorArgs) internal virtual returns (address) {
-        return Utils.deployViaCreate2(abi.encodePacked(creationCode, constructorArgs), config.contracts.create2FactorySalt, addresses.create2Factory);
+    function deployViaCreate2(
+        bytes memory creationCode,
+        bytes memory constructorArgs
+    ) internal virtual returns (address) {
+        return
+            Utils.deployViaCreate2(
+                abi.encodePacked(creationCode, constructorArgs),
+                config.contracts.create2FactorySalt,
+                addresses.create2Factory
+            );
     }
 
     function deployVerifier() internal {
@@ -287,10 +295,7 @@ contract DeployUtils is Script {
         restrictions[0] = accessControlRestriction;
         addresses.accessControlRestrictionAddress = accessControlRestriction;
 
-        address contractAddress = deployViaCreate2(
-            type(ChainAdmin).creationCode,
-            abi.encode(restrictions)
-        );
+        address contractAddress = deployViaCreate2(type(ChainAdmin).creationCode, abi.encode(restrictions));
         console.log("ChainAdmin deployed at:", contractAddress);
         addresses.chainAdmin = contractAddress;
     }
@@ -315,10 +320,7 @@ contract DeployUtils is Script {
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
-        address adminFacet = deployViaCreate2(
-            type(AdminFacet).creationCode,
-            abi.encode(config.l1ChainId)
-        );
+        address adminFacet = deployViaCreate2(type(AdminFacet).creationCode, abi.encode(config.l1ChainId));
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 
@@ -447,8 +449,6 @@ contract DeployUtils is Script {
         console.log("ChainTypeManagerProxy deployed at:", contractAddress);
         addresses.stateTransition.chainTypeManagerProxy = contractAddress;
     }
-
-
 
     function test() internal virtual {}
 }
