@@ -12,7 +12,7 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses, Config} from "deploy-scripts/DeployL1.s.sol";
+import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
 
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
@@ -69,15 +69,6 @@ contract L1ContractDeployer is Test {
         bridgeHubOwnerAddress = bridgeHub.owner();
     }
 
-    function _deployL2Contracts() internal {
-        vm.setEnv("L2_CONFIG", "/test/foundry/l2/integration/script-config/config-deploy-l2.toml");
-        vm.setEnv("L2_OUTPUT", "/test/foundry/l2/integration/script-out/output-deploy-l2.toml");
-
-        l1Script = new DeployL1Script();
-        l1Script.runForL2Test();
-
-        chainTypeManager = IChainTypeManager(ecosystemAddresses.stateTransition.chainTypeManagerProxy);
-    }
 
     function _acceptOwnership() private {
         vm.startPrank(bridgeHub.pendingOwner());

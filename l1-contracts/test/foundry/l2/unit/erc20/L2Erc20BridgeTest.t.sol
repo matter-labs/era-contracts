@@ -43,6 +43,7 @@ contract L2Erc20BridgeTest is Test {
     string internal constant TOKEN_DEFAULT_NAME = "TestnetERC20Token";
     string internal constant TOKEN_DEFAULT_SYMBOL = "TET";
     uint8 internal constant TOKEN_DEFAULT_DECIMALS = 18;
+    address internal l1CTMDeployer = makeAddr("l1CTMDeployer");
 
     function setUp() public {
         aliasedL1BridgeWallet = AddressAliasHelper.applyL1ToL2Alias(l1BridgeWallet);
@@ -70,12 +71,13 @@ contract L2Erc20BridgeTest is Test {
             SystemContractsArgs({
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
-                l1AssetRouter: L2_ASSET_ROUTER_ADDR,
+                l1AssetRouter: l1BridgeWallet,
                 legacySharedBridge: l2SharedBridge,
                 l2TokenBeacon: address(beacon),
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
-                contractsDeployedAlready: true
+                contractsDeployedAlready: false,
+                l1CtmDeployer: l1CTMDeployer
             })
         );
     }

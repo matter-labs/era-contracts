@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -19,6 +21,10 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+
+import {SystemContractsCaller} from "contracts/common/libraries/SystemContractsCaller.sol";
+import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 
 struct SystemContractsArgs {
     uint256 l1ChainId;
@@ -29,6 +35,7 @@ struct SystemContractsArgs {
     bytes32 l2TokenProxyBytecodeHash;
     address aliasedOwner;
     bool contractsDeployedAlready;
+    address l1CtmDeployer;
 }
 
 library L2Utils {
@@ -83,7 +90,8 @@ library L2Utils {
             _args.eraChainId,
             _args.aliasedOwner,
             _args.l1AssetRouter,
-            _args.legacySharedBridge
+            _args.legacySharedBridge,
+            _args.l1CtmDeployer
         );
         forceDeployAssetRouter(
             _args.l1ChainId,
@@ -107,16 +115,16 @@ library L2Utils {
         uint256 _eraChainId,
         address _aliasedOwner,
         address _l1AssetRouter,
-        address _legacySharedBridge
+        address _legacySharedBridge,
+        address _l1CtmDeployer
     ) internal {
         new Bridgehub(_l1ChainId, _aliasedOwner, 100);
         forceDeployWithConstructor("Bridgehub", L2_BRIDGEHUB_ADDR, abi.encode(_l1ChainId, _aliasedOwner, 100));
         Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
-        address l1CTMDeployer = address(0x1);
         vm.prank(_aliasedOwner);
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
-            ICTMDeploymentTracker(l1CTMDeployer),
+            ICTMDeploymentTracker(_l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR)
         );
     }
@@ -193,7 +201,7 @@ library L2Utils {
     function forceDeployWithConstructor(
         string memory _contractName,
         address _address,
-        bytes memory _constuctorArgs
+        bytes memory _constructorArgs
     ) public {
         bytes memory bytecode = readEraBytecode(_contractName);
 
@@ -205,7 +213,7 @@ library L2Utils {
             newAddress: _address,
             callConstructor: true,
             value: 0,
-            input: _constuctorArgs
+            input: _constructorArgs
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
@@ -252,5 +260,25 @@ library L2Utils {
         bytes memory encodedDecimals = abi.encode(decimals);
 
         return abi.encode(encodedName, encodedSymbol, encodedDecimals);
+    }
+
+    function deployViaCreat2L2(
+        bytes memory creationCode,
+        bytes memory constructorargs,
+        bytes32 create2salt
+    ) internal returns (address) {
+        bytes memory bytecode = abi.encodePacked(creationCode, constructorargs);
+        address contractAddress;
+        assembly {
+            contractAddress := create2(0, add(bytecode, 0x20), mload(bytecode), create2salt)
+        }
+        uint32 size;
+        assembly {
+            size := extcodesize(contractAddress)
+        }
+        if (size == 0) {
+            revert DeployFailed();
+        }
+        return contractAddress;
     }
 }
