@@ -87,6 +87,7 @@ contract DeployL1Script is Script, DeployUtils {
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
+        saveDiamondSelectors();
         initializeConfig(inputPath);
 
         instantiateCreate2Factory();
