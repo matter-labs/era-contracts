@@ -62,7 +62,6 @@ contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     function run() public {
         console.log("Deploying L1 contracts");
@@ -132,29 +131,6 @@ contract DeployL1Script is Script, DeployUtils {
 
     function initializeGeneratedData() internal {
         generatedData.forceDeploymentsData = prepareForceDeploymentsData();
-    }
-
-    function instantiateCreate2Factory() internal {
-        address contractAddress;
-
-        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
-        bool isConfigured = config.contracts.create2FactoryAddr != address(0);
-
-        if (isConfigured) {
-            if (config.contracts.create2FactoryAddr.code.length == 0) {
-                revert AddressHasNoCode(config.contracts.create2FactoryAddr);
-            }
-            contractAddress = config.contracts.create2FactoryAddr;
-            console.log("Using configured Create2Factory address:", contractAddress);
-        } else if (isDeterministicDeployed) {
-            contractAddress = DETERMINISTIC_CREATE2_ADDRESS;
-            console.log("Using deterministic Create2Factory address:", contractAddress);
-        } else {
-            contractAddress = Utils.deployCreate2Factory();
-            console.log("Create2Factory deployed at:", contractAddress);
-        }
-
-        addresses.create2Factory = contractAddress;
     }
 
     function deployIfNeededMulticall3() internal {

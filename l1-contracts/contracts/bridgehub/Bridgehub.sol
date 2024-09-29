@@ -153,14 +153,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        _transferOwnership(_owner);
-        whitelistedSettlementLayers[_l1ChainId] = true;
+        _initialize(_owner);
     }
 
     /// @notice used to initialize the contract
     /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
+        _initialize(_owner);
+    }
+
+    function _initialize(address _owner) internal {
         _transferOwnership(_owner);
         assetIdIsRegistered[ETH_TOKEN_ASSET_ID] = true;
         whitelistedSettlementLayers[L1_CHAIN_ID] = true;

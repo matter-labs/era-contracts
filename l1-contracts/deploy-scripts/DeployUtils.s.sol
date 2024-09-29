@@ -168,6 +168,8 @@ struct GeneratedData {
 contract DeployUtils is Script {
     using stdToml for string;
 
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+
     Config public config;
     GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
@@ -223,6 +225,29 @@ contract DeployUtils is Script {
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
+    }
+
+    function instantiateCreate2Factory() internal {
+        address contractAddress;
+
+        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
+        bool isConfigured = config.contracts.create2FactoryAddr != address(0);
+
+        if (isConfigured) {
+            if (config.contracts.create2FactoryAddr.code.length == 0) {
+                revert AddressHasNoCode(config.contracts.create2FactoryAddr);
+            }
+            contractAddress = config.contracts.create2FactoryAddr;
+            console.log("Using configured Create2Factory address:", contractAddress);
+        } else if (isDeterministicDeployed) {
+            contractAddress = DETERMINISTIC_CREATE2_ADDRESS;
+            console.log("Using deterministic Create2Factory address:", contractAddress);
+        } else {
+            contractAddress = Utils.deployCreate2Factory();
+            console.log("Create2Factory deployed at:", contractAddress);
+        }
+
+        addresses.create2Factory = contractAddress;
     }
 
     function deployViaCreate2(

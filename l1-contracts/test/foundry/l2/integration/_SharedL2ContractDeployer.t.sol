@@ -16,31 +16,26 @@ import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-import {L2Utils} from "../unit/utils/L2Utils.sol";
+import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-contract L2ContractDeployer is DeployUtils {
+import {L2Utils} from "../unit/utils/L2Utils.sol";
+import {L2ContractDummyDeployer, SystemContractsArgs} from "../../l1/integration/_SharedL2ContractDummyDeployer.sol";
+
+contract L2ContractDeployer is DeployUtils, L2ContractDummyDeployer {
     using stdToml for string;
+
+    function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
+        L2Utils.initSystemContracts(_args);
+    }
 
     function deployViaCreate2(
         bytes memory creationCode,
         bytes memory constructorArgs
-    ) internal override returns (address) {
+    ) internal virtual override returns (address) {
         console.log("Deploying via create2 L2");
         return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, config.contracts.create2FactorySalt);
     }
 
-    function deployL2Contracts() public {
-        string memory root = vm.projectRoot();
-        string memory inputPath = string.concat(
-            root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
-        );
-        initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
-        deployGenesisUpgrade();
-        deployChainTypeManagerContract();
-    }
-
     // add this to be excluded from coverage report
-    function test() internal virtual override {}
+    function test() internal virtual override(DeployUtils, L2ContractDummyDeployer) {}
 }

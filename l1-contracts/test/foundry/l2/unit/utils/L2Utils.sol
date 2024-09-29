@@ -16,7 +16,8 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -25,18 +26,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
 import {SystemContractsCaller} from "contracts/common/libraries/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
-
-struct SystemContractsArgs {
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    address legacySharedBridge;
-    address l2TokenBeacon;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedOwner;
-    bool contractsDeployedAlready;
-    address l1CtmDeployer;
-}
+import {SystemContractsArgs} from "../../../l1/integration/_SharedL2ContractDummyDeployer.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -85,6 +75,7 @@ library L2Utils {
     }
 
     function forceDeploySystemContracts(SystemContractsArgs memory _args) internal {
+        forceDeployMessageRoot();
         forceDeployBridgehub(
             _args.l1ChainId,
             _args.eraChainId,
@@ -108,6 +99,11 @@ library L2Utils {
             _args.l2TokenBeacon,
             _args.contractsDeployedAlready
         );
+    }
+
+    function forceDeployMessageRoot() internal {
+        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR));
+        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR));
     }
 
     function forceDeployBridgehub(
