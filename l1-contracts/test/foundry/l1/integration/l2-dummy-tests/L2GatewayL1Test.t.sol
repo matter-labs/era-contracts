@@ -25,26 +25,27 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-import {L2ContractDummyDeployer} from "./_SharedL2ContractDummyDeployer.sol";
+import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractDummyDeployer.sol";
+import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2GatewayTestsAbstract} from "./L2GatewayTestsAbstract.t.sol";
+import {L2GatewayTestAbstract} from "./L2GatewayTestAbstract.t.sol";
+import {SharedL2ContractL1DeployerUtils} from "./_SharedL2ContractL1DeployerUtils.sol";
 
-contract L2GatewayDummyTests is Test, L2ContractDummyDeployer, L2GatewayTestsAbstract {
-    function test() internal virtual override(DeployUtils, L2ContractDummyDeployer) {}
+contract L2GatewayL1Test is Test, SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer, L2GatewayTestAbstract {
+    function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
 
     function initSystemContracts(
         SystemContractsArgs memory _args
-    ) internal virtual override(L2GatewayTestsAbstract, L2ContractDummyDeployer) {
+    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.initSystemContracts(_args);
     }
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public virtual override(L2GatewayTestsAbstract, L2ContractDummyDeployer) {
+    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.deployL2Contracts(_l1ChainId);
     }
 }

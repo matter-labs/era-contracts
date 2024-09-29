@@ -22,6 +22,7 @@ import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -38,7 +39,7 @@ struct SystemContractsArgs {
     address l1CtmDeployer;
 }
 
-contract L2ContractDummyDeployer is DeployUtils {
+contract SharedL2ContractL1DeployerUtils is DeployUtils {
     using stdToml for string;
     using stdStorage for StdStorage;
 
@@ -59,7 +60,7 @@ contract L2ContractDummyDeployer is DeployUtils {
             )
         );
         address ntv = address(
-            new L2NativeTokenVault(
+            new L2NativeTokenVaultDev(
                 _args.l1ChainId,
                 _args.aliasedOwner,
                 _args.l2TokenProxyBytecodeHash,
@@ -95,6 +96,7 @@ contract L2ContractDummyDeployer is DeployUtils {
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
+        L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
     }
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual {

@@ -26,7 +26,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
 import {SystemContractsCaller} from "contracts/common/libraries/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
-import {SystemContractsArgs} from "../../../l1/integration/_SharedL2ContractDummyDeployer.sol";
+import {SystemContractsArgs} from "../../l1/integration/l2-dummy-tests/_SharedL2ContractDeployer.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -214,48 +214,6 @@ library L2Utils {
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(deployments);
-    }
-
-    function deploySharedBridgeLegacy(
-        uint256 _l1ChainId,
-        uint256 _eraChainId,
-        address _aliasedOwner,
-        address _l1SharedBridge,
-        bytes32 _l2TokenProxyBytecodeHash
-    ) internal returns (address) {
-        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
-
-        L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
-        console.log("bridge", address(bridge));
-        address proxyAdmin = address(0x1);
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(bridge),
-            proxyAdmin,
-            abi.encodeWithSelector(
-                L2SharedBridgeLegacy.initialize.selector,
-                _l1SharedBridge,
-                _l2TokenProxyBytecodeHash,
-                _aliasedOwner
-            )
-        );
-        console.log("proxy", address(proxy));
-        return address(proxy);
-    }
-
-    /// @notice Encodes the token data.
-    /// @param name The name of the token.
-    /// @param symbol The symbol of the token.
-    /// @param decimals The decimals of the token.
-    function encodeTokenData(
-        string memory name,
-        string memory symbol,
-        uint8 decimals
-    ) internal pure returns (bytes memory) {
-        bytes memory encodedName = abi.encode(name);
-        bytes memory encodedSymbol = abi.encode(symbol);
-        bytes memory encodedDecimals = abi.encode(decimals);
-
-        return abi.encode(encodedName, encodedSymbol, encodedDecimals);
     }
 
     function deployViaCreat2L2(
