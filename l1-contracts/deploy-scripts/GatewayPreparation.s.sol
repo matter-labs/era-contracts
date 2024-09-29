@@ -188,7 +188,7 @@ contract GatewayPreparation is Script {
     function governanceSetCTMAssetHandler(bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetId(config.chainTypeManagerProxy);
+        bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
 
         // This should be equivalent to `config.chainTypeManagerProxy`, but we just double checking to ensure that
         // bridgehub was initialized correctly

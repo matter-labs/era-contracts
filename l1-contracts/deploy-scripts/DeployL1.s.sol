@@ -237,7 +237,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.stopBroadcast();
         console.log("CTM registered in CTMDeploymentTracker");
 
-        bytes32 assetId = bridgehub.ctmAssetId(addresses.stateTransition.chainTypeManagerProxy);
+        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
         // console.log(address(bridgehub.ctmDeployer()), addresses.bridgehub.ctmDeploymentTrackerProxy);
         // console.log(address(bridgehub.ctmDeployer().BRIDGE_HUB()), addresses.bridgehub.bridgehubProxy);
         console.log(
