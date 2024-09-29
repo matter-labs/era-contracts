@@ -295,17 +295,11 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
+        IBridgehub l2Bridgehub = IBridgehub(config.bridgehub);
 
-        uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
-        if (currentSettlementLayer == config.l1ChainId) {
-            console.log("Chain already using L1 as its settlement layer");
-            saveOutput(bytes32(0));
-            return;
-        }
-
-        if (currentSettlementLayer == 0) {
-            console.log("Chain has never used Gateway as its settlement layer");
+        uint256 currentSettlementLayer = l2Bridgehub.settlementLayer(chainId);
+        if (currentSettlementLayer == config.l1ChainId || currentSettlementLayer == 0) {
+            console.log("Chain not using Gateway as settlement layer");
             saveOutput(bytes32(0));
             return;
         }
@@ -318,8 +312,8 @@ contract GatewayPreparation is Script {
             })
         );
 
+        bytes32 ctmAssetId = l2Bridgehub.ctmAssetIdFromChainId(chainId);
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
-        bytes32 ctmAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
         bytes32 l2TxHash = l2AssetRouter.withdraw(ctmAssetId, bridgehubBurnData);
 
         saveOutput(l2TxHash);
