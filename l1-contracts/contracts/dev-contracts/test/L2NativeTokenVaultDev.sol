@@ -34,7 +34,7 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
             _baseTokenAssetId
         )
     {}
-    
+
     /// @notice copied from L1NTV for L1 compilation
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
