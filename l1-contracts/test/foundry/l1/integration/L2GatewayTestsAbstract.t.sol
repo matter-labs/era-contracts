@@ -32,10 +32,9 @@ import {SystemContractsArgs} from "./_SharedL2ContractDummyDeployer.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-abstract contract L2GatewayDummyAbstract is
+abstract contract L2GatewayTestsAbstract is
     Test,
     DeployUtils
-    // L2ContractDummyDeployer
 {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
     // It is a bit easier to use EOA and it is sufficient for the tests.

@@ -33,17 +33,17 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2GatewayDummyTestsAbstract} from "../../l1/integration/L2GatewayDummyTestsAbstract.t.sol";
+import {L2GatewayTestsAbstract} from "../../l1/integration/L2GatewayTestsAbstract.t.sol";
 import {L2ContractDummyDeployer} from "../../l1/integration/_SharedL2ContractDummyDeployer.sol";
 
-contract L2GatewayTests is Test, L2GatewayDummyTestsAbstract, L2ContractDeployer {
+contract L2GatewayTests is Test, L2GatewayTestsAbstract, L2ContractDeployer {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
     // It is a bit easier to use EOA and it is sufficient for the tests.
     function test() internal virtual override(DeployUtils, L2ContractDeployer) {}
 
     function initSystemContracts(
         SystemContractsArgs memory _args
-    ) internal override(L2GatewayDummyTests, L2ContractDeployer) {
+    ) internal override(L2GatewayTestsAbstract, L2ContractDeployer) {
         super.initSystemContracts(_args);
     }
 
@@ -54,7 +54,7 @@ contract L2GatewayTests is Test, L2GatewayDummyTestsAbstract, L2ContractDeployer
         return super.deployViaCreate2(creationCode, constructorArgs);
     }
 
-    function deployL2Contracts(uint256 _l1ChainId) public override(L2GatewayDummyTests, L2ContractDummyDeployer) {
+    function deployL2Contracts(uint256 _l1ChainId) public override(L2GatewayTestsAbstract, L2ContractDummyDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
 }

@@ -31,20 +31,20 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {SystemContractsArgs} from "./_SharedL2ContractDummyDeployer.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2GatewayDummyTests} from "./L2GatewayDummyTests.t.sol";
+import {L2GatewayTestsAbstract} from "./L2GatewayTestsAbstract.t.sol";
 
-contract L2GatewayDummyTests is Test, L2ContractDummyDeployer, L2GatewayDummyTests {
+contract L2GatewayDummyTests is Test, L2ContractDummyDeployer, L2GatewayTestsAbstract {
     function test() internal virtual override(DeployUtils, L2ContractDummyDeployer) {}
 
     function initSystemContracts(
         SystemContractsArgs memory _args
-    ) internal virtual override(L2GatewayDummyTests, L2ContractDummyDeployer) {
+    ) internal virtual override(L2GatewayTestsAbstract, L2ContractDummyDeployer) {
         super.initSystemContracts(_args);
     }
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public virtual override(L2GatewayDummyTests, L2ContractDummyDeployer) {
+    ) public virtual override(L2GatewayTestsAbstract, L2ContractDummyDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
 }
