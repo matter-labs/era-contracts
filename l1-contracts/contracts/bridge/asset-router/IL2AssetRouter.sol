@@ -14,7 +14,7 @@ interface IL2AssetRouter is IAssetRouterBase {
         bytes assetData
     );
 
-    function withdraw(bytes32 _assetId, bytes calldata _transferData) external;
+    function withdraw(bytes32 _assetId, bytes calldata _transferData) external returns (bytes32);
 
     function l1AssetRouter() external view returns (address);
 

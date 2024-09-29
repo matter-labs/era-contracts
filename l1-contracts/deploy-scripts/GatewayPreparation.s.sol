@@ -45,6 +45,8 @@ struct Config {
     address gatewayChainProxyAdmin;
     address l1NullifierProxy;
     bytes gatewayDiamondCutData;
+    bytes l1DiamondCutData;
+    uint256 l1ChainId;
 }
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
@@ -97,10 +99,12 @@ contract GatewayPreparation is Script {
             gatewayChainId: toml.readUint("$.chain_chain_id"),
             governance: toml.readAddress("$.governance"),
             gatewayDiamondCutData: toml.readBytes("$.gateway_diamond_cut_data"),
+            l1DiamondCutData: toml.readBytes("$.l1_diamond_cut_data"),
             gatewayChainAdmin: toml.readAddress("$.chain_admin"),
             gatewayAccessControlRestriction: toml.readAddress("$.access_control_restriction"),
             gatewayChainProxyAdmin: toml.readAddress("$.chain_proxy_admin"),
-            l1NullifierProxy: toml.readAddress("$.l1_nullifier_proxy")
+            l1NullifierProxy: toml.readAddress("$.l1_nullifier_proxy"),
+            l1ChainId: toml.readUint("$.l1_chain_id")
         });
     }
 
@@ -294,33 +298,31 @@ contract GatewayPreparation is Script {
         bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
 
         uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
-        // if (currentSettlementLayer == config.l1ChainId) {
-        //     console.log("Chain already using L1 as its settlement layer");
-        //     saveOutput(bytes32(0));
-        //     return;
-        // }
+        if (currentSettlementLayer == config.l1ChainId) {
+            console.log("Chain already using L1 as its settlement layer");
+            saveOutput(bytes32(0));
+            return;
+        }
 
-        // if (currentSettlementLayer == address(0)) {
-        //     console.log("Chain has never used Gateway as its settlement layer");
-        //     saveOutput(bytes32(0));
-        //     return;
-        // }
+        if (currentSettlementLayer == 0) {
+            console.log("Chain has never used Gateway as its settlement layer");
+            saveOutput(bytes32(0));
+            return;
+        }
 
-        // bytes memory bridgehubData = abi.encode(
-        //     BridgehubBurnCTMAssetData({
-        //         chainId: chainId,
-        //         ctmData: abi.encode(chainAdmin, config.diamondCutData),
-        //         chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
-        //     })
-        // );
+        bytes memory bridgehubBurnData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                chainId: chainId,
+                ctmData: abi.encode(chainAdmin, config.l1DiamondCutData),
+                chainData: abi.encode(IChainTypeManager(config.chainTypeManagerProxy).getProtocolVersion(chainId))
+            })
+        );
 
-        // L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
-        // l2AssetRouter.withdraw(
-        //     ctmAssetId,
-        //     bridgehubBurnData
-        // );
+        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
+        bytes32 ctmAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
+        bytes32 l2TxHash = l2AssetRouter.withdraw(ctmAssetId, bridgehubBurnData);
 
-        // saveOutput(l2TxHash);
+        saveOutput(l2TxHash);
     }
 
     function finishMigrateChainFromGateway(
