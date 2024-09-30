@@ -7,6 +7,8 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncU
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, L2BytecodeHashMismatch, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -31,7 +33,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         proposedUpgrade.upgradeTimestamp = upgradeTimestamp;
 
-        vm.expectRevert(bytes("Upgrade is not ready yet"));
+        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, upgradeTimestamp, block.timestamp));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
@@ -49,46 +51,57 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
-        vm.expectRevert(bytes("New protocol version is not greater than the current one"));
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Implementation requires that the major version is 0 at all times
+    // Previous major version is not zero
     function test_revertWhen_MajorVersionIsNotZero() public {
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(1, 0, 0));
 
         proposedUpgrade.newProtocolVersion = SemVer.packSemVer(1, 1, 0);
 
-        vm.expectRevert(bytes("Implementation requires that the major version is 0 at all times"));
+        vm.expectRevert(abi.encodeWithSelector(PreviousProtocolMajorVersionNotZero.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Major must always be 0
+    // New major version is not zero
     function test_revertWhen_MajorMustAlwaysBeZero(uint32 newProtocolVersion) public {
         vm.assume(newProtocolVersion > 0);
 
         proposedUpgrade.newProtocolVersion = SemVer.packSemVer(1, newProtocolVersion, 0);
 
-        vm.expectRevert(bytes("Major must always be 0"));
+        vm.expectRevert(abi.encodeWithSelector(NewProtocolMajorVersionNotZero.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
     // Protocol version difference is too big
-    function test_revertWhen_tooBigProtocolVersionDifference(uint32 newProtocolVersion) public {
-        vm.assume(newProtocolVersion > MAX_ALLOWED_MINOR_VERSION_DELTA);
+    function test_revertWhen_tooBigProtocolVersionDifference(
+        uint32 newProtocolVersion,
+        uint8 oldProtocolVersion
+    ) public {
+        vm.assume(newProtocolVersion > MAX_ALLOWED_MINOR_VERSION_DELTA + oldProtocolVersion + 1);
+        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, oldProtocolVersion, 0));
         uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
 
         proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
-        vm.expectRevert(bytes("Too big protocol version difference"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProtocolVersionMinorDeltaTooBig.selector,
+                MAX_ALLOWED_MINOR_VERSION_DELTA,
+                newProtocolVersion - oldProtocolVersion
+            )
+        );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
     // Previous upgrade has not been finalized
     function test_revertWhen_previousUpgradeHasNotBeenFinalized() public {
-        baseZkSyncUpgrade.setL2SystemContractsUpgradeTxHash(bytes32(bytes("txHash")));
+        bytes32 l2SystemContractsUpgradeTxHash = bytes32(bytes("txHash"));
+        baseZkSyncUpgrade.setL2SystemContractsUpgradeTxHash(l2SystemContractsUpgradeTxHash);
 
-        vm.expectRevert(bytes("Previous upgrade has not been finalized"));
+        vm.expectRevert(abi.encodeWithSelector(PreviousUpgradeNotFinalized.selector, l2SystemContractsUpgradeTxHash));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
@@ -98,26 +111,57 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         baseZkSyncUpgrade.setL2SystemContractsUpgradeBatchNumber(batchNumber);
 
-        vm.expectRevert(bytes("The batch number of the previous upgrade has not been cleaned"));
+        vm.expectRevert(abi.encodeWithSelector(PreviousUpgradeNotCleaned.selector));
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+    }
+
+    // Patch upgrade can't set bootloader
+    function test_revertWhen_PatchUpgradeCantSetBootloader() public {
+        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
+        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);
+
+        vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetBootloader.selector));
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+    }
+
+    // Patch upgrade can't set default account
+    function test_revertWhen_PatchUpgradeCantSetDefaultAccount() public {
+        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
+        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);
+        proposedUpgrade.bootloaderHash = bytes32(0);
+
+        vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetDefaultAccount.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
     // L2 system upgrade tx type is wrong
-    function test_revertWhen_L2SystemUpgradeTxTypeIsWrong(uint256 newTxType) public {
+    function test_revertWhen_InvalidTxType(uint256 newTxType) public {
         vm.assume(newTxType != SYSTEM_UPGRADE_L2_TX_TYPE && newTxType > 0);
-
         proposedUpgrade.l2ProtocolUpgradeTx.txType = newTxType;
 
-        vm.expectRevert(bytes("L2 system upgrade tx type is wrong"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidTxType.selector, newTxType));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // The new protocol version should be included in the L2 system upgrade tx
-    function test_revertWhen_NewProtocolVersionIsNotIncludedInL2SystemUpgradeTx(
+    // Patch upgrade can't set upgrade txn
+    function test_revertWhen_PatchCantSetUpgradeTxn() public {
+        // Change bootload and default account hashes to 0, to skip previous path only checks
+        proposedUpgrade.bootloaderHash = bytes32(0);
+        proposedUpgrade.defaultAccountHash = bytes32(0);
+
+        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
+        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);
+
+        vm.expectRevert(abi.encodeWithSelector(PatchCantSetUpgradeTxn.selector));
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+    }
+
+    // L2 upgrade nonce is not equal to the new protocol version
+    function test_revertWhen_L2UpgradeNonceIsNotEqualToNewProtocolVersion(
         uint32 newProtocolVersion,
         uint32 nonce
     ) public {
-        vm.assume(newProtocolVersion > 1);
+        vm.assume(newProtocolVersion > 0);
         vm.assume(nonce != newProtocolVersion && nonce > 0);
 
         uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
@@ -127,16 +171,23 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
         proposedUpgrade.l2ProtocolUpgradeTx.nonce = nonce;
 
-        vm.expectRevert(bytes("The new protocol version should be included in the L2 system upgrade tx"));
+        vm.expectRevert(
+            abi.encodeWithSelector(L2UpgradeNonceNotEqualToNewProtocolVersion.selector, nonce, newProtocolVersion)
+        );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
     // Wrong number of factory deps
-    function test_revertWhen_WrongNumberOfFactoryDeps() public {
-        proposedUpgrade.factoryDeps = new bytes[](1);
-        proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](2);
+    function test_revertWhen_WrongNumberOfFactoryDeps(
+        uint8 factoryDepsLength,
+        uint8 l2ProtocolUpgradeTxFDLength
+    ) public {
+        vm.assume(factoryDepsLength != l2ProtocolUpgradeTxFDLength);
 
-        vm.expectRevert(bytes("Wrong number of factory deps"));
+        proposedUpgrade.factoryDeps = new bytes[](factoryDepsLength);
+        proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](l2ProtocolUpgradeTxFDLength);
+
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedNumberOfFactoryDeps.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
@@ -147,7 +198,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         proposedUpgrade.factoryDeps = new bytes[](maxNewFactoryDeps);
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](maxNewFactoryDeps);
 
-        vm.expectRevert(bytes("Factory deps can be at most 32"));
+        vm.expectRevert(abi.encodeWithSelector(TooManyFactoryDeps.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
@@ -159,7 +210,15 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         proposedUpgrade.factoryDeps = factoryDeps;
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](1);
 
-        vm.expectRevert(bytes("Wrong factory dep hash"));
+        bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(factoryDeps[0]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                L2BytecodeHashMismatch.selector,
+                bytecodeHash,
+                bytes32(proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps[0])
+            )
+        );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
