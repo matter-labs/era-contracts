@@ -23,7 +23,7 @@ contract DefaultUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
     }
 
-    function test_SuccessUpdate() public {
+    function test_SuccessUpgrade() public {
         bytes32 result = baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
