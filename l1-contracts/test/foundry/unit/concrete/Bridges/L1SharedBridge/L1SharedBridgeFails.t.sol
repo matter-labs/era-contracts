@@ -55,16 +55,8 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
     }
 
-    function test_receiveEth_notSTM(uint256 amount, address caller) public {
-        address stmAddress = makeAddr("stm");
-
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, eraChainId),
-            abi.encode(stmAddress)
-        );
-
-        vm.assume(caller != stmAddress);
+    function test_receiveEth_notEra(uint256 amount, address caller) public {
+        vm.assume(caller != eraDiamondProxy);
         vm.deal(caller, amount);
         vm.prank(caller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
@@ -392,6 +384,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     function test_claimFailedDeposit_lastDepositTimeNotSet() public {
         vm.deal(address(sharedBridge), amount);
 
+        // mock just to skip the require and progress to last deposit checks
         vm.mockCall(
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters

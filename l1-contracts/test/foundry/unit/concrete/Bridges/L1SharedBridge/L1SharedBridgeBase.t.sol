@@ -17,40 +17,34 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_pauseUnpause(address amount) public {
+        // test pausing
         vm.prank(owner);
         sharedBridge.pause();
         assertTrue(sharedBridge.paused());
 
+         // test calling functions while paused
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-
         vm.expectRevert("Pausable: paused");
         vm.prank(bridgehubAddress);
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
 
+        // test unpausing
         vm.prank(owner);
         sharedBridge.unpause();
         assertFalse(sharedBridge.paused());
+
+        // test calling functions after unpausing
         vm.prank(bridgehubAddress);
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
     }
 
     function test_receiveEth(uint256 amount) public {
-        address stmAddress = makeAddr("stm");
-
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, eraChainId),
-            abi.encode(stmAddress)
-        );
-
-        vm.deal(stmAddress, amount);
-        vm.prank(stmAddress);
+        vm.deal(eraDiamondProxy, amount);
+        vm.prank(eraDiamondProxy);
         sharedBridge.receiveEth{value: amount}(eraChainId);
 
-        assertEq(address(stmAddress).balance, 0);
-
         assertEq(address(sharedBridge).balance, amount);
-        assertEq(stmAddress.balance, 0);
+        assertEq(eraDiamondProxy.balance, 0);
     }
 
     function test_bridgehubDepositBaseToken_Eth() public {
@@ -97,9 +91,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     }
 
     function test_bridgehubDeposit_Eth(uint256 amount) public {
-        // bound to avoid empty deposit assert
-        amount = bound(amount, 1, type(uint256).max);
-
+        vm.assume(amount > 0);
         vm.deal(bridgehubAddress, amount);
 
         vm.mockCall(

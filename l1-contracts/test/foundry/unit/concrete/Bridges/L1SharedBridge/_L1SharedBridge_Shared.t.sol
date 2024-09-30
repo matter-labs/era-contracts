@@ -10,6 +10,8 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 
 contract L1SharedBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -61,6 +63,8 @@ contract L1SharedBridgeTest is Test {
 
     L1SharedBridge sharedBridgeImpl;
     L1SharedBridge sharedBridge;
+    DummyBridgehub bridgeHub;
+    DummyStateTransitionManagerWBH stm;
     address bridgehubAddress;
     L1ERC20Bridge l1Erc20Bridge;
     address l1ERC20BridgeAddress;
@@ -75,6 +79,7 @@ contract L1SharedBridgeTest is Test {
     address zkSync;
     address alice;
     address bob;
+    address stmAddress;
     uint256 chainId;
     uint256 amount = 100;
     bytes32 txHash;
@@ -104,7 +109,6 @@ contract L1SharedBridgeTest is Test {
         proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
         zkSync = makeAddr("zkSync");
-        bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
         bob = makeAddr("bob");
         l1WethAddress = makeAddr("weth");
@@ -122,6 +126,14 @@ contract L1SharedBridgeTest is Test {
         eraChainId = 9;
         eraDiamondProxy = makeAddr("eraDiamondProxy");
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
+
+        bridgeHub = new DummyBridgehub();
+        bridgehubAddress = address(bridgeHub);
+    
+        stm = new DummyStateTransitionManagerWBH(bridgehubAddress);
+        stm.setHyperchain(eraChainId, eraDiamondProxy);
+        stmAddress = address(stm);
+        bridgeHub.setStateTransitionManager(eraChainId, stmAddress);
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         sharedBridgeImpl = new L1SharedBridge({
