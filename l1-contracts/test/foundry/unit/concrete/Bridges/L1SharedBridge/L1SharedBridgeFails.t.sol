@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol"; 
 
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -14,7 +14,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {L2BridgeNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, DepositIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {L2BridgeNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, DepositIncorrectAmount, InvalidProof, NoFundsTransferred, SharedBridgeValueAlreadySet, SharedBridgeValueNotSet, Unauthorized, AddressAlreadyUsed, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
@@ -35,12 +35,12 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         sharedBridge.acceptOwnership();
 
         vm.startPrank(owner);
-        vm.expectRevert("ShB: legacy bridge 0");
+        vm.expectRevert(ZeroAddress.selector);
         sharedBridge.setL1Erc20Bridge(address(0));
 
         sharedBridge.setL1Erc20Bridge(bridge);
 
-        vm.expectRevert("ShB: legacy bridge already set");
+        vm.expectRevert(abi.encodeWithSelector(AddressAlreadyUsed.selector, bridge));
         sharedBridge.setL1Erc20Bridge(anotherBridge);
         vm.stopPrank();
     }
@@ -50,7 +50,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.assume(chainId != chainId || caller != eraDiamondProxy);
 
         vm.deal(caller, amount);
-        vm.expectRevert("L1SharedBridge: not bridgehub or era chain");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         vm.prank(caller);
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
     }
@@ -67,7 +67,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.assume(caller != stmAddress);
         vm.deal(caller, amount);
         vm.prank(caller);
-        vm.expectRevert("receiveEth not state transition");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         sharedBridge.receiveEth{value: amount}(eraChainId);
     }
 
@@ -78,7 +78,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
 
         vm.prank(owner);
-        vm.expectRevert("ShB: eFPUB already set");
+        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueAlreadySet.selector, 0));
         sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
     }
 
@@ -89,7 +89,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostLegacyBridgeUpgradeFirstBatch);
 
         vm.prank(owner);
-        vm.expectRevert("ShB: eFPUB already set");
+        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueAlreadySet.selector, 1));
         sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
@@ -109,7 +109,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             eraLegacyBridgeLastDepositTxNumber
         );
 
-        vm.expectRevert("ShB: eLOBDB already set");
+        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueAlreadySet.selector, 2));
         sharedBridge.setEraLegacyBridgeLastDepositTime(
             eraLegacyBridgeLastDepositBatch,
             eraLegacyBridgeLastDepositTxNumber
@@ -148,7 +148,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             eraLegacyBridgeLastDepositTxNumber
         );
 
-        vm.expectRevert("ShB: eLOBDTN already set");
+        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueAlreadySet.selector, 3));
         sharedBridge.setEraLegacyBridgeLastDepositTime(
             eraLegacyBridgeLastDepositBatch,
             eraLegacyBridgeLastDepositTxNumber
@@ -307,7 +307,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
     function test_bridgehubConfirmL2Transaction_invalidCaller(address caller) public {
         vm.assume(caller != bridgehubAddress);
-        vm.expectRevert("ShB not BH");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         vm.prank(caller);
         sharedBridge.bridgehubConfirmL2Transaction(chainId, bytes32(0), bytes32(0));
     }
@@ -408,7 +408,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("ShB: last deposit time not set for Era");
+        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueNotSet.selector, 2));
         sharedBridge.claimFailedDeposit({
             _chainId: eraChainId,
             _depositSender: alice,
@@ -607,7 +607,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             amount
         );
 
-        vm.expectRevert("ShB: LegacyUFB not set for Era");
+        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueNotSet.selector, 1));
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: legacyBatchNumber,
@@ -620,7 +620,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.prank(owner);
         sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
 
-        vm.expectRevert("ShB: diamondUFB not set for Era");
+        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueNotSet.selector, 0));
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: legacyBatchNumber,
@@ -830,7 +830,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     function test_finalizeWithdrawalLegacyErc20Bridge_badCaller(address caller) public {
         vm.assume(caller != l1ERC20BridgeAddress);
 
-        vm.expectRevert("ShB not legacy bridge");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         vm.prank(caller);
         sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: 0,
@@ -844,7 +844,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     function test_claimFailedDepositLegacyErc20Bridge_badCaller(address caller) public {
         vm.assume(caller != l1ERC20BridgeAddress);
 
-        vm.expectRevert("ShB not legacy bridge");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         vm.prank(caller);
         sharedBridge.claimFailedDepositLegacyErc20Bridge({
             _depositSender: address(0),
@@ -874,7 +874,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     function test_depositLegacyERC20Bridge_badCaller(address caller) public {
         vm.assume(caller != l1ERC20BridgeAddress);
 
-        vm.expectRevert("ShB not legacy bridge");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         vm.prank(caller);
         sharedBridge.depositLegacyErc20Bridge({
             _prevMsgSender: alice,

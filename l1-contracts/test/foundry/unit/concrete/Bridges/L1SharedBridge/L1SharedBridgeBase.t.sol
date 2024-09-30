@@ -10,10 +10,10 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {IL2Bridge} from "contracts/bridge/interfaces/IL2Bridge.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_pauseUnpause(address amount) public {
@@ -84,8 +84,8 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
+            bytes memory name = abi.encode("Ether");
+            bytes memory symbol = abi.encode("ETH");
             bytes memory decimals = abi.encode(uint8(18));
             return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
         }

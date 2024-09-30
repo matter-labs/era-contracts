@@ -10,8 +10,10 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {NoFundsTransferred, ZeroBalance, SharedBridgeBalanceMismatch} from "contracts/common/L1ContractErrors.sol";
+
 
 contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     function test_transferFundsFromLegacy_zeroETHTransferred() public {
@@ -20,7 +22,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         vm.mockCall(targetDiamond, abi.encodeWithSelector(IMailbox.transferEthToSharedBridge.selector), "");
 
-        vm.expectRevert("ShB: 0 eth transferred");
+        vm.expectRevert(NoFundsTransferred.selector);
         vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, targetDiamond, targetChainId);
         assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), 0);
@@ -33,7 +35,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         vm.mockCall(targetDiamond, abi.encodeWithSelector(IMailbox.transferEthToSharedBridge.selector), "");
 
-        vm.expectRevert("ShB: 0 amount to transfer");
+        vm.expectRevert(ZeroBalance.selector);
         vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(tokenAddress, targetDiamond, targetChainId);
         assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
@@ -53,7 +55,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
 
-        vm.expectRevert("ShB: wrong amount transferred");
+        vm.expectRevert(SharedBridgeBalanceMismatch.selector);
         vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(tokenAddress, l1ERC20BridgeAddress, 9);
         assertEq(token.balanceOf(l1ERC20BridgeAddress), amount);
