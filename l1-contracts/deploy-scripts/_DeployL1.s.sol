@@ -5,8 +5,8 @@ pragma solidity 0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -37,8 +37,8 @@ import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 contract _DeployL1Script is Script {
     using stdToml for string;
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     // solhint-disable-next-line gas-struct-packing
     struct DeployedAddresses {
@@ -47,6 +47,7 @@ contract _DeployL1Script is Script {
         BridgesDeployedAddresses bridges;
         address transparentProxyAdmin;
         address governance;
+        address chainAdmin;
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
