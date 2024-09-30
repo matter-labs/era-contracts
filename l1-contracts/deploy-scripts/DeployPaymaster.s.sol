@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-
+import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "./Utils.sol";
 
 contract DeployPaymaster is Script {
@@ -19,13 +19,20 @@ contract DeployPaymaster is Script {
         address paymaster;
     }
 
+    function getPaymasterAddress() public view returns (address) {
+        return config.paymaster;
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-paymaster.toml");
+        string memory path = string.concat(root, "/deploy-script-config-template/config-deploy-paymaster.toml");
         string memory toml = vm.readFile(path);
-        config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
-        config.chainId = toml.readUint("$.chain_id");
+
+        path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        toml = vm.readFile(path);
+        config.bridgehubAddress = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        config.chainId = toml.readUint("$.era_chain_id");
     }
 
     function saveOutput() internal {
@@ -47,7 +54,6 @@ contract DeployPaymaster is Script {
         bytes memory testnetPaymasterBytecode = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/TestnetPaymaster.sol/TestnetPaymaster.json"
         );
-
         config.paymaster = Utils.deployThroughL1({
             bytecode: testnetPaymasterBytecode,
             constructorargs: "",
