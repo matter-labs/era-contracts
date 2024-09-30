@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -69,6 +69,7 @@ contract L1SharedBridgeTest is Test {
 
     address owner;
     address admin;
+    address proxyAdmin;
     address zkSync;
     address alice;
     address bob;
@@ -90,6 +91,7 @@ contract L1SharedBridgeTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         admin = makeAddr("admin");
+        proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
@@ -119,7 +121,7 @@ contract L1SharedBridgeTest is Test {
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
-            admin,
+            proxyAdmin,
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
@@ -135,6 +137,10 @@ contract L1SharedBridgeTest is Test {
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
+        vm.prank(owner);
+        sharedBridge.setPendingAdmin(admin);
+        vm.prank(admin);
+        sharedBridge.acceptAdmin();
     }
 
     function _setSharedBridgeDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {

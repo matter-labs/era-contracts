@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 /// @dev The enum that represents the transaction execution status
 /// @param Failure The transaction execution failed
@@ -122,6 +122,7 @@ struct L2CanonicalTransaction {
 /// @param factoryDeps The array of L2 bytecodes that the tx depends on.
 /// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
 /// this address will receive the `l2Value`.
+// solhint-disable-next-line gas-struct-packing
 struct BridgehubL2TransactionRequest {
     address sender;
     address contractL2;

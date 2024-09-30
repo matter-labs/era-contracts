@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainBaseTest, ERROR_ONLY_VALIDATOR} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest} from "./_Base_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract OnlyValidatorTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonValidator() public {
@@ -10,8 +11,7 @@ contract OnlyValidatorTest is ZkSyncHyperchainBaseTest {
 
         utilsFacet.util_setValidator(nonValidator, false);
 
-        vm.expectRevert(ERROR_ONLY_VALIDATOR);
-
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonValidator));
         vm.startPrank(nonValidator);
         testBaseFacet.functionWithOnlyValidatorModifier();
     }

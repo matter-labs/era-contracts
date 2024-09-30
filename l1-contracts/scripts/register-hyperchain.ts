@@ -59,17 +59,15 @@ async function main() {
 
   program
     .option("--private-key <private-key>")
-    .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .option("--governor-address <governor-address>")
-    .option("--create2-salt <create2-salt>")
-    .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
     .option("--use-governance <use-governance>")
+    .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -106,8 +104,14 @@ async function main() {
         await deployer.registerToken(baseTokenAddress, useGovernance);
       }
 
+      const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
+
       await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
-      await deployer.transferAdminFromDeployerToGovernance();
+      if (tokenMultiplierSetterAddress != "") {
+        console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
+        await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
+      }
+      await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
   await program.parseAsync(process.argv);

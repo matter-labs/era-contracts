@@ -7,7 +7,7 @@ import * as ethers from "ethers";
 import type { BigNumberish, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import * as zkethers from "zksync-ethers";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
+import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/utils";
 import * as fs from "fs";
 
 import type { FacetCut } from "./diamondCut";
@@ -145,6 +145,9 @@ export async function initialPreUpgradeContractsDeployment(
   nonce++;
 
   await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
+  nonce++;
+
+  await deployer.deployChainAdmin(create2Salt, { gasPrice, nonce });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
 

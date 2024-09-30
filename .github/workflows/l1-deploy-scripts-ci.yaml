@@ -1,4 +1,4 @@
-name: L1 contracts foundry CI
+name: L1 Deploy Scripts Tests CI
 
 env:
   ANVIL_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -38,7 +38,7 @@ jobs:
       - name: Create cache
         uses: actions/cache/save@v3
         with:
-          key: artifacts-l1-contracts-foudry-${{ github.sha }}
+          key: artifacts-l1-contracts-foundry-${{ github.sha }}
           path: |
             l1-contracts/cache
             l1-contracts/out
@@ -61,7 +61,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-contracts-foudry-${{ github.sha }}
+          key: artifacts-l1-contracts-foundry-${{ github.sha }}
           path: |
             l1-contracts/cache
             l1-contracts/out
@@ -99,19 +99,37 @@ jobs:
             exit 1
           fi
 
-      - name: Run DeployL1 script
-        working-directory: ./l1-contracts
-        run: forge script ./deploy-scripts/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+  test-ffi:
+    needs: [build]
+    runs-on: ubuntu-latest
 
-      - name: Run DeployErc20 script
-        working-directory: ./l1-contracts
-        run: forge script ./deploy-scripts/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
-# TODO restore scripts verification
-#      - name: Run RegisterHyperchain script
-#        working-directory: ./l1-contracts
-#        run: |
-#          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-hyperchain.toml
-#          forge script ./deploy-scripts/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
-#      - name: Run InitializeL2WethToken script
-#        working-directory: ./l1-contracts-foundry
-#        run: forge script ./deploy-scripts/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
+
+      - name: Run tests
+        run: yarn l1 test:ffi

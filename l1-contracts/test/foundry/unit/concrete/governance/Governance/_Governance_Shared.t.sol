@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {EventOnFallback} from "contracts/dev-contracts/EventOnFallback.sol";
 import {Forwarder} from "contracts/dev-contracts/Forwarder.sol";
 import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
@@ -58,8 +59,8 @@ contract GovernanceTest is Test, EventOnFallback {
         uint256 _value,
         bytes memory _data
     ) internal pure returns (IGovernance.Operation memory) {
-        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
-        calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: _value, data: _data});
         return IGovernance.Operation({calls: calls, salt: bytes32(0), predecessor: bytes32(0)});
     }
 

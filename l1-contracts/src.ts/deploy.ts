@@ -34,10 +34,11 @@ import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
+
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ERC20Factory } from "../typechain";
+import { ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 import type { Contract, Overrides } from "@ethersproject/contracts";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
@@ -81,7 +82,7 @@ export class Deployer {
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
   }
 
-  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
+  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[], compareDiamondCutHash: boolean = false) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
@@ -99,7 +100,7 @@ export class Deployer {
     };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
-    return compileInitialCutHash(
+    const diamondCut = compileInitialCutHash(
       facetCuts,
       verifierParams,
       L2_BOOTLOADER_BYTECODE_HASH,
@@ -110,6 +111,25 @@ export class Deployer {
       this.addresses.StateTransition.DiamondInit,
       false
     );
+
+    if (compareDiamondCutHash) {
+      const hash = ethers.utils.keccak256(
+        ethers.utils.defaultAbiCoder.encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCut])
+      );
+
+      console.log(`Diamond cut hash: ${hash}`);
+      const stm = StateTransitionManagerFactory.connect(
+        this.addresses.StateTransition.StateTransitionProxy,
+        this.deployWallet
+      );
+
+      const hashFromSTM = await stm.initialCutHash();
+      if (hash != hashFromSTM) {
+        throw new Error(`Has from STM ${hashFromSTM} does not match the computed hash ${hash}`);
+      }
+    }
+
+    return diamondCut;
   }
 
   public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -190,6 +210,32 @@ export class Deployer {
     this.addresses.Governance = contractAddress;
   }
 
+  public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    // Firstly, we deploy the access control restriction for the chain admin
+    const accessControlRestriction = await this.deployViaCreate2(
+      "AccessControlRestriction",
+      [0, this.ownerAddress],
+      create2Salt,
+      ethTxOptions
+    );
+    if (this.verbose) {
+      console.log(`CONTRACTS_ACCESS_CONTROL_RESTRICTION_ADDR=${accessControlRestriction}`);
+    }
+
+    // Then we deploy the ChainAdmin contract itself
+    const contractAddress = await this.deployViaCreate2(
+      "ChainAdmin",
+      [[accessControlRestriction]],
+      create2Salt,
+      ethTxOptions
+    );
+    if (this.verbose) {
+      console.log(`CONTRACTS_CHAIN_ADMIN_ADDR=${contractAddress}`);
+    }
+    this.addresses.ChainAdmin = contractAddress;
+  }
+
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("Bridgehub", [], create2Salt, ethTxOptions);
@@ -207,9 +253,12 @@ export class Deployer {
       console.log("Deploying Proxy Admin");
     }
     // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
-    const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
-      signer: this.deployWallet,
-    });
+    const contractFactory = await hardhat.ethers.getContractFactory(
+      "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
+      {
+        signer: this.deployWallet,
+      }
+    );
 
     const proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
     const rec = await proxyAdmin.deployTransaction.wait();
@@ -245,7 +294,7 @@ export class Deployer {
     const initCalldata = bridgehub.encodeFunctionData("initialize", [this.ownerAddress]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridgehub.BridgehubImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -309,7 +358,7 @@ export class Deployer {
     ]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [
         this.addresses.StateTransition.StateTransitionImplementation,
         this.addresses.TransparentProxyAdmin,
@@ -505,7 +554,7 @@ export class Deployer {
       "initialize"
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -548,7 +597,7 @@ export class Deployer {
       [this.addresses.Governance]
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.SharedBridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -685,6 +734,7 @@ export class Deployer {
     validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
+    compareDiamondCutHash: boolean = false,
     nonce?,
     predefinedChainId?: string,
     useGovernance: boolean = false
@@ -698,7 +748,7 @@ export class Deployer {
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
-    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
+    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const receipt = await this.executeDirectOrGovernance(
@@ -751,7 +801,8 @@ export class Deployer {
         console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
       }
     }
-    this.chainId = parseInt(chainId, 16);
+    const intChainId = parseInt(chainId, 16);
+    this.chainId = intChainId;
 
     const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
@@ -783,32 +834,62 @@ export class Deployer {
     }
 
     const diamondProxy = this.stateTransitionContract(this.deployWallet);
-    const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
-    const receipt4 = await tx4.wait();
-    if (this.verbose) {
-      console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);
-    }
-
-    if (validiumMode) {
-      const tx5 = await diamondProxy.setPubdataPricingMode(PubdataPricingMode.Validium);
-      const receipt5 = await tx5.wait();
+    // if we are using governance, the deployer will not be the admin, so we can't call the diamond proxy directly
+    if (admin == this.deployWallet.address) {
+      const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
+      const receipt4 = await tx4.wait();
       if (this.verbose) {
-        console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
+        console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);
       }
+
+      if (validiumMode) {
+        const tx5 = await diamondProxy.setPubdataPricingMode(PubdataPricingMode.Validium);
+        const receipt5 = await tx5.wait();
+        if (this.verbose) {
+          console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
+        }
+      }
+    } else {
+      console.warn(
+        "BaseTokenMultiplier and Validium mode can't be set through the governance, please set it separately, using the admin account"
+      );
     }
   }
 
-  public async transferAdminFromDeployerToGovernance() {
+  public async setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress: string) {
+    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
+
+    const receipt = await (await chainAdmin.setTokenMultiplierSetter(tokenMultiplierSetterAddress)).wait();
+    if (this.verbose) {
+      console.log(
+        `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
+      );
+    }
+  }
+
+  public async transferAdminFromDeployerToChainAdmin() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
     const diamondProxyAddress = await stm.getHyperchain(this.chainId);
     const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
 
-    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.Governance)).wait();
+    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.ChainAdmin)).wait();
     if (this.verbose) {
-      console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
+      console.log(`ChainAdmin set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"), false);
+    const acceptAdminData = hyperchain.interface.encodeFunctionData("acceptAdmin");
+    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
+    const multicallTx = await chainAdmin.multicall(
+      [
+        {
+          target: hyperchain.address,
+          value: 0,
+          data: acceptAdminData,
+        },
+      ],
+      true
+    );
+    await multicallTx.wait();
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");

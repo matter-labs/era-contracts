@@ -9,11 +9,11 @@ import { web3Provider } from "../../l1-contracts/scripts/utils";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
-import type { Provider } from "zksync-web3";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
-import { IERC20Factory } from "zksync-web3/build/typechain";
+import type { Provider } from "zksync-ethers";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-ethers/build/utils";
 
 import { ERC20Factory } from "../../l1-contracts/typechain";
+import { IERC20Factory } from "../typechain/IERC20Factory";
 
 export const provider = web3Provider();
 
@@ -141,6 +141,27 @@ export async function create2DeployFromL1(
     },
     { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
   );
+}
+
+export async function create2DeployFromL2(
+  wallet: ethers.Wallet,
+  bytecode: ethers.BytesLike,
+  constructor: ethers.BytesLike,
+  create2Salt: ethers.BytesLike,
+  extraFactoryDeps?: ethers.BytesLike[]
+) {
+  const deployerSystemContracts = new Interface(artifacts.readArtifactSync("IContractDeployer").abi);
+  const bytecodeHash = hashL2Bytecode(bytecode);
+  const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
+
+  const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
+  return await wallet.call({
+    to: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    data: calldata,
+    customData: {
+      factoryDeps,
+    },
+  });
 }
 
 export async function publishBytecodeFromL1(
