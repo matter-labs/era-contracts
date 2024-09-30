@@ -108,6 +108,18 @@ library Utils {
         return logs;
     }
 
+    function createSystemLogsWithEmptyDAValidator() public returns (bytes[] memory) {
+        bytes[] memory systemLogs = createSystemLogs(bytes32(0));
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+            true,
+            L2_TO_L1_MESSENGER,
+            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            bytes32(uint256(0))
+        );
+
+        return systemLogs;
+    }
+
     function createSystemLogsWithUpgradeTransaction(
         bytes32 _expectedSystemContractUpgradeTxHash
     ) public returns (bytes[] memory) {
@@ -116,6 +128,30 @@ library Utils {
         for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
             logs[i] = logsWithoutUpgradeTx[i];
         }
+        logs[logsWithoutUpgradeTx.length] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
+            _expectedSystemContractUpgradeTxHash
+        );
+        return logs;
+    }
+
+    function createSystemLogsWithUpgradeTransactionForCTM(
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        bytes32 _outputHash
+    ) public returns (bytes[] memory) {
+        bytes[] memory logsWithoutUpgradeTx = createSystemLogs(_outputHash);
+        bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
+        for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
+            logs[i] = logsWithoutUpgradeTx[i];
+        }
+        logs[uint256(SystemLogKey.PREV_BATCH_HASH_KEY)] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
+            bytes32(uint256(0x01))
+        );
         logs[logsWithoutUpgradeTx.length] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
@@ -198,7 +234,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](12);
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = AdminFacet.setPendingAdmin.selector;
         selectors[1] = AdminFacet.acceptAdmin.selector;
         selectors[2] = AdminFacet.setValidator.selector;
@@ -211,6 +247,7 @@ library Utils {
         selectors[9] = AdminFacet.freezeDiamond.selector;
         selectors[10] = AdminFacet.unfreezeDiamond.selector;
         selectors[11] = AdminFacet.genesisUpgrade.selector;
+        selectors[12] = AdminFacet.setDAValidatorPair.selector;
         return selectors;
     }
 
