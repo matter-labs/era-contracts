@@ -11,7 +11,7 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummytBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeUtils {}
+contract DummyBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeUtils {}
 
 contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
     DummytBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
@@ -19,7 +19,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
     function setUp() public {
         baseZkSyncUpgrade = new DummytBaseZkSyncUpgradeGenesis();
 
-        _prepereProposedUpgrade();
+        _prepareProposedUpgrade();
 
         baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);

@@ -25,7 +25,7 @@ contract BaseUpgrade is Test {
 
     address verifier;
 
-    function _prepereProposedUpgrade() internal {
+    function _prepareProposedUpgrade() internal {
         bytes[] memory bytesEmptyArray = new bytes[](1);
         bytesEmptyArray[0] = "11111111111111111111111111111111";
         uint256[] memory uintEmptyArray = new uint256[](1);
