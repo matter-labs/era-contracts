@@ -37,6 +37,9 @@ contract DummySharedBridge is PausableUpgradeable {
         dummyL2DepositTxHash = _dummyL2DepositTxHash;
     }
 
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function setDataToBeReturnedInFinalizeWithdrawal(address _l1Receiver, address _l1Token, uint256 _amount) external {
         l1ReceiverReturnInFinalizeWithdrawal = _l1Receiver;
         l1TokenReturnInFinalizeWithdrawal = _l1Token;
