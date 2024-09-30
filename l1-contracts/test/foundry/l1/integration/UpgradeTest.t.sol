@@ -66,8 +66,7 @@ contract UpgradeTest is Test {
         // including era specific deposit/withdraw functions
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
 
-        // This does not affect the tests, but for visibility that we will wait for 7 days.
-        vm.warp(7 days);
+        vm.warp(generateUpgradeData.getOldProtocolDeadline());
 
         console.log("Starting stage2 of the upgrade!");
         governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());

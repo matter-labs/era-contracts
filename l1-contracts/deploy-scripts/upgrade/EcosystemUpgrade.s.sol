@@ -353,6 +353,10 @@ contract EcosystemUpgrade is Script {
         return 0x1900000000;
     }
 
+    function getOldProtocolDeadline() public returns (uint256) {
+        return 7 days;
+    }
+
     function getOldProtocolVersion() public returns (uint256) {
         return 0x1800000002;
     }
@@ -360,8 +364,7 @@ contract EcosystemUpgrade is Script {
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
         // Just retrieved it from the contract
         uint256 PREVIOUS_PROTOCOL_VERSION = getOldProtocolVersion();
-        // TODO: Is it ok to provide a deadline here?
-        uint256 DEADLINE = type(uint256).max;
+        uint256 DEADLINE = getOldProtocolDeadline();
         uint256 NEW_PROTOCOL_VERSION = getNewProtocolVersion();
         Call memory call = Call({
             target: config.contracts.stateTransitionManagerAddress,
@@ -443,7 +446,7 @@ contract EcosystemUpgrade is Script {
             // FIXME: TBH, I am not sure if even should even put any time there,
             // but we may
             upgradeTimestamp: 0,
-            newProtocolVersion: 0x1900000000
+            newProtocolVersion: getNewProtocolVersion()
         });
 
         upgradeCutData = Diamond.DiamondCutData({
