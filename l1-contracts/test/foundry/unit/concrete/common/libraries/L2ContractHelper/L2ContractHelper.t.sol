@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {MalformedBytecode, BytecodeError, LengthIsNotDivisibleBy32} from "contracts/common/L1ContractErrors.sol";
 
 contract L2ContractHelperTest is Test {
     address daiOnEthereum = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
@@ -17,7 +18,7 @@ contract L2ContractHelperTest is Test {
     function test_RevertWhen_BytecodeLengthIsNotMultipleOf32() public {
         bytes memory bytecode = new bytes(63);
 
-        vm.expectRevert(bytes("pq"));
+        vm.expectRevert(abi.encodeWithSelector(LengthIsNotDivisibleBy32.selector, 63));
         bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecode);
     }
 
@@ -25,7 +26,7 @@ contract L2ContractHelperTest is Test {
     function test_RevertWhen_BytecodeLengthIsTooLarge() public {
         bytes memory bytecode = new bytes(2 ** 16 * 32);
 
-        vm.expectRevert(bytes("pp"));
+        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.NumberOfWords));
         bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecode);
     }
 
@@ -33,7 +34,7 @@ contract L2ContractHelperTest is Test {
     function test_RevertWhen_BytecodeLengthIsNotOdd() public {
         bytes memory bytecode = new bytes(64);
 
-        vm.expectRevert(bytes("ps"));
+        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.WordsMustBeOdd));
         bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecode);
     }
 
@@ -48,7 +49,7 @@ contract L2ContractHelperTest is Test {
     function test_RevertWhen_BytecodeHashVersionIsNotOne() public {
         bytes32 bytecodeHash = bytes32(0x02000001f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925);
 
-        vm.expectRevert(bytes("zf"));
+        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.Version));
         L2ContractHelper.validateBytecodeHash(bytecodeHash);
     }
 
@@ -56,7 +57,7 @@ contract L2ContractHelperTest is Test {
     function test_RevertWhen_CodeLengthInWordsIsNotOdd() public {
         bytes32 bytecodeHash = bytes32(0x01000002f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925);
 
-        vm.expectRevert(bytes("uy"));
+        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.WordsMustBeOdd));
         L2ContractHelper.validateBytecodeHash(bytecodeHash);
     }
 

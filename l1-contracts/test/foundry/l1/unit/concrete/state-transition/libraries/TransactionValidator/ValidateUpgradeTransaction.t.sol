@@ -49,7 +49,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // MaxFeePerGas must be 0 - otherwise we revert.
         testTx.maxFeePerGas = 1;
-        vm.expectRevert(bytes("uq"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxFeePerGas));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -57,7 +57,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // MaxPriorityFeePerGas must be 0 - otherwise we revert.
         testTx.maxPriorityFeePerGas = 1;
-        vm.expectRevert(bytes("ux"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxPriorityFeePerGas));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
