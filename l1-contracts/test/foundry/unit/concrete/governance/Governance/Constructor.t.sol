@@ -4,10 +4,11 @@ pragma solidity 0.8.24;
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {Governance} from "contracts/governance/Governance.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract ConstructorTest is GovernanceTest {
     function test_RevertWhen_AdminAddressIsZero() public {
-        vm.expectRevert("Admin should be non zero address");
+        vm.expectRevert(ZeroAddress.selector);
         new Governance(address(0), securityCouncil, 0);
     }
 

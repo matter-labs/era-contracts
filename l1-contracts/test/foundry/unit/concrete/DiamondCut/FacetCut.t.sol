@@ -9,7 +9,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, FacetExists, SelectorsMustAllHaveSameFreezability, AddressHasNoCode, NonZeroAddress, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, FacetExists, SelectorsMustAllHaveSameFreezability, AddressHasNoCode, NonZeroAddress, RemoveFunctionFacetAddressZero, ZeroAddress, NoFunctionsForDiamondCut} from "contracts/common/L1ContractErrors.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
@@ -87,7 +87,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("B"));
+        vm.expectRevert(NoFunctionsForDiamondCut.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -186,7 +186,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("a2"));
+        vm.expectRevert(RemoveFunctionFacetAddressZero.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
