@@ -11,7 +11,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
-contract GettersFacetWrapper is GettersFacet {
+contract GettersFacetWrapper is GettersFacet, Test {
     function util_setVerifier(address _verifier) external {
         s.verifier = IVerifier(_verifier);
     }
@@ -170,6 +170,9 @@ contract GettersFacetWrapper is GettersFacet {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         ds.selectorToFacet[_selector].facetAddress = _facet;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
 
 contract GettersFacetTest is Test {

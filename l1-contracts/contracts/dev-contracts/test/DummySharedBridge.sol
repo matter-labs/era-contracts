@@ -13,6 +13,9 @@ import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
 
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
