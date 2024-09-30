@@ -141,7 +141,6 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
             baseTokenAssetId,
-            L2_ASSET_ROUTER_ADDR,
             address(0x1),
             abi.encode(config.contracts.diamondCutData, generatedData.forceDeploymentsData),
             new bytes[](0)

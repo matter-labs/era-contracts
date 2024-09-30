@@ -76,7 +76,10 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
 
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
+        uint256 prevChainId = block.chainid;
+        vm.chainId(_args.l1ChainId);
         Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
+        vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
         Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
             L2_ASSET_ROUTER_ADDR,
