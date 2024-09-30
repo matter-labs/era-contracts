@@ -10,17 +10,20 @@ import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 import {SystemContractsCaller} from "../common/libraries/SystemContractsCaller.sol";
 import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {IL2AssetRouter} from "./asset-router/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./ntv/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../common/L1ContractErrors.sol";
+import {InvalidCaller, ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
+/// @dev Note, that this contract should be compatible with its previous version as it will be
+/// the primary bridge to be used during migration.
 contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
@@ -37,6 +40,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
+    // slither-disable-next-line uninitialized-state
     address public override l1Bridge;
 
     modifier onlyNTV() {
@@ -101,6 +105,44 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             revert AmountMustBeGreaterThanZero();
         }
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge(_l1Receiver, _l2Token, _amount, msg.sender);
+    }
+
+    /// @notice Finalize the deposit and mint funds
+    /// @param _l1Sender The account address that initiated the deposit on L1
+    /// @param _l2Receiver The account address that would receive minted ether
+    /// @param _l1Token The address of the token that was locked on the L1
+    /// @param _amount Total amount of tokens deposited from L1
+    /// @param _data The additional data that user can pass with the deposit
+    function finalizeDeposit(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) external {
+        // Only the L1 bridge counterpart can initiate and finalize the deposit.
+        if (
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
+        ) {
+            revert InvalidCaller(msg.sender);
+        }
+
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
+
+        address l2Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(_l1Token);
+
+        if (l1TokenAddress[l2Token] == address(0)) {
+            l1TokenAddress[l2Token] = _l1Token;
+        }
+
+        emit FinalizeDeposit(_l1Sender, _l2Receiver, l2Token, _amount);
     }
 
     /// @return Address of an L2 token counterpart

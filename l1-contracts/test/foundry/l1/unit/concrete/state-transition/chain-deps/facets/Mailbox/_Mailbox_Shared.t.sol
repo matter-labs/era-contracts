@@ -21,9 +21,11 @@ contract MailboxTest is Test {
     uint256 constant eraChainId = 9;
     address internal testnetVerifier = address(new TestnetVerifier());
     address diamondProxy;
+    address bridgehub;
 
     function setupDiamondProxy() public virtual {
         sender = makeAddr("sender");
+        bridgehub = makeAddr("bridgehub");
         vm.deal(sender, 100 ether);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
@@ -50,6 +52,8 @@ contract MailboxTest is Test {
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
         gettersFacet = IGetters(diamondProxy);
+
+        utilsFacet.util_setBridgehub(bridgehub);
     }
 
     // add this to be excluded from coverage report

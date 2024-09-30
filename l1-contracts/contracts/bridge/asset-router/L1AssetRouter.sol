@@ -585,4 +585,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
     }
+
+    /// @notice Legacy function to get the L2 shared bridge address for a chain.
+    /// @dev In case the chain has been deployed after the gateway release,
+    /// the returned value is 0.
+    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
+        return L1_NULLIFIER.l2BridgeAddress(_chainId);
+    }
 }

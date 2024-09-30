@@ -209,6 +209,10 @@ export class Deployer {
       l2AssetRouterBytecodeHash: ethers.utils.hexlify(hashL2Bytecode(assetRouterZKBytecode)),
       l2NtvBytecodeHash: ethers.utils.hexlify(hashL2Bytecode(nativeTokenVaultZKBytecode)),
       messageRootBytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
+      l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
+      l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
+      l2BridgeProxyOwnerAddress: ethers.constants.AddressZero,
+      l2BridgedStandardERC20ProxyOwnerAddress: ethers.constants.AddressZero,
     };
 
     return ethers.utils.defaultAbiCoder.encode([FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING], [fixedForceDeploymentsData]);

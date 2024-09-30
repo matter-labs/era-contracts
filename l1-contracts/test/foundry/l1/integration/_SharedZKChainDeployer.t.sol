@@ -161,7 +161,6 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployZkChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _sharedBridge,
         address _admin,
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
@@ -183,7 +182,6 @@ contract ZKChainDeployer is L1ContractDeployer {
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(address(0x1337)))),
                 _baseTokenAssetId,
-                bytes32(uint256(uint160(_sharedBridge))),
                 _storedBatchZero,
                 diamondCut.initCalldata
             );

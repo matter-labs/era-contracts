@@ -100,6 +100,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public __DEPRECATED_chainBalance;
 
+    /// @dev Admin has the ability to register new chains within the shared bridge.
+    address public __DEPRECATED_admin;
+
+    /// @dev The pending admin, i.e. the candidate to the admin role.
+    address public __DEPRECATED_pendingAdmin;
+
     /// @dev Address of L1 asset router.
     IL1AssetRouter public l1AssetRouter;
 

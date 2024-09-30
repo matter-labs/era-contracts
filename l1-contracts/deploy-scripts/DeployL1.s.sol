@@ -683,7 +683,12 @@ contract DeployL1Script is Script, DeployUtils {
             l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode())
+            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            // For newly created chains it it is expected that the following bridges are not present
+            l2SharedBridgeLegacyImpl: address(0),
+            l2BridgedStandardERC20Impl: address(0),
+            l2BridgeProxyOwnerAddress: address(0),
+            l2BridgedStandardERC20ProxyOwnerAddress: address(0)
         });
 
         return abi.encode(data);
