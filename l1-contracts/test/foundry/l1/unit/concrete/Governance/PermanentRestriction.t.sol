@@ -369,16 +369,10 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.stopPrank();
 
         address l1Nullifier = makeAddr("l1Nullifier");
-        address l2LegacySharedBridge = makeAddr("l2LegacySharedBridge");
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
             abi.encode(l1Nullifier)
-        );
-        vm.mockCall(
-            address(l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
-            abi.encode(l2LegacySharedBridge)
         );
         vm.startPrank(governor);
         bridgehub.createNewChain({

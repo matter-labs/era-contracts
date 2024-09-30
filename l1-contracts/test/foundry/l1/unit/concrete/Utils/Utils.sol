@@ -309,48 +309,47 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](41);
+        bytes4[] memory selectors = new bytes4[](39);
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
         selectors[3] = UtilsFacet.util_getBridgehub.selector;
         selectors[4] = UtilsFacet.util_setBaseToken.selector;
         selectors[5] = UtilsFacet.util_getBaseTokenAssetId.selector;
-        selectors[6] = UtilsFacet.util_setBaseTokenBridge.selector;
-        selectors[7] = UtilsFacet.util_getBaseTokenBridge.selector;
-        selectors[8] = UtilsFacet.util_setVerifier.selector;
-        selectors[9] = UtilsFacet.util_getVerifier.selector;
-        selectors[10] = UtilsFacet.util_setStoredBatchHashes.selector;
-        selectors[11] = UtilsFacet.util_getStoredBatchHashes.selector;
-        selectors[12] = UtilsFacet.util_setVerifierParams.selector;
-        selectors[13] = UtilsFacet.util_getVerifierParams.selector;
-        selectors[14] = UtilsFacet.util_setL2BootloaderBytecodeHash.selector;
-        selectors[15] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
-        selectors[16] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
-        selectors[17] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
-        selectors[18] = UtilsFacet.util_setPendingAdmin.selector;
-        selectors[19] = UtilsFacet.util_getPendingAdmin.selector;
-        selectors[20] = UtilsFacet.util_setAdmin.selector;
-        selectors[21] = UtilsFacet.util_getAdmin.selector;
-        selectors[22] = UtilsFacet.util_setValidator.selector;
-        selectors[23] = UtilsFacet.util_getValidator.selector;
-        selectors[24] = UtilsFacet.util_setZkPorterAvailability.selector;
-        selectors[25] = UtilsFacet.util_getZkPorterAvailability.selector;
-        selectors[26] = UtilsFacet.util_setChainTypeManager.selector;
-        selectors[27] = UtilsFacet.util_getChainTypeManager.selector;
-        selectors[28] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
-        selectors[29] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
-        selectors[30] = UtilsFacet.util_setFeeParams.selector;
-        selectors[31] = UtilsFacet.util_getFeeParams.selector;
-        selectors[32] = UtilsFacet.util_setProtocolVersion.selector;
-        selectors[33] = UtilsFacet.util_getProtocolVersion.selector;
-        selectors[34] = UtilsFacet.util_setIsFrozen.selector;
-        selectors[35] = UtilsFacet.util_getIsFrozen.selector;
-        selectors[36] = UtilsFacet.util_setTransactionFilterer.selector;
-        selectors[37] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
-        selectors[38] = UtilsFacet.util_setTotalBatchesExecuted.selector;
-        selectors[39] = UtilsFacet.util_setL2LogsRootHash.selector;
-        selectors[40] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
+        selectors[6] = UtilsFacet.util_setVerifier.selector;
+        selectors[7] = UtilsFacet.util_getVerifier.selector;
+        selectors[8] = UtilsFacet.util_setStoredBatchHashes.selector;
+        selectors[9] = UtilsFacet.util_getStoredBatchHashes.selector;
+        selectors[10] = UtilsFacet.util_setVerifierParams.selector;
+        selectors[11] = UtilsFacet.util_getVerifierParams.selector;
+        selectors[12] = UtilsFacet.util_setL2BootloaderBytecodeHash.selector;
+        selectors[13] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
+        selectors[14] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
+        selectors[15] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
+        selectors[16] = UtilsFacet.util_setPendingAdmin.selector;
+        selectors[17] = UtilsFacet.util_getPendingAdmin.selector;
+        selectors[18] = UtilsFacet.util_setAdmin.selector;
+        selectors[19] = UtilsFacet.util_getAdmin.selector;
+        selectors[20] = UtilsFacet.util_setValidator.selector;
+        selectors[21] = UtilsFacet.util_getValidator.selector;
+        selectors[22] = UtilsFacet.util_setZkPorterAvailability.selector;
+        selectors[23] = UtilsFacet.util_getZkPorterAvailability.selector;
+        selectors[24] = UtilsFacet.util_setChainTypeManager.selector;
+        selectors[25] = UtilsFacet.util_getChainTypeManager.selector;
+        selectors[26] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
+        selectors[27] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
+        selectors[28] = UtilsFacet.util_setFeeParams.selector;
+        selectors[29] = UtilsFacet.util_getFeeParams.selector;
+        selectors[30] = UtilsFacet.util_setProtocolVersion.selector;
+        selectors[31] = UtilsFacet.util_getProtocolVersion.selector;
+        selectors[32] = UtilsFacet.util_setIsFrozen.selector;
+        selectors[33] = UtilsFacet.util_getIsFrozen.selector;
+        selectors[34] = UtilsFacet.util_setTransactionFilterer.selector;
+        selectors[35] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
+        selectors[36] = UtilsFacet.util_setTotalBatchesExecuted.selector;
+        selectors[37] = UtilsFacet.util_setL2LogsRootHash.selector;
+        selectors[38] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
+
         return selectors;
     }
 
@@ -387,7 +386,6 @@ library Utils {
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
-                baseTokenBridge: address(0x23746765237749923040872834),
                 storedBatchZero: bytes32(0),
                 verifier: makeVerifier(testnetVerifier),
                 verifierParams: makeVerifierParams(),

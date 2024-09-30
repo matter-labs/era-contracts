@@ -36,10 +36,6 @@ contract GettersFacetWrapper is GettersFacet {
         s.baseTokenAssetId = _baseTokenAssetId;
     }
 
-    function util_setBaseTokenBridge(address _baseTokenBridge) external {
-        s.baseTokenBridge = _baseTokenBridge;
-    }
-
     function util_setTotalBatchesCommitted(uint256 _totalBatchesCommitted) external {
         s.totalBatchesCommitted = _totalBatchesCommitted;
     }

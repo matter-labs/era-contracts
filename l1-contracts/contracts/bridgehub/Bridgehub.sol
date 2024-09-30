@@ -154,14 +154,24 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
-        whitelistedSettlementLayers[_l1ChainId] = true;
+        _initializeInner();
     }
 
     /// @notice used to initialize the contract
     /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
     /// @param _owner the owner of the contract
-    function initialize(address _owner) external reentrancyGuardInitializer {
+    function initialize(address _owner) external reentrancyGuardInitializer onlyL1 {
         _transferOwnership(_owner);
+        _initializeInner();
+    }
+
+    /// @notice Used to initialize the contract on L1
+    function initializeV2() external initializer onlyL1 {
+        _initializeInner();
+    }
+
+    /// @notice Initializes the contract
+    function _initializeInner() internal {
         assetIdIsRegistered[ETH_TOKEN_ASSET_ID] = true;
         whitelistedSettlementLayers[L1_CHAIN_ID] = true;
     }
@@ -356,7 +366,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
-            _assetRouter: assetRouter,
             _admin: _admin,
             _initData: _initData,
             _factoryDeps: _factoryDeps

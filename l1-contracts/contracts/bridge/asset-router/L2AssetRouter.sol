@@ -215,6 +215,38 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _amount,
         bytes calldata _data
     ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+        _translateLegacyFinalizeDeposit({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
+    }
+
+    function finalizeDepositLegacyBridge(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) external onlyLegacyBridge {
+        _translateLegacyFinalizeDeposit({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
+    }
+
+    function _translateLegacyFinalizeDeposit(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) internal {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);

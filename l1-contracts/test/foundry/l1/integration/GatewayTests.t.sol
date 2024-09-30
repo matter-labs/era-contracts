@@ -258,7 +258,6 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
             address chain = _deployZkChain(
                 chainId,
                 baseTokenAssetId,
-                address(bridgehub.sharedBridge()),
                 owner,
                 stm.protocolVersion(),
                 stm.storedBatchZero(),
@@ -290,7 +289,6 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
             address chain = _deployZkChain(
                 chainId,
                 baseTokenAssetId,
-                address(bridgehub.sharedBridge()),
                 owner,
                 stm.protocolVersion(),
                 stm.storedBatchZero(),

@@ -8,6 +8,7 @@ struct ZKChainSpecificForceDeploymentsData {
     address l2Weth;
 }
 
+// solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -19,6 +20,10 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    address l2SharedBridgeLegacyImpl;
+    address l2BridgedStandardERC20Impl;
+    address l2BridgeProxyOwnerAddress;
+    address l2BridgedStandardERC20ProxyOwnerAddress;
 }
 
 interface IL2GenesisUpgrade {
