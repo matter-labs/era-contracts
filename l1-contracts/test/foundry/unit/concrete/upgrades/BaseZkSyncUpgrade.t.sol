@@ -21,7 +21,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
     function setUp() public {
         baseZkSyncUpgrade = new DummyBaseZkSyncUpgrade();
 
-        _prepereProposedUpgrade();
+        _prepareProposedUpgrade();
 
         baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
