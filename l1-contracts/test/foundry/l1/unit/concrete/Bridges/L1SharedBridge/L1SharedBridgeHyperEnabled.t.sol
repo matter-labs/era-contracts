@@ -10,6 +10,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 
 // note, this should be the same as where hyper is disabled
 contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
@@ -97,7 +98,9 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // storing depositHappened[chainId][l2TxHash] = txDataHash.
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         _setNativeTokenVaultChainBalance(chainId, address(token), amount);
 
@@ -138,7 +141,9 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // storing depositHappened[chainId][l2TxHash] = txDataHash.
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));

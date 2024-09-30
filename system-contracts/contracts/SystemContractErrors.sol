@@ -113,6 +113,72 @@ error ValuesNotEqual(uint256 expected, uint256 actual);
 // 0x6818f3f9
 error ZeroNonceError();
 
+error InvalidChainId();
+
+error UpgradeTransactionMustBeFirst();
+
+error L2BlockNumberIsNeverExpectedToBeZero();
+
+error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
+
+error CannotInitializeFirstVirtualBlock();
+
+error TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch(
+    uint128 l2BlockTimestamp,
+    uint128 currentBatchTimestamp
+);
+
+error ThereMustBeVirtualBlockCreatedAtStartOfBatch();
+
+error CannotReuseL2BlockNumberFromPreviousBatch();
+
+error TimestampOfSameL2BlockMustBeSame(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
+
+error PreviousHashOfSameL2BlockMustBeSame(bytes32 expectedPrevL2BlockHash, bytes32 latestL2blockHash);
+
+error CannotCreateVirtualBlocksInMiddleOfMiniblock();
+
+error CurrentL2BlockHashIsIncorrect(bytes32 expectedPrevL2BlockHash, bytes32 pendingL2BlockHash);
+
+error TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block(
+    uint128 l2BlockTimestamp,
+    uint128 currentL2BlockTimestamp
+);
+
+error CurrentBatchNumberMustBeGreaterThanZero();
+
+error TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock(uint128 newTimestamp, uint128 currentBlockTimestamp);
+
+error TimestampsShouldBeIncremental(uint128 newTimestamp, uint128 previousBatchTimestamp);
+
+error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);
+
+error CodeOracleCallFailed();
+
+error ReturnedBytecodeDoesNotMatchExpectedHash(bytes32 returnedBytecode, bytes32 expectedBytecodeHash);
+
+error SecondCallShouldHaveCostLessGas(uint256 secondCallCost, uint256 firstCallCost);
+
+error ThirdCallShouldHaveSameGasCostAsSecondCall(uint256 thirdCallCost, uint256 secondCallCost);
+
+error CallToKeccakShouldHaveSucceeded();
+
+error KeccakReturnDataSizeShouldBe32Bytes(uint256 returnDataSize);
+
+error KeccakResultIsNotCorrect(bytes32 result);
+
+error KeccakShouldStartWorkingAgain();
+
+error KeccakMismatchBetweenNumberOfInputsAndOutputs(uint256 testInputsLength, uint256 expectedOutputsLength);
+
+error KeccakHashWasNotCalculatedCorrectly(bytes32 result, bytes32 expectedOutputs);
+
+error TransactionFailed();
+
+error NotEnoughGas();
+
+error TooMuchGas();
+
 enum CodeHashReason {
     NotContractOnConstructor,
     NotConstructedContract

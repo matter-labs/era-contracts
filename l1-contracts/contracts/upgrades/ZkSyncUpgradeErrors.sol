@@ -46,3 +46,7 @@ error InvalidTxType(uint256 txType);
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0xd92e233d
 error ZeroAddress();
+
+error GatewayUpgradeInvalidMsgSender();
+
+error GatewayUpgradeFailed();

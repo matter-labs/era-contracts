@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-
 // solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
@@ -13,6 +12,7 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {TokenNotInitialized} from "test/foundry/L1TestsErrors.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
@@ -86,7 +86,9 @@ contract L2Erc20BridgeTest is Test {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
         l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-        require(l2TokenAddress != address(0), "Token not initialized");
+        if (l2TokenAddress == address(0)) {
+            revert TokenNotInitialized();
+        }
     }
 
     function test_shouldFinalizeERC20Deposit() public {
@@ -121,7 +123,7 @@ contract L2Erc20BridgeTest is Test {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), 18);
     }
 
-    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
+    function test_governanceShouldlNotBeAbleToSkipInitializerVersions() public {
         address l2TokenAddress = initializeTokenByDeposit();
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({

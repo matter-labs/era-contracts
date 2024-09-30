@@ -14,6 +14,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithExecuted, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -37,7 +38,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     modifier onlyL1() {
-        require(block.chainid == L1_CHAIN_ID, "AdminFacet: not L1");
+        if (block.chainid != L1_CHAIN_ID) {
+            revert NotL1(block.chainid);
+        }
         _;
     }
 
@@ -154,8 +157,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external onlyAdmin {
-        require(_l1DAValidator != address(0), "AdminFacet: L1DAValidator address is zero");
-        require(_l2DAValidator != address(0), "AdminFacet: L2DAValidator address is zero");
+        if (_l1DAValidator == address(0)) {
+            revert L1DAValidatorAddressIsZero();
+        }
+        if (_l2DAValidator == address(0)) {
+            revert L2DAValidatorAddressIsZero();
+        }
 
         _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
     }
@@ -251,14 +258,21 @@ contract AdminFacet is ZKChainBase, IAdmin {
         address _originalCaller,
         bytes calldata _data
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
-        require(s.settlementLayer == address(0), "Af: already migrated");
-        require(_originalCaller == s.admin, "Af: not chainAdmin");
+        if (s.settlementLayer != address(0)) {
+            revert AlreadyMigrated();
+        }
+        if (_originalCaller != s.admin) {
+            revert NotChainAdmin(_originalCaller, s.admin);
+        }
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_data, (uint256));
 
         uint256 currentProtocolVersion = s.protocolVersion;
+        // uint256 protocolVersion = stm.protocolVersion();
 
-        require(currentProtocolVersion == protocolVersion, "CTM: protocolVersion not up to date");
+        if (currentProtocolVersion != protocolVersion) {
+            revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
+        }
 
         if (block.chainid != L1_CHAIN_ID) {
             // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
@@ -292,16 +306,19 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.totalBatchesExecuted = batchesExecuted;
 
         // Some consistency checks just in case.
-        require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
-        require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
+        if (batchesExecuted > batchesVerified) {
+            revert ExecutedIsNotConsistentWithVerified(batchesExecuted, batchesVerified);
+        }
+        if (batchesVerified > batchesCommitted) {
+            revert VerifiedIsNotConsistentWithCommitted(batchesVerified, batchesCommitted);
+        }
 
         // In the worst case, we may need to revert all the committed batches that were not executed.
         // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
         // there should be batchesCommitted - batchesExecuted + 1 hashes.
-        require(
-            _commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1,
-            "Invalid number of batch hashes"
-        );
+        if (_commitment.batchHashes.length != batchesCommitted - batchesExecuted + 1) {
+            revert InvalidNumberOfBatchHashes(_commitment.batchHashes.length, batchesCommitted - batchesExecuted + 1);
+        }
 
         // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
         // outstanding committed batches is not too long.
@@ -366,7 +383,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
     /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
-        require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex) {
+            revert PriorityQueueNotReady();
+        }
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
@@ -376,14 +395,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.priorityTree = s.priorityTree.getCommitment();
 
         // just in case
-        require(
-            commitment.totalBatchesExecuted <= commitment.totalBatchesVerified,
-            "Verified is not consistent with executed"
-        );
-        require(
-            commitment.totalBatchesVerified <= commitment.totalBatchesCommitted,
-            "Verified is not consistent with committed"
-        );
+        if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
+            revert VerifiedIsNotConsistentWithExecuted(
+                commitment.totalBatchesExecuted,
+                commitment.totalBatchesVerified
+            );
+        }
+        if (commitment.totalBatchesVerified > commitment.totalBatchesCommitted) {
+            revert VerifiedIsNotConsistentWithCommitted(
+                commitment.totalBatchesVerified,
+                commitment.totalBatchesCommitted
+            );
+        }
 
         uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
 

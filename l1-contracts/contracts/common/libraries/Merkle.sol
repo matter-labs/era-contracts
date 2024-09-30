@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 // solhint-disable gas-custom-errors
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds} from "../../common/L1ContractErrors.sol";
+import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds, MerklePathLengthMismatch, MerkleNothingToProve, MerkleIndexOrHeightMismatch} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -76,7 +76,9 @@ library Merkle {
         bytes32[] memory _itemHashes
     ) internal pure returns (bytes32) {
         uint256 pathLength = _startPath.length;
-        require(pathLength == _endPath.length, "Merkle: path length mismatch");
+        if (pathLength != _endPath.length) {
+            revert MerklePathLengthMismatch(pathLength, _endPath.length);
+        }
         if (pathLength >= 256) {
             revert MerklePathOutOfBounds();
         }
@@ -85,8 +87,12 @@ library Merkle {
         if (pathLength == 0 && (_startIndex != 0 || levelLen != 1)) {
             revert MerklePathEmpty();
         }
-        require(levelLen > 0, "Merkle: nothing to prove");
-        require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index/height mismatch");
+        if (levelLen <= 0) {
+            revert MerkleNothingToProve();
+        }
+        if (_startIndex + levelLen > (1 << pathLength)) {
+            revert MerkleIndexOrHeightMismatch();
+        }
         bytes32[] memory itemHashes = _itemHashes;
 
         for (uint256 level; level < pathLength; level = level.uncheckedInc()) {

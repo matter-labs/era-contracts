@@ -412,6 +412,16 @@ error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
 
+error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);
+
+error MerkleNothingToProve();
+
+error MerkleIndexOrHeightMismatch();
+
+error MerkleWrongIndex(uint256 index, uint256 maxNodeNumber);
+
+error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

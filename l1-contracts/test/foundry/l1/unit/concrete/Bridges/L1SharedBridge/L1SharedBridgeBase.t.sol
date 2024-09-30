@@ -18,6 +18,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 
 contract L1AssetRouterTestBase is L1AssetRouterTest {
     using stdStorage for StdStorage;
@@ -125,7 +126,9 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_claimFailedDeposit_Erc() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         vm.mockCall(
             bridgehubAddress,
@@ -166,7 +169,9 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_claimFailedDeposit_Eth() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         vm.mockCall(
             bridgehubAddress,
@@ -208,7 +213,9 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         bytes memory transferData = abi.encode(amount, alice);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         vm.mockCall(
             bridgehubAddress,

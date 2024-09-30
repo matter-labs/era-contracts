@@ -6,6 +6,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Unauthorized, PriorityTxPubdataExceedsMaxPubDataPerBatch} from "contracts/common/L1ContractErrors.sol";
+import {FeeParamsWereNotChangedCorrectly} from "test/foundry/L1TestsErrors.sol";
 
 contract ChangeFeeParamsTest is AdminTest {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
@@ -82,6 +83,8 @@ contract ChangeFeeParamsTest is AdminTest {
 
         bytes32 newFeeParamsHash = keccak256(abi.encode(newFeeParams));
         bytes32 currentFeeParamsHash = keccak256(abi.encode(utilsFacet.util_getFeeParams()));
-        require(currentFeeParamsHash == newFeeParamsHash, "Fee params were not changed correctly");
+        if (currentFeeParamsHash != newFeeParamsHash) {
+            revert FeeParamsWereNotChangedCorrectly();
+        }
     }
 }
