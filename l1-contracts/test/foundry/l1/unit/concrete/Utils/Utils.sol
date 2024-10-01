@@ -297,7 +297,7 @@ library Utils {
         selectors[30] = GettersFacet.getChainId.selector;
         selectors[31] = GettersFacet.baseTokenGasPriceMultiplierDenominator.selector;
         selectors[32] = GettersFacet.baseTokenGasPriceMultiplierNominator.selector;
-
+        
         return selectors;
     }
 
