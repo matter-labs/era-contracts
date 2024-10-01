@@ -9,7 +9,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 contract StateTransitionManagerSetters is StateTransitionManagerTest {
     function setUp() public {
         deploy();
-    }    
+    }
 
     // setPriorityTxMaxGasLimit
     function test_SuccessfulSetPriorityTxMaxGasLimit() public {
