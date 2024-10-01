@@ -30,7 +30,6 @@ import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-// import {L2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";

@@ -47,7 +47,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         address wethToken = address(0x1);
-        // we deploy the code to get the contract code with immutables which we then etch
+        // we deploy the code to get the contract code with immutables which we then vm.etch
         address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR)));
         address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
         address assetRouter = address(
