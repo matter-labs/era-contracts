@@ -13,6 +13,7 @@ library EIP712Utils {
     ) internal view returns (bytes32) {
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 abi.encode(
                     TYPE_HASH,
                     keccak256(bytes(_name)),

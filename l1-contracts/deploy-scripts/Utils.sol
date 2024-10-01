@@ -446,6 +446,7 @@ library Utils {
             IEmergencyUpgrageBoard emergencyUpgradeBoard = IEmergencyUpgrageBoard(
                 _protocolUpgradeHandler.emergencyUpgradeBoard()
             );
+            // solhint-disable-next-line func-named-parameters
             emergencyUpgradeBoard.executeEmergencyUpgrade(
                 _calls,
                 _salt,
