@@ -32,14 +32,6 @@ contract TestBaseFacet is ZkSyncHyperchainBase {
     function test() internal virtual {}
 }
 
-bytes constant ERROR_ONLY_ADMIN = "Hyperchain: not admin";
-bytes constant ERROR_ONLY_VALIDATOR = "Hyperchain: not validator";
-bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "Hyperchain: not state transition manager";
-bytes constant ERROR_ONLY_BRIDGEHUB = "Hyperchain: not bridgehub";
-bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by admin or state transition manager";
-bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by validator or state transition manager";
-bytes constant ERROR_ONLY_BASE_TOKEN_BRIDGE = "Hyperchain: Only base token bridge can call this function";
-
 contract ZkSyncHyperchainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
