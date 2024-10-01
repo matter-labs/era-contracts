@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainBaseTest, ERROR_ONLY_BASE_TOKEN_BRIDGE} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest} from "./_Base_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract OnlyBaseTokenBridge is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonBaseTokenBridge() public {
         address nonBaseTokenBridge = makeAddr("nonBaseTokenBridge");
 
-        vm.expectRevert(ERROR_ONLY_BASE_TOKEN_BRIDGE);
-
         vm.startPrank(nonBaseTokenBridge);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonBaseTokenBridge));
         testBaseFacet.functionWithOnlyBaseTokenBridgeModifier();
     }
 
