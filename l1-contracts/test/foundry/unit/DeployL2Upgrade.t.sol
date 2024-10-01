@@ -180,7 +180,7 @@ contract L2UpgradeTest is Test {
         });
 
         adminFacet.setTokenMultiplier(1, 1);
- 
+
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
         proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
@@ -306,7 +306,7 @@ contract L2UpgradeTest is Test {
             gettersFacet.getL2SystemContractsUpgradeTxHash(),
             0x0000000000000000000000000000000000000000000000000000000000000000
         );
-      
+
         uint256 oldProtocolVersion = gettersFacet.getProtocolVersion();
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
@@ -428,7 +428,11 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: COMMIT_TIMESTAMP_NOT_OLDER + 10,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = abi.encodeWithSelector(TimeNotReached.selector, proposedUpgrade.upgradeTimestamp, COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        bytes memory revertMsg = abi.encodeWithSelector(
+            TimeNotReached.selector,
+            proposedUpgrade.upgradeTimestamp,
+            COMMIT_TIMESTAMP_NOT_OLDER + 1
+        );
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -546,7 +550,11 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        bytes memory revertMsg = abi.encodeWithSelector(L2UpgradeNonceNotEqualToNewProtocolVersion.selector, upgradeTx.nonce, 1);
+        bytes memory revertMsg = abi.encodeWithSelector(
+            L2UpgradeNonceNotEqualToNewProtocolVersion.selector,
+            upgradeTx.nonce,
+            1
+        );
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -696,7 +704,11 @@ contract L2UpgradeTest is Test {
         });
         console.log(factoryHash[0]);
         console.logBytes(factoryDeps[0]);
-        bytes memory revertMsg = abi.encodeWithSelector(L2BytecodeHashMismatch.selector, 0x01000001b32f2d7374a0d4c6a6963811a3ba2a1fde5468b290cf01523c939025, 0x68958563f7e4d37cd700e1be8e9a685dbadaa1c5f3f8eb062c6d0eed74525308);
+        bytes memory revertMsg = abi.encodeWithSelector(
+            L2BytecodeHashMismatch.selector,
+            0x01000001b32f2d7374a0d4c6a6963811a3ba2a1fde5468b290cf01523c939025,
+            0x68958563f7e4d37cd700e1be8e9a685dbadaa1c5f3f8eb062c6d0eed74525308
+        );
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -797,7 +809,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        executeUpgrade(false, "",  proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
 
         assertEq(gettersFacet.getL2BootloaderBytecodeHash(), bootloaderHash);
         assertEq(gettersFacet.getL2DefaultAccountBytecodeHash(), defaultAccountHash);
@@ -971,7 +983,10 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        bytes memory revertMsg = abi.encodeWithSelector(PreviousUpgradeNotFinalized.selector, 0x2a372301465b1e0e8dfd0521d620ccfd7119e74599234a3681dea41e0d759d5b);
+        bytes memory revertMsg = abi.encodeWithSelector(
+            PreviousUpgradeNotFinalized.selector,
+            0x2a372301465b1e0e8dfd0521d620ccfd7119e74599234a3681dea41e0d759d5b
+        );
         executeUpgrade(true, revertMsg, newProposedUpgrade);
     }
 
@@ -1054,7 +1069,10 @@ contract L2UpgradeTest is Test {
 
         adminFacet.setValidator(msg.sender, true);
         vm.startPrank(0x0000000000000000000000000000000001010101);
-        StateTransitionManager(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C).setProtocolVersionDeadline(newProtocolVersion, 999999);
+        StateTransitionManager(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C).setProtocolVersionDeadline(
+            newProtocolVersion,
+            999999
+        );
         vm.stopPrank();
         vm.startPrank(msg.sender);
         vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 16383, 8191));
@@ -1216,7 +1234,7 @@ contract L2UpgradeTest is Test {
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,
-            newProtocolVersion: newProtocolVersion 
+            newProtocolVersion: newProtocolVersion
         });
 
         executeUpgrade(false, "", proposedUpgrade);
@@ -1225,7 +1243,10 @@ contract L2UpgradeTest is Test {
         adminFacet.setValidator(msg.sender, true);
         vm.stopPrank();
         vm.startPrank(0x0000000000000000000000000000000001010101);
-        StateTransitionManager(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C).setProtocolVersionDeadline(newProtocolVersion, 999999);
+        StateTransitionManager(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C).setProtocolVersionDeadline(
+            newProtocolVersion,
+            999999
+        );
         vm.stopPrank();
         vm.startPrank(msg.sender);
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
@@ -1325,7 +1346,10 @@ contract L2UpgradeTest is Test {
         vm.stopPrank();
 
         vm.startPrank(0x0000000000000000000000000000000001010101);
-        StateTransitionManager(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C).setProtocolVersionDeadline(newProtocolVersion, 999999);
+        StateTransitionManager(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C).setProtocolVersionDeadline(
+            newProtocolVersion,
+            999999
+        );
         vm.stopPrank();
 
         vm.startPrank(msg.sender);
@@ -1499,11 +1523,7 @@ contract L2UpgradeTest is Test {
         IAdmin(newChainAddress).executeUpgrade(newDiamondCutData);
     }
 
-    function executeUpgrade(
-        bool shouldRevert,
-        bytes memory revertMsg,
-        ProposedUpgrade memory proposedUpgrade
-    ) public {
+    function executeUpgrade(bool shouldRevert, bytes memory revertMsg, ProposedUpgrade memory proposedUpgrade) public {
         uint256 oldProtocolVersion = gettersFacet.getProtocolVersion();
 
         DefaultUpgrade defaultUpgrade = new DefaultUpgrade();
