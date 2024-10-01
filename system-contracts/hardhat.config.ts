@@ -6,8 +6,8 @@ import "@nomiclabs/hardhat-ethers";
 import "hardhat-typechain";
 
 // This version of system contracts requires a pre release of the compiler
-const COMPILER_VERSION = "v1.5.4";
-const PRE_RELEASE_VERSION = "1.5.4";
+const COMPILER_VERSION = "fix-output-directory"; // 1.5.5
+const PRE_RELEASE_VERSION = "72ea6d2";
 function getZksolcUrl(): string {
   // @ts-ignore
   const platform = { darwin: "macosx", linux: "linux", win32: "windows" }[process.platform];
@@ -26,7 +26,7 @@ export default {
     compilerSource: "binary",
     settings: {
       compilerPath: getZksolcUrl(),
-      isSystem: true,
+      enableEraVMExtensions: true,
       suppressedErrors: ["sendtransfer"],
     },
   },
