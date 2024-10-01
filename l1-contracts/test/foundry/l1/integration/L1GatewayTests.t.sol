@@ -38,6 +38,7 @@ import {TxStatus} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -281,7 +282,37 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             abi.encode(chainTypeManager.protocolVersion())
         );
 
-        gatewayScript.finishMigrateChainFromGateway(migratingChain, migratingChainId, gatewayChainId);
+        uint256 protocolVersion = chainTypeManager.getProtocolVersion(migratingChainId);
+
+        bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
+        bytes memory ctmData = abi.encode(
+            baseTokenAssetId,
+            msg.sender,
+            protocolVersion,
+            ecosystemConfig.contracts.diamondCutData
+        );
+        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
+            chainId: migratingChainId,
+            baseTokenAssetId: baseTokenAssetId,
+            ctmData: ctmData,
+            chainData: chainData
+        });
+        bytes memory bridgehubMintData = abi.encode(data);
+        bytes memory message = abi.encodePacked(
+            IAssetRouterBase.finalizeDeposit.selector,
+            gatewayChainId,
+            assetId,
+            bridgehubMintData
+        );
+        gatewayScript.finishMigrateChainFromGateway(
+            migratingChainId,
+            gatewayChainId,
+            0,
+            0,
+            0,
+            message,
+            new bytes32[](0)
+        );
 
         vm.chainId(currentChainId);
 

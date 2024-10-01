@@ -22,7 +22,7 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2AssetRouter, IL2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -46,7 +46,6 @@ struct Config {
     address l1NullifierProxy;
     bytes gatewayDiamondCutData;
     bytes l1DiamondCutData;
-    uint256 l1ChainId;
 }
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
@@ -103,8 +102,7 @@ contract GatewayPreparation is Script {
             gatewayChainAdmin: toml.readAddress("$.chain_admin"),
             gatewayAccessControlRestriction: toml.readAddress("$.access_control_restriction"),
             gatewayChainProxyAdmin: toml.readAddress("$.chain_proxy_admin"),
-            l1NullifierProxy: toml.readAddress("$.l1_nullifier_proxy"),
-            l1ChainId: toml.readUint("$.l1_chain_id")
+            l1NullifierProxy: toml.readAddress("$.l1_nullifier_proxy_addr")
         });
     }
 
@@ -294,11 +292,10 @@ contract GatewayPreparation is Script {
         uint256 chainId
     ) public {
         initializeConfig();
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
 
-        IBridgehub l2Bridgehub = IBridgehub(config.bridgehub);
-
-        uint256 currentSettlementLayer = l2Bridgehub.settlementLayer(chainId);
-        if (currentSettlementLayer == config.l1ChainId || currentSettlementLayer == 0) {
+        uint256 currentSettlementLayer = bridgehub.settlementLayer(chainId);
+        if (currentSettlementLayer != config.gatewayChainId) {
             console.log("Chain not using Gateway as settlement layer");
             saveOutput(bytes32(0));
             return;
@@ -312,60 +309,56 @@ contract GatewayPreparation is Script {
             })
         );
 
-        bytes32 ctmAssetId = l2Bridgehub.ctmAssetIdFromChainId(chainId);
+        bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
-        bytes32 l2TxHash = l2AssetRouter.withdraw(ctmAssetId, bridgehubBurnData);
+        bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+        // vm.startBroadcast();
+        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+            _getL1GasPrice(),
+            chainAdmin,
+            accessControlRestriction,
+            l2Calldata,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            L2_ASSET_ROUTER_ADDR,
+            config.gatewayChainId,
+            config.bridgehub,
+            config.sharedBridgeProxy
+        );
 
         saveOutput(l2TxHash);
     }
 
     function finishMigrateChainFromGateway(
-        IZKChain migratingChain,
         uint256 migratingChainId,
-        uint256 gatewayChainId
+        uint256 gatewayChainId,
+        uint256 l2BatchNumber,
+        uint256 l2MessageIndex,
+        uint16 l2TxNumberInBatch,
+        bytes memory message,
+        bytes32[] memory merkleProof
     ) public {
         initializeConfig();
 
         // TODO(EVM-746): Use L2-based chain admin contract
         // address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
-        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(migratingChainId);
-        IChainTypeManager ctm = IChainTypeManager(config.chainTypeManagerProxy);
-
-        bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
-        bytes memory ctmData = abi.encode(
-            baseTokenAssetId,
-            msg.sender,
-            ctm.protocolVersion(),
-            config.gatewayDiamondCutData
-        );
-        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
-            chainId: migratingChainId,
-            baseTokenAssetId: baseTokenAssetId,
-            ctmData: ctmData,
-            chainData: chainData
-        });
-        bytes memory bridgehubMintData = abi.encode(data);
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-
-        l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
-                chainId: migratingChainId,
-                l2BatchNumber: 1,
-                l2MessageIndex: 1,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
-                l2TxNumberInBatch: 1,
-                message: abi.encodePacked(
-                    IAssetRouterBase.finalizeDeposit.selector,
-                    gatewayChainId,
-                    assetId,
-                    bridgehubMintData
-                ),
-                merkleProof: new bytes32[](0)
-            })
-        );
+        {
+            IBridgehub bridgehub = IBridgehub(config.bridgehub);
+            bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+            l1Nullifier.finalizeDeposit(
+                FinalizeL1DepositParams({
+                    chainId: gatewayChainId,
+                    l2BatchNumber: l2BatchNumber,
+                    l2MessageIndex: l2MessageIndex,
+                    l2Sender: L2_ASSET_ROUTER_ADDR,
+                    l2TxNumberInBatch: l2TxNumberInBatch,
+                    message: message,
+                    merkleProof: merkleProof
+                })
+            );
+        }
     }
 
     /// @dev Calling this function requires private key to the admin of the chain
