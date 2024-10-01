@@ -7,6 +7,8 @@ import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
+
 
 contract ProtocolVersion is ChainTypeManagerTest {
     function setUp() public {

@@ -7,6 +7,10 @@ import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract StateTransitionManagerSetters is StateTransitionManagerTest {
+    function setUp() public {
+        deploy();
+    }    
+
     // setPriorityTxMaxGasLimit
     function test_SuccessfulSetPriorityTxMaxGasLimit() public {
         createNewChain(getDiamondCutData(diamondInit));
