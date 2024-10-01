@@ -26,16 +26,11 @@ contract TestBaseFacet is ZkSyncHyperchainBase {
         onlyValidatorOrStateTransitionManager
     {}
 
+    function functionWithOnlyBaseTokenBridgeModifier() external onlyBaseTokenBridge {}
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
-
-bytes constant ERROR_ONLY_ADMIN = "Hyperchain: not admin";
-bytes constant ERROR_ONLY_VALIDATOR = "Hyperchain: not validator";
-bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "Hyperchain: not state transition manager";
-bytes constant ERROR_ONLY_BRIDGEHUB = "Hyperchain: not bridgehub";
-bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by admin or state transition manager";
-bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by validator or state transition manager";
 
 contract ZkSyncHyperchainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
@@ -43,13 +38,14 @@ contract ZkSyncHyperchainBaseTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](6);
+        selectors = new bytes4[](7);
         selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
         selectors[2] = TestBaseFacet.functionWithOnlyStateTransitionManagerModifier.selector;
         selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
         selectors[4] = TestBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier.selector;
         selectors[5] = TestBaseFacet.functionWithonlyValidatorOrStateTransitionManagerModifier.selector;
+        selectors[6] = TestBaseFacet.functionWithOnlyBaseTokenBridgeModifier.selector;
     }
 
     function setUp() public virtual {
