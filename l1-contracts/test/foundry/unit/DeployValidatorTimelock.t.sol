@@ -7,7 +7,7 @@ import {DummyExecutor} from "contracts/dev-contracts/test/DummyExecutor.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "test/foundry/unit/concrete/Utils/Utils.sol";
-import {Unauthorized, TimeNotReached, ZeroAddress} from "../../../contracts/common/L1ContractErrors.sol";
+import {Unauthorized, TimeNotReached} from "../../../contracts/common/L1ContractErrors.sol";
 
 contract ValidatorTest is Test {
     ValidatorTimelock validatorTimelock;
