@@ -194,7 +194,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         L2WrappedBaseToken wethImpl = new L2WrappedBaseToken();
         TransparentUpgradeableProxy wethProxy = new TransparentUpgradeableProxy(address(wethImpl), ownerWallet, "");
         weth = L2WrappedBaseToken(payable(wethProxy));
-        weth.initializeV2("Wrapped Ether", "WETH", L2_ASSET_ROUTER_ADDR, l1WethAddress);
+        weth.initializeV2("Wrapped Ether", "WETH", L2_ASSET_ROUTER_ADDR, l1WethAddress, baseTokenAssetId);
         return weth;
     }
 

@@ -357,7 +357,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _token The native token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
     function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
-        assetId = nativeTokenVault.calculateAssetId(block.chainid, _token);
+        assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);
         }
