@@ -30,9 +30,9 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {SharedL2ContractL1DeployerUtils} from "../../l1/integration/l2-dummy-tests/_SharedL2ContractL1DeployerUtils.sol";
-import {L2GatewayTestAbstract} from "../../l1/integration/l2-dummy-tests/L2GatewayTestAbstract.t.sol";
-import {SharedL2ContractDeployer} from "../../l1/integration/l2-dummy-tests/_SharedL2ContractDeployer.sol";
+import {SharedL2ContractL1DeployerUtils} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
+import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-in-l1-context/L2GatewayTestAbstract.t.sol";
+import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
 contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2DeployerUtils {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
