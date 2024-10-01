@@ -14,10 +14,10 @@ import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 contract DummyBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeUtils {}
 
 contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
-    DummytBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
+    DummyBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
 
     function setUp() public {
-        baseZkSyncUpgrade = new DummytBaseZkSyncUpgradeGenesis();
+        baseZkSyncUpgrade = new DummyBaseZkSyncUpgradeGenesis();
 
         _prepareProposedUpgrade();
 
