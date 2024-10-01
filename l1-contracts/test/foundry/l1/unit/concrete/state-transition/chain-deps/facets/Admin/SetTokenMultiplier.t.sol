@@ -18,8 +18,13 @@ contract SetTokenMultiplierTest is AdminTest {
         uint128 nominator = 1;
         uint128 denominator = 100;
 
+<<<<<<< HEAD
         vm.startPrank(nonChainTypeManager);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonChainTypeManager));
+=======
+        vm.startPrank(nonStateTransitionManager);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
+>>>>>>> 3bcfce92 (feat: Update upgrade contracts to handle selector errors)
 
         adminFacet.setTokenMultiplier(nominator, denominator);
     }
@@ -30,7 +35,11 @@ contract SetTokenMultiplierTest is AdminTest {
         uint128 nominator = 1;
         uint128 denominator = 0;
 
+<<<<<<< HEAD
         vm.startPrank(chainTypeManager);
+=======
+        vm.startPrank(stateTransitionManager);
+>>>>>>> 3bcfce92 (feat: Update upgrade contracts to handle selector errors)
         vm.expectRevert(DenominatorIsZero.selector);
 
         adminFacet.setTokenMultiplier(nominator, denominator);
@@ -39,7 +48,11 @@ contract SetTokenMultiplierTest is AdminTest {
     function test_successfulSet(uint128 nominator, uint128 denominator) public {
         vm.assume(denominator != 0);
 
+<<<<<<< HEAD
         address chainTypeManager = utilsFacet.util_getChainTypeManager();
+=======
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+>>>>>>> 3bcfce92 (feat: Update upgrade contracts to handle selector errors)
         uint128 oldNominator = utilsFacet.util_getBaseTokenGasPriceMultiplierNominator();
         uint128 oldDenominator = utilsFacet.util_getBaseTokenGasPriceMultiplierDenominator();
 
