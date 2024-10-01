@@ -219,7 +219,4 @@ contract ChainTypeManagerTest is Test {
 
         vm.startPrank(governor);
     }
-
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
 }
