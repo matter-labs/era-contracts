@@ -7,6 +7,7 @@ import {DummyExecutor} from "contracts/dev-contracts/test/DummyExecutor.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "test/foundry/unit/concrete/Utils/Utils.sol";
+import {Unauthorized, TimeNotReached, ZeroAddress} from "../../../contracts/common/L1ContractErrors.sol";
 
 contract ValidatorTest is Test {
     ValidatorTimelock validatorTimelock;
@@ -92,43 +93,43 @@ contract ValidatorTest is Test {
         assertEq(dummyExecutor.getAdmin(), owner);
     }
 
-    function test_nonValidatorCommitsBatches() public {
+    function test_nonValidatorCommitsBatches(address caller) public {
         IExecutor.StoredBatchInfo[] memory storedBatch = getMockStoredBatchInfo(0, 0);
 
         IExecutor.CommitBatchInfo[] memory batch = getMockCommitBatchInfo(1);
-        vm.startBroadcast(makeAddr("random address"));
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.startBroadcast(caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         validatorTimelock.commitBatches(storedBatch[0], batch);
         vm.stopBroadcast();
     }
 
-    function test_nonValidatorProvesBatches() public {
+    function test_nonValidatorProvesBatches(address caller) public {
         IExecutor.StoredBatchInfo[] memory storedBatch = getMockStoredBatchInfo(0, 0);
         IExecutor.StoredBatchInfo[] memory storedBatch1 = getMockStoredBatchInfo(1, 0);
 
-        vm.startBroadcast(makeAddr("random address"));
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.startBroadcast(caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         validatorTimelock.proveBatches(storedBatch[0], storedBatch1, proofInput);
         vm.stopBroadcast();
     }
 
-    function test_nonValidatorRevertsBatches() public {
-        vm.startBroadcast(makeAddr("random address"));
-        vm.expectRevert("ValidatorTimelock: only validator");
+    function test_nonValidatorRevertsBatches(address caller) public {
+        vm.startBroadcast(caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         validatorTimelock.revertBatches(1);
         vm.stopBroadcast();
     }
 
-    function test_nonValidatorExecutesBatches() public {
-        vm.startBroadcast(makeAddr("random address"));
-        vm.expectRevert("ValidatorTimelock: only validator");
+    function test_nonValidatorExecutesBatches(address caller) public {
+        vm.startBroadcast(caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         validatorTimelock.executeBatches(getMockStoredBatchInfo(1, 0));
         vm.stopBroadcast();
     }
 
-    function test_nonGovernorSetsValidator() public {
-        vm.startBroadcast(makeAddr("random address"));
-        vm.expectRevert("ValidatorTimelock: only chain admin");
+    function test_nonGovernorSetsValidator(address caller) public {
+        vm.startBroadcast(caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
         validatorTimelock.addValidator(chainId, makeAddr("random address"));
         vm.stopBroadcast();
     }
@@ -193,7 +194,7 @@ contract ValidatorTest is Test {
         vm.stopBroadcast();
 
         vm.startBroadcast(newValidator);
-        vm.expectRevert(abi.encodePacked("5c"));
+        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, 1000, 1));
         validatorTimelock.executeBatchesSharedBridge(chainId, getMockStoredBatchInfo(1, 0));
         vm.stopBroadcast();
     }
