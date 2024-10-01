@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {AdminFacetTest} from "../../../contracts/dev-contracts/test/AdminFacetTest.sol";
-import {console2 as console} from "forge-std/Script.sol";
+import {Unauthorized} from "../../../contracts/common/L1ContractErrors.sol";
 
 contract GovernanceTest is Test {
     AdminFacetTest public adminFacet;
@@ -22,9 +22,10 @@ contract GovernanceTest is Test {
 
     function test_randomAddressFailsSetValidator() public {    
         address validatorAddress = makeAddr("random address");
-        vm.expectRevert("Hyperchain: not state transition manager");
+        address caller = makeAddr("caller");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
 
-        vm.startBroadcast(makeAddr("random address"));
+        vm.startBroadcast(caller);
         adminFacet.setValidator(validatorAddress, true);
         vm.stopBroadcast();
     }
@@ -37,9 +38,10 @@ contract GovernanceTest is Test {
     }
 
     function test_randomAddressFailsSetPorterAvailability() public {
-        vm.expectRevert("Hyperchain: not state transition manager");
+        address caller = makeAddr("caller");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
 
-        vm.startBroadcast(makeAddr("random address"));
+        vm.startBroadcast(caller);
         adminFacet.setPorterAvailability(false);
         vm.stopBroadcast();
     }
@@ -54,9 +56,10 @@ contract GovernanceTest is Test {
 
     function test_randomAddressFailsSetPriorityTransactionMaxGas() public {
         uint256 gasLimit = 12345678;
-        vm.expectRevert("Hyperchain: not state transition manager");
+        address caller = makeAddr("caller");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
 
-        vm.startBroadcast(makeAddr("random address"));
+        vm.startBroadcast(caller);
         adminFacet.setPriorityTxMaxGasLimit(gasLimit);
         vm.stopBroadcast();
     }
@@ -81,9 +84,10 @@ contract GovernanceTest is Test {
     }
 
     function test_failToacceptAdminFromNotProposedAccount() public {
-        vm.expectRevert(bytes("n4"));
+        address caller = makeAddr("caller");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, caller));
 
-        vm.startBroadcast(makeAddr("random address"));
+        vm.startBroadcast(caller);
         adminFacet.acceptAdmin();
         vm.stopBroadcast();
     }
