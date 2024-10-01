@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
-
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 contract ProtocolVersion is StateTransitionManagerTest {
     function setUp() public {
@@ -21,14 +21,26 @@ contract ProtocolVersion is StateTransitionManagerTest {
         assertEq(oldProtocolVersion, 0);
         assertEq(oldProtocolVersionDeadline, type(uint256).max);
 
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), oldProtocolVersion, 1000, 1);
+        uint256 newProtocolVersionSemVer = SemVer.packSemVer(0, 1, 0);
+
+        chainContractAddress.setNewVersionUpgrade(
+            getDiamondCutData(diamondInit),
+            oldProtocolVersion,
+            1000,
+            newProtocolVersionSemVer
+        );
 
         uint256 newProtocolVersion = chainContractAddress.protocolVersion();
         uint256 newProtocolVersionDeadline = chainContractAddress.protocolVersionDeadline(newProtocolVersion);
 
         oldProtocolVersionDeadline = chainContractAddress.protocolVersionDeadline(oldProtocolVersion);
 
-        assertEq(newProtocolVersion, 1);
+        (uint32 major, uint32 minor, uint32 patch) = chainContractAddress.getSemverProtocolVersion();
+
+        assertEq(major, 0);
+        assertEq(minor, 1);
+        assertEq(patch, 0);
+        assertEq(newProtocolVersion, newProtocolVersionSemVer);
         assertEq(newProtocolVersionDeadline, type(uint256).max);
         assertEq(oldProtocolVersionDeadline, 1000);
     }

@@ -20,8 +20,6 @@ import {StateTransitionManager} from "contracts/state-transition/StateTransition
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {console} from "forge-std/console.sol";
-
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -169,7 +167,4 @@ contract StateTransitionManagerTest is Test {
 
         vm.startPrank(governor);
     }
-
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
 }

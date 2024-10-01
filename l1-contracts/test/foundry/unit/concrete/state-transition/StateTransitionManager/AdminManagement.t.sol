@@ -5,7 +5,6 @@ import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol
 import {console} from "forge-std/console.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-
 contract AdminManagement is StateTransitionManagerTest {
     function setUp() public {
         deploy();
