@@ -24,7 +24,7 @@ import {InitializeData, DiamondInit} from "contracts/state-transition/chain-deps
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Test} from "forge-std/Test.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -34,6 +34,7 @@ import {CustomUpgradeTest} from "contracts/dev-contracts/test/CustomUpgradeTest.
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {GettersFacetWrapper} from "test/foundry/unit/concrete/state-transition/chain-deps/facets/Getters/_Getters_Shared.t.sol";
 import {console2 as console} from "forge-std/Script.sol";
+import {ZeroAddress, LogAlreadyProcessed, PubdataGreaterThanLimit, TxHashMismatch, TimeNotReached, L2BytecodeHashMismatch, InvalidTxType, NewProtocolMajorVersionNotZero, ProtocolVersionTooSmall, L2UpgradeNonceNotEqualToNewProtocolVersion, MissingSystemLogs, TxnBodyGasLimitNotEnoughGas, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchCantSetUpgradeTxn, ProtocolVersionMinorDeltaTooBig, TooMuchGas, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, PreviousUpgradeNotFinalized} from "../../../contracts/common/L1ContractErrors.sol";
 
 contract L2UpgradeTest is Test {
     uint32 internal major;
@@ -127,7 +128,7 @@ contract L2UpgradeTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("STM: owner zero"));
+        vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
@@ -340,7 +341,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Patch only upgrade can not set new default account");
+        bytes memory revertMsg = abi.encodeWithSelector(PatchUpgradeCantSetDefaultAccount.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -360,7 +361,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Patch only upgrade can not set new bootloader");
+        bytes memory revertMsg = abi.encodeWithSelector(PatchUpgradeCantSetBootloader.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -384,7 +385,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Patch only upgrade can not set upgrade transaction");
+        bytes memory revertMsg = abi.encodeWithSelector(PatchCantSetUpgradeTxn.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -407,7 +408,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Major must always be 0");
+        bytes memory revertMsg = abi.encodeWithSelector(NewProtocolMajorVersionNotZero.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -427,7 +428,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: COMMIT_TIMESTAMP_NOT_OLDER + 10,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Upgrade is not ready yet");
+        bytes memory revertMsg = abi.encodeWithSelector(TimeNotReached.selector, proposedUpgrade.upgradeTimestamp, COMMIT_TIMESTAMP_NOT_OLDER + 1);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -450,7 +451,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("L2 system upgrade tx type is wrong");
+        bytes memory revertMsg = abi.encodeWithSelector(InvalidTxType.selector, l2ProtocolUpgradeTx.txType);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -545,7 +546,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        bytes memory revertMsg = bytes("The new protocol version should be included in the L2 system upgrade tx");
+        bytes memory revertMsg = abi.encodeWithSelector(L2UpgradeNonceNotEqualToNewProtocolVersion.selector, upgradeTx.nonce, 1);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -565,7 +566,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("New protocol version is not greater than the current one");
+        bytes memory revertMsg = abi.encodeWithSelector(ProtocolVersionTooSmall.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -585,7 +586,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Too big protocol version difference");
+        bytes memory revertMsg = abi.encodeWithSelector(ProtocolVersionMinorDeltaTooBig.selector, 100, 1000);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -610,7 +611,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("my");
+        bytes memory revertMsg = abi.encodeWithSelector(TxnBodyGasLimitNotEnoughGas.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -635,7 +636,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("ui");
+        bytes memory revertMsg = abi.encodeWithSelector(TooMuchGas.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -661,7 +662,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("uk");
+        bytes memory revertMsg = abi.encodeWithSelector(PubdataGreaterThanLimit.selector, 99000, 495000);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -693,7 +694,9 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Wrong factory dep hash");
+        console.log(factoryHash[0]);
+        console.logBytes(factoryDeps[0]);
+        bytes memory revertMsg = abi.encodeWithSelector(L2BytecodeHashMismatch.selector, 0x01000001b32f2d7374a0d4c6a6963811a3ba2a1fde5468b290cf01523c939025, 0x68958563f7e4d37cd700e1be8e9a685dbadaa1c5f3f8eb062c6d0eed74525308);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -726,7 +729,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        bytes memory revertMsg = bytes("Wrong number of factory deps");
+        bytes memory revertMsg = abi.encodeWithSelector(UnexpectedNumberOfFactoryDeps.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -757,7 +760,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: protocolVersion
         });
 
-        bytes memory revertMsg = bytes("Factory deps can be at most 32");
+        bytes memory revertMsg = abi.encodeWithSelector(TooManyFactoryDeps.selector);
         executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
@@ -968,7 +971,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        bytes memory revertMsg = bytes("Previous upgrade has not been finalized");
+        bytes memory revertMsg = abi.encodeWithSelector(PreviousUpgradeNotFinalized.selector, 0x2a372301465b1e0e8dfd0521d620ccfd7119e74599234a3681dea41e0d759d5b);
         executeUpgrade(true, revertMsg, newProposedUpgrade);
     }
 
@@ -1054,7 +1057,7 @@ contract L2UpgradeTest is Test {
         StateTransitionManager(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C).setProtocolVersionDeadline(newProtocolVersion, 999999);
         vm.stopPrank();
         vm.startPrank(msg.sender);
-        vm.expectRevert(bytes("b8"));
+        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 16383, 8191));
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
     }
 
@@ -1106,7 +1109,7 @@ contract L2UpgradeTest is Test {
             systemLogs: l2Logs2,
             pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
-        vm.expectRevert(bytes("kp"));
+        vm.expectRevert(abi.encodeWithSelector(LogAlreadyProcessed.selector, 13));
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
     }
 
@@ -1140,7 +1143,7 @@ contract L2UpgradeTest is Test {
             systemLogs: l2Logs2,
             pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
-        vm.expectRevert(bytes("ut"));
+        vm.expectRevert(TxHashMismatch.selector);
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
     }
 
