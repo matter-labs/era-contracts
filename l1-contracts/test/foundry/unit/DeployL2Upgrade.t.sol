@@ -33,7 +33,6 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {CustomUpgradeTest} from "contracts/dev-contracts/test/CustomUpgradeTest.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {GettersFacetWrapper} from "test/foundry/unit/concrete/state-transition/chain-deps/facets/Getters/_Getters_Shared.t.sol";
-import {console2 as console} from "forge-std/Script.sol";
 import {ZeroAddress, LogAlreadyProcessed, PubdataGreaterThanLimit, TxHashMismatch, TimeNotReached, L2BytecodeHashMismatch, InvalidTxType, NewProtocolMajorVersionNotZero, ProtocolVersionTooSmall, L2UpgradeNonceNotEqualToNewProtocolVersion, MissingSystemLogs, TxnBodyGasLimitNotEnoughGas, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchCantSetUpgradeTxn, ProtocolVersionMinorDeltaTooBig, TooMuchGas, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, PreviousUpgradeNotFinalized} from "../../../contracts/common/L1ContractErrors.sol";
 
 contract L2UpgradeTest is Test {
@@ -702,8 +701,7 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        console.log(factoryHash[0]);
-        console.logBytes(factoryDeps[0]);
+
         bytes memory revertMsg = abi.encodeWithSelector(
             L2BytecodeHashMismatch.selector,
             0x01000001b32f2d7374a0d4c6a6963811a3ba2a1fde5468b290cf01523c939025,
