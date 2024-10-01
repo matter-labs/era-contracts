@@ -3,8 +3,14 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
+
 
 contract ProtocolVersion is StateTransitionManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     // setNewVersionUpgrade
     function test_SuccessfulSetNewVersionUpgrade() public {
         createNewChain(getDiamondCutData(diamondInit));
@@ -85,7 +91,7 @@ contract ProtocolVersion is StateTransitionManagerTest {
             1
         );
 
-        vm.expectRevert(bytes("AdminFacet: protocolVersion mismatch in STC after upgrading"));
+        vm.expectRevert(ProtocolIdNotGreater.selector);
         chainContractAddress.upgradeChainFromVersion(
             chainId,
             0,

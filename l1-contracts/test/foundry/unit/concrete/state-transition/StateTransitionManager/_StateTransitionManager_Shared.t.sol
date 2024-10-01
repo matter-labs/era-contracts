@@ -20,6 +20,8 @@ import {StateTransitionManager} from "contracts/state-transition/StateTransition
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {console} from "forge-std/console.sol";
+
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -44,8 +46,8 @@ contract StateTransitionManagerTest is Test {
         bridgehub = new Bridgehub();
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub, MAX_NUMBER_OF_HYPERCHAINS);
+        vm.startPrank(address(bridgehub));
+        stateTransitionManager = new StateTransitionManager(address(bridgehub), MAX_NUMBER_OF_HYPERCHAINS);
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -116,6 +118,7 @@ contract StateTransitionManagerTest is Test {
             admin,
             abi.encodeCall(StateTransitionManager.initialize, stmInitializeData)
         );
+
         chainContractAddress = StateTransitionManager(address(transparentUpgradeableProxy));
 
         vm.stopPrank();
@@ -139,7 +142,7 @@ contract StateTransitionManagerTest is Test {
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
-        vm.prank(bridgehub);
+        vm.prank(address(bridgehub));
 
         chainContractAddress.createNewChain({
             _chainId: chainId,
@@ -154,7 +157,7 @@ contract StateTransitionManagerTest is Test {
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
         vm.stopPrank();
-        vm.prank(bridgehub);
+        vm.prank(address(bridgehub));
 
         chainContractAddress.createNewChain({
             _chainId: id,

@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, HashMismatch, ZeroAddress, HyperchainLimitReached} from "contracts/common/L1ContractErrors.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
@@ -69,7 +69,7 @@ contract createNewChainTest is StateTransitionManagerTest {
     }
 
     function test_RevertWhen_AlreadyDeployedHyperchainAddressIsZero() public {
-        vm.expectRevert(bytes("STM: hyperchain zero"));
+        vm.expectRevert(ZeroAddress.selector);
 
         chainContractAddress.registerAlreadyDeployedHyperchain(chainId, address(0));
     }
@@ -90,7 +90,7 @@ contract createNewChainTest is StateTransitionManagerTest {
         uint256[] memory chainIds = chainContractAddress.getAllHyperchainChainIDs();
         assertEq(chainIds.length, MAX_NUMBER_OF_HYPERCHAINS);
 
-        vm.expectRevert("STM: Hyperchain limit reached");
+        vm.expectRevert(HyperchainLimitReached.selector);
         chainContractAddress.registerAlreadyDeployedHyperchain(100, makeAddr("randomHyperchain"));
     }
 }
