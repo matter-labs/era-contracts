@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_ADMIN} from "../Base/_Base_Shared.t.sol";
+import {Unauthorized, ChainAlreadyLive} from "contracts/common/L1ContractErrors.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract SetPubdataPricingModeTest is AdminTest {
@@ -12,7 +12,7 @@ contract SetPubdataPricingModeTest is AdminTest {
         address nonAdmin = makeAddr("nonAdmin");
 
         vm.startPrank(nonAdmin);
-        vm.expectRevert(ERROR_ONLY_ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
 
         adminFacet.setPubdataPricingMode(PubdataPricingMode.Validium);
     }
@@ -24,7 +24,7 @@ contract SetPubdataPricingModeTest is AdminTest {
 
         vm.startPrank(admin);
 
-        vm.expectRevert(bytes.concat("AdminFacet: set validium only after genesis"));
+        vm.expectRevert(ChainAlreadyLive.selector);
         adminFacet.setPubdataPricingMode(PubdataPricingMode.Validium);
     }
 

@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
+import {Unauthorized, DenominatorIsZero} from "contracts/common/L1ContractErrors.sol";
 
 contract SetTokenMultiplierTest is AdminTest {
     event NewBaseTokenMultiplier(
@@ -19,7 +19,7 @@ contract SetTokenMultiplierTest is AdminTest {
         uint128 denominator = 100;
 
         vm.startPrank(nonStateTransitionManager);
-        vm.expectRevert(ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
 
         adminFacet.setTokenMultiplier(nominator, denominator);
     }
@@ -31,17 +31,17 @@ contract SetTokenMultiplierTest is AdminTest {
         uint128 denominator = 0;
 
         vm.startPrank(stateTransitionManager);
-        vm.expectRevert(bytes("AF: denominator 0"));
+        vm.expectRevert(DenominatorIsZero.selector);
 
         adminFacet.setTokenMultiplier(nominator, denominator);
     }
 
-    function test_successfulSet() public {
+    function test_successfulSet(uint128 nominator, uint128 denominator) public {
+        vm.assume(denominator != 0);
+
         address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         uint128 oldNominator = utilsFacet.util_getBaseTokenGasPriceMultiplierNominator();
         uint128 oldDenominator = utilsFacet.util_getBaseTokenGasPriceMultiplierDenominator();
-        uint128 nominator = 1;
-        uint128 denominator = 100;
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));

@@ -80,7 +80,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("DiamondInit: b0"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
@@ -94,7 +94,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("DiamondInit: stm0"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
@@ -108,7 +108,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("DiamondInit: bt0"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
@@ -122,7 +122,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("DiamondInit: btb0"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
@@ -136,7 +136,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("DiamondInit: bvhr0"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
