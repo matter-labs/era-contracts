@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, HashMismatch, ZeroAddress, ZKChainLimitedReached} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
@@ -70,7 +70,7 @@ contract createNewChainTest is ChainTypeManagerTest {
     }
 
     function test_RevertWhen_AlreadyDeployedHyperchainAddressIsZero() public {
-        vm.expectRevert(bytes("STM: hyperchain zero"));
+        vm.expectRevert(ZeroAddress.selector);
 
         chainContractAddress.registerAlreadyDeployedHyperchain(chainId, address(0));
     }
@@ -91,7 +91,7 @@ contract createNewChainTest is ChainTypeManagerTest {
         uint256[] memory chainIds = chainContractAddress.getAllHyperchainChainIDs();
         assertEq(chainIds.length, MAX_NUMBER_OF_HYPERCHAINS);
 
-        vm.expectRevert("STM: Hyperchain limit reached");
+        vm.expectRevert(HyperchainLimitReached.selector);
         chainContractAddress.registerAlreadyDeployedHyperchain(100, makeAddr("randomHyperchain"));
     }
 }

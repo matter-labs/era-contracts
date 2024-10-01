@@ -2,14 +2,21 @@
 pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {console} from "forge-std/console.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+
 
 contract AdminManagement is StateTransitionManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_RevertWhen_IsNotAdminOrOwner() public {
         address newAdmin = makeAddr("newAdmin");
 
         vm.stopPrank();
         vm.prank(newAdmin);
-        vm.expectRevert(bytes("STM: not owner or admin"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, newAdmin));
         chainContractAddress.setPendingAdmin(newAdmin);
     }
 
@@ -27,7 +34,7 @@ contract AdminManagement is StateTransitionManagerTest {
 
         vm.stopPrank();
         vm.prank(random);
-        vm.expectRevert(bytes("n42"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, random));
         chainContractAddress.acceptAdmin();
     }
 
@@ -36,7 +43,7 @@ contract AdminManagement is StateTransitionManagerTest {
 
         vm.stopPrank();
         vm.prank(random);
-        vm.expectRevert(bytes("n42"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, random));
         chainContractAddress.acceptAdmin();
     }
 
