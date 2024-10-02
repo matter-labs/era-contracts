@@ -155,7 +155,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         return _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 
-
     function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
         return _withdrawSender(assetId, _assetData, msg.sender, true);
