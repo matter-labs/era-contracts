@@ -34,7 +34,7 @@ mod tracer;
 fn execute_internal_bootloader_test() {
     let test_location = env::current_dir()
         .unwrap()
-        .join("../build/artifacts/bootloader_test.yul.zbin");
+        .join("../build/artifacts/bootloader_test.yul/bootloader_test.yul.zbin");
     println!("Current dir is {:?}", test_location);
     let bytecode = read_zbin_bytecode(test_location.as_path());
     let hash = hash_bytecode(&bytecode);
