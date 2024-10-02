@@ -26,7 +26,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
 import {SystemContractsCaller} from "contracts/common/libraries/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
-import {SystemContractsArgs} from "../../l1/integration/l2-dummy-tests/_SharedL2ContractDeployer.sol";
+import {SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));

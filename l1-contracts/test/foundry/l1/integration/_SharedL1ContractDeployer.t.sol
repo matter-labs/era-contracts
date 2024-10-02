@@ -21,9 +21,9 @@ contract L1ContractDeployer is Test {
     DeployedAddresses public ecosystemAddresses;
     Config public ecosystemConfig;
 
-    address bridgeHubProxyAddress;
-    address bridgeHubOwnerAddress;
-    Bridgehub bridgeHub;
+    address bridgehubProxyAddress;
+    address bridgehubOwnerAddress;
+    Bridgehub bridgehub;
 
     CTMDeploymentTracker ctmDeploymentTracker;
 
@@ -55,7 +55,7 @@ contract L1ContractDeployer is Test {
         ecosystemAddresses = l1Script.getAddresses();
         ecosystemConfig = l1Script.getConfig();
 
-        bridgeHub = Bridgehub(ecosystemAddresses.bridgehub.bridgehubProxy);
+        bridgehub = Bridgehub(ecosystemAddresses.bridgehub.bridgehubProxy);
         chainTypeManager = IChainTypeManager(ecosystemAddresses.stateTransition.chainTypeManagerProxy);
         ctmDeploymentTracker = CTMDeploymentTracker(ecosystemAddresses.bridgehub.ctmDeploymentTrackerProxy);
 
@@ -66,12 +66,12 @@ contract L1ContractDeployer is Test {
         _acceptOwnership();
         _setEraBatch();
 
-        bridgeHubOwnerAddress = bridgeHub.owner();
+        bridgehubOwnerAddress = bridgehub.owner();
     }
 
     function _acceptOwnership() private {
-        vm.startPrank(bridgeHub.pendingOwner());
-        bridgeHub.acceptOwnership();
+        vm.startPrank(bridgehub.pendingOwner());
+        bridgehub.acceptOwnership();
         sharedBridge.acceptOwnership();
         ctmDeploymentTracker.acceptOwnership();
         vm.stopPrank();
@@ -86,9 +86,9 @@ contract L1ContractDeployer is Test {
 
     function _registerNewToken(address _tokenAddress) internal {
         bytes32 tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _tokenAddress);
-        if (!bridgeHub.assetIdIsRegistered(tokenAssetId)) {
-            vm.prank(bridgeHubOwnerAddress);
-            bridgeHub.addTokenAssetId(tokenAssetId);
+        if (!bridgehub.assetIdIsRegistered(tokenAssetId)) {
+            vm.prank(bridgehubOwnerAddress);
+            bridgehub.addTokenAssetId(tokenAssetId);
         }
     }
 

@@ -10,6 +10,7 @@ import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -53,6 +54,10 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         if (ntv == address(0)) {
             ntv = L2_NATIVE_TOKEN_VAULT_ADDR;
             nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+            assetId = DataEncoding.encodeNTVAssetId(
+                INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L1_CHAIN_ID(),
+                originToken
+            );
         }
         if (msg.sender != ntv) {
             revert Unauthorized(msg.sender);

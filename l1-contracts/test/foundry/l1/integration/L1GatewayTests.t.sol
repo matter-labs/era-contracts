@@ -91,13 +91,13 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _initializeGatewayScript();
 
         vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
-        migratingChain = IZKChain(IBridgehub(bridgeHub).getZKChain(migratingChainId));
-        gatewayChain = IZKChain(IBridgehub(bridgeHub).getZKChain(gatewayChainId));
+        migratingChain = IZKChain(IBridgehub(bridgehub).getZKChain(migratingChainId));
+        gatewayChain = IZKChain(IBridgehub(bridgehub).getZKChain(gatewayChainId));
         vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
-        // vm.deal(bridgeHub, 100000000000000000000000000000000000);
+        // vm.deal(bridgehub, 100000000000000000000000000000000000);
     }
 
     // This is a method to simplify porting the tests for now.
@@ -128,7 +128,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
-        require(bridgeHub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
+        require(bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
@@ -149,7 +149,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
-        IBridgehub bridgehub = IBridgehub(bridgeHub);
+        IBridgehub bridgehub = IBridgehub(bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
@@ -172,7 +172,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         // Setup
-        IBridgehub bridgehub = IBridgehub(bridgeHub);
+        IBridgehub bridgehub = IBridgehub(bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         bytes memory transferData;
 
@@ -219,7 +219,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         // Set Deposit Happened
-        vm.startBroadcast(address(bridgeHub));
+        vm.startBroadcast(address(bridgehub));
         assetRouter.bridgehubConfirmL2Transaction({
             _chainId: migratingChainId,
             _txDataHash: txDataHash,
@@ -242,7 +242,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         vm.stopBroadcast();
     }
 
-    function test_migrateBackChain() public {
+    function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
@@ -253,7 +253,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function migrateBackChain() public {
-        IBridgehub bridgehub = IBridgehub(bridgeHub);
+        IBridgehub bridgehub = IBridgehub(bridgehub);
         IZKChain migratingChain = IZKChain(bridgehub.getZKChain(migratingChainId));
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
@@ -267,7 +267,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(bridgeHub),
+            address(bridgehub),
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
@@ -326,7 +326,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        bridgeHub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
+        bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
 

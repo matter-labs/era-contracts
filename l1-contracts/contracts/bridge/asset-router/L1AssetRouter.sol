@@ -386,7 +386,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         if (assetId != bytes32(0)) {
             return assetId;
         }
-        assetId = nativeTokenVault.calculateAssetId(block.chainid, _token);
+        assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);=======
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);
         }

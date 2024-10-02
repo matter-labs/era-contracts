@@ -139,15 +139,15 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function getZKChainAddress(uint256 _chainId) public view returns (address) {
-        return bridgeHub.getZKChain(_chainId);
+        return bridgehub.getZKChain(_chainId);
     }
 
     function getZKChainBaseToken(uint256 _chainId) public view returns (address) {
-        return bridgeHub.baseToken(_chainId);
+        return bridgehub.baseToken(_chainId);
     }
 
     function acceptPendingAdmin() public {
-        IZKChain chain = IZKChain(bridgeHub.getZKChain(currentZKChainId - 1));
+        IZKChain chain = IZKChain(bridgehub.getZKChain(currentZKChainId - 1));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();
@@ -164,7 +164,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address _admin,
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
-        address _bridgeHub
+        address _bridgehub
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             ecosystemConfig.contracts.diamondCutData,
@@ -176,7 +176,7 @@ contract ZKChainDeployer is L1ContractDeployer {
             initData = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),
-                bytes32(uint256(uint160(address(_bridgeHub)))),
+                bytes32(uint256(uint160(address(_bridgehub)))),
                 bytes32(uint256(uint160(address(this)))),
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),
