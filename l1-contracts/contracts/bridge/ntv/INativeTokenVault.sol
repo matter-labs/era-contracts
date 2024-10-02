@@ -16,6 +16,10 @@ interface INativeTokenVault {
 
     /// @notice The AssetRouter contract
     function ASSET_ROUTER() external view returns (IAssetRouterBase);
+
+    /// @notice The chain ID of the L1 chain
+    function L1_CHAIN_ID() external view returns (uint256);
+
     /// @notice Returns the chain ID of the origin chain for a given asset ID
     function originChainId(bytes32 assetId) external view returns (uint256);
 

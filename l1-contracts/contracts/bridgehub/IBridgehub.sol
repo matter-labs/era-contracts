@@ -197,6 +197,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
+    function settlementLayer(uint256 _chainId) external view returns (uint256);
+
     // function finalizeMigrationToGateway(
     //     uint256 _chainId,
     //     address _baseToken,
@@ -215,7 +217,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
-    function ctmAssetId(address _ctmAddress) external view returns (bytes32);
+    function ctmAssetIdFromAddress(address _ctmAddress) external view returns (bytes32);
 
     function l1CtmDeployer() external view returns (ICTMDeploymentTracker);
 
@@ -230,4 +232,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
 
     function setLegacyChainAddress(uint256 _chainId) external;
+
+    /// @notice return the ZK chain contract for a chainId
+    /// @dev It is a legacy method. Do not use!
+    function getHyperchain(uint256 _chainId) external view returns (address);
 }

@@ -132,7 +132,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
-    function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
+    function _deployBeaconProxy(bytes32 _salt) internal virtual override returns (BeaconProxy proxy) {
         if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
             // Deploy the beacon proxy for the L2 token
 
@@ -177,7 +177,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _l1Token
-    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
+    ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {

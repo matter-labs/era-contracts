@@ -84,7 +84,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
             baseTokenAssetId: DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken"))),
-            baseTokenBridge: makeAddr("baseTokenBridge"),
             storedBatchZero: bytes32(0),
             // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
             // genesisIndexRepeatedStorageChanges: 0,

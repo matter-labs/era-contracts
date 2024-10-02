@@ -33,7 +33,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// @dev Address of the native token vault.
     address public override nativeTokenVault;
 
-    /// @dev The assetId of the token.
+    /// @dev The assetId of the token. The wrapped token does not have its own assetId.
     bytes32 public override assetId;
 
     modifier onlyBridge() {
@@ -66,7 +66,8 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         string calldata name_,
         string calldata symbol_,
         address _l2Bridge,
-        address _l1Address
+        address _l1Address,
+        bytes32 _baseTokenAssetId
     ) external reinitializer(2) {
         if (_l2Bridge == address(0)) {
             revert ZeroAddress();
@@ -75,9 +76,13 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         if (_l1Address == address(0)) {
             revert ZeroAddress();
         }
+        if (_baseTokenAssetId == bytes32(0)) {
+            revert ZeroAddress();
+        }
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
         nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+        assetId = _baseTokenAssetId;
 
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(name_, symbol_);

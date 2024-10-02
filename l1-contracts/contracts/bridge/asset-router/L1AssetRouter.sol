@@ -386,7 +386,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         if (assetId != bytes32(0)) {
             return assetId;
         }
-        assetId = nativeTokenVault.calculateAssetId(block.chainid, _token);
+        assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);
         }
@@ -622,5 +622,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2MessageIndex
     ) external view returns (bool) {
         return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
+    }
+    
+    /// @notice Legacy function to get the L2 shared bridge address for a chain.
+    /// @dev In case the chain has been deployed after the gateway release,
+    /// the returned value is 0.
+    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
+        return L1_NULLIFIER.l2BridgeAddress(_chainId);
     }
 }
