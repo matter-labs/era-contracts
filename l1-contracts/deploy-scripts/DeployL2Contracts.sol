@@ -15,6 +15,7 @@ contract DeployL2Script is Script {
     ContractsBytecodes contracts;
 
     struct Config {
+        bool legacyBridge;
         address bridgehubAddress;
         address l1SharedBridgeProxy;
         address governance;
@@ -24,6 +25,12 @@ contract DeployL2Script is Script {
         address consensusRegistryOwner;
         uint256 chainId;
         uint256 eraChainId;
+
+        bool deploySharedBridge;
+        bool deployConsensusRegistry;
+        bool deployMulticall3;
+        bool deployDefaultUpgrader;
+
         address l2SharedBridgeImplementation;
         address l2SharedBridgeProxy;
         address consensusRegistryImplementation;
@@ -44,70 +51,31 @@ contract DeployL2Script is Script {
         bytes forceDeployUpgrader;
     }
 
-    function run() public {
-        deploy(false);
-    }
-
-    function runWithLegacyBridge() public {
-        deploy(true);
-    }
-
-    function deploy(bool legacyBridge) public {
+    function deploy() public {
         initializeConfig();
-        loadContracts(legacyBridge);
+        loadContracts();
 
-        deployFactoryDeps();
-        deploySharedBridge();
-        deploySharedBridgeProxy(legacyBridge);
-        initializeChain();
-        deployForceDeployer();
-        deployConsensusRegistry();
-        deployConsensusRegistryProxy();
-        deployMulticall3();
+        if (config.deploySharedBridge) {
+            deployFactoryDeps();
+            deploySharedBridge();
+            deploySharedBridgeProxy();
+            initializeChain();
+        }
+        if (config.deployConsensusRegistry) {
+            deployConsensusRegistry();
+            deployConsensusRegistryProxy();
+        }
+        if (config.deployMulticall3) {
+            deployMulticall3();
+        }
+        if (config.deployDefaultUpgrader) {
+            deployForceDeployer();
+        }
 
         saveOutput();
     }
 
-    function runDeployLegacySharedBridge() public {
-        deploySharedBridge(true);
-    }
-
-    function runDeploySharedBridge() public {
-        deploySharedBridge(false);
-    }
-
-    function deploySharedBridge(bool legacyBridge) internal {
-        initializeConfig();
-        loadContracts(legacyBridge);
-
-        deployFactoryDeps();
-        deploySharedBridge();
-        deploySharedBridgeProxy(legacyBridge);
-        initializeChain();
-
-        saveOutput();
-    }
-
-    function runDefaultUpgrader() public {
-        initializeConfig();
-        loadContracts(false);
-
-        deployForceDeployer();
-
-        saveOutput();
-    }
-
-    function runDeployConsensusRegistry() public {
-        initializeConfig();
-        loadContracts(false);
-
-        deployConsensusRegistry();
-        deployConsensusRegistryProxy();
-
-        saveOutput();
-    }
-
-    function loadContracts(bool legacyBridge) internal {
+    function loadContracts() internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
@@ -119,7 +87,7 @@ contract DeployL2Script is Script {
             "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
         );
 
-        if (legacyBridge) {
+        if (config.legacyBridge) {
             contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
                 "/../l2-contracts/artifacts-zk/contracts/dev-contracts/DevL2SharedBridge.sol/DevL2SharedBridge.json"
             );
@@ -153,6 +121,7 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
         string memory toml = vm.readFile(path);
+        config.legacyBridge = toml.readBool("$.legacy_bridge");
         config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.governance = toml.readAddress("$.governance");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
@@ -160,6 +129,10 @@ contract DeployL2Script is Script {
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
+        config.deploySharedBridge = toml.readBool("$.deploy_shared_bridge");
+        config.deployConsensusRegistry = toml.readBool("$.deploy_consensus_registry");
+        config.deployMulticall3 = toml.readBool("$.deploy_multicall3");
+        config.deployDefaultUpgrader = toml.readBool("$.deploy_force_deploy_upgrader");
     }
 
     function saveOutput() internal {
@@ -214,13 +187,13 @@ contract DeployL2Script is Script {
         });
     }
 
-    function deploySharedBridgeProxy(bool legacyBridge) internal {
+    function deploySharedBridgeProxy() internal {
         address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
 
         string memory functionSignature;
 
-        if (legacyBridge) {
+        if (config.legacyBridge) {
             functionSignature = "initializeDevBridge(address,address,bytes32,address)";
         } else {
             functionSignature = "initialize(address,address,bytes32,address)";
