@@ -15,6 +15,8 @@ contract DummyBridgehub {
 
     address public zkChain;
 
+    address public sharedBridge;
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
@@ -40,5 +42,9 @@ contract DummyBridgehub {
 
     function getZKChain(uint256) external view returns (address) {
         return address(0);
+    }
+
+    function setSharedBridge(address addr) external {
+        sharedBridge = addr;
     }
 }

@@ -14,11 +14,19 @@ interface IL2AssetRouter is IAssetRouterBase {
         bytes assetData
     );
 
-    function withdraw(bytes32 _assetId, bytes calldata _transferData) external;
+    function withdraw(bytes32 _assetId, bytes calldata _transferData) external returns (bytes32);
 
     function l1AssetRouter() external view returns (address);
 
     function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external;
+
+    function finalizeDepositLegacyBridge(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) external;
 
     /// @dev Used to set the assedAddress for a given assetId.
     /// @dev Will be used by ZK Gateway

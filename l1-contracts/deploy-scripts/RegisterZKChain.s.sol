@@ -28,37 +28,37 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
+// solhint-disable-next-line gas-struct-packing
+struct Config {
+    address deployerAddress;
+    address ownerAddress;
+    uint256 chainChainId;
+    bool validiumMode;
+    uint256 bridgehubCreateNewChainSalt;
+    address validatorSenderOperatorCommitEth;
+    address validatorSenderOperatorBlobsEth;
+    address baseToken;
+    bytes32 baseTokenAssetId;
+    uint128 baseTokenGasPriceMultiplierNominator;
+    uint128 baseTokenGasPriceMultiplierDenominator;
+    address bridgehub;
+    // TODO(EVM-744): maybe rename to asset router
+    address sharedBridgeProxy;
+    address nativeTokenVault;
+    address chainTypeManagerProxy;
+    address validatorTimelock;
+    bytes diamondCutData;
+    bytes forceDeployments;
+    address governanceSecurityCouncilAddress;
+    uint256 governanceMinDelay;
+    address l1Nullifier;
+}
+
 contract RegisterZKChainScript is Script {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
-
-    // solhint-disable-next-line gas-struct-packing
-    struct Config {
-        address deployerAddress;
-        address ownerAddress;
-        uint256 chainChainId;
-        bool validiumMode;
-        uint256 bridgehubCreateNewChainSalt;
-        address validatorSenderOperatorCommitEth;
-        address validatorSenderOperatorBlobsEth;
-        address baseToken;
-        bytes32 baseTokenAssetId;
-        uint128 baseTokenGasPriceMultiplierNominator;
-        uint128 baseTokenGasPriceMultiplierDenominator;
-        address bridgehub;
-        // TODO(EVM-744): maybe rename to asset router
-        address sharedBridgeProxy;
-        address nativeTokenVault;
-        address chainTypeManagerProxy;
-        address validatorTimelock;
-        bytes diamondCutData;
-        bytes forceDeployments;
-        address governanceSecurityCouncilAddress;
-        uint256 governanceMinDelay;
-        address l1Nullifier;
-    }
 
     struct Output {
         address governance;
@@ -165,6 +165,10 @@ contract RegisterZKChainScript is Script {
         config.validiumMode = toml.readBool("$.chain.validium_mode");
         config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
+    }
+
+    function getConfig() public view returns (Config memory) {
+        return config;
     }
 
     function initializeConfigTest() internal {

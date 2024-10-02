@@ -90,7 +90,7 @@ describe("L2GenesisUpgrade tests", function () {
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash)",
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address l2BridgeProxyOwnerAddress, address l2BridgedStandardERC20ProxyOwnerAddress)",
       ],
       [
         {
@@ -104,6 +104,11 @@ describe("L2GenesisUpgrade tests", function () {
           l2AssetRouterBytecodeHash: l2AssetRouterBytecodeHash,
           l2NtvBytecodeHash: ntvBytecodeHash,
           messageRootBytecodeHash: messageRootBytecodeHash,
+          // For genesis upgrade these values will always be zero
+          l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
+          l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
+          l2BridgeProxyOwnerAddress: ethers.constants.AddressZero,
+          l2BridgedStandardERC20ProxyOwnerAddress: ethers.constants.AddressZero,
         },
       ]
     );

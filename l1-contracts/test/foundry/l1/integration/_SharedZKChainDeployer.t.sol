@@ -13,6 +13,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
+import {Config as ChainConfig} from "deploy-scripts/RegisterZKChain.s.sol";
+
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 
@@ -28,6 +30,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
     }
+
+    ChainConfig internal eraConfig;
 
     uint256 currentZKChainId = 10;
     uint256 eraZKChainId = 9;
@@ -47,6 +51,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         vm.warp(100);
         deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
+        eraConfig = deployScript.getConfig();
     }
 
     function _deployZKChain(address _baseToken) internal {
@@ -156,14 +161,13 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployZkChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _sharedBridge,
         address _admin,
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
         address _bridgeHub
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
-            l1Script.getInitialDiamondCutData(),
+            ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
         bytes memory initData;
@@ -178,7 +182,6 @@ contract ZKChainDeployer is L1ContractDeployer {
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(address(0x1337)))),
                 _baseTokenAssetId,
-                bytes32(uint256(uint160(_sharedBridge))),
                 _storedBatchZero,
                 diamondCut.initCalldata
             );

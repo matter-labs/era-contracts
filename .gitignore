@@ -33,4 +33,5 @@ l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-*.toml
 l1-contracts/test/foundry/integration/deploy-scripts/script-out/*
+l1-contracts/test/foundry/l1/integration/upgrade-envs/script-out/*.toml
 l1-contracts/zkout/*

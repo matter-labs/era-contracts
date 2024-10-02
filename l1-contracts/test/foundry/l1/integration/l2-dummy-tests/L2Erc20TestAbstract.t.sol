@@ -14,71 +14,33 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-import {L2Utils} from "../utils/L2Utils.sol";
+import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
-contract L2Erc20BridgeTest is Test {
-    // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
-    // It is a bit easier to use EOA and it is sufficient for the tests.
-    address internal l1BridgeWallet = address(1);
-    address internal aliasedL1BridgeWallet;
+import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-    // The owner of the beacon and the native token vault
-    address internal ownerWallet = address(2);
-
-    BridgedStandardERC20 internal standardErc20Impl;
-
-    UpgradeableBeacon internal beacon;
-    BeaconProxy internal proxy;
-
-    uint256 internal constant L1_CHAIN_ID = 9;
-    uint256 internal ERA_CHAIN_ID = 270;
-
-    // We won't actually deploy an L1 token in these tests, but we need some address for it.
-    address internal L1_TOKEN_ADDRESS = 0x1111100000000000000000000000000000011111;
-
-    string internal constant TOKEN_DEFAULT_NAME = "TestnetERC20Token";
-    string internal constant TOKEN_DEFAULT_SYMBOL = "TET";
-    uint8 internal constant TOKEN_DEFAULT_DECIMALS = 18;
-
-    function setUp() public {
-        aliasedL1BridgeWallet = AddressAliasHelper.applyL1ToL2Alias(l1BridgeWallet);
-
-        standardErc20Impl = new BridgedStandardERC20();
-        beacon = new UpgradeableBeacon(address(standardErc20Impl));
-        beacon.transferOwnership(ownerWallet);
-
-        // One of the purposes of deploying it here is to publish its bytecode
-        BeaconProxy beaconProxy = new BeaconProxy(address(beacon), new bytes(0));
-        proxy = beaconProxy;
-        bytes32 beaconProxyBytecodeHash;
-        assembly {
-            beaconProxyBytecodeHash := extcodehash(beaconProxy)
-        }
-
-        L2Utils.initSystemContracts();
-        L2Utils.forceDeployAssetRouter(L1_CHAIN_ID, ERA_CHAIN_ID, ownerWallet, l1BridgeWallet, address(0));
-        L2Utils.forceDeployNativeTokenVault({
-            _l1ChainId: L1_CHAIN_ID,
-            _aliasedOwner: ownerWallet,
-            _l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
-            _legacySharedBridge: address(0),
-            _l2TokenBeacon: address(beacon),
-            _contractsDeployedAlready: true
-        });
-    }
-
+abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     function performDeposit(address depositor, address receiver, uint256 amount) internal {
-        vm.prank(aliasedL1BridgeWallet);
+        vm.prank(aliasedL1AssetRouter);
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
             _l1Sender: depositor,
             _l2Receiver: receiver,
             _l1Token: L1_TOKEN_ADDRESS,
             _amount: amount,
-            _data: L2Utils.encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+            _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
     }
 
