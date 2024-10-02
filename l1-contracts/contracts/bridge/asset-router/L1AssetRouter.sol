@@ -621,6 +621,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool) {
+        
         return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
     }
 
