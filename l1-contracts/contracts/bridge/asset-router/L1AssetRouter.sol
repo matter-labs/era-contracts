@@ -335,6 +335,31 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
     }
+
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetId,
+        bytes memory _assetData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external {
+        L1_NULLIFIER.bridgeRecoverFailedTransfer(
+            _chainId,
+            _depositSender,
+            _assetId,
+            _assetData,
+            _l2TxHash,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            _l2TxNumberInBatch,
+            _merkleProof
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
@@ -357,6 +382,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _token The native token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
     function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+        assetId = nativeTokenVault.assetId(_token);
+        if (assetId != bytes32(0)) {
+            return assetId;
+        }
         assetId = nativeTokenVault.calculateAssetId(block.chainid, _token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);

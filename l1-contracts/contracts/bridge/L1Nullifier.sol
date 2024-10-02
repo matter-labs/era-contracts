@@ -642,7 +642,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).calculateAssetId(block.chainid, _l1Token);
+        bytes32 assetId = l1NativeTokenVault.assetId(_l1Token);
+        if (assetId == bytes32(0)) {
+            assetId = INativeTokenVault(address(l1NativeTokenVault)).calculateAssetId(block.chainid, _l1Token);
+        }
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));
