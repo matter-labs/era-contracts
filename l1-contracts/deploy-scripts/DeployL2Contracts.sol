@@ -318,7 +318,10 @@ contract DeployL2Script is Script {
 
     function initializeChain() internal {
         L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
-
+        // Early exit if chain is already initialized.
+        if (bridge.l2BridgeAddress(config.chainId) != address(0)) {
+            return;
+        }
         Utils.chainAdminMulticall({
             _chainAdmin: bridge.admin(),
             _target: config.l1SharedBridgeProxy,
