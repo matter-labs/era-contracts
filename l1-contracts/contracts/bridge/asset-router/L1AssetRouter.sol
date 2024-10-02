@@ -386,7 +386,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         if (assetId != bytes32(0)) {
             return assetId;
         }
-        assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);=======
+        assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);
         }
@@ -621,7 +621,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool) {
-        
         return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
     }
 
