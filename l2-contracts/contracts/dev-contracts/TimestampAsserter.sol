@@ -2,11 +2,11 @@
 pragma solidity 0.8.20;
 
 
-interface ITimeWindowAsserter {
-    function assertTimestampInRange(uint256 a, uint256 b) external view;
+interface ITimestampAsserter {
+    function assertTimestampInRange(uint256 start, uint256 end) external view;
 }
 
-contract TimeWindowAsserter is ITimeWindowAsserter {
+contract TimestampAsserter is ITimestampAsserter {
     // Minimum interval that the end of the time window should be ahead of the block.timestamp in seconds
     uint256 public constant MIN_INTERVAL = 60;
     // Minimum difference between time window start and end in seconds
