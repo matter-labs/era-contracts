@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import {IVectorx} from "./IVectorx.sol";
-import {IAvailBridge} from "./IAvailBridge.sol";
+import {IVectorx} from "../IVectorx.sol";
+import {IAvailBridge} from "../IAvailBridge.sol";
 
 abstract contract AvailAttestationLib {
     struct AttestationData {
@@ -22,7 +22,7 @@ abstract contract AvailAttestationLib {
         vectorx = bridge.vectorx();
     }
 
-    function _attest(IAvailBridge.MerkleProofInput calldata input) internal virtual {
+    function _attest(IAvailBridge.MerkleProofInput memory input) internal virtual {
         if (!bridge.verifyBlobLeaf(input)) revert InvalidAttestationProof();
         attestations[input.leaf] = AttestationData(
             vectorx.rangeStartBlocks(input.rangeHash) + uint32(input.dataRootIndex) + 1, uint128(input.leafIndex)
