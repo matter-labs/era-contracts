@@ -11,6 +11,26 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {EIP712Utils} from "./EIP712Utils.sol";
+import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
+import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
+import {IMultisig} from "./interfaces/IMultisig.sol";
+import {ISafe} from "./interfaces/ISafe.sol";
+
+/// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
+bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
+    "ExecuteEmergencyUpgradeGuardians(bytes32 id)"
+);
+
+/// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the Security Council.
+bytes32 constant EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256(
+    "ExecuteEmergencyUpgradeSecurityCouncil(bytes32 id)"
+);
+
+/// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the ZK Foundation.
+bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
+    "ExecuteEmergencyUpgradeZKFoundation(bytes32 id)"
+);
 
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
@@ -323,5 +343,118 @@ library Utils {
             governance.execute{value: _value}(operation);
         }
         vm.stopBroadcast();
+    }
+
+    function executeEmergencyProtocolUpgrade(
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler.Call[] memory _calls,
+        bytes32 _salt
+    ) internal returns (bytes memory) {
+        bytes32 upgradeId;
+        bytes32 emergencyUpgradeBoardDigest;
+        {
+            address emergencyUpgradeBoard = _protocolUpgradeHandler.emergencyUpgradeBoard();
+            IProtocolUpgradeHandler.UpgradeProposal memory upgradeProposal = IProtocolUpgradeHandler.UpgradeProposal({
+                calls: _calls,
+                salt: _salt,
+                executor: emergencyUpgradeBoard
+            });
+            upgradeId = keccak256(abi.encode(upgradeProposal));
+            emergencyUpgradeBoardDigest = EIP712Utils.buildDomainHash(
+                emergencyUpgradeBoard,
+                "EmergencyUpgradeBoard",
+                "1"
+            );
+        }
+
+        bytes memory guardiansSignatures;
+        {
+            address[] memory guardiansMembers = new address[](8);
+            {
+                IMultisig guardians = IMultisig(_protocolUpgradeHandler.guardians());
+                for (uint256 i = 0; i < 8; i++) {
+                    guardiansMembers[i] = guardians.members(i);
+                }
+            }
+            bytes[] memory guardiansRawSignatures = new bytes[](8);
+            for (uint256 i = 0; i < 8; i++) {
+                bytes32 safeDigest;
+                {
+                    bytes32 guardiansDigest = EIP712Utils.buildDigest(
+                        emergencyUpgradeBoardDigest,
+                        keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH, upgradeId))
+                    );
+                    safeDigest = ISafe(guardiansMembers[i]).getMessageHash(abi.encode(guardiansDigest));
+                }
+
+                (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+                guardiansRawSignatures[i] = abi.encodePacked(r, s, v);
+            }
+            guardiansSignatures = abi.encode(guardiansMembers, guardiansRawSignatures);
+        }
+
+        bytes memory securityCouncilSignatures;
+        {
+            address[] memory securityCouncilMembers = new address[](12);
+            {
+                IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
+                for (uint256 i = 0; i < 12; i++) {
+                    securityCouncilMembers[i] = securityCouncil.members(i);
+                }
+            }
+            bytes[] memory securityCouncilRawSignatures = new bytes[](12);
+            for (uint256 i = 0; i < securityCouncilMembers.length; i++) {
+                bytes32 safeDigest;
+                {
+                    bytes32 securityCouncilDigest = EIP712Utils.buildDigest(
+                        emergencyUpgradeBoardDigest,
+                        keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH, upgradeId))
+                    );
+                    safeDigest = ISafe(securityCouncilMembers[i]).getMessageHash(abi.encode(securityCouncilDigest));
+                }
+                {
+                    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+                    securityCouncilRawSignatures[i] = abi.encodePacked(r, s, v);
+                }
+            }
+            securityCouncilSignatures = abi.encode(securityCouncilMembers, securityCouncilRawSignatures);
+        }
+
+        bytes memory zkFoundationSignature;
+        {
+            ISafe zkFoundation;
+            {
+                IEmergencyUpgrageBoard emergencyUpgradeBoard = IEmergencyUpgrageBoard(
+                    _protocolUpgradeHandler.emergencyUpgradeBoard()
+                );
+                zkFoundation = ISafe(emergencyUpgradeBoard.ZK_FOUNDATION_SAFE());
+            }
+            bytes32 zkFoundationDigest = EIP712Utils.buildDigest(
+                emergencyUpgradeBoardDigest,
+                keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, upgradeId))
+            );
+            bytes32 safeDigest = ISafe(zkFoundation).getMessageHash(abi.encode(zkFoundationDigest));
+            {
+                (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+                zkFoundationSignature = abi.encodePacked(r, s, v);
+            }
+        }
+
+        {
+            vm.startBroadcast();
+            IEmergencyUpgrageBoard emergencyUpgradeBoard = IEmergencyUpgrageBoard(
+                _protocolUpgradeHandler.emergencyUpgradeBoard()
+            );
+            // solhint-disable-next-line func-named-parameters
+            emergencyUpgradeBoard.executeEmergencyUpgrade(
+                _calls,
+                _salt,
+                guardiansSignatures,
+                securityCouncilSignatures,
+                zkFoundationSignature
+            );
+            vm.stopBroadcast();
+        }
     }
 }
