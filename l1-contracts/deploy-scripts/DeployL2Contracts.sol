@@ -107,6 +107,15 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployMulticall3() public {
+        initializeConfig();
+        loadContracts(false);
+
+        deployMulticall3();
+
+        saveOutput();
+    }
+
     function loadContracts(bool legacyBridge) internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
