@@ -347,6 +347,7 @@ contract GatewayPreparation is Script {
         {
             IBridgehub bridgehub = IBridgehub(config.bridgehub);
             bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+            vm.broadcast();
             l1Nullifier.finalizeDeposit(
                 FinalizeL1DepositParams({
                     chainId: gatewayChainId,
