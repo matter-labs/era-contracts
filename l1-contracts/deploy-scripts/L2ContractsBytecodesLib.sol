@@ -148,7 +148,6 @@ library L2ContractsBytecodesLib {
             );
     }
 
-    // FIXME: replace it with L2 verifier
     /// @notice Reads the bytecode of the Verifier contract.
     /// @return The bytecode of the Verifier contract.
     function readVerifierBytecode() internal view returns (bytes memory) {
@@ -156,6 +155,12 @@ library L2ContractsBytecodesLib {
             Utils.readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/Verifier.sol/Verifier.json"
             );
+    }
+
+    /// @notice Reads the bytecode of the L2 Verifier contract.
+    /// @return The bytecode of the Verifier contract.
+    function readL2VerifierBytecode() internal view returns (bytes memory) {
+        return Utils.readHardhatBytecode("/../l2-contracts/artifacts-zk/contracts/verifier/Verifier.sol/Verifier.json");
     }
 
     /// @notice Reads the bytecode of the Verifier contract.
@@ -169,10 +174,10 @@ library L2ContractsBytecodesLib {
 
     /// @notice Reads the bytecode of the TestnetVerifier contract.
     /// @return The bytecode of the TestnetVerifier contract.
-    function readTestnetVerifierBytecode() internal view returns (bytes memory) {
+    function readL2TestnetVerifierBytecode() internal view returns (bytes memory) {
         return
             Utils.readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/TestnetVerifier.sol/TestnetVerifier.json"
+                "/../l2-contracts/artifacts-zk/contracts/verifier/TestnetVerifier.sol/TestnetVerifier.json"
             );
     }
 
@@ -236,6 +241,13 @@ library L2ContractsBytecodesLib {
         return
             Utils.readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/RelayedSLDAValidator.sol/RelayedSLDAValidator.json"
+            );
+    }
+
+    function readValidiumL1DAValidatorBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json"
             );
     }
 
