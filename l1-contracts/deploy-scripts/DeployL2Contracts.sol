@@ -185,7 +185,7 @@ contract DeployL2Script is Script {
         vm.serializeAddress("root", "consensus_registry_implementation", config.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", config.consensusRegistryProxy);
         vm.serializeAddress("root", "multicall3", config.multicall3);
-        vm.serializeAddress("root", "timestampAsserter", config.timestampAsserter);
+        vm.serializeAddress("root", "timestamp_asserter", config.timestampAsserter);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
