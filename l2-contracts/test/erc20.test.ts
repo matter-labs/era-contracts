@@ -21,6 +21,10 @@ const richAccount = [
     address: "0x0D43eB5B8a47bA8900d84AA36656c92024e9772e",
     privateKey: "0xd293c684d884d56f8d6abd64fc76757d3664904e309a0645baf8522ab6366d9e",
   },
+  {
+    address: "0xA13c10C0D5bd6f79041B9835c63f91de35A15883",
+    privateKey: "0x850683b40d4a740aa6e745f889a6fdc8327be76e122f5aba645a5b02d0248db8",
+  },
 ];
 
 describe("ERC20Bridge", function () {
@@ -31,6 +35,8 @@ describe("ERC20Bridge", function () {
   // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
   // It is a bit easier to use EOA and it is sufficient for the tests.
   const l1BridgeWallet = new Wallet(richAccount[2].privateKey, provider);
+  // To simulate the exchange account, we will use another EOA.
+  const exchangeWallet = new Wallet(richAccount[3].privateKey, provider);
 
   // We won't actually deploy an L1 token in these tests, but we need some address for it.
   const L1_TOKEN_ADDRESS = "0x1111000000000000000000000000000000001111";
@@ -67,9 +73,20 @@ describe("ERC20Bridge", function () {
     ]);
 
     erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
+
+    // exchange address is required before ERC20 can be deployed
+    await (await erc20Bridge.setExchangeAddress(exchangeWallet.address)).wait();
+
+    let dupExAddrEx;
+    try {
+      await (await erc20Bridge.setExchangeAddress(exchangeWallet.address)).wait();
+    } catch (e) {
+      dupExAddrEx = e;
+    }
+    expect(dupExAddrEx.error.reason).to.be.equal("execution reverted: exchange address already set");
   });
 
-  it("Should finalize deposit ERC20 deposit", async function () {
+  it("Should finalize deposit ERC20 deposit and fund exchange account", async function () {
     const erc20BridgeWithL1Bridge = L2SharedBridgeFactory.connect(erc20Bridge.address, l1BridgeWallet);
 
     const l1Depositor = ethers.Wallet.createRandom();
@@ -89,12 +106,24 @@ describe("ERC20Bridge", function () {
     const l2TokenAddress = tx.events.find((event) => event.event === "FinalizeDeposit").args.l2Token;
 
     // Checking the correctness of the balance:
-    erc20Token = L2StandardERC20Factory.connect(l2TokenAddress, deployerWallet);
+    erc20Token = L2StandardERC20Factory.connect(l2TokenAddress, exchangeWallet);
     expect(await erc20Token.balanceOf(l2Receiver.address)).to.equal(100);
     expect(await erc20Token.totalSupply()).to.equal(100);
     expect(await erc20Token.name()).to.equal("TestToken");
     expect(await erc20Token.symbol()).to.equal("TT");
     expect(await erc20Token.decimals()).to.equal(18);
+
+    const fundExchangeAccountTx = await (await erc20Token.fundExchangeAccount(l2Receiver.address, 100)).wait();
+
+    const fundExchangeAccountEvent = fundExchangeAccountTx.events.find(
+      (event) => event.event === "FundExchangeAccount"
+    );
+
+    expect(fundExchangeAccountEvent.args.account).to.equal(l2Receiver.address);
+    expect(fundExchangeAccountEvent.args.amount).to.equal(100);
+    expect(await erc20Token.balanceOf(l2Receiver.address)).to.equal(0);
+    expect(await erc20Token.balanceOf(exchangeWallet.address)).to.equal(100);
+    expect(await erc20Token.totalSupply()).to.equal(100);
   });
 
   it("Governance should be able to reinitialize the token", async () => {

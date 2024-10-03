@@ -37,6 +37,9 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
 
+    /// @dev Address of the exchange smart contract. Any funds deposited to L2 will be transferred to the user main account under in this smart contract
+    address public exchangeAddress;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     uint256 immutable ERA_CHAIN_ID;
@@ -111,10 +114,11 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
     function _deployL2Token(address _l1Token, bytes calldata _data) internal returns (address) {
+        require(exchangeAddress != address(0), "grvt@");
         bytes32 salt = _getCreate2Salt(_l1Token);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt);
-        L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data);
+        L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data, exchangeAddress);
 
         return address(l2Token);
     }
@@ -179,5 +183,15 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         // The deployment should be successful and return the address of the proxy
         require(success, "mk");
         proxy = BeaconProxy(abi.decode(returndata, (address)));
+    }
+
+    /// @notice Set the address of GRVT smart contracts that can move the funds from user EOA to their exchange account. This should only be called once after the bridge is deployed
+    function setExchangeAddress(address _exchangeAddress) external {
+        require(exchangeAddress == address(0), "exchange address already set");
+        require(_exchangeAddress != address(0), "grvt@");
+        exchangeAddress = _exchangeAddress;
+        L2ContractHelper.sendMessageToL1(
+            abi.encodePacked(L2SharedBridge.setExchangeAddress.selector, _exchangeAddress)
+        );
     }
 }

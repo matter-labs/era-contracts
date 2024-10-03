@@ -7,12 +7,13 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {ERC1967Upgrade} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol";
 
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {IL2TokenFundExchange} from "./interfaces/IL2TokenFundExchange.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upgrade {
+contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upgrade, IL2TokenFundExchange {
     /// @dev Describes whether there is a specific getter in the token.
     /// @notice Used to explicitly separate which getters the token has and which it does not.
     /// @notice Different tokens in L1 can implement or not implement getter function as `name`/`symbol`/`decimals`,
@@ -36,6 +37,9 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
 
+    /// @dev Address of the exchange smart contract. Any funds deposited to L2 will be transferred to the user main account under in this smart contract
+    address public exchangeAddress;
+
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
@@ -47,11 +51,13 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 token
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
-    function bridgeInitialize(address _l1Address, bytes memory _data) external initializer {
+    function bridgeInitialize(address _l1Address, bytes memory _data, address _exchangeAddress) external initializer {
         require(_l1Address != address(0), "in6"); // Should be non-zero address
         l1Address = _l1Address;
 
         l2Bridge = msg.sender;
+
+        exchangeAddress = _exchangeAddress;
 
         // We parse the data exactly as they were created on the L1 bridge
         (bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = abi.decode(
@@ -145,6 +151,18 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
         _mint(_to, _amount);
         emit BridgeMint(_to, _amount);
+    }
+
+    /// @dev Move the user's fund to their main account under the exchange contract
+    /// @dev We don't directly move the fund in bridgeMint as we want GRVT's backend to be notified of the deposit first. Only after our risk engine has approved the deposit, we move the fund to the user's exchange account by calling this function. This way, we can prevent a state divergent where user balance is updated on chain before it is updated off chain.
+    function fundExchangeAccount(address _from, uint256 _amount) external {
+        require(_from != exchangeAddress, "invalid sender");
+        require(exchangeAddress != address(0), "invalid exchange address");
+        require(msg.sender == exchangeAddress, "sender must be exchange");
+
+        _transfer(_from, exchangeAddress, _amount);
+
+        emit FundExchangeAccount(_from, _amount);
     }
 
     /// @dev Burn tokens from a given account.
