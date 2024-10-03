@@ -190,8 +190,8 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         proxy = abi.decode(returndata, (address));
     }
 
-    function sendMessageToL1(bytes calldata _message) external override onlyAssetRouter {
+    function sendMessageToL1(bytes calldata _message) external override onlyAssetRouter returns (bytes32) {
         // slither-disable-next-line unused-return
-        L2ContractHelper.sendMessageToL1(_message);
+        return L2ContractHelper.sendMessageToL1(_message);
     }
 }

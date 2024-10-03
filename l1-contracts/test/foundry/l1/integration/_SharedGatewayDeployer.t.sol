@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {GatewayPreparationForTests} from "./GatewayPreparationForTests.sol";
+import {GatewayPreparationForTests} from "./_GatewayPreparationForTests.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 
@@ -17,11 +17,11 @@ contract GatewayDeployer is L1ContractDeployer {
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-10.toml"
         );
         vm.setEnv(
-            "GATEWAY_CONFIG",
+            "GATEWAY_AS_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-11.toml"
         );
         vm.setEnv(
-            "GATEWAY_OUTPUT",
+            "GATEWAY_AS_CHAIN_OUTPUT",
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-11.toml"
         );
 

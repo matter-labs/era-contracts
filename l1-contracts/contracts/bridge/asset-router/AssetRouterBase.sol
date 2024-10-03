@@ -306,6 +306,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         bytes memory _assetData
     ) public view virtual returns (bytes memory);
+    
+    /// @notice Ensures that token is registered with native token vault.
+    /// @dev Only used when deposit is made with legacy data encoding format.
+    /// @param _token The native token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _token) internal virtual returns (bytes32 assetId);
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

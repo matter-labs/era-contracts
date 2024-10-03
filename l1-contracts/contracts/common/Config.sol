@@ -123,6 +123,11 @@ address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111
 /// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
 uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
 
+/// @dev The virtual address of the L1 settlement layer.
+address constant L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS = address(
+    uint160(uint256(keccak256("L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS")) - 1)
+);
+
 struct PriorityTreeCommitment {
     uint256 nextLeafIndex;
     uint256 startIndex;

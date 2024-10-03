@@ -200,6 +200,22 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /*//////////////////////////////////////////////////////////////
+                     Internal & Helpers
+    //////////////////////////////////////////////////////////////*/
+
+    // kl todo add handle Legaacy data here, which calls esureTokenRegisteredWithNTV
+    // have handleLegacyData called from somewhere.
+
+    /// @inheritdoc AssetRouterBase
+    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assetId = nativeTokenVault.calculateAssetId(block.chainid, _token);
+        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
+            nativeTokenVault.registerToken(_token);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -208,8 +224,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @dev do not rely on this function, it will be deprecated in the future
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
-        _withdrawSender(_assetId, _assetData, msg.sender, true);
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override returns (bytes32) {
+        return _withdrawSender(_assetId, _assetData, msg.sender, true);
+    }
+
+    function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
+        return _withdrawSender(assetId, _assetData, msg.sender, true);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -223,7 +244,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes memory _assetData,
         address _sender,
         bool _alwaysNewMessageFormat
-    ) internal {
+    ) internal returns (bytes32 txHash) {
         address assetHandler = assetHandlerAddress[_assetId];
         bytes memory _l1bridgeMintData = IAssetHandler(assetHandler).bridgeBurn({
             _chainId: L1_CHAIN_ID,
@@ -237,7 +258,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         if (_alwaysNewMessageFormat || L2_LEGACY_SHARED_BRIDGE == address(0)) {
             message = _getAssetRouterWithdrawMessage(_assetId, _l1bridgeMintData);
             // slither-disable-next-line unused-return
-            L2ContractHelper.sendMessageToL1(message);
+            txHash = L2ContractHelper.sendMessageToL1(message);
         } else {
             address l1Token = IBridgedStandardToken(
                 IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
@@ -247,7 +268,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             }
             (uint256 amount, address l1Receiver) = abi.decode(_assetData, (uint256, address));
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
-            IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
+            txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
         }
 
         emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
@@ -259,9 +280,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function _getAssetRouterWithdrawMessage(
         bytes32 _assetId,
         bytes memory _l1bridgeMintData
-    ) internal pure returns (bytes memory) {
+    ) internal view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, _assetId, _l1bridgeMintData);
+        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, block.chainid, _assetId, _l1bridgeMintData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -356,7 +377,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         _withdrawSender(assetId, data, _sender, false);
     }
@@ -364,7 +385,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @notice Legacy getL1TokenAddress.
     /// @param _l2Token The address of token on L2.
     /// @return The address of token on L1.
-    function getL1TokenAddress(address _l2Token) public view returns (address) {
+    function l1TokenAddress(address _l2Token) public view returns (address) {
         return IBridgedStandardToken(_l2Token).l1Address();
     }
 

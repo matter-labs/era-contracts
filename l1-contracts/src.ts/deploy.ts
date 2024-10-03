@@ -1358,7 +1358,9 @@ export class Deployer {
     const alreadyRegisteredInCTM = (await chainTypeManager.getZKChain(inputChainId)) != ethers.constants.AddressZero;
 
     if (l2LegacySharedBridge) {
-      console.log("Setting L2 legacy shared bridge in L1Nullifier");
+      if (this.verbose) {
+        console.log("Setting L2 legacy shared bridge in L1Nullifier");
+      }
       await this.setL2LegacySharedBridgeInL1Nullifier(inputChainId);
       nonce++;
     }

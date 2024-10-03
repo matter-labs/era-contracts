@@ -6,6 +6,7 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
+import {ZKChainCommitment} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -149,4 +150,6 @@ interface IAdmin is IZKChainBase {
 
     /// @dev Similar to IL1AssetHandler interface, used to receive chains.
     function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
+
+    function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);
 }

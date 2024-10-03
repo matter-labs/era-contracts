@@ -219,7 +219,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
-    function ctmAssetId(address _ctmAddress) external view returns (bytes32);
+    function ctmAssetIdFromAddress(address _ctmAddress) external view returns (bytes32);
 
     function l1CtmDeployer() external view returns (ICTMDeploymentTracker);
 

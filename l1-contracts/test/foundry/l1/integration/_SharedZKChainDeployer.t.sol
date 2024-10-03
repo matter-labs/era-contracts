@@ -13,6 +13,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
+import {Config as ChainConfig} from "deploy-scripts/RegisterZKChain.s.sol";
+
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 
@@ -28,6 +30,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
     }
+
+    ChainConfig internal eraConfig;
 
     uint256 currentZKChainId = 10;
     uint256 eraZKChainId = 9;
@@ -47,6 +51,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         vm.warp(100);
         deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
+        eraConfig = deployScript.getConfig();
     }
 
     function _deployZKChain(address _baseToken) internal {
@@ -134,15 +139,15 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function getZKChainAddress(uint256 _chainId) public view returns (address) {
-        return bridgeHub.getZKChain(_chainId);
+        return bridgehub.getZKChain(_chainId);
     }
 
     function getZKChainBaseToken(uint256 _chainId) public view returns (address) {
-        return bridgeHub.baseToken(_chainId);
+        return bridgehub.baseToken(_chainId);
     }
 
     function acceptPendingAdmin() public {
-        IZKChain chain = IZKChain(bridgeHub.getZKChain(currentZKChainId - 1));
+        IZKChain chain = IZKChain(bridgehub.getZKChain(currentZKChainId - 1));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();
@@ -159,10 +164,10 @@ contract ZKChainDeployer is L1ContractDeployer {
         address _admin,
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
-        address _bridgeHub
+        address _bridgehub
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
-            l1Script.getInitialDiamondCutData(),
+            ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
         bytes memory initData;
@@ -171,7 +176,7 @@ contract ZKChainDeployer is L1ContractDeployer {
             initData = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),
-                bytes32(uint256(uint160(address(_bridgeHub)))),
+                bytes32(uint256(uint160(address(_bridgehub)))),
                 bytes32(uint256(uint160(address(this)))),
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),

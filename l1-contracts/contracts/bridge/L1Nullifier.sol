@@ -648,7 +648,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Token);
+        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).calculateAssetId(block.chainid, _l1Token);
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));
@@ -702,7 +702,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external override onlyLegacyBridge {
         bytes memory assetData = abi.encode(_amount, _depositSender);
         /// the legacy bridge can only be used with L1 native tokens.
-        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Asset);
 
         _verifyAndClearFailedTransfer({
             _checkedInLegacyBridge: true,
