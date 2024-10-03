@@ -351,7 +351,10 @@ contract BootloaderUtilities is IBootloaderUtilities {
         // kl todo verify the proof here, get return values
         // emit TestEvent(_proofData);
         // uint256 chainId = abi.decode(_proofData, (uint256));
-        (uint256 chainId, uint256 batchNumber, uint256 leafProofMask, bytes32 leaf) = abi.decode(_proofData, (uint256, uint256, uint256, bytes32));
+        (uint256 chainId, uint256 batchNumber, uint256 leafProofMask, bytes32 leaf) = abi.decode(
+            _proofData,
+            (uint256, uint256, uint256, bytes32)
+        );
         // (uint256 chainId, uint256 batchNumber, uint256 leafProofMask, bytes32 leaf, bytes32[] memory proof  ) = abi.decode(_proofData, (uint256, uint256, uint256, bytes32, bytes32[]));
         // ProofVerificationResult memory result = MessageHashing.hashProof(
         //     chainId,

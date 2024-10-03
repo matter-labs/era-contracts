@@ -468,7 +468,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) { // kl todo 
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
+                // kl todo
                 if (msg.value != _request.mintValue) {
                     revert MsgValueMismatch(_request.mintValue, msg.value);
                 }
@@ -525,7 +526,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) { // kl todo 
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
+                // kl todo
                 if (msg.value != _request.mintValue + _request.secondBridgeValue) {
                     revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
                 }

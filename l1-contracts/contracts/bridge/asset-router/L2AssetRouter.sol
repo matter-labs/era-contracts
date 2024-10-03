@@ -309,7 +309,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _amount,
         bytes calldata _data
     ) external {
-    // onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+        // onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,

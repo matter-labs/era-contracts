@@ -25,16 +25,18 @@ contract InteropTest is Test {
     IBridgehub internal bridgehub;
     function setUp() public {
         bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
-        L2Utils.initSystemContracts(SystemContractsArgs({
-            l1ChainId: 1,
-            eraChainId: 2,
-            l1AssetRouter: address(1),
-            legacySharedBridge: address(2),
-            l2TokenBeacon: address(3),
-            l2TokenProxyBytecodeHash: bytes32(uint256(4)),
-            aliasedOwner: address(5),
-            contractsDeployedAlready: false
-        }));
+        L2Utils.initSystemContracts(
+            SystemContractsArgs({
+                l1ChainId: 1,
+                eraChainId: 2,
+                l1AssetRouter: address(1),
+                legacySharedBridge: address(2),
+                l2TokenBeacon: address(3),
+                l2TokenProxyBytecodeHash: bytes32(uint256(4)),
+                aliasedOwner: address(5),
+                contractsDeployedAlready: false
+            })
+        );
     }
 
     function test_interop() public {
@@ -51,6 +53,6 @@ contract InteropTest is Test {
             secondBridgeValue: secondBridgeValue,
             secondBridgeCalldata: new bytes(0)
         });
-        bridgehub.requestL2TransactionTwoBridges{value:mintValue + secondBridgeValue}(request);
+        bridgehub.requestL2TransactionTwoBridges{value: mintValue + secondBridgeValue}(request);
     }
 }
