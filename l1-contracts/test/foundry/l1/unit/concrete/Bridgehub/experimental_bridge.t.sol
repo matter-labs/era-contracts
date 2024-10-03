@@ -439,9 +439,10 @@ contract ExperimentalBridgeTest is Test {
         );
 
         if (randomAddress != address(testTokenAddress)) {
+            assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(randomAddress));
+            vm.assume(!bridgeHub.assetIdIsRegistered(assetId));
             // Testing to see if a random address can also be added or not
             vm.prank(bridgeOwner);
-            assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(randomAddress));
             bridgeHub.addTokenAssetId(assetId);
             assertTrue(bridgeHub.assetIdIsRegistered(assetId));
         }
@@ -787,7 +788,6 @@ contract ExperimentalBridgeTest is Test {
                 mockCTM.createNewChain.selector,
                 chainId,
                 tokenAssetId,
-                sharedBridgeAddress,
                 admin,
                 mockInitCalldata,
                 factoryDeps

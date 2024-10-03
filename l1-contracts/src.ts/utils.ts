@@ -17,6 +17,20 @@ const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate
 export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+export const STORED_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)";
+export const COMMIT_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, uint64 timestamp, uint64 indexRepeatedStorageChanges, bytes32 newStateRoot, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 bootloaderHeapInitialContentsHash, bytes32 eventsQueueStateHash, bytes systemLogs, bytes operatorDAInput)";
+export const PRIORITY_OPS_BATCH_INFO_ABI_STRING =
+  "tuple(bytes32[] leftPath, bytes32[] rightPath, bytes32[] itemHashes)";
+export const DIAMOND_CUT_DATA_ABI_STRING =
+  "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
+export const FORCE_DEPLOYMENT_ABI_STRING =
+  "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
+export const BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes ctmData, bytes chainData)";
+export const FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING =
+  "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address l2BridgeProxyOwnerAddress, address l2BridgedStandardERC20ProxyOwnerAddress)";
+export const ADDITIONAL_FORCE_DEPLOYMENTS_DATA_ABI_STRING = "tuple(bytes32 baseTokenAssetId, address l2Weth)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
@@ -289,7 +303,6 @@ export function compileInitialCutHash(
       admin: "0x0000000000000000000000000000000000003234",
       validatorTimelock: "0x0000000000000000000000000000000000004234",
       baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000004234",
-      baseTokenBridge: "0x0000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
       verifier,
       verifierParams,
@@ -301,7 +314,7 @@ export function compileInitialCutHash(
     },
   ]);
 
-  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
+  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 8 * 32) * 2));
 }
 
 export enum PubdataSource {

@@ -234,4 +234,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
 
     function setLegacyChainAddress(uint256 _chainId) external;
+
+    /// @notice return the ZK chain contract for a chainId
+    /// @dev It is a legacy method. Do not use!
+    function getHyperchain(uint256 _chainId) external view returns (address);
 }

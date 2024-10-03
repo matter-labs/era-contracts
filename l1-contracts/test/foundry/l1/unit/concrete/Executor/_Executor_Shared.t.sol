@@ -150,6 +150,8 @@ contract ExecutorTest is Test {
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 
+        dummyBridgehub.setSharedBridge(address(sharedBridge));
+
         vm.mockCall(
             address(messageRoot),
             abi.encodeWithSelector(MessageRoot.addChainBatchRoot.selector, 9, 1, bytes32(0)),
@@ -197,7 +199,6 @@ contract ExecutorTest is Test {
             admin: owner,
             validatorTimelock: validator,
             baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
-            baseTokenBridge: address(sharedBridge),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
             verifierParams: VerifierParams({
