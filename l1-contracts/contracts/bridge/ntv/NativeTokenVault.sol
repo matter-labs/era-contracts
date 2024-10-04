@@ -21,7 +21,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress, L1TokenDeploymentWithZeroChainId, } from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -93,6 +93,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         require(_nativeToken.code.length > 0, "NTV: empty token");
         _unsafeRegisterNativeToken(_nativeToken);
+    }
+
+    /// @inheritdoc INativeTokenVault
+    function ensureTokenIsRegistered(address _nativeToken) public {
+        if (assetId[_nativeToken] == bytes32(0)) {
+            _registerToken(_nativeToken);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -322,13 +329,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         return BridgeHelper.getERC20Getters(_token, _originChainId);
     }
 
-    /// @notice Returns the parsed assetId.
-    /// @param _nativeToken The address of the token to be parsed.
-    /// @dev Shows the assetId for a given chain and token address
-    function calculateAssetId(uint256 _chainId, address _nativeToken) external pure override returns (bytes32) {
-        return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
-    }
-
     /// @notice Registers a native token address for the vault.
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.
@@ -429,7 +429,14 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             _originToken,
             _erc20Data
         );
+        // an extre check for legacy tokens on L1, they might not be registered i.e. 
+        if (block.chainid == L1_CHAIN_ID && tokenOriginChainId == 0) {
+            revert L1TokenDeploymentWithZeroChainId(_assetId);
+        }
         tokenOriginChainId = tokenOriginChainId == 0 ? L1_CHAIN_ID : tokenOriginChainId;
+        if (tokenOriginChainId == block.chainid) {
+            revert DeployingBridgedTokenForNativeToken();
+        }
         originChainId[DataEncoding.encodeNTVAssetId(tokenOriginChainId, _originToken)] = tokenOriginChainId;
         return address(l2Token);
     }

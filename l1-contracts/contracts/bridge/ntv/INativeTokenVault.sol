@@ -29,8 +29,9 @@ interface INativeTokenVault {
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external;
 
-    /// @notice Used to calculate the assetId of a token
-    function calculateAssetId(uint256 _chainId, address _tokenAddress) external view returns (bytes32);
+    /// @notice Ensures that the native token is registered with the NTV.
+    /// @dev This function is used to ensure that the token is registered with the NTV.
+    function ensureTokenIsRegistered(address _nativeToken) external;
 
     /// @notice Used to get the the ERC20 data for a token
     function getERC20Getters(address _token, uint256 _originChainId) external view returns (bytes memory);

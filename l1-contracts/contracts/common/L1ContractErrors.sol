@@ -89,6 +89,8 @@ error DelegateCallFailed(bytes returnData);
 error DenominatorIsZero();
 //
 error DeployFailed();
+//
+error DeployingBridgedTokenForNativeToken();
 // 0xc7c9660f
 error DepositDoesNotExist();
 // 0xad2fa98e
@@ -119,6 +121,7 @@ error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 error FacetExists(bytes4 selector, address);
 // 0x79e12cc3
 error FacetIsFrozen(bytes4 func);
+///
 error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
@@ -180,6 +183,8 @@ error InvalidTxType(uint256 txType);
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xaa7feadc
 error InvalidValue();
+// 0x00000000
+error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
 // 0xa4f62e33
 error L2BridgeNotDeployed(uint256 chainId);
 // 0xff8811ff
