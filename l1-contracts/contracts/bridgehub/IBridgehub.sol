@@ -110,8 +110,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
-    function getHyperchain(uint256 _chainId) external view returns (address);
-
     function getAllZKChains() external view returns (address[] memory);
 
     function getAllZKChainChainIDs() external view returns (uint256[] memory);
