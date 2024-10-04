@@ -1,14 +1,14 @@
 use crate::{test_count_tracer::TestCountTracer, tracer::BootloaderTestTracer};
 use colored::Colorize;
-use zksync_multivm::interface::{
-    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmExecutionMode, VmFactory, VmInterface
+use multivm::interface::{
+    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmExecutionMode, VmInterface,
 };
-use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
+use multivm::vm_latest::{HistoryDisabled, ToTracerPointer, Vm};
 use once_cell::sync::OnceCell;
 use zksync_types::fee_model::BatchFeeInput;
 use std::process;
 
-use zksync_multivm::interface::{ExecutionResult, Halt};
+use multivm::interface::{ExecutionResult, Halt};
 use std::{env, sync::Arc};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -17,7 +17,7 @@ use zksync_contracts::{
     read_zbin_bytecode, BaseSystemContracts, ContractLanguage, SystemContractCode,
     SystemContractsRepo,
 };
-use zksync_state::interface::{
+use zksync_state::{
     InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
 };
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
@@ -103,8 +103,7 @@ fn execute_internal_bootloader_test() {
 
         // We're using a TestCountTracer (and passing 0 as fee account) - this should cause the bootloader
         // test framework to report number of tests via VM hook.
-        let mut dispatcher = TracerDispatcher::new(vec![custom_tracers]);
-        vm.inspect(&mut dispatcher, VmExecutionMode::Bootloader);
+        vm.inspect(custom_tracers.into(), VmExecutionMode::Bootloader);
 
         test_count.get().unwrap().clone()
     };
@@ -145,8 +144,7 @@ fn execute_internal_bootloader_test() {
         let tx: Transaction = serde_json::from_str(json_str).unwrap();
         vm.push_transaction(tx);
 
-        let mut dispatcher = TracerDispatcher::new(vec![custom_tracers]);
-        let result = vm.inspect(&mut dispatcher, VmExecutionMode::Bootloader);
+        let result = vm.inspect(custom_tracers.into(), VmExecutionMode::Bootloader);
         let mut test_result = Arc::into_inner(test_result).unwrap().into_inner();
         let requested_assert = Arc::into_inner(requested_assert).unwrap().into_inner();
         let test_name = Arc::into_inner(test_name)

@@ -1,9 +1,9 @@
-use zksync_multivm::vm_latest::{
+use multivm::vm_latest::{
     constants::{BOOTLOADER_HEAP_PAGE, get_vm_hook_start_position_latest},
     HistoryMode, SimpleMemory,
 };
 
-use zksync_multivm::zk_evm_latest::{
+use multivm::zk_evm_latest::{
     aux_structures::MemoryPage,
     tracing::{BeforeExecutionData, VmLocalStateData},
     zkevm_opcode_defs::{FatPointer, Opcode, UMAOpcode},
