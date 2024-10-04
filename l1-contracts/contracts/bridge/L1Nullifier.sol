@@ -510,7 +510,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return transferData The transfer data used to finalize withdawal.
     function _verifyWithdrawal(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+    ) internal returns (bytes32 assetId, bytes memory transferData) {
         (assetId, transferData) = _parseL2WithdrawalMessage(
             _finalizeWithdrawalParams.chainId,
             _finalizeWithdrawalParams.message
@@ -559,7 +559,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+    ) internal returns (bytes32 assetId, bytes memory transferData) {
         // Please note that there are three versions of the message:
         // 1. The message that is sent from `L2BaseToken` to withdraw base token.
         // 2. The message that is sent from L2 Legacy Shared Bridge to withdraw ERC20 tokens or base token.

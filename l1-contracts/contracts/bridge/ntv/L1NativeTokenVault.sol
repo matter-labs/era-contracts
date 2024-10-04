@@ -137,7 +137,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");
     }
 
-    function getOriginChainId(bytes32 _assetId) external view override returns (uint256) {
+    function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
         uint256 chainId = originChainId[_assetId];
         if (chainId != 0) {
             return chainId;
@@ -147,7 +147,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                 return block.chainid;
             } else if (IERC20(token).balanceOf(address(this)) > 0) {
                 return block.chainid;
-            } else if (IERC20(token).balanceOf(L1_NULLIFIER) > 0) {
+            } else if (IERC20(token).balanceOf(address(L1_NULLIFIER)) > 0) {
                 return block.chainid;
             } else {
                 return 0;
@@ -210,7 +210,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
             require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
         } else {
-            uint256 originChainId = getOriginChainId(_assetId);
+            uint256 originChainId = _getOriginChainId(_assetId);
             if (originChainId == block.chainid) {
                 IERC20(l1Token).safeTransfer(_depositSender, _amount);
             } else if (originChainId != 0) {

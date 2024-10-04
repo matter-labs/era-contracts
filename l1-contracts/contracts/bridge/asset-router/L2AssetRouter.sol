@@ -7,6 +7,7 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
+import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
@@ -151,7 +152,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
         bytes32 recordedAssetId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2NativeToken);
-        bytes32 recordedOriginChainId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(recordedAssetId);
+        uint256 recordedOriginChainId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(recordedAssetId);
         if (recordedOriginChainId == L1_CHAIN_ID) {
             revert AssetIdNotSupported(recordedAssetId);
         }

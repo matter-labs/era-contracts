@@ -387,6 +387,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             return assetId;
         }
         nativeTokenVault.ensureTokenIsRegistered(_token);
+        assetId = nativeTokenVault.assetId(_token);
     }
 
     /// @inheritdoc IL1AssetRouter
