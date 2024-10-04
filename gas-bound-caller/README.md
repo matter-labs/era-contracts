@@ -46,4 +46,4 @@ Since `GasBoundCaller` would be the contract that calls the `_to` contract, the 
 
 It should be deployed via a built-in CREATE2 factory on each individual chain.
 
-The current address on both sepolia testnet and mainnet for zkSync Era is `0xc706EC7dfA5D4Dc87f29f859094165E8290530f5`.
+The current address on both sepolia testnet and mainnet for ZKsync Era is `0xc706EC7dfA5D4Dc87f29f859094165E8290530f5`.

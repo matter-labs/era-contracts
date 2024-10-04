@@ -16,7 +16,7 @@ import { packSemver } from "../../scripts/utils";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
+export const IERC20_INTERFACE = require("@openzeppelin/contracts-v4/build/contracts/IERC20");
 export const DEFAULT_REVERT_REASON = "VM did not revert";
 
 export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -98,7 +98,21 @@ export async function getCallRevertReason(promise) {
             }
           }
         } catch (_) {
-          throw e;
+          try {
+            if (
+              revertReason === "cannot estimate gas; transaction may fail or may require manual gas limit" ||
+              revertReason === DEFAULT_REVERT_REASON
+            ) {
+              if (e.error) {
+                revertReason =
+                  e.error.toString().match(/reverted with custom error '([^']*)'/)[1] || "PLACEHOLDER_STRING";
+              } else {
+                revertReason = e.toString().match(/reverted with custom error '([^']*)'/)[1] || "PLACEHOLDER_STRING";
+              }
+            }
+          } catch (_) {
+            throw e;
+          }
         }
       }
     }

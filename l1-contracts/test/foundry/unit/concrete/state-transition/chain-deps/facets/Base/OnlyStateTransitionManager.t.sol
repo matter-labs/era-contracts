@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainBaseTest, ERROR_ONLY_STATE_TRANSITION_MANAGER} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest} from "./_Base_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract OnlyStateTransitionManagerTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonStateTransitionManager() public {
         address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
 
-        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
-
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
         vm.startPrank(nonStateTransitionManager);
         testBaseFacet.functionWithOnlyStateTransitionManagerModifier();
     }

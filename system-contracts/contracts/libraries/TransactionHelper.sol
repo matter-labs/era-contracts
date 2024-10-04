@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {IERC20} from "../openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -9,8 +9,9 @@ import {IPaymasterFlow} from "../interfaces/IPaymasterFlow.sol";
 import {BASE_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {EfficientCall} from "./EfficientCall.sol";
+import {UnsupportedTxType, InvalidInput, UnsupportedPaymasterFlow} from "../SystemContractErrors.sol";
 
-/// @dev The type id of zkSync's EIP-712-signed transaction.
+/// @dev The type id of ZKsync's EIP-712-signed transaction.
 uint8 constant EIP_712_TX_TYPE = 0x71;
 
 /// @dev The type id of legacy transactions.
@@ -20,7 +21,7 @@ uint8 constant EIP_2930_TX_TYPE = 0x01;
 /// @dev The type id of EIP1559 transactions.
 uint8 constant EIP_1559_TX_TYPE = 0x02;
 
-/// @notice Structure used to represent a zkSync transaction.
+/// @notice Structure used to represent a ZKsync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;
@@ -78,9 +79,10 @@ library TransactionHelper {
     using SafeERC20 for IERC20;
 
     /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId)");
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId)");
 
-    bytes32 constant EIP712_TRANSACTION_TYPE_HASH =
+    bytes32 internal constant EIP712_TRANSACTION_TYPE_HASH =
         keccak256(
             "Transaction(uint256 txType,uint256 from,uint256 to,uint256 gasLimit,uint256 gasPerPubdataByteLimit,uint256 maxFeePerGas,uint256 maxPriorityFeePerGas,uint256 paymaster,uint256 nonce,uint256 value,bytes data,bytes32[] factoryDeps,bytes paymasterInput)"
         );
@@ -108,11 +110,11 @@ library TransactionHelper {
         } else {
             // Currently no other transaction types are supported.
             // Any new transaction types will be processed in a similar manner.
-            revert("Encoding unsupported tx");
+            revert UnsupportedTxType(_transaction.txType);
         }
     }
 
-    /// @notice Encode hash of the zkSync native transaction type.
+    /// @notice Encode hash of the ZKsync native transaction type.
     /// @return keccak256 hash of the EIP-712 encoded representation of transaction
     function _encodeHashEIP712Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         bytes32 structHash = keccak256(
@@ -221,7 +223,7 @@ library TransactionHelper {
         // Hash of EIP2930 transactions is encoded the following way:
         // H(0x01 || RLP(chain_id, nonce, gas_price, gas_limit, destination, amount, data, access_list))
         //
-        // Note, that on zkSync access lists are not supported and should always be empty.
+        // Note, that on ZKsync access lists are not supported and should always be empty.
 
         // Encode all fixed-length params to avoid "stack too deep error"
         bytes memory encodedFixedLengthParams;
@@ -259,7 +261,7 @@ library TransactionHelper {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory encodedListLength;
@@ -293,7 +295,7 @@ library TransactionHelper {
         // Hash of EIP1559 transactions is encoded the following way:
         // H(0x02 || RLP(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list))
         //
-        // Note, that on zkSync access lists are not supported and should always be empty.
+        // Note, that on ZKsync access lists are not supported and should always be empty.
 
         // Encode all fixed-length params to avoid "stack too deep error"
         bytes memory encodedFixedLengthParams;
@@ -333,7 +335,7 @@ library TransactionHelper {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory encodedListLength;
@@ -365,14 +367,15 @@ library TransactionHelper {
     /// for tokens, etc. For more information on the expected behavior, check out
     /// the "Paymaster flows" section in the documentation.
     function processPaymasterInput(Transaction calldata _transaction) internal {
-        require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
+        if (_transaction.paymasterInput.length < 4) {
+            revert InvalidInput();
+        }
 
         bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
         if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector) {
-            require(
-                _transaction.paymasterInput.length >= 68,
-                "The approvalBased paymaster input must be at least 68 bytes long"
-            );
+            if (_transaction.paymasterInput.length < 68) {
+                revert InvalidInput();
+            }
 
             // While the actual data consists of address, uint256 and bytes data,
             // the data is needed only for the paymaster, so we ignore it here for the sake of optimization
@@ -390,7 +393,7 @@ library TransactionHelper {
         } else if (paymasterInputSelector == IPaymasterFlow.general.selector) {
             // Do nothing. general(bytes) paymaster flow means that the paymaster must interpret these bytes on his own.
         } else {
-            revert("Unsupported paymaster flow");
+            revert UnsupportedPaymasterFlow();
         }
     }
 

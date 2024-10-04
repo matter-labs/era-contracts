@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
@@ -26,6 +26,7 @@ struct StateTransitionManagerInitializeData {
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
+// solhint-disable-next-line gas-struct-packing
 struct ChainCreationParams {
     address genesisUpgrade;
     bytes32 genesisBatchHash;
@@ -120,7 +121,7 @@ interface IStateTransitionManager {
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
-        uint256 _oldprotocolVersionDeadline,
+        uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external;
 

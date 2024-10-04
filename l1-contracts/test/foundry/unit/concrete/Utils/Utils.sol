@@ -244,7 +244,7 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[1] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[2] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
@@ -252,11 +252,12 @@ library Utils {
         selectors[4] = MailboxFacet.requestL2Transaction.selector;
         selectors[5] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[6] = MailboxFacet.l2TransactionBaseCost.selector;
+        selectors[7] = MailboxFacet.transferEthToSharedBridge.selector;
         return selectors;
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](38);
+        bytes4[] memory selectors = new bytes4[](41);
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
@@ -295,6 +296,9 @@ library Utils {
         selectors[35] = UtilsFacet.util_getIsFrozen.selector;
         selectors[36] = UtilsFacet.util_setTransactionFilterer.selector;
         selectors[37] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
+        selectors[38] = UtilsFacet.util_setTotalBatchesExecuted.selector;
+        selectors[39] = UtilsFacet.util_setL2LogsRootHash.selector;
+        selectors[40] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
         return selectors;
     }
 
