@@ -5,7 +5,7 @@ import "hardhat-contract-sizer";
 import "hardhat-gas-reporter";
 import "hardhat-typechain";
 import "solidity-coverage";
-
+ 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
