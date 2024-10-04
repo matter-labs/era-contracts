@@ -44,6 +44,7 @@ jobs:
           path: |
             system-contracts/zkout
             system-contracts/cache-forge
+            system-contracts/bootloader/build
 
   lint:
     runs-on: ubuntu-latest
@@ -85,6 +86,7 @@ jobs:
           path: |
             system-contracts/zkout
             system-contracts/cache-forge
+            system-contracts/bootloader/build
 
       - name: Run bootloader tests
         run: |
@@ -121,6 +123,7 @@ jobs:
           path: |
             system-contracts/zkout
             system-contracts/cache-forge
+            system-contracts/bootloader/build
 
       - name: Run tests
         run: yarn sc test
