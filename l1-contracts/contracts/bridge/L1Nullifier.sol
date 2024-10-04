@@ -16,7 +16,6 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
 import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
 
@@ -650,7 +649,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external override {
         bytes32 assetId = l1NativeTokenVault.assetId(_l1Token);
         if (assetId == bytes32(0)) {
-            assetId = INativeTokenVault(address(l1NativeTokenVault)).calculateAssetId(block.chainid, _l1Token);
+            assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
         }
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
