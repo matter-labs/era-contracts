@@ -97,7 +97,7 @@ The Mailbox performs three functions:
 
 L1 -> L2 communication is implemented as requesting an L2 transaction on L1 and executing it on L2. This means a user
 can call the function on the L1 contract to save the data about the transaction in some queue. Later on, a validator can
-process it on L2 and mark them as processed on the L1 priority queue. Currently, it is used for sending information from
+process it on L2 and mark it as processed on the L1 priority queue. Currently, it is used for sending information from
 L1 to L2 or implementing multi-layer protocols.
 
 _NOTE_: While user requests the transaction from L1, the initiated transaction on L2 will have such a `msg.sender`:
@@ -124,7 +124,7 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
 we simply reused the same L1 addresses as the L2 sender. In zkSync Era address derivation rule is different from the
 Ethereum, so cross-chain exploits are already impossible. However, zkSync Era may add full EVM support in the future, so
-applying address aliasing leave room for future EVM compatibility.
+applying address aliasing leaves room for future EVM compatibility.
 
 The L1 -> L2 communication is also used for bridging ether. The user should include a `msg.value` when initiating a
 transaction request on the L1 contract. Before executing a transaction on L2, the specified address will be credited
