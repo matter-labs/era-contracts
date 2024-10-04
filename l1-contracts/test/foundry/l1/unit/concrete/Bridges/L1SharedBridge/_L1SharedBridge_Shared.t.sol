@@ -208,11 +208,6 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
-        // vm.mockCall(
-        //     address(bridgehubAddress),
-        //     abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, address(token)),
-        //     abi.encode(nativeTokenVault.calculateAssetId(address(token)))
-        // );
 
         token.mint(address(nativeTokenVault), amount);
 

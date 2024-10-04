@@ -312,7 +312,6 @@ contract GatewayPreparation is Script {
         bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
         bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
-        // vm.startBroadcast();
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
@@ -340,26 +339,21 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        // TODO(EVM-746): Use L2-based chain admin contract
-        // address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
-
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-        {
-            IBridgehub bridgehub = IBridgehub(config.bridgehub);
-            bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
-            vm.broadcast();
-            l1Nullifier.finalizeDeposit(
-                FinalizeL1DepositParams({
-                    chainId: gatewayChainId,
-                    l2BatchNumber: l2BatchNumber,
-                    l2MessageIndex: l2MessageIndex,
-                    l2Sender: L2_ASSET_ROUTER_ADDR,
-                    l2TxNumberInBatch: l2TxNumberInBatch,
-                    message: message,
-                    merkleProof: merkleProof
-                })
-            );
-        }
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        vm.broadcast();
+        l1Nullifier.finalizeDeposit(
+            FinalizeL1DepositParams({
+                chainId: gatewayChainId,
+                l2BatchNumber: l2BatchNumber,
+                l2MessageIndex: l2MessageIndex,
+                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2TxNumberInBatch: l2TxNumberInBatch,
+                message: message,
+                merkleProof: merkleProof
+            })
+        );
     }
 
     /// @dev Calling this function requires private key to the admin of the chain

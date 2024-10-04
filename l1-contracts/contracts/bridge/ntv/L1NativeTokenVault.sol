@@ -17,6 +17,7 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
+import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
@@ -190,7 +191,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
             require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
         } else {
-            IERC20(l1Token).safeTransfer(_depositSender, _amount);
+            if (originChainId[_assetId] != block.chainid) {
+                IBridgedStandardToken(l1Token).bridgeMint(_depositSender, _amount);
+            } else {
+                IERC20(l1Token).safeTransfer(_depositSender, _amount);
+            }
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }

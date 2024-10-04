@@ -16,7 +16,6 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
 import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
 
@@ -616,7 +615,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // The data is expected to be at least 36 bytes long to contain assetId.
             require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length
             // slither-disable-next-line unused-return
-            (, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
+            (, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
@@ -648,7 +647,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).calculateAssetId(block.chainid, _l1Token);
+        bytes32 assetId = l1NativeTokenVault.assetId(_l1Token);
+        if (assetId == bytes32(0)) {
+            assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
+        }
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));

@@ -388,8 +388,11 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployBridgedTokenBeacon() internal {
+        /// Note we cannot use create2 as the deployer is the owner.
+        vm.broadcast();
         UpgradeableBeacon beacon = new UpgradeableBeacon(addresses.bridges.bridgedStandardERC20Implementation);
         address contractAddress = address(beacon);
+        vm.broadcast();
         beacon.transferOwnership(config.ownerAddress);
         console.log("BridgedTokenBeacon deployed at:", contractAddress);
         addresses.bridges.bridgedTokenBeacon = contractAddress;

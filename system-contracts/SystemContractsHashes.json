@@ -87,22 +87,22 @@
     "contractName": "L2GatewayUpgrade",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L2GatewayUpgrade.sol/L2GatewayUpgrade.json",
     "sourceCodePath": "contracts-preprocessed/L2GatewayUpgrade.sol",
-    "bytecodeHash": "0x0100019d6f999ca8393f86be0b24f494bf647cc3ec56e01eed6aa233c6a0e6c0",
-    "sourceCodeHash": "0x3b85c44fc4fdc422c43d8bf8a2b8229665698996a034bf37c895e963f6c839bf"
-  },
-  {
-    "contractName": "L2GatewayUpgradeHelper",
-    "bytecodePath": "artifacts-zk/contracts-preprocessed/L2GatewayUpgradeHelper.sol/L2GatewayUpgradeHelper.json",
-    "sourceCodePath": "contracts-preprocessed/L2GatewayUpgradeHelper.sol",
-    "bytecodeHash": "0x01000007a010cd0e6cd1a9fcb802ccc92eb7a1acfb6566864ff6429a2c0ddf0a",
-    "sourceCodeHash": "0xe7bdc91f70cd5c395435423c25dd9cd27a99e19e12965854106cdc1385bcf14d"
+    "bytecodeHash": "0x0100019db8d039fb6ef02a7aea5eb8cbfd917afdf3dc88659f28e18b6a43e5df",
+    "sourceCodeHash": "0xc69d0c1819a366fc91a43a9ad2d747540a7b8ee2071b48e4adfd301ec40e8600"
   },
   {
     "contractName": "L2GenesisUpgrade",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L2GenesisUpgrade.sol/L2GenesisUpgrade.json",
     "sourceCodePath": "contracts-preprocessed/L2GenesisUpgrade.sol",
-    "bytecodeHash": "0x010000fb0d40ab01a12ce7bad289cb44ab49563e51e6e1d889d431492a4b320f",
-    "sourceCodeHash": "0xdd7a89c11b624282aed07ef9d985d2fd006015a0aa0b11aec8e445695f7dd689"
+    "bytecodeHash": "0x010000fbf45473bbd4c0ef708beb28c5f40c10b22b0a289feb4ccbce9b7ae825",
+    "sourceCodeHash": "0xe21a58d96b2727020958e95605764b84f7f2f3cc4e0c01c4cdf2854f882d41ca"
+  },
+  {
+    "contractName": "L2GenesisUpgradeHelper",
+    "bytecodePath": "artifacts-zk/contracts-preprocessed/L2GenesisUpgradeHelper.sol/L2GenesisUpgradeHelper.json",
+    "sourceCodePath": "contracts-preprocessed/L2GenesisUpgradeHelper.sol",
+    "bytecodeHash": "0x01000007e61dc52f7aff33c2c209b51ab7fbaf9b4668980f076fdabb24934f97",
+    "sourceCodeHash": "0xc2fd787a23e7935f8109f3eb35b71853fe3a9acf5cd96138afcb0e5b65002ba3"
   },
   {
     "contractName": "MsgValueSimulator",

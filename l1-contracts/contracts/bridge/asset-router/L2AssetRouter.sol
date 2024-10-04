@@ -203,13 +203,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
 
-    // kl todo add handle Legaacy data here, which calls esureTokenRegisteredWithNTV
-    // have handleLegacyData called from somewhere.
-
     /// @inheritdoc AssetRouterBase
     function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
         IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assetId = nativeTokenVault.calculateAssetId(block.chainid, _token);
+        assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);
         }
