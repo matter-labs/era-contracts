@@ -429,7 +429,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             _originToken,
             _erc20Data
         );
-        // an extre check for legacy tokens on L1, they might not be registered i.e. 
+        // an extre check for legacy tokens on L1, they might not be registered i.e.
         if (block.chainid == L1_CHAIN_ID && tokenOriginChainId == 0) {
             revert L1TokenDeploymentWithZeroChainId(_assetId);
         }
