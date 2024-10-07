@@ -751,7 +751,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (zkChain == address(0)) {
             revert ChainIdNotRegistered(bridgehubData.chainId);
         }
-        if (_originalCaller == IZKChain(zkChain).getAdmin()) {
+        if (_originalCaller != IZKChain(zkChain).getAdmin()) {
             revert Unauthorized(_originalCaller);
         }
 
@@ -791,7 +791,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (ctm == address(0)) {
             revert AssetIdNotSupported(_assetId);
         }
-        if (settlementLayer[bridgehubData.chainId] != block.chainid) {
+        if (settlementLayer[bridgehubData.chainId] == block.chainid) {
             revert AlreadyCurrentSettlementLayer();
         }
 
