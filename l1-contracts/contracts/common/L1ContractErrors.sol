@@ -183,7 +183,7 @@ error InvalidTxType(uint256 txType);
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xaa7feadc
 error InvalidValue();
-// 0x00000000
+// 0x888b2f09
 error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
 // 0xa4f62e33
 error L2BridgeNotDeployed(uint256 chainId);
