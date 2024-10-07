@@ -18,7 +18,9 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} fro
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-import {L2Utils, SystemContractsArgs} from "../utils/L2Utils.sol";
+import {SystemContractsArgs} from "../../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+
+import {L2Utils} from "../../integration/L2Utils.sol";
 import {L2TransactionRequestTwoBridgesOuter, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract InteropTest is Test {
@@ -34,7 +36,8 @@ contract InteropTest is Test {
                 l2TokenBeacon: address(3),
                 l2TokenProxyBytecodeHash: bytes32(uint256(4)),
                 aliasedOwner: address(5),
-                contractsDeployedAlready: false
+                contractsDeployedAlready: false,
+                l1CtmDeployer: address(6)
             })
         );
     }
