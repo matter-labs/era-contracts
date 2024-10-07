@@ -43,7 +43,7 @@ error AmountMustBeGreaterThanZero();
 error AssetHandlerDoesNotExist(bytes32 assetId);
 // 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
-//
+// 0xfe919e28
 error AssetIdAlreadyRegistered();
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
@@ -63,7 +63,7 @@ error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumb
 error BlobHashCommitmentError(uint256 index, bool blobHashEmpty, bool blobCommitmentEmpty);
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
-//
+// 0xdb538614
 error BridgeMintNotImplemented();
 // 0xcf102c5a
 error CalldataLengthTooBig();
@@ -79,9 +79,9 @@ error ChainIdAlreadyExists();
 error ChainIdCantBeCurrentChain();
 // 0xa179f8c9
 error ChainIdMismatch();
-//
+// 0x23f3c357
 error ChainIdNotRegistered(uint256 chainId);
-//
+// 0x5de72107
 error ChainNotLegacy();
 // 0x78d2ed02
 error ChainAlreadyLive();
@@ -91,8 +91,10 @@ error ChainIdTooBig();
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
 error DenominatorIsZero();
-//
+// 0xb4f54111
 error DeployFailed();
+// 0x138ee1a3
+error DeployingBridgedTokenForNativeToken();
 // 0xc7c9660f
 error DepositDoesNotExist();
 // 0xad2fa98e
@@ -105,17 +107,17 @@ error DiamondAlreadyFrozen();
 error DiamondFreezeIncorrectState();
 // 0xa7151b9a
 error DiamondNotFrozen();
-//
+// 0x7138356f
 error EmptyAddress();
 // 0x2d4d012f
 error EmptyAssetId();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
-//
+// 0x1c25715b
 error EmptyBytes32();
 // 0x95b66fe9
 error EmptyDeposit();
-//
+// 0x627e0872
 error ETHDepositNotSupported();
 //
 error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
@@ -123,6 +125,7 @@ error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 error FacetExists(bytes4 selector, address);
 // 0x79e12cc3
 error FacetIsFrozen(bytes4 func);
+///
 error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
@@ -148,7 +151,7 @@ error IncorrectBridgeHubAddress(address bridgehub);
 error InsufficientChainBalance();
 // 0x356680b7
 error InsufficientFunds();
-//
+// 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x7a47c9a2
 error InvalidChainId();
@@ -190,6 +193,8 @@ error L2AssetRouter_LegacyDataNotImplemented();
 error L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
 //
 error L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
+// 0x00000000
+error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
 // 0xa4f62e33
 error L2BridgeNotDeployed(uint256 chainId);
 // 0xff8811ff
@@ -220,7 +225,7 @@ error MerkleIndexOutOfBounds();
 error MerklePathEmpty();
 // 0x1c500385
 error MerklePathOutOfBounds();
-//
+// 0x3312a450
 error MigrationPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
@@ -246,7 +251,7 @@ error NonEmptyMsgValue();
 error NonIncreasingTimestamp();
 // 0x0105f9c0
 error NonSequentialBatch();
-//
+// 0x0ac76f01
 error NonSequentialVersion();
 // 0x4ef79e5a
 error NonZeroAddress(address);
@@ -266,6 +271,8 @@ error OperationExists();
 error OperationMustBePending();
 // 0xe1c1ff37
 error OperationMustBeReady();
+// 0xb926450e
+error OriginChainIdNotFound();
 // 0xd7f50a9d
 error PatchCantSetUpgradeTxn();
 // 0x962fd7d0
@@ -374,7 +381,7 @@ error UnexpectedSystemLog(uint256 logKey);
 error UnimplementedMessage(string);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
-//
+// 0x084a1449
 error UnsupportedEncodingVersion();
 //
 error UnsupportedPaymasterFlow();
