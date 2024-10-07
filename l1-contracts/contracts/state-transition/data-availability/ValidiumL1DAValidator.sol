@@ -13,7 +13,7 @@ contract ValidiumL1DAValidator is IL1DAValidator {
         bytes32, // _l2DAValidatorOutputHash
         bytes calldata _operatorDAInput,
         uint256 maxBlobsSupported
-    ) external override returns (L1DAValidatorOutput memory output) {
+    ) external pure override returns (L1DAValidatorOutput memory output) {
         // For Validiums, we expect the operator to just provide the data for us.
         // We don't need to do any checks with regard to the l2DAValidatorOutputHash.
         require(_operatorDAInput.length == 32, "ValL1DA wrong input length");

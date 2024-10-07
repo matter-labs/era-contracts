@@ -99,7 +99,7 @@ library L2ContractsBytecodesLib {
     function readValidiumL2DAValidatorBytecode() internal view returns (bytes memory) {
         return
             Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/data-availability/ValidiumL2DAValidator.sol/ValidiumL2DAValidator.json"
+                "/../l2-contracts/artifacts-zk/contracts/data-availability/da-layers/AvailL2DAValidator.sol/AvailL2DAValidator.json"
             );
     }
 
@@ -247,7 +247,7 @@ library L2ContractsBytecodesLib {
     function readValidiumL1DAValidatorBytecode() internal view returns (bytes memory) {
         return
             Utils.readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json"
+                "/../l1-contracts/artifacts-zk/contracts/state-transition/data-availability/AvailL1DAValidator.sol/AvailL1DAValidator.json"
             );
     }
 

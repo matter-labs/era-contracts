@@ -81,7 +81,7 @@ async function main() {
       let l2DaValidatorAddress;
       let l1DaValidatorAddress;
       if (cmd.validiumMode) {
-        l2DaValidatorAddress = await deployContractOnL2ThroughL1(deployer, "LayerNameL2DAValidator", chainId, gasPrice);
+        l2DaValidatorAddress = await deployContractOnL2ThroughL1(deployer, "AvailL2DAValidator", chainId, gasPrice);
         l1DaValidatorAddress = deployer.addresses.ValidiumL1DAValidator;
       } else {
         l2DaValidatorAddress = await deployContractOnL2ThroughL1(deployer, "RollupL2DAValidator", chainId, gasPrice);

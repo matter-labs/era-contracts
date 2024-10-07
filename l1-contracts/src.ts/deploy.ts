@@ -79,6 +79,7 @@ import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory"
 
 import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
 import { LayerNameL1DAValidatorFactory } from "../../da-contracts/typechain/LayerNameL1DAValidatorFactory";
+import { AvailL1DAValidatorFactory } from "../../da-contracts/typechain/AvailL1DAValidatorFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -297,6 +298,8 @@ export class Deployer {
       factory = new RollupL1DAValidatorFactory(this.deployWallet);
     } else if (contractName == "LayerNameL1DAValidator") {
       factory = new LayerNameL1DAValidatorFactory(this.deployWallet);
+    } else if (contractName == "AvailL1DAValidator") {
+      factory = new AvailL1DAValidatorFactory(this.deployWallet);
     } else {
       throw new Error(`Unknown DA contract name ${contractName}`);
     }
@@ -1759,8 +1762,8 @@ export class Deployer {
       console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
     }
     const validiumDAValidatorAddress = await this.deployViaCreate2(
-      "LayerNameL1DAValidator",
-      [],
+      "AvailL1DAValidator",
+      ["0x1369A4C9391cF90D393b40fAeAD521b0F7019dc5"],
       create2Salt,
       ethTxOptions,
       undefined
