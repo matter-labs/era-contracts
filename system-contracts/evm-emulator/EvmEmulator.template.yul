@@ -160,8 +160,6 @@ object "EvmEmulator" {
             // segment of memory.
             getDeployedBytecode()
 
-            pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
-
             let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
         }
