@@ -193,7 +193,7 @@ error L2AssetRouter_LegacyDataNotImplemented();
 error L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
 //
 error L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
-// 0x00000000
+// 0x888b2f09
 error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
 // 0xa4f62e33
 error L2BridgeNotDeployed(uint256 chainId);
