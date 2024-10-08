@@ -36,7 +36,8 @@ fn execute_internal_bootloader_test() {
         .unwrap()
         .join("../build/artifacts/bootloader_test.yul/bootloader_test.yul.zbin");
     println!("Current dir is {:?}", test_location);
-    let bytecode = read_zbin_bytecode(test_location.as_path());
+
+    let bytecode = readBytecodeUtf8(test_location);
     let hash = hash_bytecode(&bytecode);
     let bootloader = SystemContractCode {
         code: bytes_to_be_words(bytecode),
