@@ -22,12 +22,12 @@ contract GatewayPreparationForTests is GatewayPreparation {
         );
         config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
 
-        path = string.concat(root, vm.envString("GATEWAY_CONFIG"));
+        path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_CONFIG"));
         toml = vm.readFile(path);
 
         config.gatewayChainId = toml.readUint("$.chain.chain_chain_id");
 
-        path = string.concat(root, vm.envString("GATEWAY_OUTPUT"));
+        path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));
         toml = vm.readFile(path);
 
         config.gatewayChainAdmin = toml.readAddress("$.chain_admin_addr");
@@ -35,6 +35,7 @@ contract GatewayPreparationForTests is GatewayPreparation {
         config.gatewayAccessControlRestriction = toml.readAddress(
             "$.deployed_addresses.access_control_restriction_addr"
         );
+        config.l1NullifierProxy = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
 
         console.log("chain chain id = ", config.gatewayChainId);
 
