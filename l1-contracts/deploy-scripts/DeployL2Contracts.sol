@@ -99,48 +99,6 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-    function loadContracts(bool legacyBridge) internal {
-        //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
-        contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
-        );
-        contracts.beaconProxy = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-        );
-        contracts.l2StandardErc20Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
-        );
-
-        if (legacyBridge) {
-            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/DevL2SharedBridge.sol/DevL2SharedBridge.json"
-            );
-        } else {
-            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
-            );
-        }
-
-        contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
-        );
-
-        contracts.consensusRegistryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ConsensusRegistry.sol/ConsensusRegistry.json"
-        );
-        contracts.consensusRegistryProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
-        );
-
-        contracts.multicall3Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
-        );
-
-        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
-        );
-    }
-
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
