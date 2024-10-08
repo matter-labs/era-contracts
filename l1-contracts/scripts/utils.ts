@@ -109,4 +109,3 @@ export function addToProtocolVersion(packedProtocolVersion: number, minor: numbe
   const [major, minorVersion, patchVersion] = unpackNumberSemVer(packedProtocolVersion);
   return packSemver(major, minorVersion + minor, patchVersion + patch);
 }
-

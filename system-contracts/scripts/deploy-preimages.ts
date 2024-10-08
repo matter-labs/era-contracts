@@ -13,7 +13,14 @@ import { Provider, Wallet } from "zksync-ethers";
 import { hashBytecode } from "zksync-ethers/build/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import type { Dependency, DeployedDependency } from "./utils";
-import { checkMarkers, filterPublishedFactoryDeps, getBytecodes, publishFactoryDeps, readBytecodeUtf8, readYulBytecode } from "./utils";
+import {
+  checkMarkers,
+  filterPublishedFactoryDeps,
+  getBytecodes,
+  publishFactoryDeps,
+  readBytecodeUtf8,
+  readYulBytecode,
+} from "./utils";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
