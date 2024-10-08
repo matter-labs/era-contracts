@@ -38,7 +38,6 @@ bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
     "ExecuteEmergencyUpgradeZKFoundation(bytes32 id)"
 );
 
-
 /// @dev The offset from which the built-in, but user space contracts are located.
 uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 
