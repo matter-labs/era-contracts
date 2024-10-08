@@ -335,6 +335,31 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
     }
+
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetId,
+        bytes calldata _assetData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external {
+        L1_NULLIFIER.bridgeRecoverFailedTransfer({
+            _chainId: _chainId,
+            _depositSender: _depositSender,
+            _assetId: _assetId,
+            _assetData: _assetData,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
+    }
+
     /*//////////////////////////////////////////////////////////////
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
@@ -354,13 +379,15 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Ensures that token is registered with native token vault.
     /// @dev Only used when deposit is made with legacy data encoding format.
-    /// @param _token The L1 token address which should be registered with native token vault.
+    /// @param _token The native token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
-    function _ensureTokenRegisteredWithNTV(address _token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(block.chainid, _token);
-        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
-            nativeTokenVault.registerToken(_token);
+    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+        assetId = nativeTokenVault.assetId(_token);
+        if (assetId != bytes32(0)) {
+            return assetId;
         }
+        nativeTokenVault.ensureTokenIsRegistered(_token);
+        assetId = nativeTokenVault.assetId(_token);
     }
 
     /// @inheritdoc IL1AssetRouter
@@ -584,6 +611,15 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _l2TxNumberInBatch: _l2TxNumberInBatch,
             _merkleProof: _merkleProof
         });
+    }
+
+    /// @notice Legacy read method, which forwards the call to L1Nullifier to check if withdrawal was finalized
+    function isWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex
+    ) external view returns (bool) {
+        return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
     }
 
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
