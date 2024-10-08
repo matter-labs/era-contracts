@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
-pragma solidity 0.8.20;
-
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IPaymaster, ExecutionResult, PAYMASTER_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IPaymaster.sol";
 import {IPaymasterFlow} from "./interfaces/IPaymasterFlow.sol";
 import {Transaction, BOOTLOADER_ADDRESS} from "./L2ContractHelper.sol";
+import {Unauthorized, InvalidInput, InsufficientAllowance, FailedToTransferTokens, UnsupportedPaymasterFlow} from "./errors/L2ContractErrors.sol";
 
 // This is a dummy paymaster. It expects the paymasterInput to contain its "signature" as well as the needed exchange rate.
 // It supports only approval-based paymaster flow.
@@ -15,12 +16,17 @@ contract TestnetPaymaster is IPaymaster {
         bytes32,
         bytes32,
         Transaction calldata _transaction
-    ) external payable returns (bytes4 magic, bytes memory context) {
+    ) external payable returns (bytes4 magic, bytes memory) {
         // By default we consider the transaction as accepted.
         magic = PAYMASTER_VALIDATION_SUCCESS_MAGIC;
 
-        require(msg.sender == BOOTLOADER_ADDRESS, "Only bootloader can call this contract");
-        require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
+        if (msg.sender != BOOTLOADER_ADDRESS) {
+            revert Unauthorized(msg.sender);
+        }
+
+        if (_transaction.paymasterInput.length < 4) {
+            revert InvalidInput();
+        }
 
         bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
         if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector) {
@@ -33,7 +39,9 @@ contract TestnetPaymaster is IPaymaster {
             address thisAddress = address(this);
 
             uint256 providedAllowance = IERC20(token).allowance(userAddress, thisAddress);
-            require(providedAllowance >= amount, "The user did not provide enough allowance");
+            if (providedAllowance < amount) {
+                revert InsufficientAllowance(providedAllowance, amount);
+            }
 
             // The testnet paymaster exchanges X wei of the token to the X wei of ETH.
             uint256 requiredETH = _transaction.gasLimit * _transaction.maxFeePerGas;
@@ -51,7 +59,7 @@ contract TestnetPaymaster is IPaymaster {
                 // If the revert reason is empty or represented by just a function selector,
                 // we replace the error with a more user-friendly message
                 if (revertReason.length <= 4) {
-                    revert("Failed to transferFrom from users' account");
+                    revert FailedToTransferTokens(token, thisAddress, amount);
                 } else {
                     assembly {
                         revert(add(0x20, revertReason), mload(revertReason))
@@ -61,9 +69,11 @@ contract TestnetPaymaster is IPaymaster {
 
             // The bootloader never returns any data, so it can safely be ignored here.
             (bool success, ) = payable(BOOTLOADER_ADDRESS).call{value: requiredETH}("");
-            require(success, "Failed to transfer funds to the bootloader");
+            if (!success) {
+                revert FailedToTransferTokens(address(0), BOOTLOADER_ADDRESS, requiredETH);
+            }
         } else {
-            revert("Unsupported paymaster flow");
+            revert UnsupportedPaymasterFlow();
         }
     }
 

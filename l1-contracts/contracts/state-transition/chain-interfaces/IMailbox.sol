@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
-/// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
+/// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IMailbox is IZkSyncHyperchainBase {
+interface IMailbox is IZKChainBase {
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -95,8 +95,22 @@ interface IMailbox is IZkSyncHyperchainBase {
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash);
 
+    /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
+    ) external returns (bytes32 canonicalTxHash);
+
+    /// @dev On the Gateway the chain's mailbox receives the tx from the bridgehub.
+    function bridgehubRequestL2TransactionOnGateway(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) external;
+
+    /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gw
+    /// @param _chainId the chainId of the chain
+    /// @param _canonicalTxHash the canonical transaction hash
+    /// @param _expirationTimestamp the expiration timestamp
+    function requestL2TransactionToGatewayMailbox(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
     ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
@@ -110,8 +124,33 @@ interface IMailbox is IZkSyncHyperchainBase {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
+    /// Proves that a certain leaf was included as part of the log merkle tree.
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _batchRootMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view returns (bool);
+
     /// @notice transfer Eth to shared bridge as part of migration process
-    function transferEthToSharedBridge() external;
+    // function transferEthToSharedBridge() external;
+
+    // function relayTxSL(
+    //     address _to,
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
+
+    // function freeAcceptTx(
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
+
+    // function acceptFreeRequestFromBridgehub(BridgehubL2TransactionRequest calldata _request) external;
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation
@@ -127,4 +166,13 @@ interface IMailbox is IZkSyncHyperchainBase {
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps
     );
+
+    /// @notice New relayed priority request event. It is emitted on a chain that is deployed
+    /// on top of the gateway when it receives a request relayed via the Bridgehub.
+    /// @dev IMPORTANT: this event most likely will be removed in the future, so
+    /// no one should rely on it for indexing purposes.
+    /// @param txId Serial number of the priority operation
+    /// @param txHash keccak256 hash of encoded transaction representation
+    /// @param expirationTimestamp Timestamp up to which priority request should be processed
+    event NewRelayedPriorityTransaction(uint256 txId, bytes32 txHash, uint64 expirationTimestamp);
 }

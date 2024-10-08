@@ -1,6 +1,6 @@
 # Overview
 
-zkSync Era is a permissionless general-purpose ZK rollup. Similar to many L1 blockchains and sidechains it enables
+ZKsync Era is a permissionless general-purpose ZK rollup. Similar to many L1 blockchains and sidechains it enables
 deployment and interaction with Turing-complete smart contracts.
 
 - L2 smart contracts are executed on a zkEVM.
@@ -10,7 +10,7 @@ deployment and interaction with Turing-complete smart contracts.
 - There is no escape hatch mechanism yet, but there will be one.
 
 All data that is needed to restore the L2 state are also pushed on-chain. There are two approaches, publishing inputs of
-L2 transactions on-chain and publishing the state transition diff. zkSync follows the second option.
+L2 transactions on-chain and publishing the state transition diff. ZKsync follows the second option.
 
 See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html) to read more!
 
@@ -25,13 +25,13 @@ See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html
   L2 blocks.
 - **Facet** - implementation contract. The word comes from the EIP-2535.
 - **Gas** - a unit that measures the amount of computational effort required to execute specific operations on the
-  zkSync Era network.
+  ZKsync Era network.
 
 ### L1 Smart contracts
 
 #### Diamond
 
-Technically, this L1 smart contract acts as a connector between Ethereum (L1) and zkSync (L2). This contract checks the
+Technically, this L1 smart contract acts as a connector between Ethereum (L1) and ZKsync (L2). This contract checks the
 validity proof and data availability, handles L2 <-> L1 communication, finalizes L2 state transition, and more.
 
 There are also important contracts deployed on the L2 that can also execute logic called _system contracts_. Using L2
@@ -73,7 +73,7 @@ execution of upgrades in the diamond proxy.
 
 This contract manages operations (calls with preconditions) for governance tasks. The contract allows for operations to
 be scheduled, executed, and canceled with appropriate permissions and delays. It is used for managing and coordinating
-upgrades and changes in all zkSync Era governed contracts.
+upgrades and changes in all ZKsync Era governed contracts.
 
 Each upgrade consists of two steps:
 
@@ -122,8 +122,8 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
 ```
 
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
-we simply reused the same L1 addresses as the L2 sender. In zkSync Era address derivation rule is different from the
-Ethereum, so cross-chain exploits are already impossible. However, zkSync Era may add full EVM support in the future, so
+we simply reused the same L1 addresses as the L2 sender. In ZKsync Era address derivation rule is different from the
+Ethereum, so cross-chain exploits are already impossible. However, ZKsync Era may add full EVM support in the future, so
 applying address aliasing leave room for future EVM compatibility.
 
 The L1 -> L2 communication is also used for bridging ether. The user should include a `msg.value` when initiating a
@@ -157,7 +157,7 @@ this trick:
 #### L1 -> L2 Transaction filtering
 
 There is a mechanism for applying custom filters to the L1 -> L2 communication. It is achieved by having an address of
-the `TransactionFilterer` contract in the `ZkSyncHyperchainStorage`. If the filterer exists, it is being called in
+the `TransactionFilterer` contract in the `ZkSyncZKChainStorage`. If the filterer exists, it is being called in
 the `Mailbox` facet with the tx details and has to return whether the transaction can be executed or not. The filterer
 has to implement the `ITransactionFilterer` interface. The ones intended to use this feature, have to deploy the
 contract that implements `ITransactionFilterer` and use `setTransactionFilterer` function of `AdminFacet` to set the
@@ -178,12 +178,12 @@ Each L2 -> L1 system log will have a key that is part of the following:
 ```solidity
 enum SystemLogKey {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
-  TOTAL_L2_TO_L1_PUBDATA_KEY,
-  STATE_DIFF_HASH_KEY,
   PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
   PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
+  L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 ```
@@ -223,7 +223,7 @@ fee-on-transfer tokens or other custom logic for handling user balances. Only wo
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
 - `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
 
-##### L1SharedBridge
+##### L1AssetRouter
 
 The "standard" implementation of the ERC20 and WETH token bridge. Works only with regular ERC20 tokens, i.e. not with
 fee-on-transfer tokens or other custom logic for handling user balances.
@@ -253,8 +253,8 @@ the L1 recipient.
 
 #### ValidatorTimelock
 
-An intermediate smart contract between the validator EOA account and the zkSync smart contract. Its primary purpose is
-to provide a trustless means of delaying batch execution without modifying the main zkSync contract. zkSync actively
+An intermediate smart contract between the validator EOA account and the ZKsync smart contract. Its primary purpose is
+to provide a trustless means of delaying batch execution without modifying the main ZKsync contract. ZKsync actively
 monitors the chain activity and reacts to any suspicious activity by freezing the chain. This allows time for
 investigation and mitigation before resuming normal operations.
 
@@ -264,12 +264,12 @@ the Alpha stage.
 This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`,
 that can be called only by the validator.
 
-When the validator calls `commitBatches`, the same calldata will be propagated to the zkSync contract (`DiamondProxy`
+When the validator calls `commitBatches`, the same calldata will be propagated to the ZKsync contract (`DiamondProxy`
 through `call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these
 batches to track the time these batches are committed by the validator to enforce a delay between committing and
 execution of batches. Then, the validator can prove the already committed batches regardless of the mentioned timestamp,
-and again the same calldata (related to the `proveBatches` function) will be propagated to the zkSync contract. After,
-the `delay` is elapsed, the validator is allowed to call `executeBatches` to propagate the same calldata to zkSync
+and again the same calldata (related to the `proveBatches` function) will be propagated to the ZKsync contract. After,
+the `delay` is elapsed, the validator is allowed to call `executeBatches` to propagate the same calldata to ZKsync
 contract.
 
 ### L2 specifics

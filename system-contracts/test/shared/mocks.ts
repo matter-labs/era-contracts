@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 import type { MockContract } from "../../typechain";
 import { MockContractFactory } from "../../typechain";
 import {
+  TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
   TEST_BOOTLOADER_FORMAL_ADDRESS,
   TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS,
@@ -13,6 +14,8 @@ import {
   TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
   TEST_COMPRESSOR_CONTRACT_ADDRESS,
   TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+  REAL_BRIDGEHUB_ADDRESS,
+  REAL_L2_MESSAGE_ROOT_ADDRESS,
 } from "./constants";
 import { deployContractOnAddress, getWallets, loadArtifact } from "./utils";
 
@@ -26,6 +29,7 @@ type CallResult = {
 const TEST_SYSTEM_CONTRACTS_MOCKS = {
   Compressor: TEST_COMPRESSOR_CONTRACT_ADDRESS,
   SystemContext: TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
+  ContractDeployer: TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   NonceHolder: TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
   L1Messenger: TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
   KnownCodesStorage: TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS,
@@ -35,6 +39,13 @@ const TEST_SYSTEM_CONTRACTS_MOCKS = {
   MsgValueSimulator: TEST_MSG_VALUE_SYSTEM_CONTRACT_ADDRESS,
   Bootloader: TEST_BOOTLOADER_FORMAL_ADDRESS,
   PubdataChunkPublisher: TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+  // We use `IBridgehub` name, since this is the name of the file in the system-contracts folder.
+  // The contract itself is present in a different one.
+  // For bridgehub we mock the real address for simplicity.
+  // In case of need, it can be ported to use the test address.
+  IBridgehub: REAL_BRIDGEHUB_ADDRESS,
+  // For similar reasons we mock the L2 message real root only for simplicity
+  IMessageRoot: REAL_L2_MESSAGE_ROOT_ADDRESS,
 };
 
 // Deploys mocks, and cleans previous call results during deployments.

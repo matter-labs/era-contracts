@@ -1,4 +1,6 @@
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -6,42 +8,33 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+// import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
 
-    Config config;
-    ContractsBytecodes contracts;
+    Config internal config;
+    DeployedContrats internal deployed;
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
-        address bridgehubAddress;
+        uint256 eraChainId;
+        uint256 chainId;
         address l1SharedBridgeProxy;
+        address bridgehubAddress;
         address governance;
         address erc20BridgeProxy;
-        // The owner of the contract sets the validator/attester weights.
-        // Can be the developer multisig wallet on mainnet.
+        bool validiumMode;
         address consensusRegistryOwner;
-        uint256 chainId;
-        uint256 eraChainId;
-        address l2SharedBridgeImplementation;
-        address l2SharedBridgeProxy;
+    }
+
+    struct DeployedContrats {
+        address l2DaValidatorAddress;
+        address forceDeployUpgraderAddress;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
         address multicall3;
-        address forceDeployUpgraderAddress;
-    }
-
-    struct ContractsBytecodes {
-        bytes l2StandardErc20FactoryBytecode;
-        bytes beaconProxy;
-        bytes l2StandardErc20Bytecode;
-        bytes l2SharedBridgeBytecode;
-        bytes l2SharedBridgeProxyBytecode;
-        bytes consensusRegistryBytecode;
-        bytes consensusRegistryProxyBytecode;
-        bytes multicall3Bytecode;
-        bytes forceDeployUpgrader;
     }
 
     function run() public {
@@ -54,12 +47,10 @@ contract DeployL2Script is Script {
 
     function deploy(bool legacyBridge) public {
         initializeConfig();
-        loadContracts(legacyBridge);
 
-        deployFactoryDeps();
-        deploySharedBridge();
-        deploySharedBridgeProxy(legacyBridge);
-        initializeChain();
+        // Note, that it is important that the first transaction is for setting the L2 DA validator
+        deployL2DaValidator();
+
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -76,21 +67,15 @@ contract DeployL2Script is Script {
         deploySharedBridge(false);
     }
 
+    // TODO(EVM-745): port legacy contract tests to new contracts
     function deploySharedBridge(bool legacyBridge) internal {
         initializeConfig();
-        loadContracts(legacyBridge);
-
-        deployFactoryDeps();
-        deploySharedBridge();
-        deploySharedBridgeProxy(legacyBridge);
-        initializeChain();
 
         saveOutput();
     }
 
     function runDefaultUpgrader() public {
         initializeConfig();
-        loadContracts(false);
 
         deployForceDeployer();
 
@@ -99,7 +84,6 @@ contract DeployL2Script is Script {
 
     function runDeployConsensusRegistry() public {
         initializeConfig();
-        loadContracts(false);
 
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -109,7 +93,6 @@ contract DeployL2Script is Script {
 
     function runDeployMulticall3() public {
         initializeConfig();
-        loadContracts(false);
 
         deployMulticall3();
 
@@ -162,6 +145,7 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
         string memory toml = vm.readFile(path);
+        config.validiumMode = toml.readBool("$.validium_mode");
         config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.governance = toml.readAddress("$.governance");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
@@ -172,37 +156,31 @@ contract DeployL2Script is Script {
     }
 
     function saveOutput() internal {
-        vm.serializeAddress("root", "l2_shared_bridge_implementation", config.l2SharedBridgeImplementation);
-        vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
-        vm.serializeAddress("root", "consensus_registry_implementation", config.consensusRegistryImplementation);
-        vm.serializeAddress("root", "consensus_registry_proxy", config.consensusRegistryProxy);
-        vm.serializeAddress("root", "multicall3", config.multicall3);
-        string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
+        vm.serializeAddress("root", "l2_da_validator_address", deployed.l2DaValidatorAddress);
+        vm.serializeAddress("root", "multicall3", deployed.multicall3);
+        vm.serializeAddress("root", "consensus_registry_implementation", deployed.consensusRegistryImplementation);
+        vm.serializeAddress("root", "consensus_registry_proxy", deployed.consensusRegistryProxy);
+        string memory toml = vm.serializeAddress("root", "l2_default_upgrader", deployed.forceDeployUpgraderAddress);
+
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
         vm.writeToml(toml, path);
     }
 
-    function deployFactoryDeps() internal {
-        bytes[] memory factoryDeps = new bytes[](3);
-        factoryDeps[0] = contracts.l2StandardErc20FactoryBytecode;
-        factoryDeps[1] = contracts.l2StandardErc20Bytecode;
-        factoryDeps[2] = contracts.beaconProxy;
-        Utils.publishBytecodes(factoryDeps, config.chainId, config.bridgehubAddress, config.l1SharedBridgeProxy);
-    }
+    function deployL2DaValidator() internal {
+        bytes memory bytecode;
+        if (config.validiumMode) {
+            bytecode = L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode();
+        } else {
+            bytecode = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
+        }
 
-    function deploySharedBridge() internal {
-        bytes[] memory factoryDeps = new bytes[](1);
-        factoryDeps[0] = contracts.beaconProxy;
-
-        bytes memory constructorData = abi.encode(config.eraChainId);
-
-        config.l2SharedBridgeImplementation = Utils.deployThroughL1({
-            bytecode: contracts.l2SharedBridgeBytecode,
-            constructorargs: constructorData,
+        deployed.l2DaValidatorAddress = Utils.deployThroughL1({
+            bytecode: bytecode,
+            constructorargs: bytes(""),
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: factoryDeps,
+            factoryDeps: new bytes[](0),
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
@@ -211,50 +189,12 @@ contract DeployL2Script is Script {
 
     function deployForceDeployer() internal {
         bytes[] memory factoryDeps = new bytes[](0);
-        config.forceDeployUpgraderAddress = Utils.deployThroughL1({
-            bytecode: contracts.forceDeployUpgrader,
+        deployed.forceDeployUpgraderAddress = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readForceDeployUpgraderBytecode(),
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: factoryDeps,
-            chainId: config.chainId,
-            bridgehubAddress: config.bridgehubAddress,
-            l1SharedBridgeProxy: config.l1SharedBridgeProxy
-        });
-    }
-
-    function deploySharedBridgeProxy(bool legacyBridge) internal {
-        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
-
-        string memory functionSignature;
-
-        if (legacyBridge) {
-            functionSignature = "initializeDevBridge(address,address,bytes32,address)";
-        } else {
-            functionSignature = "initialize(address,address,bytes32,address)";
-        }
-        // solhint-disable-next-line func-named-parameters
-        bytes memory proxyInitializationParams = abi.encodeWithSignature(
-            functionSignature,
-            config.l1SharedBridgeProxy,
-            config.erc20BridgeProxy,
-            l2StandardErc20BytecodeHash,
-            l2GovernorAddress
-        );
-
-        bytes memory l2SharedBridgeProxyConstructorData = abi.encode(
-            config.l2SharedBridgeImplementation,
-            l2GovernorAddress,
-            proxyInitializationParams
-        );
-
-        config.l2SharedBridgeProxy = Utils.deployThroughL1({
-            bytecode: contracts.l2SharedBridgeProxyBytecode,
-            constructorargs: l2SharedBridgeProxyConstructorData,
-            create2salt: "",
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: new bytes[](0),
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
@@ -266,8 +206,8 @@ contract DeployL2Script is Script {
         // ConsensusRegistry.sol doesn't have a constructor, just an initializer.
         bytes memory constructorData = "";
 
-        config.consensusRegistryImplementation = Utils.deployThroughL1({
-            bytecode: contracts.consensusRegistryBytecode,
+        deployed.consensusRegistryImplementation = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readConsensusRegistryBytecode(),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -282,8 +222,8 @@ contract DeployL2Script is Script {
         // Multicall3 doesn't have a constructor.
         bytes memory constructorData = "";
 
-        config.multicall3 = Utils.deployThroughL1({
-            bytecode: contracts.multicall3Bytecode,
+        deployed.multicall3 = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readMulticall3Bytecode(),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -308,13 +248,13 @@ contract DeployL2Script is Script {
         );
 
         bytes memory consensusRegistryProxyConstructorData = abi.encode(
-            config.consensusRegistryImplementation, // _logic
+            deployed.consensusRegistryImplementation, // _logic
             l2GovernorAddress, // admin_
             proxyInitializationParams // _data
         );
 
-        config.consensusRegistryProxy = Utils.deployThroughL1({
-            bytecode: contracts.consensusRegistryProxyBytecode,
+        deployed.consensusRegistryProxy = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
             constructorargs: consensusRegistryProxyConstructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -322,17 +262,6 @@ contract DeployL2Script is Script {
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
-        });
-    }
-
-    function initializeChain() internal {
-        L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
-
-        Utils.chainAdminMulticall({
-            _chainAdmin: bridge.admin(),
-            _target: config.l1SharedBridgeProxy,
-            _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
-            _value: 0
         });
     }
 }

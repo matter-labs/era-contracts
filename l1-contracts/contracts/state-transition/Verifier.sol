@@ -8,13 +8,14 @@ import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 /// @author Matter Labs
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
 /// Knowledge (PLONK) verifier.
-/// Modifications have been made to optimize the proof system for zkSync hyperchain circuits.
+/// Modifications have been made to optimize the proof system for ZK chain circuits.
+/// @dev Contract was generated from a verification key with a hash of 0x14f97b81e54b35fe673d8708cc1a19e1ea5b5e348e12d31e39824ed4f42bbca2
 /// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
 /// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
 /// * Original Plonk Article: https://eprint.iacr.org/2019/953.pdf
 /// * Original LookUp Article: https://eprint.iacr.org/2020/315.pdf
-/// * Plonk for zkSync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
+/// * Plonk for ZKsync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
 /// The notation used in the code is the same as in the papers.
 /* solhint-enable max-line-length */
 contract Verifier is IVerifier {
@@ -342,8 +343,7 @@ contract Verifier is IVerifier {
     /// @inheritdoc IVerifier
     function verify(
         uint256[] calldata, // _publicInputs
-        uint256[] calldata, // _proof
-        uint256[] calldata // _recursiveAggregationInput
+        uint256[] calldata // _proof
     ) public view virtual returns (bool) {
         // No memory was accessed yet, so keys can be loaded into the right place and not corrupt any other memory.
         _loadVerificationKey();
@@ -522,7 +522,17 @@ contract Verifier is IVerifier {
                 // 2. Load the proof (except for the recursive part)
                 offset := calldataload(0x24)
                 let proofLengthInWords := calldataload(add(offset, 0x04))
-                isValid := and(eq(proofLengthInWords, 44), isValid)
+
+                // Check the proof length depending on whether the recursive part is present
+                let expectedProofLength
+                switch mload(VK_RECURSIVE_FLAG_SLOT)
+                case 0 {
+                    expectedProofLength := 44
+                }
+                default {
+                    expectedProofLength := 48
+                }
+                isValid := and(eq(proofLengthInWords, expectedProofLength), isValid)
 
                 // PROOF_STATE_POLYS_0
                 {
@@ -669,21 +679,13 @@ contract Verifier is IVerifier {
                 }
 
                 // 3. Load the recursive part of the proof
-                offset := calldataload(0x44)
-                let recursiveProofLengthInWords := calldataload(add(offset, 0x04))
-
-                switch mload(VK_RECURSIVE_FLAG_SLOT)
-                case 0 {
-                    // recursive part should be empty
-                    isValid := and(iszero(recursiveProofLengthInWords), isValid)
-                }
-                default {
+                if mload(VK_RECURSIVE_FLAG_SLOT) {
                     // recursive part should be consist of 2 points
-                    isValid := and(eq(recursiveProofLengthInWords, 4), isValid)
+
                     // PROOF_RECURSIVE_PART_P1
                     {
-                        let x := mod(calldataload(add(offset, 0x024)), Q_MOD)
-                        let y := mod(calldataload(add(offset, 0x044)), Q_MOD)
+                        let x := mod(calldataload(add(offset, 0x5a4)), Q_MOD)
+                        let y := mod(calldataload(add(offset, 0x5c4)), Q_MOD)
                         let xx := mulmod(x, x, Q_MOD)
                         isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
                         mstore(PROOF_RECURSIVE_PART_P1_X_SLOT, x)
@@ -691,8 +693,8 @@ contract Verifier is IVerifier {
                     }
                     // PROOF_RECURSIVE_PART_P2
                     {
-                        let x := mod(calldataload(add(offset, 0x064)), Q_MOD)
-                        let y := mod(calldataload(add(offset, 0x084)), Q_MOD)
+                        let x := mod(calldataload(add(offset, 0x5e4)), Q_MOD)
+                        let y := mod(calldataload(add(offset, 0x604)), Q_MOD)
                         let xx := mulmod(x, x, Q_MOD)
                         isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
                         mstore(PROOF_RECURSIVE_PART_P2_X_SLOT, x)

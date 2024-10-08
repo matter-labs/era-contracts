@@ -45,7 +45,7 @@ describe("Diamond proxy tests", function () {
     diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
 
     const adminFactory = await hardhat.ethers.getContractFactory("AdminFacet");
-    const adminContract = await adminFactory.deploy();
+    const adminContract = await adminFactory.deploy(await owner.getChainId());
     adminFacet = AdminFacetFactory.connect(adminContract.address, adminContract.signer);
 
     const gettersFacetFactory = await hardhat.ethers.getContractFactory("GettersFacet");
@@ -53,7 +53,7 @@ describe("Diamond proxy tests", function () {
     gettersFacet = GettersFacetFactory.connect(gettersFacetContract.address, gettersFacetContract.signer);
 
     const mailboxFacetFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
-    const mailboxFacetContract = await mailboxFacetFactory.deploy(chainId);
+    const mailboxFacetContract = await mailboxFacetFactory.deploy(chainId, await owner.getChainId());
     mailboxFacet = MailboxFacetFactory.connect(mailboxFacetContract.address, mailboxFacetContract.signer);
 
     const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
@@ -62,6 +62,9 @@ describe("Diamond proxy tests", function () {
 
     const diamondProxyTestFactory = await hardhat.ethers.getContractFactory("DiamondProxyTest");
     const diamondProxyTestContract = await diamondProxyTestFactory.deploy();
+
+    const dummyBridgehubFactory = await hardhat.ethers.getContractFactory("DummyBridgehub");
+    const dummyBridgehub = await dummyBridgehubFactory.deploy();
 
     diamondProxyTest = DiamondProxyTestFactory.connect(
       diamondProxyTestContract.address,
@@ -84,12 +87,12 @@ describe("Diamond proxy tests", function () {
     const diamondInitCalldata = diamondInit.interface.encodeFunctionData("initialize", [
       {
         chainId,
-        bridgehub: "0x0000000000000000000000000000000000000001",
-        stateTransitionManager: await owner.getAddress(),
+        bridgehub: dummyBridgehub.address,
+        chainTypeManager: await owner.getAddress(),
         protocolVersion: 0,
         admin: governorAddress,
         validatorTimelock: governorAddress,
-        baseToken: "0x0000000000000000000000000000000000000001",
+        baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000000001",
         baseTokenBridge: "0x0000000000000000000000000000000000000001",
         storedBatchZero: "0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21",
         verifier: "0x0000000000000000000000000000000000000001",
@@ -134,14 +137,14 @@ describe("Diamond proxy tests", function () {
     const proxyAsERC20 = TestnetERC20TokenFactory.connect(proxy.address, proxy.signer);
 
     const revertReason = await getCallRevertReason(proxyAsERC20.transfer(proxyAsERC20.address, 0));
-    expect(revertReason).equal("F");
+    expect(revertReason).contains("F");
   });
 
   it("check that proxy reject data with no selector", async () => {
     const dataWithoutSelector = "0x1122";
 
     const revertReason = await getCallRevertReason(proxy.fallback({ data: dataWithoutSelector }));
-    expect(revertReason).equal("Ut");
+    expect(revertReason).contains("Ut");
   });
 
   it("should freeze the diamond storage", async () => {
@@ -178,7 +181,7 @@ describe("Diamond proxy tests", function () {
         data: executorFacetSelector3 + "0000000000000000000000000000000000000000000000000000000000000000",
       })
     );
-    expect(revertReason).equal("q1");
+    expect(revertReason).contains("q1");
   });
 
   it("should be able to call an unfreezable facet when diamondStorage is frozen", async () => {

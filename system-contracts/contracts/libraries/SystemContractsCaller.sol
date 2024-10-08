@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT} from "../Constants.sol";
 import {Utils} from "./Utils.sol";
 
 // Addresses used for the compiler to be replaced with the
-// zkSync-specific opcodes during the compilation.
+// ZKsync-specific opcodes during the compilation.
 // IMPORTANT: these are just compile-time constants and are used
 // only if used in-place by Yul optimizer.
 address constant TO_L1_CALL_ADDRESS = address((1 << 16) - 1);
@@ -80,7 +80,7 @@ library SystemContractsCaller {
         assembly {
             dataStart := add(data, 0x20)
         }
-        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
+        uint32 dataLength = Utils.safeCastToU32(data.length);
 
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
             dataOffset: 0,

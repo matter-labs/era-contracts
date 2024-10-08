@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 /**
  * @author Matter Labs
@@ -30,6 +30,13 @@ library UnsafeBytes {
         }
     }
 
+    function readUint128(bytes memory _bytes, uint256 _start) internal pure returns (uint128 result, uint256 offset) {
+        assembly {
+            offset := add(_start, 16)
+            result := mload(add(_bytes, offset))
+        }
+    }
+
     function readUint256(bytes memory _bytes, uint256 _start) internal pure returns (uint256 result, uint256 offset) {
         assembly {
             offset := add(_start, 32)
@@ -41,6 +48,15 @@ library UnsafeBytes {
         assembly {
             offset := add(_start, 32)
             result := mload(add(_bytes, offset))
+        }
+    }
+
+    function readRemainingBytes(bytes memory _bytes, uint256 _start) internal pure returns (bytes memory result) {
+        uint256 arrayLen = _bytes.length - _start;
+        result = new bytes(arrayLen);
+
+        assembly {
+            mcopy(add(result, 0x20), add(_bytes, add(0x20, _start)), arrayLen)
         }
     }
 }

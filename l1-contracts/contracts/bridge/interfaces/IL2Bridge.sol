@@ -1,22 +1,15 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2Bridge {
-    function finalizeDeposit(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        bytes calldata _data
-    ) external;
+    function withdraw(bytes32 _assetId, bytes memory _assetData) external;
 
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
-
-    function l1TokenAddress(address _l2Token) external view returns (address);
-
-    function l2TokenAddress(address _l1Token) external view returns (address);
+    function finalizeDeposit(bytes32 _assetId, bytes calldata _transferData) external;
 
     function l1Bridge() external view returns (address);
+
+    function setAssetHandlerAddress(bytes32 _assetId, address _assetAddress) external;
 }

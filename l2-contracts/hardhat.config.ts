@@ -12,14 +12,14 @@ if (!process.env.CHAIN_ETH_NETWORK) {
 
 export default {
   zksolc: {
-    version: "1.3.18",
+    version: "1.5.3",
     compilerSource: "binary",
     settings: {
       isSystem: true,
     },
   },
   solidity: {
-    version: "0.8.20",
+    version: "0.8.24",
   },
   defaultNetwork: "localhost",
   networks: {
