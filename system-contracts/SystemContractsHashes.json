@@ -126,9 +126,9 @@
     "sourceCodeHash": "0xfcf4828bcc109dea5f88c38f428d9ac5e18d5a2767fa4909277802c7e38c1f93"
   },
   {
-    "contractName": "EvmInterpreter",
-    "bytecodePath": "contracts-preprocessed/artifacts/EvmInterpreter.yul.zbin",
-    "sourceCodePath": "contracts-preprocessed/EvmInterpreter.yul",
+    "contractName": "EvmEmulator",
+    "bytecodePath": "contracts-preprocessed/artifacts/EvmEmulator.yul.zbin",
+    "sourceCodePath": "contracts-preprocessed/EvmEmulator.yul",
     "bytecodeHash": "0x01000cdf5bb7dd8a97faf231a5e1e20f2fe308d6f200c3295c6e3629547cc4a4",
     "sourceCodeHash": "0xe1133c2af9e4fc38e845f7fcc23f3cbab37b857013f55b6e7e9bdea28f331c40"
   },

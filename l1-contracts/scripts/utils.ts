@@ -70,9 +70,9 @@ export function readSystemContractsBytecode(fileName: string) {
   return JSON.parse(artifact.toString()).bytecode;
 }
 
-export function readEvmSimulatorbytecode() {
+export function readEvmEmulatorbytecode() {
   const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts");
-  return fs.readFileSync(`${systemContractsPath}/contracts-preprocessed/artifacts/EvmInterpreter.yul.zbin`);
+  return fs.readFileSync(`${systemContractsPath}/contracts-preprocessed/artifacts/EvmEmulator.yul.zbin`);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

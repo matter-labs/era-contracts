@@ -226,7 +226,7 @@ library Utils {
         selectors[12] = GettersFacet.storedBatchHash.selector;
         selectors[13] = GettersFacet.getL2BootloaderBytecodeHash.selector;
         selectors[14] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = GettersFacet.getL2EvmSimulatorBytecodeHash.selector;
+        selectors[15] = GettersFacet.getL2EvmEmulatorBytecodeHash.selector;
         selectors[16] = GettersFacet.getVerifierParams.selector;
         selectors[17] = GettersFacet.isDiamondStorageFrozen.selector;
         selectors[18] = GettersFacet.getPriorityTxMaxGasLimit.selector;
@@ -278,8 +278,8 @@ library Utils {
         selectors[15] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
         selectors[16] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
         selectors[17] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
-        selectors[18] = UtilsFacet.util_getL2EvmSimulatorBytecodeHash.selector;
-        selectors[19] = UtilsFacet.util_setL2EvmSimulatorBytecodeHash.selector;
+        selectors[18] = UtilsFacet.util_getL2EvmEmulatorBytecodeHash.selector;
+        selectors[19] = UtilsFacet.util_setL2EvmEmulatorBytecodeHash.selector;
         selectors[20] = UtilsFacet.util_setPendingAdmin.selector;
         selectors[21] = UtilsFacet.util_getPendingAdmin.selector;
         selectors[22] = UtilsFacet.util_setAdmin.selector;
@@ -343,7 +343,7 @@ library Utils {
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmSimulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 500000,
                 feeParams: makeFeeParams(),
                 blobVersionedHashRetriever: address(0x23746765237749923040872834)
@@ -359,7 +359,7 @@ library Utils {
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmSimulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 80000000,
                 feeParams: makeFeeParams(),
                 blobVersionedHashRetriever: address(0x23746765237749923040872834)

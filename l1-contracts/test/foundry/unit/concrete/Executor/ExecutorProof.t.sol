@@ -77,7 +77,7 @@ contract ExecutorProofTest is Test {
         utilsFacet.util_setL2DefaultAccountBytecodeHash(
             0x0100058d1abd41a9984b37939862f99c18237dc6951c3d5a3d81593c798a8f81
         );
-        utilsFacet.util_setL2EvmSimulatorBytecodeHash(
+        utilsFacet.util_setL2EvmEmulatorBytecodeHash(
             0x01000f196acd122635a752fcb275be0cc95fd3bba348c1d0908a517fe316418e
         );
         utilsFacet.util_setL2BootloaderBytecodeHash(0x010008ddde4acc465cde1c420883701caadb41954567c0b4e3a0d1093a7afde7);

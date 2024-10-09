@@ -10,7 +10,7 @@ import {
   packSemver,
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
-  readEvmSimulatorbytecode,
+  readEvmEmulatorbytecode,
   unpackStringSemVer,
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
@@ -44,7 +44,7 @@ import type { Contract, Overrides } from "@ethersproject/contracts";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
-let L2_EVM_SIMULATOR_BYTECODE_HASH: string;
+let L2_EVM_EMULATOR_BYTECODE_HASH: string;
 
 export interface DeployerConfig {
   deployWallet: Wallet;
@@ -53,7 +53,7 @@ export interface DeployerConfig {
   verbose?: boolean;
   bootloaderBytecodeHash?: string;
   defaultAccountBytecodeHash?: string;
-  evmSimulatorBytecodeHash?: string;
+  evmEmulatorBytecodeHash?: string;
 }
 
 export interface Operation {
@@ -81,9 +81,9 @@ export class Deployer {
     L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash
       ? config.defaultAccountBytecodeHash
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
-    L2_EVM_SIMULATOR_BYTECODE_HASH = config.evmSimulatorBytecodeHash
-      ? config.evmSimulatorBytecodeHash
-      : hexlify(hashL2Bytecode(readEvmSimulatorbytecode()));
+    L2_EVM_EMULATOR_BYTECODE_HASH = config.evmEmulatorBytecodeHash
+      ? config.evmEmulatorBytecodeHash
+      : hexlify(hashL2Bytecode(readEvmEmulatorbytecode()));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
   }
@@ -111,7 +111,7 @@ export class Deployer {
       verifierParams,
       L2_BOOTLOADER_BYTECODE_HASH,
       L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-      L2_EVM_SIMULATOR_BYTECODE_HASH,
+      L2_EVM_EMULATOR_BYTECODE_HASH,
       this.addresses.StateTransition.Verifier,
       this.addresses.BlobVersionedHashRetriever,
       +priorityTxMaxGasLimit,
