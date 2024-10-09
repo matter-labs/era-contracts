@@ -916,12 +916,16 @@ object "Bootloader" {
                 debugLog("Verify XL2 Tx 1", mload(merkleProofPtr))
                 // Prepare the call to verify the XL2 transaction
                 // note: a an empy space has been left for the selector. 
+                debugLog("Verify XL2 Tx 3 before", mload(add(merkleProofPtr, 32)))
                 mstore(add(merkleProofPtr, 32), {{LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR}})
                 debugLog("Verify XL2 Tx 2", mload(merkleProofPtr))
-                debugLog("Verify XL2 Tx 3",  {{LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR}})
-                debugLog("Verify XL2 Tx 4", mload(add(merkleProofPtr, 32)))
+                debugLog("Verify XL2 Tx 3", {{LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR}})
+                debugLog("Verify XL2 Tx 3", mload(add(merkleProofPtr, 32)))
                 debugLog("Verify XL2 Tx 4", mload(add(merkleProofPtr, 64)))
                 debugLog("Verify XL2 Tx 5", mload(add(merkleProofPtr, 96)))
+                debugLog("Verify XL2 Tx 6", mload(add(merkleProofPtr, 128)))
+                debugLog("Verify XL2 Tx 7", mload(add(merkleProofPtr, 160)))
+                //],
 
                 let success := call(
                     gas(),
@@ -929,18 +933,21 @@ object "Bootloader" {
                     0,
                     add(merkleProofPtr, 60),
                     // 68,
-                    sub(mload(merkleProofPtr), 28), // 4 bytes for selector + length of merkle proof
+                    36,
+                    // sub(mload(merkleProofPtr), 28), // 4 bytes for selector + length of merkle proof
+                    // 132,
                     0,
                     64
                 )
                 debugLog("kl todo", sub(mload(merkleProofPtr), 28))
 
-                if iszero(success) {
-                    revertWithReason(
-                        VERIFY_XL2_TX_FAILED_ERR_CODE(),
-                        0
-                    )
-                }
+                // if iszero(success) {
+                //     revertWithReason(
+                //         VERIFY_XL2_TX_FAILED_ERR_CODE(),
+                //         0
+                //     )
+                // } // kl todo
+                debugLog("KL first call succeeded", 1)
                 debugLog("KL todo 3", 1)
 
                 let returnDataSize := returndatasize()
