@@ -143,8 +143,8 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getL2EvmSimulatorBytecodeHash() external view returns (bytes32) {
-        return s.l2EvmSimulatorBytecodeHash;
+    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
+        return s.l2EvmEmulatorBytecodeHash;
     }
 
     /// @inheritdoc IGetters

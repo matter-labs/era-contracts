@@ -17,9 +17,9 @@ describe("Executor test", function () {
   it("Test hashes (Rollup)", async () => {
     const bootloaderHash = "0x010008bbde6fc402ea3a3d6cb15cb97e70245d3d4e48fb74362d4961b74c16b1";
     const aaHash = "0x0100058d9eee51f4b9e9a9ecb7fd7e8301e90bef018c2bd913ed36e583fec8c2";
-    const evmSimulatorHash = "0x01000ccb740e2345754450eda583f59b31a346920a22f968dfcfc63feae303ee";
+    const evmEmulatorHash = "0x01000ccb740e2345754450eda583f59b31a346920a22f968dfcfc63feae303ee";
 
-    const setResult = await executor.setHashes(aaHash, bootloaderHash, evmSimulatorHash);
+    const setResult = await executor.setHashes(aaHash, bootloaderHash, evmEmulatorHash);
     const finish = await setResult.wait();
     expect(finish.status == 1);
 

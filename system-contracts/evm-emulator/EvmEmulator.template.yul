@@ -1,4 +1,4 @@
-object "EVMInterpreter" {
+object "EvmEmulator" {
     code {
         /// @dev This function is used to get the initCode.
         /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
@@ -80,7 +80,7 @@ object "EVMInterpreter" {
             returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
-        <!-- @include EvmInterpreterFunctions.template.yul -->
+        <!-- @include EvmEmulatorFunctions.template.yul -->
 
         function simulate(
             isCallerEVM,
@@ -91,7 +91,7 @@ object "EVMInterpreter" {
             returnOffset := MEM_OFFSET_INNER()
             returnLen := 0
 
-            <!-- @include EvmInterpreterLoop.template.yul -->
+            <!-- @include EvmEmulatorLoop.template.yul -->
 
             retGasLeft := evmGasLeft
         }
@@ -120,9 +120,9 @@ object "EVMInterpreter" {
 
         setDeployedCode(gasToReturn, offset, len)
     }
-    object "EVMInterpreter_deployed" {
+    object "EvmEmulator_deployed" {
         code {
-            <!-- @include EvmInterpreterFunctions.template.yul -->
+            <!-- @include EvmEmulatorFunctions.template.yul -->
 
             function $llvm_NoInline_llvm$_simulate(
                 isCallerEVM,
@@ -133,7 +133,7 @@ object "EVMInterpreter" {
                 returnOffset := MEM_OFFSET_INNER()
                 returnLen := 0
 
-                <!-- @include EvmInterpreterLoop.template.yul -->
+                <!-- @include EvmEmulatorLoop.template.yul -->
 
                 if eq(isCallerEVM, 1) {
                     // Includes gas

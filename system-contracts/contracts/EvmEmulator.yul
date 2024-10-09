@@ -1,4 +1,4 @@
-object "EVMInterpreter" {
+object "EvmEmulator" {
     code {
         /// @dev This function is used to get the initCode.
         /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
@@ -2912,7 +2912,7 @@ object "EVMInterpreter" {
 
         setDeployedCode(gasToReturn, offset, len)
     }
-    object "EVMInterpreter_deployed" {
+    object "EvmEmulator_deployed" {
         code {
             function ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT() -> addr {
                 addr := 0x0000000000000000000000000000000000008002
