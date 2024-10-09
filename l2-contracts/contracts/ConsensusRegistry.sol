@@ -36,6 +36,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _initialOwner) external initializer {
         if (_initialOwner == address(0)) {
             revert InvalidInputNodeOwnerAddress();
