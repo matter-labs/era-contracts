@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
 import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
+import {ZeroAddress} from "./errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -38,7 +39,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function initialize(address _initialOwner) external initializer {
         if (_initialOwner == address(0)) {
-            revert InvalidInputNodeOwnerAddress();
+            revert ZeroAddress();
         }
         _transferOwnership(_initialOwner);
     }
@@ -438,7 +439,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function _verifyInputAddress(address _nodeOwner) private pure {
         if (_nodeOwner == address(0)) {
-            revert InvalidInputNodeOwnerAddress();
+            revert ZeroAddress();
         }
     }
 
