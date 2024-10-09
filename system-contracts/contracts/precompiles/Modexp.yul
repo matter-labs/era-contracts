@@ -99,7 +99,7 @@ object "Modexp" {
             // Copy input base, exp and mod from calldata to memory
             calldatacopy(0, 96, baseLen)
             calldatacopy(MAX_BASE_BYTES_SUPPORTED(), add(96, baseLen), expLen)
-            calldatacopy(MAX_EXP_BYTES_SUPPORTED(), add(add(96, baseLen), expLen), modLen)
+            calldatacopy(add(MAX_BASE_BYTES_SUPPORTED(), MAX_EXP_BYTES_SUPPORTED()), add(add(96, baseLen), expLen), modLen)
             
             let precompileParams := unsafePackPrecompileParams(
                 0,                                  // input offset in words
