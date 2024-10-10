@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.24;
 
-import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed, NotBridgehub, InvalidSelector, InvalidAddress, NotEnoughGas} from "../common/L1ContractErrors.sol";
+import {NotChainMigration, NotChainMigrationReason, NotAdminOfChainReason, NotAdminOfChain, UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed, NotBridgehub, InvalidSelector, InvalidAddress, NotEnoughGas} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
 import {IRestriction} from "./IRestriction.sol";
@@ -18,11 +18,6 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
-
-/// @dev We use try-catch to test whether some of the conditions should be checked.
-/// To avoid attacks based on the 63/64 gas limitations, we ensure that each such call
-/// has at least this amount.
-uint256 constant MIN_GAS_FOR_FALLABLE_CALL = 5_000_000;
 
 /// @title PermanentRestriction contract
 /// @author Matter Labs
@@ -130,13 +125,11 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @dev Note that we do not need to validate the migration to the L1 layer as the admin
     /// is not changed in this case.
     function _validateMigrationToL2(Call calldata _call) internal view {
-        _ensureEnoughGas();
-        try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
-            if (!allowedL2Admins[admin]) {
+        (address admin, bool isMigration) = _getNewAdminFromMigration(_call);
+        if(isMigration) {
+            if(!allowedL2Admins[admin]) {
                 revert NotAllowed(admin);
             }
-        } catch {
-            // It was not the migration call, so we do nothing
         }
     }
 
@@ -212,19 +205,8 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
     /// @param _chain The address of the chain.
     function _isAdminOfAChain(address _chain) internal view returns (bool) {
-        _ensureEnoughGas();
-        (bool success, ) = address(this).staticcall(abi.encodeCall(this.tryCompareAdminOfAChain, (_chain, msg.sender)));
-        return success;
-    }
-
-    /// @notice Tries to compare the admin of a chain with the potential admin.
-    /// @param _chain The address of the chain.
-    /// @param _potentialAdmin The address of the potential admin.
-    /// @dev This function reverts if the `_chain` is not a ZkSyncHyperchain or the `_potentialAdmin` is not the
-    /// admin of the chain.
-    function tryCompareAdminOfAChain(address _chain, address _potentialAdmin) external view {
         if (_chain == address(0)) {
-            revert ChainZeroAddress();
+            return false;
         }
 
         // Unfortunately there is no easy way to double check that indeed the `_chain` is a ZkSyncHyperchain.
@@ -233,79 +215,126 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
 
-        // Note, that we do not use an explicit call here to ensure that the function does not panic in case of
-        // incorrect `_chain` address.
-        (bool success, bytes memory data) = _chain.staticcall(abi.encodeWithSelector(IGetters.getChainId.selector));
-        if (!success || data.length < 32) {
-            revert NotAHyperchain(_chain);
+        // Note, that we do use assembly here to ensure that the function does not panic in case of
+        // either incorrect `_chain` address or in case the returndata is too large
+
+        bytes4 selector = IGetters.getChainId.selector;
+        bool success;
+        uint256 chainId;
+        assembly {
+            // We use scratch space here, so it is safe
+            mstore(0, selector)
+            success := staticcall(
+                gas(),
+                0,
+                0,
+                4,
+                0,
+                0
+            )
+
+            let isReturndataSizeCorrect := eq(returndatasize(), 32)
+
+            success := and(success, isReturndataSizeCorrect)
+
+            if success {
+                // We use scratch space here, so it is safe
+                returndatacopy(0, 0, 32)
+
+                chainId := mload(0)
+            }
         }
 
-        // Can not fail
-        uint256 chainId = abi.decode(data, (uint256));
+        if (!success) {
+            // It is not a hyperchain, so we can return `false` here.
+            return false;
+        } 
 
         // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
         // is compatible with the legacy ones.
         if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
-            revert NotAHyperchain(_chain);
+            // It is not a hyperchain, so we can return `false` here.
+            return false;
         }
 
-        // Now, the chain is known to be a hyperchain, so it should implement the corresponding interface
+        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
         address admin = IZKChain(_chain).getAdmin();
-        if (admin != _potentialAdmin) {
-            revert NotAnAdmin(admin, _potentialAdmin);
-        }
+
+        return admin == msg.sender;
     }
 
     /// @notice Tries to get the new admin from the migration.
     /// @param _call The call data.
-    /// @dev This function reverts if the provided call was not a migration call.
-    function tryGetNewAdminFromMigration(Call calldata _call) external view returns (address) {
+    /// @return Returns a tuple of of the new admin and whether the transaction is indeed the migration.
+    /// If the second parameter is `false`, the caller should ignore the first value. 
+    /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected 
+    /// error that should be bubbled up by the caller.
+    function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
         if (_call.target != address(BRIDGE_HUB)) {
-            revert NotBridgehub(_call.target);
+            return (address(0), false);
+        }
+
+        if(_call.data.length < 4) {
+            return (address(0), false);
         }
 
         if (bytes4(_call.data[:4]) != IBridgehub.requestL2TransactionTwoBridges.selector) {
-            revert InvalidSelector(bytes4(_call.data[:4]));
+            return (address(0), false);
         }
 
         address sharedBridge = BRIDGE_HUB.sharedBridge();
 
+        // Assuming that correctly encoded calldata is provided, the following line must never fail,
+        // since the correct selector was checked before. 
         L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
             _call.data[4:],
             (L2TransactionRequestTwoBridgesOuter)
         );
 
         if (request.secondBridgeAddress != sharedBridge) {
-            revert InvalidAddress(sharedBridge, request.secondBridgeAddress);
+            return (address(0), false);
         }
 
         bytes memory secondBridgeData = request.secondBridgeCalldata;
+        if (secondBridgeData.length == 0) {
+            return (address(0), false);
+        }
+
         if (secondBridgeData[0] != NEW_ENCODING_VERSION) {
-            revert UnsupportedEncodingVersion();
+            return (address(0), false);
         }
         bytes memory encodedData = new bytes(secondBridgeData.length - 1);
         assembly {
             mcopy(add(encodedData, 0x20), add(secondBridgeData, 0x21), mload(encodedData))
         }
 
+        // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
+        // supported only in the new protocol version with Gateway support, so we can assume 
+        // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
+
+        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`. 
+        // If it fails, it would mean that the data is not correct and the call would eventually fail anyway.
         (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
+
         // We will just check that the chainAssetId is a valid chainAssetId.
         // For now, for simplicity, we do not check that the admin is exactly the admin
         // of this chain.
         address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(chainAssetId);
         if (ctmAddress == address(0)) {
-            revert ZeroAddress();
+            return (address(0), false);
         }
 
+        // Almost certainly it will be Bridgehub, but we add this check just in case we have circumstances
+        // that require us to use a different asset handler.
+        address assetHandlerAddress = IAssetRouterBase(sharedBridge).assetHandlerAddress(chainAssetId);
+        if (assetHandlerAddress != address(BRIDGE_HUB)) {
+            return (address(0), false);
+        }
+
+        // The asset handler of CTM is the bridgehub and so the following decoding should work 
         BridgehubBurnCTMAssetData memory burnData = abi.decode(bridgehubData, (BridgehubBurnCTMAssetData));
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 
-        return l2Admin;
-    }
-
-    function _ensureEnoughGas() internal view {
-        if (gasleft() < MIN_GAS_FOR_FALLABLE_CALL) {
-            revert NotEnoughGas();
-        }
+        return (l2Admin, true);
     }
 }
