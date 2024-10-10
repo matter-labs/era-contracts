@@ -312,7 +312,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     /// @notice Returns an array of `AttesterAttr` structs representing the current attester committee.
     /// @dev Collects active and non-removed attesters based on the latest commit to the committee.
-    function getAttesterCommittee() public view returns (CommitteeAttester[] memory) {
+    function getAttesterCommittee() external view returns (CommitteeAttester[] memory) {
         uint256 len = nodeOwners.length;
         CommitteeAttester[] memory committee = new CommitteeAttester[](len);
         uint256 count = 0;
@@ -337,7 +337,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     /// @notice Returns an array of `ValidatorAttr` structs representing the current attester committee.
     /// @dev Collects active and non-removed validators based on the latest commit to the committee.
-    function getValidatorCommittee() public view returns (CommitteeValidator[] memory) {
+    function getValidatorCommittee() external view returns (CommitteeValidator[] memory) {
         uint256 len = nodeOwners.length;
         CommitteeValidator[] memory committee = new CommitteeValidator[](len);
         uint256 count = 0;
@@ -364,7 +364,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         return committee;
     }
 
-    function numNodes() public view returns (uint256) {
+    function numNodes() external view returns (uint256) {
         return nodeOwners.length;
     }
 
