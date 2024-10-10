@@ -218,6 +218,32 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         // Note, that we do use assembly here to ensure that the function does not panic in case of
         // either incorrect `_chain` address or in case the returndata is too large
 
+        (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
+
+        if (!chainIdQuerySuccess) {
+            // It is not a hyperchain, so we can return `false` here.
+            return false;
+        } 
+
+        // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
+        // is compatible with the legacy ones.
+        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
+            // It is not a hyperchain, so we can return `false` here.
+            return false;
+        }
+
+        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
+        address admin = IZKChain(_chain).getAdmin();
+
+        return admin == msg.sender;
+    }
+
+    /// @notice Tries to call `IGetters.getChainId()` function on the `_potentialChainAddress`.
+    /// It ensures that the returndata is of correct format and if not, it returns false.
+    /// @param _chain The address of the potential chain
+    /// @return Returns a tuple of of the chainId and whether the call was successful.
+    /// If the second item is `false`, the caller should ignore the first value. 
+    function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256, bool) {
         bytes4 selector = IGetters.getChainId.selector;
         bool success;
         uint256 chainId;
@@ -245,28 +271,13 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             }
         }
 
-        if (!success) {
-            // It is not a hyperchain, so we can return `false` here.
-            return false;
-        } 
-
-        // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
-        // is compatible with the legacy ones.
-        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
-            // It is not a hyperchain, so we can return `false` here.
-            return false;
-        }
-
-        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
-        address admin = IZKChain(_chain).getAdmin();
-
-        return admin == msg.sender;
+        return (chainId, success);
     }
 
     /// @notice Tries to get the new admin from the migration.
     /// @param _call The call data.
     /// @return Returns a tuple of of the new admin and whether the transaction is indeed the migration.
-    /// If the second parameter is `false`, the caller should ignore the first value. 
+    /// If the second item is `false`, the caller should ignore the first value. 
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected 
     /// error that should be bubbled up by the caller.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
