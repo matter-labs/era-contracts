@@ -6,11 +6,11 @@ pragma solidity ^0.8.0;
 
 import {Utils} from "./libraries/Utils.sol";
 
-import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, SHA256_SYSTEM_CONTRACT} from "./Constants.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemCallFlagRequired, CallerMustBeEvmContract} from "./SystemContractErrors.sol";
 
-// We consider all the contracts (including system ones) as warm.
+// We consider all precompiles and system contracts as warm.
 uint160 constant PRECOMPILES_END = 0xffff;
 
 // Transient storage prefixes
@@ -74,7 +74,6 @@ contract EvmGasManager {
     function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
         uint256 transient_slot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(account));
-
         assembly {
             wasWarm := tload(transient_slot)
 
@@ -89,11 +88,8 @@ contract EvmGasManager {
 
     function isSlotWarm(uint256 _slot) external view returns (bool isWarm) {
         uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
-        uint256 transient_slot;
+        bytes32 transient_slot = _sha2words(prefix, _slot);
         assembly {
-            mstore(0, prefix)
-            mstore(0x20, _slot)
-            transient_slot := keccak256(0, 64)
             isWarm := tload(transient_slot)
 
             mstore(0x0, isWarm)
@@ -106,12 +102,8 @@ contract EvmGasManager {
         uint256 _currentValue
     ) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
         uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
-        uint256 transient_slot;
+        bytes32 transient_slot = _sha2words(prefix, _slot);
         assembly {
-            mstore(0, prefix)
-            mstore(0x20, _slot)
-            transient_slot := keccak256(0, 64)
-
             isWarm := tload(transient_slot)
 
             switch isWarm
@@ -160,6 +152,23 @@ contract EvmGasManager {
             mstore(0x0, passGas)
             mstore(0x20, auxDataRes)
             return(0x0, 0x40)
+        }
+    }
+
+    function _sha2words(uint256 word0, uint256 word1) internal view returns(bytes32 result) {
+        address to = address(SHA256_SYSTEM_CONTRACT);
+        assembly {
+            mstore(0, word0)
+            mstore(0x20, word1)
+
+            let success := staticcall(gas(), to, 0, 64, 0, 32)
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+
+            result := mload(0)
         }
     }
 }
