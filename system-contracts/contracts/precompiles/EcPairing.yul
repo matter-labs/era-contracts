@@ -98,7 +98,7 @@ object "EcPairing" {
                 return(0, 0)
             }
 
-            return(0, 64)
+            return(0, 32)
             
         }
     }
