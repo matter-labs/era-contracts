@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {AccessToFallbackDenied, AccessToFunctionDenied} from "../common/L1ContractErrors.sol";
+import {AccessToFallbackDenied, AccessToFunctionDenied, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {IAccessControlRestriction} from "./IAccessControlRestriction.sol";
 import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/AccessControlDefaultAdminRules.sol";
 import {IRestriction} from "./IRestriction.sol";
@@ -39,6 +39,9 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
         bytes4 _selector,
         bytes32 _requiredRole
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_target == address(0)) {
+            revert ZeroAddress();
+        }
         requiredRoles[_target][_selector] = _requiredRole;
 
         emit RoleSet(_target, _selector, _requiredRole);
@@ -48,6 +51,9 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
     /// @param _target The address of the contract.
     /// @param _requiredRole The required role.
     function setRequiredRoleForFallback(address _target, bytes32 _requiredRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_target == address(0)) {
+            revert ZeroAddress();
+        }
         requiredRolesForFallback[_target] = _requiredRole;
 
         emit FallbackRoleSet(_target, _requiredRole);

@@ -8,8 +8,32 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AdminFactory} from "contracts/governance/L2AdminFactory.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract L2AdminFactoryTest is Test {
+    function testDeployL2AdminFactoryRevertZeroAddress() public {
+        address[] memory requiredRestrictions = new address[](2);
+        requiredRestrictions[0] = makeAddr("required");
+        requiredRestrictions[1] = address(0);
+
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+        new L2AdminFactory(requiredRestrictions);
+    }
+
+    function testDeployL2AdminZeroAddress() public {
+        address[] memory requiredRestrictions = new address[](1);
+        requiredRestrictions[0] = makeAddr("required");
+
+        L2AdminFactory factory = new L2AdminFactory(requiredRestrictions);
+
+        address[] memory additionalRestrictions = new address[](2);
+        additionalRestrictions[0] = makeAddr("additional");
+        additionalRestrictions[1] = address(0);
+
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+        address admin = factory.deployAdmin(additionalRestrictions, bytes32(0));
+    }
+
     function testL2AdminFactory() public {
         address[] memory requiredRestrictions = new address[](1);
         requiredRestrictions[0] = makeAddr("required");
