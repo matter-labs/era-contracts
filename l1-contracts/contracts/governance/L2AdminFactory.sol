@@ -14,6 +14,8 @@ import {ChainAdmin} from "./ChainAdmin.sol";
 /// @dev The contract is immutable, in case the restrictions need to be changed,
 /// a new contract should be deployed.
 contract L2AdminFactory {
+    /// @notice Emitted when an admin is deployed on the L2.
+    /// @param admin The address of the newly deployed admin.
     event AdminDeployed(address admin);
 
     /// @dev We use storage instead of immutable variables due to the
