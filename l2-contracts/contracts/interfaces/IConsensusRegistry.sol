@@ -104,6 +104,8 @@ interface IConsensusRegistry {
     error InvalidInputBLS12_381PublicKey();
     error InvalidInputBLS12_381Signature();
     error InvalidInputSecp256k1PublicKey();
+    error ZeroAttesterWeight();
+    error ZeroValidatorWeight();
 
     event NodeAdded(
         address indexed nodeOwner,

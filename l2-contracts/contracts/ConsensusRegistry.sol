@@ -47,10 +47,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Fails if node owner already exists.
     /// @dev Fails if a validator/attester with the same public key already exists.
     /// @param _nodeOwner The address of the new node's owner.
-    /// @param _validatorWeight The voting weight of the validator.
+    /// @param _validatorWeight The voting weight of the validator, must be greater than 0.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
     /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
-    /// @param _attesterWeight The voting weight of the attester.
+    /// @param _attesterWeight The voting weight of the attester, must be greater than 0.
     /// @param _attesterPubKey The ECDSA public key of the attester.
     function add(
         address _nodeOwner,
@@ -65,6 +65,12 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
         _verifyInputSecp256k1PublicKey(_attesterPubKey);
+        if ( _attesterWeight == 0) {
+            revert ZeroAttesterWeight();
+        }
+        if (_validatorWeight == 0) {
+            revert ZeroValidatorWeight();
+        }
 
         // Verify storage.
         _verifyNodeOwnerDoesNotExist(_nodeOwner);
@@ -180,8 +186,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose validator weight will be changed.
-    /// @param _weight The new validator weight to assign to the node.
+    /// @param _weight The new validator weight to assign to the node, must be greater than 0.
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
+        if (_weight == 0) {
+            revert ZeroValidatorWeight();
+        }
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
@@ -198,8 +207,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester weight will be changed.
-    /// @param _weight The new attester weight to assign to the node.
+    /// @param _weight The new attester weight to assign to the node, must be greater than 0.
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
+        if (_weight == 0) {
+            revert ZeroAttesterWeight();
+        }
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
