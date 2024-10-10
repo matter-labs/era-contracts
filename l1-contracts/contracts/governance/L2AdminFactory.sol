@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {ChainAdmin} from "./ChainAdmin.sol";
+import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -21,12 +22,14 @@ contract L2AdminFactory {
     address[] public requiredRestrictions;
 
     constructor(address[] memory _requiredRestrictions) {
+        _validateRestrctions(_requiredRestrictions);
         requiredRestrictions = _requiredRestrictions;
     }
 
     /// @notice Deploys a new L2 admin contract.
     /// @return admin The address of the deployed admin contract.
     function deployAdmin(address[] calldata _additionalRestrictions, bytes32 _salt) external returns (address admin) {
+        _validateRestrctions(_additionalRestrictions);
         address[] memory restrictions = new address[](requiredRestrictions.length + _additionalRestrictions.length);
         uint256 cachedRequired = requiredRestrictions.length;
         for (uint256 i = 0; i < cachedRequired; ++i) {
@@ -38,5 +41,14 @@ contract L2AdminFactory {
         }
 
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
+    }
+
+    function _validateRestrctions(address[] memory _restrictions) internal view {
+        unchecked {
+            uint256 length = _restrictions.length;
+            for(uint256 i = 0; i < length; ++i) {
+                RestrictionValidator.validateRestriction(_restrictions[i]);
+            }
+        }
     }
 }
