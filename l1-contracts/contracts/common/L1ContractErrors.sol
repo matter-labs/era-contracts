@@ -413,11 +413,6 @@ error NotBridgehub(address addr);
 error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
-// 
-error NotAdminOfChain(NotAdminOfChainReason reason);
-// 
-error NotChainMigration(NotAdminOfChainReason reason);
-
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
@@ -447,22 +442,4 @@ enum UpgradeTxVerifyParam {
     Signature,
     PaymasterInput,
     ReservedDynamic
-}
-
-enum NotAdminOfChainReason {
-    ChainZeroAddress,
-    ChainIdNotAvailable,
-    NotAHyperchain,
-    NotAdminOfExistingHyperchain
-}
-
-enum NotChainMigrationReason {
-    CalleeNotBridgehub,
-    CalldataTooShort,
-    NotTwoBridges,
-    SecondBridgeIsNotSharedBridge,
-    SecondBridgeDataTooShort,
-    IncorrectEncodingVersion,
-    AssetIdNotCTM,
-    AssetHandlerNotBridgehub
 }
