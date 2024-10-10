@@ -8,12 +8,12 @@ pragma solidity ^0.8.20;
 interface IConsensusRegistry {
     /// @dev Represents a consensus node.
     /// @param attesterLastUpdateCommit The latest `attestersCommit` where the node's attester attributes were updated.
+    /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
+    /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
     /// @param attesterLatest Attester attributes to read if `node.attesterLastUpdateCommit` < `attestersCommit`.
     /// @param attesterSnapshot Attester attributes to read if `node.attesterLastUpdateCommit` == `attestersCommit`.
-    /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
     /// @param validatorLatest Validator attributes to read if `node.validatorLastUpdateCommit` < `validatorsCommit`.
     /// @param validatorSnapshot Validator attributes to read if `node.validatorLastUpdateCommit` == `validatorsCommit`.
-    /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
     struct Node {
         uint32 attesterLastUpdateCommit;
         uint32 validatorLastUpdateCommit;
