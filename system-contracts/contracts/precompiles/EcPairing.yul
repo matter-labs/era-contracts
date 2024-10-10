@@ -94,12 +94,15 @@ object "EcPairing" {
             let gasToPay := ecpairingGasCost(pairs)
 
             let success := precompileCall(precompileParams, gasToPay)
-            if iszero(success) {
+            let internalSuccess := mload(0)
+
+            switch and(success, internalSuccess)
+            case 0 {
                 return(0, 0)
             }
-
-            return(0, 32)
-            
+            default {
+                return(32, 32)
+            }
         }
     }
 }

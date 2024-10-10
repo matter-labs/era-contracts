@@ -67,11 +67,15 @@ object "EcAdd" {
             let gasToPay := ECADD_GAS_COST()
 
             let success := precompileCall(precompileParams, gasToPay)
-            if iszero(success) {
+            let internalSuccess := mload(0)
+
+            switch and(success, internalSuccess)
+            case 0 {
                 return(0, 0)
             }
-
-            return(0, 64)
+            default {
+                return(32, 64)
+            }
         }
     }
 }
