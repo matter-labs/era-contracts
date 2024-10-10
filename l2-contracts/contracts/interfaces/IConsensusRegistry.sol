@@ -107,14 +107,18 @@ interface IConsensusRegistry {
 
     event NodeAdded(
         address indexed nodeOwner,
+        bool isValidatorActive,
         uint32 validatorWeight,
         BLS12_381PublicKey validatorPubKey,
         BLS12_381Signature validatorPoP,
+        bool isAttesterActive,
         uint32 attesterWeight,
         Secp256k1PublicKey attesterPubKey
     );
-    event NodeDeactivated(address indexed nodeOwner);
-    event NodeActivated(address indexed nodeOwner);
+    event AttesterDeactivated(address indexed nodeOwner);
+    event ValidatorDeactivated(address indexed nodeOwner);
+    event AttesterActivated(address indexed nodeOwner);
+    event ValidatorActivated(address indexed nodeOwner);
     event NodeRemoved(address indexed nodeOwner);
     event NodeDeleted(address indexed nodeOwner);
     event NodeValidatorWeightChanged(address indexed nodeOwner, uint32 newWeight);
@@ -126,16 +130,22 @@ interface IConsensusRegistry {
 
     function add(
         address _nodeOwner,
+        bool _isValidatorActive,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP,
+        bool _isAttesterActive,
         uint32 _attesterWeight,
         Secp256k1PublicKey calldata _attesterPubKey
     ) external;
 
-    function deactivate(address _nodeOwner) external;
+    function deactivate_attester(address _nodeOwner) external;
 
-    function activate(address _nodeOwner) external;
+    function deactivate_validator(address _nodeOwner) external;
+
+    function activate_attester(address _nodeOwner) external;
+
+    function activate_validator(address _nodeOwner) external;
 
     function remove(address _nodeOwner) external;
 

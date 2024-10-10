@@ -47,16 +47,20 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Fails if node owner already exists.
     /// @dev Fails if a validator/attester with the same public key already exists.
     /// @param _nodeOwner The address of the new node's owner.
+    /// @param _isValidatorActive A flag stating if the validator starts activated.
     /// @param _validatorWeight The voting weight of the validator.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
     /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
+    /// @param _isAttesterActive A flag stating if the attester starts activated.
     /// @param _attesterWeight The voting weight of the attester.
     /// @param _attesterPubKey The ECDSA public key of the attester.
     function add(
         address _nodeOwner,
+        bool _isValidatorActive,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP,
+        bool _isAttesterActive,
         uint32 _attesterWeight,
         Secp256k1PublicKey calldata _attesterPubKey
     ) external onlyOwner {
@@ -77,8 +81,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         nodeOwners.push(_nodeOwner);
         nodes[_nodeOwner] = Node({
             attesterLatest: AttesterAttr({
-                active: true,
                 removed: false,
+                active: _isAttesterActive,
                 weight: _attesterWeight,
                 pubKey: _attesterPubKey
             }),
@@ -90,8 +94,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             }),
             attesterLastUpdateCommit: attestersCommit,
             validatorLatest: ValidatorAttr({
-                active: true,
                 removed: false,
+                active: _isValidatorActive,
                 weight: _validatorWeight,
                 pubKey: _validatorPubKey,
                 proofOfPossession: _validatorPoP
@@ -111,19 +115,21 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         emit NodeAdded({
             nodeOwner: _nodeOwner,
+            isValidatorActive: _isValidatorActive,
             validatorWeight: _validatorWeight,
             validatorPubKey: _validatorPubKey,
             validatorPoP: _validatorPoP,
+            isAttesterActive: _isAttesterActive,
             attesterWeight: _attesterWeight,
             attesterPubKey: _attesterPubKey
         });
     }
 
-    /// @notice Deactivates a node, preventing it from participating in committees.
+    /// @notice Deactivates an attester, preventing it from participating in attester committees.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be inactivated.
-    function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    function deactivate_attester(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
@@ -132,17 +138,32 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         _ensureAttesterSnapshot(node);
         node.attesterLatest.active = false;
-        _ensureValidatorSnapshot(node);
-        node.validatorLatest.active = false;
 
-        emit NodeDeactivated(_nodeOwner);
+        emit AttesterDeactivated(_nodeOwner);
     }
 
-    /// @notice Activates a previously inactive node, allowing it to participate in committees.
+    /// @notice Deactivates a validator, preventing it from participating in validator committees.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
+    /// @param _nodeOwner The address of the node's owner to be inactivated.
+    function deactivate_validator(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+        _verifyNodeOwnerExists(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
+        if (deleted) {
+            return;
+        }
+    
+        _ensureValidatorSnapshot(node);
+        node.validatorLatest.active = false;
+    
+        emit ValidatorDeactivated(_nodeOwner);
+    }
+
+    /// @notice Activates a previously inactive attester, allowing it to participate in attester committees.
+    /// @dev Only callable by the contract owner.
+    /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be activated.
-    function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    function activate_attester(address _nodeOwner) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
@@ -151,10 +172,25 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         _ensureAttesterSnapshot(node);
         node.attesterLatest.active = true;
+
+        emit AttesterActivated(_nodeOwner);
+    }
+
+    /// @notice Activates a previously inactive validator, allowing it to participate in validator committees.
+    /// @dev Only callable by the contract owner.
+    /// @dev Verifies that the node owner exists in the registry.
+    /// @param _nodeOwner The address of the node's owner to be activated.
+    function activate_validator(address _nodeOwner) external onlyOwner {
+        _verifyNodeOwnerExists(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
+        if (deleted) {
+            return;
+        }
+
         _ensureValidatorSnapshot(node);
         node.validatorLatest.active = true;
 
-        emit NodeActivated(_nodeOwner);
+        emit ValidatorActivated(_nodeOwner);
     }
 
     /// @notice Removes a node from the registry.
