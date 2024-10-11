@@ -129,8 +129,8 @@
     "contractName": "Modexp",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/Modexp.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/Modexp.yul",
-    "bytecodeHash": "0x010000274b0369cca5c3da51e5423de7b3ea2f28e9d07c845d17bb4f455ee69e",
-    "sourceCodeHash": "0xbb10ec77d40fc4c91a60ae46fb9829cd72c20523a467e541c7ceb07f5ec8e0a2"
+    "bytecodeHash": "0x010000252b89097c0d9d2eb844f66bf556bb39b04642477e8242ea2142ff50af",
+    "sourceCodeHash": "0xd67e5b4b168ecf4b9b9734ed1245034bcc902cf44583b45d68c61e9cbc7126a5"
   },
   {
     "contractName": "EcAdd",

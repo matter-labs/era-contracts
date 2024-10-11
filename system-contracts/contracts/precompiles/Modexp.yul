@@ -105,24 +105,20 @@ object "Modexp" {
                 0,                                  // input offset in words
                 div(precompileInputBytes, 32),      // input length in words
                 0,                                  // output offset in words
-                div(MAX_MOD_BYTES_SUPPORTED(), 32),   // output length in words 
+                div(MAX_MOD_BYTES_SUPPORTED(), 32), // output length in words 
                 0                                   // circuit doesn't check this value
             )
 
             let gasToPay := MODEXP_GAS_COST() // TODO (?): make dynamic gas calculation
             let success := precompileCall(precompileParams, gasToPay)
-            let internalSuccess := mload(0)
 
-            switch and(success, internalSuccess)
-            case 0 {
-                return(0, 0)
+            if iszero(success) {
+                revert(0, 0)
             }
-            default {
-                // To achieve homogeneity of the circuit, we always return the max supported bytes of the modulus (e.g. 256).
-                // It is assumed to be right-padded with zeros, thus we simply cut the modLen part to conform the specification.
-                // See: https://eips.ethereum.org/EIPS/eip-198.
-                return(32, modLen)
-            }
+            // To achieve homogeneity of the circuit, we always return the max supported bytes of the modulus (e.g. 256).
+            // It is assumed to be right-padded with zeros, thus we simply cut the modLen part to conform the specification.
+            // See: https://eips.ethereum.org/EIPS/eip-198.
+            return(0, modLen)
         }
     }
 }
