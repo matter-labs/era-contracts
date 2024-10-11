@@ -354,6 +354,15 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         canonicalTxHash = _requestL2Transaction(params);
     }
 
+    function requestXL2TransactionOnL1(
+        BridgehubL2TransactionRequest calldata _request
+    ) external returns (bytes32 canonicalTxHash) {
+        WritePriorityOpParams memory params;
+        params.request = _request;
+
+        canonicalTxHash = _requestL2Transaction(params);
+    }
+
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 

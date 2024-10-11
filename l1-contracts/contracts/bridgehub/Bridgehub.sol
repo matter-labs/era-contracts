@@ -618,7 +618,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 reservedDynamic: new bytes(0)
             });
             /// Fixme this does not have a unique hash atm.
-            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
+            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(_request)); //kl todo it should be transaction not _request
             // solhint-disable-next-line func-named-parameters
             emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
         }

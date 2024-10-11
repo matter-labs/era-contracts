@@ -350,7 +350,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
         // (ProofData memory proofData ) = abi.decode(_proofData, (ProofData));
         // kl todo verify the proof here, get return values
         // emit TestEvent(_proofData);
-        (uint256 chainId) = abi.decode(_proofData, (uint256));
+        uint256 chainId = abi.decode(_proofData, (uint256));
         // (uint256 chainId, uint256 batchNumber, uint256 leafProofMask) = abi.decode(_proofData, (uint256, uint256, uint256));
         // (uint256 chainId, uint256 batchNumber, uint256 leafProofMask, bytes32 leaf) = abi.decode(
         //     _proofData,

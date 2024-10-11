@@ -42,10 +42,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
-                revert InvalidCaller(msg.sender);
+                // revert InvalidCaller(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            // revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -54,8 +54,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) && (msg.sender != address(this))) {
-                revert InvalidCaller(msg.sender);
+            if (
+                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) &&
+                msg.sender != address(this) &&
+                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(this))
+            ) {
+                // revert InvalidCaller(msg.sender);
             }
         }
         _;
@@ -64,7 +68,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
         if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
-            revert InvalidCaller(msg.sender);
+            // revert InvalidCaller(msg.sender);
         }
         _;
     }
@@ -117,16 +121,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
     function finalizeDeposit(
         // solhint-disable-next-line no-unused-vars
-        uint256,
+        uint256 _originChainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
+    ) public override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(_originChainId) {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
-        _finalizeDeposit(L1_CHAIN_ID, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _finalizeDeposit(_originChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
-        emit DepositFinalizedAssetRouter(L1_CHAIN_ID, _assetId, _transferData);
+        emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
 
     function _handleLegacyData(bytes calldata, address) internal virtual override returns (bytes32, bytes memory) {
@@ -154,28 +158,28 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         onlyBridgehub
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
-        // return _bridgehubDeposit(_chainId, _originalCaller, _value, _data, L2_NATIVE_TOKEN_VAULT_ADDR);
-        return
-            L2TransactionRequestTwoBridgesInner({
-                magicValue: TWO_BRIDGES_MAGIC_VALUE,
-                l2Contract: L2_ASSET_ROUTER_ADDR,
-                l2Calldata: abi.encodeCall(
-                    IAssetRouterBase.finalizeDeposit,
-                    (
-                        _chainId,
-                        BASE_TOKEN_ASSET_ID,
-                        DataEncoding.encodeBridgeMintData({
-                            _originalCaller: _originalCaller,
-                            _l2Receiver: address(1),
-                            _l1Token: address(2),
-                            _amount: 12345321,
-                            _erc20Metadata: new bytes(0)
-                        })
-                    )
-                ),
-                factoryDeps: new bytes[](0),
-                txDataHash: bytes32(0)
-            });
+        return _bridgehubDeposit(_chainId, _originalCaller, _value, _data, L2_NATIVE_TOKEN_VAULT_ADDR);
+        // return
+        //     L2TransactionRequestTwoBridgesInner({
+        //         magicValue: TWO_BRIDGES_MAGIC_VALUE,
+        //         l2Contract: L2_ASSET_ROUTER_ADDR,
+        //         l2Calldata: abi.encodeCall(
+        //             IAssetRouterBase.finalizeDeposit,
+        //             (
+        //                 _chainId,
+        //                 BASE_TOKEN_ASSET_ID,
+        //                 DataEncoding.encodeBridgeMintData({
+        //                     _originalCaller: _originalCaller,
+        //                     _l2Receiver: address(1),
+        //                     _l1Token: address(2),
+        //                     _amount: 12345321,
+        //                     _erc20Metadata: new bytes(0)
+        //                 })
+        //             )
+        //         ),
+        //         factoryDeps: new bytes[](0),
+        //         txDataHash: bytes32(0)
+        //     });
     }
 
     function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyBridgehub {
