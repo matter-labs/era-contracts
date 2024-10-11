@@ -19,18 +19,6 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.8'
-
-      - name: Create virtual environment
-        run: python -m venv venv
-
-      - name: Activate virtual environment and install dependencies
-        run: |
-          source venv/bin/activate
-
       - name: pip cache
         uses: actions/cache@v4
         with:
