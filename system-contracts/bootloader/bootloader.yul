@@ -940,7 +940,7 @@ object "Bootloader" {
                     64
                 )
                 debugLog("kl todo", sub(mload(merkleProofPtr), 28))
-
+                mstore(add(merkleProofPtr, 32), 0)
                 // if iszero(success) {
                 //     revertWithReason(
                 //         VERIFY_XL2_TX_FAILED_ERR_CODE(),
