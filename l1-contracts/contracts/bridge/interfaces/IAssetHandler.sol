@@ -7,9 +7,6 @@ pragma solidity 0.8.24;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Used for any asset handler and called by the AssetRouter
 interface IAssetHandler {
-    /// @dev Emitted when a new token is initialized
-    event BridgeInitialize(address indexed token, string name, string symbol, uint8 decimals);
-
     /// @dev Emitted when a token is minted
     event BridgeMint(uint256 indexed chainId, bytes32 indexed assetId, address receiver, uint256 amount);
 

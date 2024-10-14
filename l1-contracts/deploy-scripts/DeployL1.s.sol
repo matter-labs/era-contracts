@@ -405,7 +405,6 @@ contract DeployL1Script is Script, DeployUtils {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
-                config.eraChainId,
                 addresses.bridges.l1NullifierProxy
             )
         );

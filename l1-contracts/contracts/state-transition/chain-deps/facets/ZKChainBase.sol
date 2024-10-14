@@ -55,13 +55,6 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyValidatorOrChainTypeManager() {
-        if (!s.validators[msg.sender] && msg.sender != s.chainTypeManager) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     function _getTotalPriorityTxs() internal view returns (uint256) {
         if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
             return s.priorityTree.getTotalPriorityTxs();

@@ -294,7 +294,7 @@ contract DeployUtils is Script {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         address contractAddress = deployViaCreate2(
             type(ValidatorTimelock).creationCode,
-            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
+            abi.encode(config.deployerAddress, executionDelay)
         );
         console.log("ValidatorTimelock deployed at:", contractAddress);
         addresses.validatorTimelock = contractAddress;
