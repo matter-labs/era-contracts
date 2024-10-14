@@ -32,13 +32,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
     /// @dev The address of the L1 asset router counterpart.
-    address public override l1AssetRouter;
+    address public immutable override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
+            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
@@ -51,7 +51,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) && (msg.sender != address(this))) {
+            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
                 revert InvalidCaller(msg.sender);
             }
         }
@@ -79,7 +79,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
-        l1AssetRouter = _l1AssetRouter;
+        L1_ASSET_ROUTER = _l1AssetRouter;
         assetHandlerAddress[_baseTokenAssetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
@@ -278,6 +278,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @notice Returns the address of the L1 asset router.
     /// @dev The old name is kept for backward compatibility.
     function l1Bridge() external view returns (address) {
-        return l1AssetRouter;
+        return L1_ASSET_ROUTER;
     }
 }
