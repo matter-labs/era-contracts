@@ -139,13 +139,13 @@ interface IConsensusRegistry {
         Secp256k1PublicKey calldata _attesterPubKey
     ) external;
 
-    function deactivate_attester(address _nodeOwner) external;
+    function deactivateAttester(address _nodeOwner) external;
 
-    function deactivate_validator(address _nodeOwner) external;
+    function deactivateValidator(address _nodeOwner) external;
 
-    function activate_attester(address _nodeOwner) external;
+    function activateAttester(address _nodeOwner) external;
 
-    function activate_validator(address _nodeOwner) external;
+    function activateValidator(address _nodeOwner) external;
 
     function remove(address _nodeOwner) external;
 

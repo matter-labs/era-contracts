@@ -129,7 +129,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be inactivated.
-    function deactivate_attester(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    function deactivateAttester(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
@@ -146,7 +146,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be inactivated.
-    function deactivate_validator(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    function deactivateValidator(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
@@ -163,7 +163,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be activated.
-    function activate_attester(address _nodeOwner) external onlyOwner {
+    function activateAttester(address _nodeOwner) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
@@ -180,7 +180,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be activated.
-    function activate_validator(address _nodeOwner) external onlyOwner {
+    function activateValidator(address _nodeOwner) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
