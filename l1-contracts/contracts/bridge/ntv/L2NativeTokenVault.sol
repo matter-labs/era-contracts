@@ -37,6 +37,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     bytes32 internal l2TokenProxyBytecodeHash;
 
     /// @notice Initializes the bridge contract for later use.
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy. 
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
