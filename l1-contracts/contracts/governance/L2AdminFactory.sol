@@ -29,6 +29,8 @@ contract L2AdminFactory {
     /// @notice Deploys a new L2 admin contract.
     /// @return admin The address of the deployed admin contract.
     function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
+        // Even though the chain admin will likely perform similar checks, 
+        // we keep those here just in case, since it is not expensive, while allowing to fail fast.
         _validateRestrctions(_additionalRestrictions);
         address[] memory restrictions = new address[](requiredRestrictions.length + _additionalRestrictions.length);
         uint256 cachedRequired = requiredRestrictions.length;
@@ -43,6 +45,9 @@ contract L2AdminFactory {
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
     }
 
+    /// @notice Checks that the provided list of restrictions is correct.
+    /// @param _restrictions List of the restrictions to check.
+    /// @dev In case either of the restrictions is not correct, the function reverts.
     function _validateRestrctions(address[] memory _restrictions) internal view {
         unchecked {
             uint256 length = _restrictions.length;
