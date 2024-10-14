@@ -11,7 +11,7 @@ import { IRestriction, RESTRICTION_MAGIC } from "./IRestriction.sol";
 /// @notice The library which validates whether an address can be a valid restriction
 library RestrictionValidator {
     /// @notice Ensures that the provided address implements the restriction interface
-    /// @dev Note that it *cna not guarantee* that the corresponding address indeed implements
+    /// @dev Note that it *can not guarantee* that the corresponding address indeed implements
     /// the interface completely or that it is implemented correctly. It is mainly used to 
     /// ensure that invalid restrictions can not be accidentally added. 
     function validateRestriction(address _restriction) internal view {
