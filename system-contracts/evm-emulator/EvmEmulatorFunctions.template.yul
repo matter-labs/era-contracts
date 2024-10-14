@@ -1098,8 +1098,6 @@ function _fetchConstructorReturnGas() -> gasLeft {
 }
 
 function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr {
-    pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
-
     _eraseReturndataPointer()
 
     let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
