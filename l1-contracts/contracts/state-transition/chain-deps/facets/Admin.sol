@@ -320,7 +320,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             );
             require(_contractAlreadyDeployed, "Af: contract not deployed");
             require(s.settlementLayer != address(0), "Af: not migrated");
-            s.priorityTree.checkL1Reinit(_commitment.priorityTree);
+            s.priorityTree.l1Reinit(_commitment.priorityTree);
         } else if (_contractAlreadyDeployed) {
             require(s.settlementLayer != address(0), "Af: not migrated 2");
             s.priorityTree.checkGWReinit(_commitment.priorityTree);
