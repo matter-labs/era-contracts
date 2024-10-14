@@ -204,8 +204,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev This function is part of the upgrade process used to nullify chain balances once they are credited to NTV.
     /// @param _chainId The ID of the ZK chain.
     /// @param _token The address of the token which was previously deposit to shared bridge.
-    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
-        require(msg.sender == address(l1NativeTokenVault), "L1N: not NTV");
+    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external onlyL1NTV {
         __DEPRECATED_chainBalance[_chainId][_token] = 0;
     }
 
