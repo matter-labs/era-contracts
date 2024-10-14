@@ -28,7 +28,7 @@ contract L2AdminFactory {
 
     /// @notice Deploys a new L2 admin contract.
     /// @return admin The address of the deployed admin contract.
-    function deployAdmin(address[] calldata _additionalRestrictions, bytes32 _salt) external returns (address admin) {
+    function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
         _validateZeroAddress(_additionalRestrictions);
 
         address[] memory restrictions = new address[](requiredRestrictions.length + _additionalRestrictions.length);
