@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed, NotBridgehub, InvalidSelector, InvalidAddress, NotEnoughGas} from "../common/L1ContractErrors.sol";
+import {CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -268,8 +268,6 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
                 chainId := mload(0)
             }
         }
-
-        return (chainId, success);
     }
 
     /// @notice Tries to get the new admin from the migration.
