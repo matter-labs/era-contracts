@@ -27,7 +27,7 @@ import {MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLeg
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1<->L2 communication,
+/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains

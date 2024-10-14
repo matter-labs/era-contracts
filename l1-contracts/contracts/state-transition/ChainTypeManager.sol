@@ -357,7 +357,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             return getZKChain(_chainId);
         }
 
-        // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
         {
@@ -437,7 +436,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
         require(_newSettlementLayerChainId != 0, "Bad chain id");
 
-        // Currently, we require that the sync layer is deployed by the same CTM.
         require(getZKChain(_newSettlementLayerChainId) != address(0), "CTM: sync layer not registered");
 
         IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);

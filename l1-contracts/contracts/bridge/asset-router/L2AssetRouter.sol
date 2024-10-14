@@ -128,17 +128,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /*//////////////////////////////////////////////////////////////
-                     Internal & Helpers
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc AssetRouterBase
-    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
-        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        nativeTokenVault.ensureTokenIsRegistered(_token);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            LEGACY FUNCTIONS
+                            INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -158,6 +148,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         }
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
         return _withdrawSender(assetId, _assetData, msg.sender, true);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     Internal & Helpers
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc AssetRouterBase
+    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        nativeTokenVault.ensureTokenIsRegistered(_token);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -221,6 +221,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            LEGACY FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Legacy finalizeDeposit.
     /// @dev Finalizes the deposit and mint funds.

@@ -25,7 +25,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the bridgehub.
