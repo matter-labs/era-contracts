@@ -38,5 +38,7 @@ contract L2AdminFactory {
         }
 
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
+
+        emit AdminDeployed(admin);
     }
 }
