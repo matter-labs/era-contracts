@@ -206,6 +206,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         address bridgedToken = tokenAddress[_assetId];
         IBridgedStandardToken(bridgedToken).bridgeBurn(_originalCaller, _amount);
+        _handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
 
         emit BridgeBurn({
             chainId: _chainId,
