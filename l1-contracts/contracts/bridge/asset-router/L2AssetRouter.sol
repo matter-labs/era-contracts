@@ -180,9 +180,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function _getAssetRouterWithdrawMessage(
         bytes32 _assetId,
         bytes memory _l1bridgeMintData
-    ) internal pure returns (bytes memory) {
+    ) internal view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, _assetId, _l1bridgeMintData);
+        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, block.chainid, _assetId, _l1bridgeMintData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
