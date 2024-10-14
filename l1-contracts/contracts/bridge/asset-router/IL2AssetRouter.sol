@@ -28,7 +28,7 @@ interface IL2AssetRouter is IAssetRouterBase {
         bytes calldata _data
     ) external;
 
-    /// @dev Used to set the assedAddress for a given assetId.
+    /// @dev Used to set the assetHandlerAddress for a given assetId.
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetAddress) external;
 }
