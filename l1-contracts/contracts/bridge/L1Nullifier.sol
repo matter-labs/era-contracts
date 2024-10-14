@@ -582,8 +582,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             address baseToken = BRIDGE_HUB.baseToken(_chainId);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
-                _l2Receiver: l1Receiver,
-                _l1Token: baseToken,
+                _remoteReceiver: l1Receiver,
+                _originToken: baseToken,
                 _amount: amount,
                 _erc20Metadata: new bytes(0)
             });
@@ -607,8 +607,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
-                _l2Receiver: l1Receiver,
-                _l1Token: l1Token,
+                _remoteReceiver: l1Receiver,
+                _originToken: l1Token,
                 _amount: amount,
                 _erc20Metadata: new bytes(0)
             });

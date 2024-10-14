@@ -331,10 +331,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert CTMNotRegistered();
         }
 
-        bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
-        ctmAssetIdToAddress[assetInfo] = _assetAddress;
-        ctmAssetIdFromAddress[_assetAddress] = assetInfo;
-        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
+        bytes32 ctmAssetId = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
+        ctmAssetIdToAddress[ctmAssetId] = _assetAddress;
+        ctmAssetIdFromAddress[_assetAddress] = ctmAssetId;
+        emit AssetRegistered(ctmAssetId, _assetAddress, _additionalData, msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////

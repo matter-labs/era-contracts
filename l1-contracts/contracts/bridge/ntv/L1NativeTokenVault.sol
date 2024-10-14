@@ -230,9 +230,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
-        address _l1Token
+        address _nonNativeToken
     ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
+        bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         return
             Create2.computeAddress(
                 salt,
