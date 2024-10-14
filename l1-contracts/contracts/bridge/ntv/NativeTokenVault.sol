@@ -224,8 +224,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
-            _l2Receiver: _receiver,
-            _l1Token: originToken,
+            _remoteReceiver: _receiver,
+            _originToken: originToken,
             _amount: _amount,
             _erc20Metadata: erc20Metadata
         });
@@ -280,8 +280,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
-            _l2Receiver: _receiver,
-            _l1Token: nativeToken,
+            _remoteReceiver: _receiver,
+            _originToken: nativeToken,
             _amount: amount,
             _erc20Metadata: erc20Metadata
         });
