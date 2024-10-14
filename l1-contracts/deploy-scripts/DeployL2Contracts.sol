@@ -304,11 +304,9 @@ contract DeployL2Script is Script {
     }
 
     function deployTimestampAsserter() internal {
-        bytes memory constructorData = "";
-
         config.timestampAsserter = Utils.deployThroughL1({
             bytecode: contracts.timestampAsserterBytecode,
-            constructorargs: constructorData,
+            constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: new bytes[](0),
