@@ -20,6 +20,13 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
+    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
+    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
+
+    /// @notice The set of active restrictions.
+    EnumerableSet.AddressSet internal activeRestrictions;
+
     /// @notice Ensures that only the `ChainAdmin` contract itself can call the function.
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
     /// should be implemented in the restriction contracts.
@@ -37,13 +44,6 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
             }
         }
     }
-
-    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
-    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
-    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
-
-    /// @notice The set of active restrictions.
-    EnumerableSet.AddressSet internal activeRestrictions;
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() public view returns (address[] memory) {
