@@ -229,7 +229,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Used for the upgrade to set the baseTokenAssetId previously stored as baseToken.
     /// @param _chainId the chainId of the chain.
     function setLegacyBaseTokenAssetId(uint256 _chainId) external override {
-        if (baseTokenAssetId[_chainId] == bytes32(0)) {
+        if (baseTokenAssetId[_chainId] != bytes32(0)) {
             return;
         }
         address token = __DEPRECATED_baseToken[_chainId];
