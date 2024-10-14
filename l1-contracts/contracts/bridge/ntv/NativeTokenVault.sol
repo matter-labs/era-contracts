@@ -445,7 +445,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @param _l1Token The address of token on L1.
     /// @return salt The salt used to compute address of bridged token on L2 and for beacon proxy deployment.
     function _getCreate2Salt(uint256 _originChainId, address _l1Token) internal view virtual returns (bytes32 salt) {
-        salt = keccak256(abi.encode(_originChainId, _l1Token)); 
+        salt = keccak256(abi.encode(_originChainId, _l1Token));
     }
 
     /// @notice Deploys the beacon proxy for the bridged token.
