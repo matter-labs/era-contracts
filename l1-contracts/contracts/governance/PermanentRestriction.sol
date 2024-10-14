@@ -243,10 +243,8 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @param _chain The address of the potential chain
     /// @return Returns a tuple of of the chainId and whether the call was successful.
     /// If the second item is `false`, the caller should ignore the first value. 
-    function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256, bool) {
+    function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;
-        bool success;
-        uint256 chainId;
         assembly {
             // We use scratch space here, so it is safe
             mstore(0, selector)
