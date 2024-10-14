@@ -115,14 +115,10 @@ error EmptyBytes32();
 error EmptyDeposit();
 // 0x627e0872
 error ETHDepositNotSupported();
-//
-error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0x79e12cc3
 error FacetIsFrozen(bytes4 func);
-///
-error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x6d4a7df8
@@ -139,8 +135,6 @@ error HashedLogIsDefault();
 error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xb615c2b1
 error ZKChainLimitReached();
-//
-error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x826fb11e
@@ -155,8 +149,6 @@ error InvalidChainId();
 error InvalidDelay();
 // 0x0af806e0
 error InvalidHash();
-//
-error InvalidInput();
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0xd8e9405c
@@ -293,8 +285,6 @@ error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
 error ProtocolVersionTooSmall();
 // 0x53dee67b
 error PubdataCommitmentsEmpty();
-// 0x7734c31a
-error PubdataCommitmentsTooBig();
 // 0x959f26fb
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x2a4a14df
@@ -363,14 +353,10 @@ error UndefinedDiamondCutAction();
 error UnexpectedNumberOfFactoryDeps();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
-//
-error UnimplementedMessage(string);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
 // 0x084a1449
 error UnsupportedEncodingVersion();
-//
-error UnsupportedPaymasterFlow();
 // 0x47b3b145
 error ValidateTxnNotEnoughGas();
 // 0x626ade30

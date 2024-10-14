@@ -11,7 +11,7 @@ import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecuto
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {BLS_MODULUS} from "da-contracts/DAUtils.sol";
-import {TimeNotReached, BatchNumberMismatch, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, PubdataCommitmentsEmpty, L2TimestampTooBig, EmptyBlobVersionHash, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs, InvalidPubdataLength, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "contracts/common/L1ContractErrors.sol";
+import {TimeNotReached, BatchNumberMismatch, InvalidPubdataCommitmentsSize, PubdataCommitmentsEmpty, L2TimestampTooBig, EmptyBlobVersionHash, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs, InvalidPubdataLength, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "contracts/common/L1ContractErrors.sol";
 
 contract CommittingTest is ExecutorTest {
     bytes32[] defaultBlobVersionedHashes;
