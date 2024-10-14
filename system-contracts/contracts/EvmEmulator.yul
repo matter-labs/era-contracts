@@ -1239,8 +1239,6 @@ object "EvmEmulator" {
             let gasUsed := sub(gasForTheCall, gasLeft)
             evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
         
-            pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
-        
             let back
         
             // skipping check since we pushed exactly 4 items earlier
@@ -2892,6 +2890,8 @@ object "EvmEmulator" {
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
 
+        pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
+        
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
         if isStatic {
@@ -4072,8 +4072,6 @@ object "EvmEmulator" {
             
                 let gasUsed := sub(gasForTheCall, gasLeft)
                 evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
-            
-                pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
             
                 let back
             

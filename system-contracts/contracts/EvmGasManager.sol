@@ -50,7 +50,7 @@ contract EvmGasManager {
                     // This error should never happen
                     revert(0, 0)
                 }
-
+                
                 rawCodeHash := mload(0)
             }
 
@@ -161,12 +161,10 @@ contract EvmGasManager {
                 tstore(EVM_AUX_DATA_SLOT, 0) // mark as consumed
             }
         } else {
-            // add sender and tx.origin to the warm accounts
+            // add sender to the warm accounts
             uint256 is_sender_warm_tslot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(msg.sender));
-            uint256 is_origin_warm_tslot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(tx.origin));
             assembly {
                 tstore(is_sender_warm_tslot, 1)
-                tstore(is_origin_warm_tslot, 1)
             }
         }
 
