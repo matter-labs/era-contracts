@@ -97,10 +97,8 @@ interface IConsensusRegistry {
     error UnauthorizedOnlyOwnerOrNodeOwner();
     error NodeOwnerExists();
     error NodeOwnerDoesNotExist();
-    error NodeOwnerNotFound();
     error ValidatorPubKeyExists();
     error AttesterPubKeyExists();
-    error InvalidInputNodeOwnerAddress();
     error InvalidInputBLS12_381PublicKey();
     error InvalidInputBLS12_381Signature();
     error InvalidInputSecp256k1PublicKey();
