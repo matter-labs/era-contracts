@@ -5,7 +5,6 @@ pragma solidity 0.8.24;
 // solhint-disable reason-string, gas-custom-errors
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
@@ -21,7 +20,7 @@ bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
-contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
