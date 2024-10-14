@@ -58,6 +58,10 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         L2_ADMIN_FACTORY = _l2AdminFactory;
     }
 
+    /// @notice The initialization function for the proxy contract.
+    /// @param _initialOwner The initial owner of the permanent restriction.
+    /// @dev Expected to be delegatecalled by the `TransparentUpgradableProxy`
+    /// upon initialization.
     function initialize(address _initialOwner) external initializer {
         // solhint-disable-next-line gas-custom-errors, reason-string
         if (_initialOwner == address(0)) {
