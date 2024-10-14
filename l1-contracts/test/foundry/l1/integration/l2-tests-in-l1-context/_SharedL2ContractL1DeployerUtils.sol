@@ -89,7 +89,6 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         );
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
-        stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
 
         stdstore
             .target(L2_ASSET_ROUTER_ADDR)
