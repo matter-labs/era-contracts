@@ -129,7 +129,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @param _call The call data.
     /// @dev Note that we do not need to validate the migration to the L1 layer as the admin
     /// is not changed in this case.
-    function _validateMigrationToL2(Call calldata _call) internal view {
+    function _validateMigrationToL2(Call calldata _call) private view {
         _ensureEnoughGas();
         try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
             if (!allowedL2Admins[admin]) {
@@ -142,7 +142,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
     /// @notice Validates the call as the chain admin
     /// @param _call The call data.
-    function _validateAsChainAdmin(Call calldata _call) internal view {
+    function _validateAsChainAdmin(Call calldata _call) private view {
         if (!_isAdminOfAChain(_call.target)) {
             // We only validate calls related to being an admin of a chain
             return;
@@ -174,7 +174,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Validates the correctness of the new admin.
     /// @param _call The call data.
     /// @dev Ensures that the admin has a whitelisted implementation and does not remove this restriction.
-    function _validateNewAdmin(Call calldata _call) internal view {
+    function _validateNewAdmin(Call calldata _call) private view {
         address newChainAdmin = abi.decode(_call.data[4:], (address));
 
         bytes32 implementationCodeHash = newChainAdmin.codehash;
@@ -193,7 +193,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Validates the removal of the restriction.
     /// @param _call The call data.
     /// @dev Ensures that this restriction is not removed.
-    function _validateRemoveRestriction(Call calldata _call) internal view {
+    function _validateRemoveRestriction(Call calldata _call) private view {
         if (_call.target != msg.sender) {
             return;
         }
@@ -211,7 +211,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
     /// @param _chain The address of the chain.
-    function _isAdminOfAChain(address _chain) internal view returns (bool) {
+    function _isAdminOfAChain(address _chain) private view returns (bool) {
         _ensureEnoughGas();
         (bool success, ) = address(this).staticcall(abi.encodeCall(this.tryCompareAdminOfAChain, (_chain, msg.sender)));
         return success;
@@ -303,7 +303,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         return l2Admin;
     }
 
-    function _ensureEnoughGas() internal view {
+    function _ensureEnoughGas() private view {
         if (gasleft() < MIN_GAS_FOR_FALLABLE_CALL) {
             revert NotEnoughGas();
         }
