@@ -100,7 +100,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         nativeTokenVault = msg.sender;
 
         // We parse the data exactly as they were created on the L1 bridge
-        (uint256, bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = DataEncoding
+        (, bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = DataEncoding
             .decodeTokenData(_data);
 
         ERC20Getters memory getters;

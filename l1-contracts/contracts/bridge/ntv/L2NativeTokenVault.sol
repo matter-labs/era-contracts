@@ -142,7 +142,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
 
         tokenAddress[_assetId] = _expectedToken;
-        assetId[expectedToken] = _assetId;
+        assetId[_expectedToken] = _assetId;
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract or the legacy shared bridge.

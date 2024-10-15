@@ -98,7 +98,7 @@ library PriorityTree {
     }
 
     /// @notice Reinitialize the tree from a commitment on L1.
-    function l1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal view {
+    function l1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         require(_tree.startIndex == _commitment.startIndex, "PT: invalid start index");
         require(_tree.unprocessedIndex <= _commitment.unprocessedIndex, "PT: invalid unprocessed index");
         require(_tree.tree._nextLeafIndex >= _commitment.nextLeafIndex, "PT: invalid next leaf index");
