@@ -107,13 +107,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlyChainCTM(uint256 _chainId) {
-        if (msg.sender != chainTypeManager[_chainId]) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert Unauthorized(msg.sender);
