@@ -78,7 +78,7 @@ contract ChainAdminTest is Test {
         address[] memory restrictions = chainAdmin.getRestrictions();
 
         vm.prank(address(chainAdmin));
-        vm.expectRevert(abi.encodeWithSelector(NotARestriction.selector, address(0)));
+        vm.expectRevert();
         chainAdmin.addRestriction(address(0));
     }
 

@@ -15,6 +15,9 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
 
+/// @dev The encoding version of the data.
+bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
@@ -24,9 +27,6 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
-
-    /// @dev The encoding version of the data.
-    bytes1 internal constant ENCODING_VERSION = 0x01;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -93,7 +93,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
         require(_originalCaller == owner(), "CTMDT: not owner");
         bytes1 encodingVersion = _data[0];
-        require(encodingVersion == ENCODING_VERSION, "CTMDT: wrong encoding version");
+        require(encodingVersion == CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION, "CTMDT: wrong encoding version");
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
         request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
@@ -115,7 +115,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "CTMDT: wrong counter part");
     }
 
-    function getAssetId(address _l1CTM) public view override returns (bytes32) {
+    function calculateAssetId(address _l1CTM) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1CTM)))));
     }
 

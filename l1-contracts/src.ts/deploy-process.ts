@@ -128,6 +128,7 @@ export async function registerZKChain(
     false,
     null,
     chainId,
-    useGovernance
+    useGovernance,
+    true
   );
 }

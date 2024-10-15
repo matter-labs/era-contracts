@@ -18,7 +18,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -85,6 +85,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev asset info used to identify chains in the Shared Bridge
     mapping(bytes32 ctmAssetId => address ctmAddress) public ctmAssetIdToAddress;
+
+    /// @dev ctmAddress to ctmAssetId
+    mapping(address ctmAddress => bytes32 ctmAssetId) public ctmAssetIdFromAddress;
 
     /// @dev used to indicate the currently active settlement layer for a given chainId
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
@@ -154,14 +157,24 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
-        whitelistedSettlementLayers[_l1ChainId] = true;
+        _initializeInner();
     }
 
     /// @notice used to initialize the contract
     /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
     /// @param _owner the owner of the contract
-    function initialize(address _owner) external reentrancyGuardInitializer {
+    function initialize(address _owner) external reentrancyGuardInitializer onlyL1 {
         _transferOwnership(_owner);
+        _initializeInner();
+    }
+
+    /// @notice Used to initialize the contract on L1
+    function initializeV2() external initializer onlyL1 {
+        _initializeInner();
+    }
+
+    /// @notice Initializes the contract
+    function _initializeInner() internal {
         assetIdIsRegistered[ETH_TOKEN_ASSET_ID] = true;
         whitelistedSettlementLayers[L1_CHAIN_ID] = true;
     }
@@ -320,6 +333,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
         ctmAssetIdToAddress[assetInfo] = _assetAddress;
+        ctmAssetIdFromAddress[_assetAddress] = assetInfo;
         emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
     }
 
@@ -356,7 +370,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
-            _assetRouter: assetRouter,
             _admin: _admin,
             _initData: _initData,
             _factoryDeps: _factoryDeps
@@ -422,10 +435,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (ctmAddress == address(0)) {
             revert ChainIdNotRegistered(_chainId);
         }
-        return ctmAssetId(chainTypeManager[_chainId]);
+        return ctmAssetIdFromAddress[chainTypeManager[_chainId]];
     }
 
-    function ctmAssetId(address _ctmAddress) public view override returns (bytes32) {
+    function calculateCtmAssetId(address _ctmAddress) internal view returns (bytes32) {
         return keccak256(abi.encode(L1_CHAIN_ID, address(l1CtmDeployer), bytes32(uint256(uint160(_ctmAddress)))));
     }
 
@@ -700,7 +713,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             bridgehubData.ctmData
         );
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
-            zkChainMap.get(_settlementChainId),
+            _settlementChainId == L1_CHAIN_ID
+                ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
+                : zkChainMap.get(_settlementChainId),
             _originalCaller,
             bridgehubData.chainData
         );
