@@ -15,27 +15,27 @@ import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
 library DataEncoding {
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
     /// @param _originalCaller The address which initiated the transfer.
-    /// @param _l2Receiver The address which to receive tokens on remote chain.
-    /// @param _l1Token The transferred token address.
+    /// @param _remoteReceiver The address which to receive tokens on remote chain.
+    /// @param _originToken The transferred token address.
     /// @param _amount The amount of token to be transferred.
     /// @param _erc20Metadata The transferred token metadata.
     /// @return The encoded bridgeMint data
     function encodeBridgeMintData(
         address _originalCaller,
-        address _l2Receiver,
-        address _l1Token,
+        address _remoteReceiver,
+        address _originToken,
         uint256 _amount,
         bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encode(_originalCaller, _l2Receiver, _l1Token, _amount, _erc20Metadata);
+        return abi.encode(_originalCaller, _remoteReceiver, _originToken, _amount, _erc20Metadata);
     }
 
     /// @notice Function decoding transfer data previously encoded with this library.
     /// @param _bridgeMintData The encoded bridgeMint data
     /// @return _originalCaller The address which initiated the transfer.
-    /// @return _l2Receiver The address which to receive tokens on remote chain.
-    /// @return _parsedL1Token The transferred token address.
+    /// @return _remoteReceiver The address which to receive tokens on remote chain.
+    /// @return _parsedOriginToken The transferred token address.
     /// @return _amount The amount of token to be transferred.
     /// @return _erc20Metadata The transferred token metadata.
     function decodeBridgeMintData(
@@ -45,13 +45,13 @@ library DataEncoding {
         pure
         returns (
             address _originalCaller,
-            address _l2Receiver,
-            address _parsedL1Token,
+            address _remoteReceiver,
+            address _parsedOriginToken,
             uint256 _amount,
             bytes memory _erc20Metadata
         )
     {
-        (_originalCaller, _l2Receiver, _parsedL1Token, _amount, _erc20Metadata) = abi.decode(
+        (_originalCaller, _remoteReceiver, _parsedOriginToken, _amount, _erc20Metadata) = abi.decode(
             _bridgeMintData,
             (address, address, address, uint256, bytes)
         );
