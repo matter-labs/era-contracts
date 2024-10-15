@@ -377,7 +377,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         // Do the transfer if allowance to Shared bridge is bigger than amount
         // And if there is not enough allowance for the NTV
-        bool _weCanTransfer = false;
+        bool weCanTransfer = false;
         if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {
            _originalCaller = address(legacyBridge);
            _weCanTransfer = true;
