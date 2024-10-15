@@ -3,8 +3,6 @@ pragma solidity ^0.8.21;
 
 // 0x53dee67b
 error PubdataCommitmentsEmpty();
-// 0x7734c31a
-error PubdataCommitmentsTooBig();
 // 0x53e6d04d
 error InvalidPubdataCommitmentsSize();
 // 0xafd53e2f
