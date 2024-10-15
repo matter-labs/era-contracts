@@ -28,6 +28,7 @@ contract L2AdminFactory {
 
     /// @notice Deploys a new L2 admin contract.
     /// @return admin The address of the deployed admin contract.
+    // solhint-disable-next-line gas-calldata-parameters
     function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
         // Even though the chain admin will likely perform similar checks, 
         // we keep those here just in case, since it is not expensive, while allowing to fail fast.
