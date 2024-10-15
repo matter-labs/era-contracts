@@ -377,10 +377,17 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         // Do the transfer if allowance to Shared bridge is bigger than amount
         // And if there is not enough allowance for the NTV
-        if (
+        bool weCanTransfer = false;
+        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {
+           _originalCaller = address(legacyBridge);
+           _weCanTransfer = true;
+        } else if (
             l1Token.allowance(_originalCaller, address(this)) >= _amount &&
             l1Token.allowance(_originalCaller, address(nativeTokenVault)) < _amount
         ) {
+            _weCanTransfer = true;
+        } 
+        if (_weCanTransfer) {
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_originalCaller, address(nativeTokenVault), _amount);
             return true;
@@ -515,7 +522,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
             ERA_CHAIN_ID,
-            keccak256(abi.encode(_originalCaller, _l1Token, _amount)),
+            DataEncoding.encodeLegacyTxDataHash(_originalCaller, _l1Token, _amount),
             txHash
         );
 
