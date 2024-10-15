@@ -87,6 +87,8 @@ error ChainIdTooBig();
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
 error DenominatorIsZero();
+// 0x138ee1a3
+error DeployingBridgedTokenForNativeToken();
 //
 error DeployFailed();
 // 0xc7c9660f
