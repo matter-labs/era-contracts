@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-length-in-loops
 
-import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IRestriction} from "./IRestriction.sol";
 import {Call} from "./Common.sol";
@@ -120,6 +120,9 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
     function _addRestriction(address _restriction) internal {
+        if (_restriction == address(0)) {
+            revert ZeroAddress();
+        }
         if (!activeRestrictions.add(_restriction)) {
             revert RestrictionWasAlreadyPresent(_restriction);
         }
