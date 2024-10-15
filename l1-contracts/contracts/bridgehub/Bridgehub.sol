@@ -764,7 +764,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external payable override onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        delete settlementLayer[bridgehubData.chainId];
+        settlementLayer[bridgehubData.chainId] = block.chainid;
 
         IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubData.chainId,
