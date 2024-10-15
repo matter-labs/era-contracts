@@ -17,12 +17,14 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
+import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed, OriginChainIdNotFound} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -94,6 +96,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Calling second time for the same token will revert.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     function transferFundsFromSharedBridge(address _token) external {
+        ensureTokenIsRegistered(_token);
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
             L1_NULLIFIER.transferTokenToNTV(_token);
@@ -116,11 +119,40 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-        uint256 nullifierChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
+        uint256 nullifierChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
         originChainId[assetId] = block.chainid;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
+    }
+
+    /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
+    /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
+    function bridgeCheckCounterpartAddress(
+        uint256,
+        bytes32,
+        address,
+        address _assetHandlerAddressOnCounterpart
+    ) external view override onlyAssetRouter {
+        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");
+    }
+
+    function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
+        uint256 chainId = originChainId[_assetId];
+        if (chainId != 0) {
+            return chainId;
+        } else {
+            address token = tokenAddress[_assetId];
+            if (token == ETH_TOKEN_ADDRESS) {
+                return block.chainid;
+            } else if (IERC20(token).balanceOf(address(this)) > 0) {
+                return block.chainid;
+            } else if (IERC20(token).balanceOf(address(L1_NULLIFIER)) > 0) {
+                return block.chainid;
+            } else {
+                return 0;
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -178,7 +210,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
             require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
         } else {
-            IERC20(l1Token).safeTransfer(_depositSender, _amount);
+            uint256 originChainId = _getOriginChainId(_assetId);
+            if (originChainId == block.chainid) {
+                IERC20(l1Token).safeTransfer(_depositSender, _amount);
+            } else if (originChainId != 0) {
+                IBridgedStandardToken(l1Token).bridgeMint(_depositSender, _amount);
+            } else {
+                revert OriginChainIdNotFound();
+            }
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }

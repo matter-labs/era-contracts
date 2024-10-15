@@ -12,7 +12,6 @@ import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 /// @param validatorTimelock address of the validator timelock that delays execution
 /// @param admin address who can manage the contract
 /// @param baseTokenAssetId asset id of the base token of the chain
-/// @param baseTokenBridge address of the L1 shared bridge contract
 /// @param storedBatchZero hash of the initial genesis batch
 /// @param verifier address of Verifier contract
 /// @param verifierParams Verifier config parameters that describes the circuit to be verified
@@ -30,7 +29,6 @@ struct InitializeData {
     address admin;
     address validatorTimelock;
     bytes32 baseTokenAssetId;
-    address baseTokenBridge;
     bytes32 storedBatchZero;
     IVerifier verifier;
     VerifierParams verifierParams;

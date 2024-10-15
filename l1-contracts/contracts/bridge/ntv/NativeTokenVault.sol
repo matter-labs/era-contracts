@@ -52,12 +52,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
+    /// @dev A mapping tokenAddress => assetId
+    mapping(address tokenAddress => bytes32 assetId) public assetId;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
@@ -90,6 +93,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         require(_nativeToken.code.length > 0, "NTV: empty token");
         _unsafeRegisterNativeToken(_nativeToken);
+    }
+
+    /// @inheritdoc INativeTokenVault
+    function ensureTokenIsRegistered(address _nativeToken) public {
+        if (assetId[_nativeToken] == bytes32(0)) {
+            _registerToken(_nativeToken);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -253,7 +263,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             }
             _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (_depositAmount != amount) {
-                revert ValueMismatch(amount, msg.value);
+                revert ValueMismatch(_depositAmount, amount);
             }
         } else {
             // The Bridgehub also checks this, but we want to be sure
@@ -320,21 +330,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         return BridgeHelper.getERC20Getters(_token, _originChainId);
     }
 
-    /// @notice Returns the parsed assetId.
-    /// @param _nativeToken The address of the token to be parsed.
-    /// @dev Shows the assetId for a given chain and token address
-    function getAssetId(uint256 _chainId, address _nativeToken) external pure override returns (bytes32) {
-        return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
-    }
-
     /// @notice Registers a native token address for the vault.
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
+        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
-        tokenAddress[assetId] = _nativeToken;
-        originChainId[assetId] = block.chainid;
+        tokenAddress[newAssetId] = _nativeToken;
+        assetId[_nativeToken] = newAssetId;
+        originChainId[newAssetId] = block.chainid;
     }
 
     function _handleChainBalanceIncrease(
@@ -413,6 +417,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
 
         tokenAddress[_assetId] = _expectedToken;
+        assetId[_expectedToken] = _assetId;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
@@ -441,7 +446,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
-        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
+        BridgedStandardERC20(address(l2Token)).bridgeInitialize(
+            _assetId,
+            _originToken,
+            _erc20Data
+        );
 
         originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);

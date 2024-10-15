@@ -76,11 +76,6 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getBaseTokenBridge() external view returns (address) {
-        return s.baseTokenBridge;
-    }
-
-    /// @inheritdoc IGetters
     function baseTokenGasPriceMultiplierNominator() external view returns (uint128) {
         return s.baseTokenGasPriceMultiplierNominator;
     }

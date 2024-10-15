@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {console2 as console} from "forge-std/console2.sol";
 
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -24,6 +25,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -79,12 +81,12 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(bridgeHub),
+            address(bridgehub),
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         uint256 chainId = eraZKChainId;
-        l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
+        l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, _tokenAddress);
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _originalCaller: ETH_TOKEN_ADDRESS,
             _l2Receiver: address(this),
@@ -152,7 +154,13 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     function test_BridgeTokenBurn() public {
         depositToL1(ETH_TOKEN_ADDRESS);
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        // setting nativeTokenVault to zero address.
         vm.store(address(bridgedToken), bytes32(uint256(207)), bytes32(0));
+        vm.mockCall(
+            address(L2_NATIVE_TOKEN_VAULT_ADDR),
+            abi.encodeWithSelector(INativeTokenVault.L1_CHAIN_ID.selector),
+            abi.encode(block.chainid)
+        );
         vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub
         bridgedToken.bridgeBurn(address(this), 100);
     }
@@ -164,7 +172,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-        bridgeHub.requestL2TransactionTwoBridges{value: 250000000000100}(
+        bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
