@@ -522,7 +522,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
             ERA_CHAIN_ID,
-            keccak256(abi.encode(_originalCaller, _l1Token, _amount)),
+            DataEncoding.encodeLegacyTxDataHash(_originalCaller, _l1Token, _amount),
             txHash
         );
 
