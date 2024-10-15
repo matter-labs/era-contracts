@@ -293,7 +293,7 @@ function consumeEvmFrame() -> passGas, isStatic, callerEVM {
         0,
         0,
         0,
-        4,
+        1,
         gas(),
         // Only rollup is supported for now
         0,
@@ -525,7 +525,7 @@ function isSlotWarm(key) -> isWarm {
     mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
     mstore(1, key)
 
-    let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+    let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
 
     if iszero(success) {
         // This error should never happen
@@ -546,7 +546,7 @@ function warmSlot(key,currentValue) -> isWarm, originalValue {
         0,
         0,
         0,
-        68,
+        65,
         gas(),
         // Only rollup is supported for now
         0,
@@ -613,7 +613,7 @@ function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
         0,
         0,
         0,
-        36,
+        32,
         gas(),
         // Only rollup is supported for now
         0,
@@ -677,7 +677,7 @@ function _pushEVMFrame(_passGas, _isStatic) {
         0,
         0,
         0,
-        68,
+        64,
         gas(),
         // Only rollup is supported for now
         0,
