@@ -188,7 +188,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             revert ETHDepositNotSupported();
         }
-        uint256 amount = _depositFundsToAssetRouter(msg.sender, IERC20(_l1Token), _amount);
+        uint256 amount = _approveFundsToAssetRouter(msg.sender, IERC20(_l1Token), _amount);
         if (amount != _amount) {
             // The token has non-standard transfer logic
             revert TokensWithFeesNotSupported();
@@ -203,6 +203,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
             _refundRecipient: _refundRecipient
         });
+        // clearing approval
+        IERC20(_l1Token).approve(address(L1_ASSET_ROUTER), 0);
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
             l2DepositTxHash: l2TxHash,
@@ -219,10 +221,11 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Transfers tokens from the depositor address to the native token vault address.
     /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(L1_ASSET_ROUTER));
-        _token.safeTransferFrom(_from, address(L1_ASSET_ROUTER), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(L1_ASSET_ROUTER));
+    function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(this));
+        _token.safeTransferFrom(_from, address(this), _amount);
+        _token.approve(address(L1_ASSET_ROUTER), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;
     }
