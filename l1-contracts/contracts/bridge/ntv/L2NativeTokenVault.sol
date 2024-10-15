@@ -95,7 +95,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _originToken The origin token address.
     /// @param _erc20Data The ERC20 data.
     /// @return expectedToken The token address.
-    function _ensureTokenDeployed(
+    function _ensureAndSaveTokenDeployed(
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
@@ -108,14 +108,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
 
         if (l1LegacyToken != address(0)) {
-            _ensureTokenDeployedInnerLegacyToken({
+            _ensureAndSaveTokenDeployedInnerLegacyToken({
                 _assetId: _assetId,
                 _originToken: _originToken,
                 _expectedToken: expectedToken,
                 _l1LegacyToken: l1LegacyToken
             });
         } else {
-            super._ensureTokenDeployedInner({
+            super._ensureAndSaveTokenDeployedInner({
                 _tokenOriginChainId: tokenOriginChainId,
                 _assetId: _assetId,
                 _originToken: _originToken,
@@ -126,7 +126,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     }
 
     /// @notice Ensures that the token is deployed inner for legacy tokens. 
-    function _ensureTokenDeployedInnerLegacyToken(
+    function _ensureAndSaveTokenDeployedInnerLegacyToken(
         bytes32 _assetId,
         address _originToken,
         address _expectedToken,

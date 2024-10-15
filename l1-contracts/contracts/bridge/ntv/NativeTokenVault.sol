@@ -132,7 +132,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         (, receiver, originToken, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
 
         if (token == address(0)) {
-            token = _ensureTokenDeployed(_assetId, originToken, erc20Data);
+            token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
         _handleChainBalanceDecrease(_originChainId, _assetId, amount, false);
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
@@ -354,14 +354,14 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                             TOKEN DEPLOYER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _ensureTokenDeployed(
+    function _ensureAndSaveTokenDeployed(
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
     ) internal virtual returns (address expectedToken) {
         uint256 tokenOriginChainId;
         (expectedToken, tokenOriginChainId) = _calculateExpectedTokenAddress(_originToken, _erc20Data);
-        _ensureTokenDeployedInner({
+        _ensureAndSaveTokenDeployedInner({
             _tokenOriginChainId: tokenOriginChainId,
             _assetId: _assetId,
             _originToken: _originToken,
@@ -397,7 +397,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
     }
 
-    function _ensureTokenDeployedInner(
+    function _ensureAndSaveTokenDeployedInner(
         uint256 _tokenOriginChainId,
         bytes32 _assetId,
         address _originToken,
