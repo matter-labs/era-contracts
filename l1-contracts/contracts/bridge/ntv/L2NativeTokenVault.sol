@@ -108,7 +108,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
 
         if (l1LegacyToken != address(0)) {
-            _ensureTokenDeployedInnerLegacyToken(_assetId, _originToken, _erc20Data, expectedToken, l1LegacyToken);
+            _ensureTokenDeployedInnerLegacyToken({
+                _assetId: _assetId,
+                _originToken: _originToken,
+                _expectedToken: expectedToken,
+                _l1LegacyToken: l1LegacyToken
+            });
         } else {
             super._ensureTokenDeployedInner({
                 _tokenOriginChainId: tokenOriginChainId,
@@ -124,7 +129,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     function _ensureTokenDeployedInnerLegacyToken(
         bytes32 _assetId,
         address _originToken,
-        bytes memory _erc20Data,
         address _expectedToken,
         address _l1LegacyToken
     ) internal {

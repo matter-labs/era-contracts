@@ -414,6 +414,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
+    /// @param _tokenOriginChainId The chain id of the origin token.
     /// @param _bridgeToken The address of native token.
     /// @return The address of bridged token.
     function calculateCreate2TokenAddress(
@@ -422,6 +423,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     ) public view virtual override returns (address);
 
     /// @notice Deploys and initializes the bridged token for the native counterpart.
+    /// @param _tokenOriginChainId The chain id of the origin token.
     /// @param _originToken The address of origin token.
     /// @param _erc20Data The ERC20 metadata of the token deployed.
     /// @return The address of the beacon proxy (bridged token).
@@ -431,10 +433,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _originToken,
         bytes memory _erc20Data
     ) internal returns (address) {
-        bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
         if (_tokenOriginChainId == block.chainid) {
             revert DeployingBridgedTokenForNativeToken();
         }
+        bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
         BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
