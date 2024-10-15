@@ -55,7 +55,7 @@ async function main() {
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
       const nonce = await deployContracts(tokens, wallet);
-      const result = await mintTokens(tokens, wallet, nonce, ethTestConfig.mnemonic);
+      const result = await mintTokens(tokens, wallet, nonce, [ethTestConfig.test_mnemonic, ethTestConfig.mnemonic]);
 
       console.log(JSON.stringify(result, null, 2));
     });

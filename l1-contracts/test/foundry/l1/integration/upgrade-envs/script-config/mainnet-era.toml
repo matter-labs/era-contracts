@@ -1,0 +1,7 @@
+owner_address = "0x4e4943346848c4867f81dfb37c4ca9c5715a7828"
+
+[chain]
+chain_id = 324
+diamond_proxy_address = "0x32400084c286cf3e17e7b677ea9583e60a000324"
+validium_mode = false
+permanent_rollup = true

@@ -8,7 +8,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -85,7 +85,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
-    function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
+    function setChainId(uint256 _newChainId) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT)) {
         chainId = _newChainId;
     }
 

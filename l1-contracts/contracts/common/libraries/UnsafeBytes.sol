@@ -30,6 +30,13 @@ library UnsafeBytes {
         }
     }
 
+    function readUint128(bytes memory _bytes, uint256 _start) internal pure returns (uint128 result, uint256 offset) {
+        assembly {
+            offset := add(_start, 16)
+            result := mload(add(_bytes, offset))
+        }
+    }
+
     function readUint256(bytes memory _bytes, uint256 _start) internal pure returns (uint256 result, uint256 offset) {
         assembly {
             offset := add(_start, 32)
@@ -41,6 +48,15 @@ library UnsafeBytes {
         assembly {
             offset := add(_start, 32)
             result := mload(add(_bytes, offset))
+        }
+    }
+
+    function readRemainingBytes(bytes memory _bytes, uint256 _start) internal pure returns (bytes memory result) {
+        uint256 arrayLen = _bytes.length - _start;
+        result = new bytes(arrayLen);
+
+        assembly {
+            mcopy(add(result, 0x20), add(_bytes, add(0x20, _start)), arrayLen)
         }
     }
 }
