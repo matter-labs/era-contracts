@@ -375,6 +375,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _originToken,
         bytes memory _erc20Data
     ) internal view returns (address expectedToken, uint256 tokenOriginChainId) {
+        /// @dev calling externally to convert from memory to calldata
         tokenOriginChainId = this.tokenDataOriginChainId(_erc20Data);
         expectedToken = calculateCreate2TokenAddress(tokenOriginChainId, _originToken);
     }
