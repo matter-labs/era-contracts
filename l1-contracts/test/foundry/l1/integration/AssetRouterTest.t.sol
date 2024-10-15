@@ -90,7 +90,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _originalCaller: ETH_TOKEN_ADDRESS,
             _l2Receiver: address(this),
-            _l1Token: ETH_TOKEN_ADDRESS,
+            _l1Token: _tokenAddress,
             _amount: 100,
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });

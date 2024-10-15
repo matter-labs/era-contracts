@@ -17,6 +17,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
