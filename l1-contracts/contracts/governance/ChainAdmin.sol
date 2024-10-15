@@ -6,7 +6,8 @@ pragma solidity 0.8.24;
 
 import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
-import {IRestriction} from "./IRestriction.sol";
+import {Restriction} from "./restriction/Restriction.sol";
+import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 import {Call} from "./Common.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts-v4/utils/structs/EnumerableSet.sol";
@@ -112,7 +113,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
         unchecked {
             for (uint256 i = 0; i < restrictions.length; ++i) {
-                IRestriction(restrictions[i]).validateCall(_call, msg.sender);
+                Restriction(restrictions[i]).validateCall(_call, msg.sender);
             }
         }
     }
@@ -120,6 +121,8 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
     function _addRestriction(address _restriction) internal {
+        RestrictionValidator.validateRestriction(_restriction);
+        
         if (!activeRestrictions.add(_restriction)) {
             revert RestrictionWasAlreadyPresent(_restriction);
         }

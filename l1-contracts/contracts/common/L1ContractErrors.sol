@@ -413,6 +413,8 @@ error NotBridgehub(address addr);
 error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
+// 0x64846fe4
+error NotARestriction(address addr);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
