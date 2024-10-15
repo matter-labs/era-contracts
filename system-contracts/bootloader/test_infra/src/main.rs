@@ -1,14 +1,15 @@
 use crate::{test_count_tracer::TestCountTracer, tracer::BootloaderTestTracer};
 use colored::Colorize;
-use multivm::interface::{
-    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmExecutionMode, VmInterface,
+use zksync_multivm::interface::{
+    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmExecutionMode, VmInterface, VmFactory
 };
-use multivm::vm_latest::{HistoryDisabled, ToTracerPointer, Vm};
+use zksync_multivm::vm_latest;
+use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, Vm}; //, MultiVMSubversion};
 use once_cell::sync::OnceCell;
 use zksync_types::fee_model::BatchFeeInput;
 use std::process;
 
-use multivm::interface::{ExecutionResult, Halt};
+use zksync_multivm::interface::{ExecutionResult, Halt, storage::{StorageView, InMemoryStorage, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID}};
 use std::{env, sync::Arc};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -16,9 +17,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use zksync_contracts::{
     read_zbin_bytecode, BaseSystemContracts, ContractLanguage, SystemContractCode,
     SystemContractsRepo,
-};
-use zksync_state::{
-    InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
 };
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
 use zksync_types::{block::L2BlockHasher, Address, L1BatchNumber, L2BlockNumber, U256};
@@ -67,6 +65,7 @@ fn execute_internal_bootloader_test() {
         execution_mode: TxExecutionMode::VerifyExecute,
         default_validation_computational_gas_limit: u32::MAX,
         chain_id: zksync_types::L2ChainId::from(299),
+        pubdata_params: Default::default(),
     };
 
     let mut l1_batch_env = L1BatchEnv {
@@ -87,7 +86,7 @@ fn execute_internal_bootloader_test() {
 
     // First - get the number of tests.
     let test_count = {
-        let storage: StoragePtr<StorageView<InMemoryStorage>> =
+        let storage =
             StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
                 L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
                 hash_bytecode,
@@ -95,8 +94,7 @@ fn execute_internal_bootloader_test() {
             ))
             .to_rc_ptr();
 
-        let mut vm: Vm<_, HistoryDisabled> =
-            Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
+        let mut vm : Vm<_, HistoryDisabled> = vm_latest::Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
 
         let test_count = Arc::new(OnceCell::default());
         let custom_tracers = TestCountTracer::new(test_count.clone()).into_tracer_pointer();
@@ -115,7 +113,7 @@ fn execute_internal_bootloader_test() {
     for test_id in 1..=test_count {
         println!("\n === Running test {}", test_id);
 
-        let storage: StoragePtr<StorageView<InMemoryStorage>> =
+        let storage =
             StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
                 L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
                 hash_bytecode,
@@ -126,8 +124,8 @@ fn execute_internal_bootloader_test() {
         // We are passing id of the test in location (0) where we normally put the operator.
         // This is then picked up by the testing framework.
         l1_batch_env.fee_account = zksync_types::H160::from(u256_to_h256(U256::from(test_id)));
-        let mut vm: Vm<_, HistoryDisabled> =
-            Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
+        let mut vm : Vm<_, HistoryDisabled> = vm_latest::Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
+
         let test_result = Arc::new(OnceCell::default());
         let requested_assert = Arc::new(OnceCell::default());
         let test_name = Arc::new(OnceCell::default());
@@ -141,8 +139,11 @@ fn execute_internal_bootloader_test() {
 
         // Let's insert transactions into slots. They are not executed, but the tests can run functions against them.
         let json_str = include_str!("test_transactions/0.json");
+        let json_str2 = include_str!("test_transactions/1.json");
         let tx: Transaction = serde_json::from_str(json_str).unwrap();
+        let tx2: Transaction = serde_json::from_str(json_str2).unwrap();
         vm.push_transaction(tx);
+        vm.push_transaction(tx2);
 
         let result = vm.inspect(custom_tracers.into(), VmExecutionMode::Bootloader);
         let mut test_result = Arc::into_inner(test_result).unwrap().into_inner();

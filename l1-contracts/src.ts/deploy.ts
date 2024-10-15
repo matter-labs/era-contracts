@@ -36,24 +36,28 @@ import {
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
-  ADDRESS_ONE,
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,
   PubdataPricingMode,
   hashL2Bytecode,
-  DIAMOND_CUT_DATA_ABI_STRING,
-  FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
-  BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING,
   encodeNTVAssetId,
   computeL2Create2Address,
   priorityTxMaxGasLimit,
   isCurrentNetworkLocal,
 } from "./utils";
+import {
+  DIAMOND_CUT_DATA_ABI_STRING,
+  BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING,
+  ADDRESS_ONE,
+  // L2_MESSAGE_ROOT_ADDRESS,
+} from "../src.ts/constants";
+
 import type { ChainAdminCall } from "./utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";

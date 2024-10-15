@@ -3,8 +3,8 @@
 pragma solidity 0.8.24;
 
 import {Merkle} from "./Merkle.sol";
-import {SUPPORTED_PROOF_METADATA_VERSION} from "../Config.sol";
-import {MerklePathEmpty, BatchNotExecuted} from "../L1ContractErrors.sol";
+import {SUPPORTED_PROOF_METADATA_VERSION} from "../Constants.sol";
+import {MerklePathEmpty, BatchNotExecuted} from "../SystemContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
 
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
@@ -38,7 +38,7 @@ library MessageHashing {
     }
 
     function parseProofMetadata(
-        bytes32[] calldata _proof
+        bytes32[] memory _proof
     ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
         bytes32 proofMetadata = _proof[0];
 
@@ -83,7 +83,7 @@ library MessageHashing {
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
-        bytes32[] calldata _proof
+        bytes32[] memory _proof
     ) internal pure returns (ProofVerificationResult memory result) {
         if (_proof.length == 0) {
             revert MerklePathEmpty();
@@ -147,7 +147,7 @@ library MessageHashing {
     }
 
     function extractSlice(
-        bytes32[] calldata _proof,
+        bytes32[] memory _proof,
         uint256 _left,
         uint256 _right
     ) internal pure returns (bytes32[] memory slice) {
@@ -160,7 +160,7 @@ library MessageHashing {
     /// @notice Extracts slice until the end of the array.
     /// @dev It is used in one place in order to circumvent the stack too deep error.
     function extractSliceUntilEnd(
-        bytes32[] calldata _proof,
+        bytes32[] memory _proof,
         uint256 _start
     ) internal pure returns (bytes32[] memory slice) {
         slice = extractSlice(_proof, _start, _proof.length);

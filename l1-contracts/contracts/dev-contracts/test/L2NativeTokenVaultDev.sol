@@ -66,7 +66,7 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
         // test
     }
 
-    function _deployBeaconProxy(bytes32 _salt) internal virtual override returns (BeaconProxy proxy) {
+    function _deployBeaconProxy(bytes32 _salt, uint256) internal virtual override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(
             0,
