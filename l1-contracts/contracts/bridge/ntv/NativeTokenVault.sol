@@ -387,6 +387,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @notice Returns the origin chain id from the token data.
     function tokenDataOriginChainId(bytes calldata _erc20Data) public view returns (uint256 tokenOriginChainId) {
+        // slither-disable-next-line unused-return
         (tokenOriginChainId, , , ) = DataEncoding.decodeTokenData(_erc20Data);
         if (tokenOriginChainId == 0) {
             tokenOriginChainId = L1_CHAIN_ID;
