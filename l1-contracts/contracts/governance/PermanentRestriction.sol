@@ -58,7 +58,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         L2_ADMIN_FACTORY = _l2AdminFactory;
     }
 
-    /// @notice The intialization function for the proxy contract.
+    /// @notice The initialization function for the proxy contract.
     /// @param _initialOwner The initial owner of the permanent restriction.
     /// @dev Expected to be delegatecalled by the `TransparentUpgradableProxy`
     /// upon initialization.
