@@ -426,11 +426,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (ctmAddress == address(0)) {
             revert ChainIdNotRegistered(_chainId);
         }
-        return ctmAssetIdFromAddress[chainTypeManager[_chainId]];
-    }
-
-    function calculateCtmAssetId(address _ctmAddress) internal view returns (bytes32) {
-        return keccak256(abi.encode(L1_CHAIN_ID, address(l1CtmDeployer), bytes32(uint256(uint160(_ctmAddress)))));
+        return ctmAssetIdFromAddress[ctmAddress];
     }
 
     /*//////////////////////////////////////////////////////////////
