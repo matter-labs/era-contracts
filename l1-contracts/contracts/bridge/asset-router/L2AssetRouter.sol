@@ -68,6 +68,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /// @dev Disable the initialization to prevent Parity hack.
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
     constructor(
         uint256 _l1ChainId,
