@@ -229,7 +229,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Used for the upgrade to set the baseTokenAssetId previously stored as baseToken.
     /// @param _chainId the chainId of the chain.
     function setLegacyBaseTokenAssetId(uint256 _chainId) external override {
-        if (baseTokenAssetId[_chainId] != bytes32(0)) {
+        if (baseTokenAssetId[_chainId] == bytes32(0)) {
             return;
         }
         address token = __DEPRECATED_baseToken[_chainId];
@@ -435,7 +435,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (ctmAddress == address(0)) {
             revert ChainIdNotRegistered(_chainId);
         }
-        return ctmAssetIdFromAddress[ctmAddress];
+        return ctmAssetIdFromAddress[chainTypeManager[_chainId]];
+    }
+
+    function calculateCtmAssetId(address _ctmAddress) internal view returns (bytes32) {
+        return keccak256(abi.encode(L1_CHAIN_ID, address(l1CtmDeployer), bytes32(uint256(uint160(_ctmAddress)))));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -773,7 +777,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external payable override onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        settlementLayer[bridgehubData.chainId] = block.chainid;
+        delete settlementLayer[bridgehubData.chainId];
 
         IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubData.chainId,
