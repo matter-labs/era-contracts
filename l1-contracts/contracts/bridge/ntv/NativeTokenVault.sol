@@ -370,6 +370,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         });
     }
 
+    /// @notice Calculates the bridged token address corresponding to native token counterpart.
     function _calculateExpectedTokenAddress(
         address _originToken,
         bytes memory _erc20Data
@@ -378,6 +379,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         expectedToken = calculateCreate2TokenAddress(tokenOriginChainId, _originToken);
     }
 
+    /// @notice Returns the origin chain id from the token data.
     function tokenDataOriginChainId(bytes calldata _erc20Data) public view returns (uint256 tokenOriginChainId) {
         (tokenOriginChainId, , , ) = DataEncoding.decodeTokenData(_erc20Data);
         if (tokenOriginChainId == 0) {
@@ -385,6 +387,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
     }
 
+    /// @notice Checks that the assetId is correct for the origin token and chain.
     function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal view {
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
         if (_assetId != expectedAssetId) {
@@ -429,12 +432,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes memory _erc20Data
     ) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
-
-        BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
-        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
         if (_tokenOriginChainId == block.chainid) {
             revert DeployingBridgedTokenForNativeToken();
         }
+
+        BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
+        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
 
         originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);

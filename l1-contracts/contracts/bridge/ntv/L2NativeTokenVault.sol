@@ -120,6 +120,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    /// @notice Ensures that the token is deployed inner for legacy tokens. 
     function _ensureTokenDeployedInnerLegacyToken(
         bytes32 _assetId,
         address _originToken,
@@ -137,16 +138,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         tokenAddress[_assetId] = _expectedToken;
     }
 
-    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
+    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract or the legacy shared bridge.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
+    /// @param _tokenOriginChainId The origin chain id of the token.
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
     function _deployBeaconProxy(
         bytes32 _salt,
         uint256 _tokenOriginChainId
     ) internal virtual override returns (BeaconProxy proxy) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0) && _tokenOriginChainId != L1_CHAIN_ID) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0) || _tokenOriginChainId != L1_CHAIN_ID) {
             // Deploy the beacon proxy for the L2 token
 
             (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
