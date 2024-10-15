@@ -446,11 +446,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
-        BridgedStandardERC20(address(l2Token)).bridgeInitialize(
-            _assetId,
-            _originToken,
-            _erc20Data
-        );
+        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_assetId, _originToken, _erc20Data);
 
         originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);
