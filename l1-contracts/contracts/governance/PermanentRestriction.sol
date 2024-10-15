@@ -135,8 +135,8 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// is not changed in this case.
     function _validateMigrationToL2(Call calldata _call) internal view {
         (address admin, bool isMigration) = _getNewAdminFromMigration(_call);
-        if(isMigration) {
-            if(!allowedL2Admins[admin]) {
+        if (isMigration) {
+            if (!allowedL2Admins[admin]) {
                 revert NotAllowed(admin);
             }
         }
@@ -232,7 +232,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         if (!chainIdQuerySuccess) {
             // It is not a hyperchain, so we can return `false` here.
             return false;
-        } 
+        }
 
         // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
         // is compatible with the legacy ones.
@@ -251,22 +251,15 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// It ensures that the returndata is of correct format and if not, it returns false.
     /// @param _chain The address of the potential chain
     /// @return chainId The chainId of the chain.
-    /// @return success Whether the `chain` is indeed an address of a ZK Chain. 
+    /// @return success Whether the `chain` is indeed an address of a ZK Chain.
     /// @dev Returns a tuple of the chainId and whether the call was successful.
-    /// If the second item is `false`, the caller should ignore the first value. 
+    /// If the second item is `false`, the caller should ignore the first value.
     function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;
         assembly {
             // We use scratch space here, so it is safe
             mstore(0, selector)
-            success := staticcall(
-                gas(),
-                _chain,
-                0,
-                4,
-                0,
-                0
-            )
+            success := staticcall(gas(), _chain, 0, 4, 0, 0)
 
             let isReturndataSizeCorrect := eq(returndatasize(), 32)
 
@@ -284,15 +277,15 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Tries to get the new admin from the migration.
     /// @param _call The call data.
     /// @return Returns a tuple of of the new admin and whether the transaction is indeed the migration.
-    /// If the second item is `false`, the caller should ignore the first value. 
-    /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected 
+    /// If the second item is `false`, the caller should ignore the first value.
+    /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
         if (_call.target != address(BRIDGE_HUB)) {
             return (address(0), false);
         }
 
-        if(_call.data.length < 4) {
+        if (_call.data.length < 4) {
             return (address(0), false);
         }
 
@@ -303,7 +296,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         address sharedBridge = BRIDGE_HUB.sharedBridge();
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
-        // since the correct selector was checked before. 
+        // since the correct selector was checked before.
         L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
             _call.data[4:],
             (L2TransactionRequestTwoBridgesOuter)
@@ -327,10 +320,10 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         }
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
-        // supported only in the new protocol version with Gateway support, so we can assume 
+        // supported only in the new protocol version with Gateway support, so we can assume
         // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
 
-        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`. 
+        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`.
         // If it fails, it would mean that the data is not correct and the call would eventually fail anyway.
         (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
 
@@ -349,7 +342,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        // The asset handler of CTM is the bridgehub and so the following decoding should work 
+        // The asset handler of CTM is the bridgehub and so the following decoding should work
         BridgehubBurnCTMAssetData memory burnData = abi.decode(bridgehubData, (BridgehubBurnCTMAssetData));
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 

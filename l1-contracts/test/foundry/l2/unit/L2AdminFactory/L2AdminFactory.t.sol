@@ -16,7 +16,7 @@ contract L2AdminFactoryTest is Test {
     address validRestriction2;
 
     address invalidRestriction;
-    
+
     function setUp() public {
         validRestriction1 = address(new DummyRestriction(true));
         validRestriction2 = address(new DummyRestriction(true));
