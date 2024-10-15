@@ -10,7 +10,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
-import {IRestriction} from "./IRestriction.sol";
+import {Restriction} from "./restriction/Restriction.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
@@ -26,7 +26,7 @@ import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 /// properties are preserved forever.
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
-contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2StepUpgradeable {
+contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
 
@@ -110,7 +110,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         emit AllowL2Admin(expectedAddress);
     }
 
-    /// @inheritdoc IRestriction
+    /// @inheritdoc Restriction
     function validateCall(
         Call calldata _call,
         address // _invoker
