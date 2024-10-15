@@ -11,7 +11,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Helper library for working with L2 contracts on L1.
+ * @notice Helper library for working with native tokens on both L1 and L2.
  */
 library BridgeHelper {
     /// @dev Receives and parses (name, symbol, decimals) from the token contract

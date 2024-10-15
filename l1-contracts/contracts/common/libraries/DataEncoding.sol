@@ -83,7 +83,7 @@ library DataEncoding {
         return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDR, _assetData));
     }
 
-    /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and asset data.
+    /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and token address.
     /// @param _chainId The id of the chain token is native to.
     /// @param _tokenAddress The address of token that has to be encoded (asset data is the address itself).
     /// @return The encoded asset data.
