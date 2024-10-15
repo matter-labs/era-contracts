@@ -69,7 +69,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Allows a certain `ChainAdmin` implementation to be used as an admin.
     /// @param _implementationHash The hash of the implementation code.
     /// @param _isAllowed The flag that indicates if the implementation is allowed.
-    function allowAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
+    function setAllowedAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
         allowedAdminImplementations[_implementationHash] = _isAllowed;
 
         emit AdminImplementationAllowed(_implementationHash, _isAllowed);
