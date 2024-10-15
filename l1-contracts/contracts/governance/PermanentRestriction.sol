@@ -245,7 +245,9 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Tries to call `IGetters.getChainId()` function on the `_potentialChainAddress`.
     /// It ensures that the returndata is of correct format and if not, it returns false.
     /// @param _chain The address of the potential chain
-    /// @return Returns a tuple of of the chainId and whether the call was successful.
+    /// @return chainId The chainId of the chain.
+    /// @return success Whether the `chain` is indeed an address of a ZK Chain. 
+    /// @dev Returns a tuple of the chainId and whether the call was successful.
     /// If the second item is `false`, the caller should ignore the first value. 
     function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;

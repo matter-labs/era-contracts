@@ -74,6 +74,14 @@ contract ChainAdminTest is Test {
         vm.stopPrank();
     }
 
+    function test_addRestrictionZeroAddress() public {
+        address[] memory restrictions = chainAdmin.getRestrictions();
+
+        vm.prank(address(chainAdmin));
+        vm.expectRevert(abi.encodeWithSelector(NotARestriction.selector, address(0)));
+        chainAdmin.addRestriction(address(0));
+    }
+
     function test_addRestrictionRevert() public {
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(address(dummyRestriction));
