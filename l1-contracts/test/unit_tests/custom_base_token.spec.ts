@@ -1,18 +1,19 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { ethers, Wallet } from "ethers";
-import { Interface } from "ethers/lib/utils";
 
 import type { TestnetERC20Token } from "../../typechain";
 import { TestnetERC20TokenFactory } from "../../typechain";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
-import type { IL1SharedBridge } from "../../typechain/IL1SharedBridge";
-import { IL1SharedBridgeFactory } from "../../typechain/IL1SharedBridgeFactory";
+import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
+import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
+import type { IL1NativeTokenVault } from "../../typechain/IL1NativeTokenVault";
+import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
-import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
@@ -22,8 +23,9 @@ describe("Custom base token chain and bridge tests", () => {
   let randomSigner: ethers.Signer;
   let deployWallet: Wallet;
   let deployer: Deployer;
-  let l1SharedBridge: IL1SharedBridge;
+  let l1SharedBridge: IL1AssetRouter;
   let bridgehub: IBridgehub;
+  let nativeTokenVault: IL1NativeTokenVault;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
   let altTokenAddress: string;
@@ -61,25 +63,18 @@ describe("Custom base token chain and bridge tests", () => {
     altToken = TestnetERC20TokenFactory.connect(altTokenAddress, owner);
 
     // prepare the bridge
-    l1SharedBridge = IL1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    l1SharedBridge = IL1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+
+    nativeTokenVault = IL1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
   });
 
   it("Should have correct base token", async () => {
     // we should still be able to deploy the erc20 bridge
-    const baseTokenAddressInBridgehub = await bridgehub.baseToken(chainId);
+    const baseTokenAddressInBridgehub = await bridgehub.baseToken(deployer.chainId);
     expect(baseTokenAddress).equal(baseTokenAddressInBridgehub);
-  });
-
-  it("Check should initialize through governance", async () => {
-    const l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
-      chainId,
-      ADDRESS_ONE,
-    ]);
-
-    const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
   });
 
   it("Should not allow direct legacy deposits", async () => {
@@ -97,7 +92,7 @@ describe("Custom base token chain and bridge tests", () => {
         )
     );
 
-    expect(revertReason).equal("ShB not legacy bridge");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("Should deposit base token successfully direct via bridgehub", async () => {
@@ -119,6 +114,7 @@ describe("Custom base token chain and bridge tests", () => {
   });
 
   it("Should deposit alternative token successfully twoBridges method", async () => {
+    nativeTokenVault.registerToken(altTokenAddress);
     const altTokenAmount = ethers.utils.parseUnits("800", 18);
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
@@ -137,23 +133,28 @@ describe("Custom base token chain and bridge tests", () => {
       secondBridgeAddress: l1SharedBridge.address,
       secondBridgeValue: 0,
       secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-        ["address", "uint256", "address"],
-        [altTokenAddress, altTokenAmount, await randomSigner.getAddress()]
+        ["bytes32", "bytes", "address"],
+        [
+          ethers.utils.hexZeroPad(altTokenAddress, 32),
+          new ethers.utils.AbiCoder().encode(["uint256"], [altTokenAmount]),
+          await randomSigner.getAddress(),
+        ]
       ),
     });
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
+    const mailboxFunctionSignature = "0x6c0960f9";
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [])
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
     );
-    expect(revertReason).equal("ShB wrong msg len");
+    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
-    expect(revertReason).equal("ShB Incorrect message function selector");
+    expect(revertReason).contains("InvalidSelector");
   });
 });

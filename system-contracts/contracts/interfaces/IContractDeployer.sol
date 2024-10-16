@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
-pragma solidity 0.8.20;
+/// @notice A struct that describes a forced deployment on an address
+struct ForceDeployment {
+    // The bytecode hash to put on an address
+    bytes32 bytecodeHash;
+    // The address on which to deploy the bytecodehash to
+    address newAddress;
+    // Whether to run the constructor on the force deployment
+    bool callConstructor;
+    // The value with which to initialize a contract
+    uint256 value;
+    // The constructor calldata
+    bytes input;
+}
 
 interface IContractDeployer {
     /// @notice Defines the version of the account abstraction protocol
@@ -88,4 +102,7 @@ interface IContractDeployer {
 
     /// @notice Can be called by an account to update its nonce ordering
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external;
+
+    /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable;
 }

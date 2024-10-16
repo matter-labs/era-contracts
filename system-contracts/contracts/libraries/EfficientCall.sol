@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {SystemContractHelper, ADDRESS_MASK} from "./SystemContractHelper.sol";
 import {SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, MIMIC_CALL_BY_REF_CALL_ADDRESS} from "./SystemContractsCaller.sol";
 import {Utils} from "./Utils.sol";
 import {SHA256_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT} from "../Constants.sol";
+import {Keccak256InvalidReturnData, ShaInvalidReturnData} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -36,7 +37,9 @@ library EfficientCall {
     /// @return The `keccak256` hash.
     function keccak(bytes calldata _data) internal view returns (bytes32) {
         bytes memory returnData = staticCall(gasleft(), KECCAK256_SYSTEM_CONTRACT, _data);
-        require(returnData.length == 32, "keccak256 returned invalid data");
+        if (returnData.length != 32) {
+            revert Keccak256InvalidReturnData();
+        }
         return bytes32(returnData);
     }
 
@@ -45,7 +48,9 @@ library EfficientCall {
     /// @return The `sha256` hash.
     function sha(bytes calldata _data) internal view returns (bytes32) {
         bytes memory returnData = staticCall(gasleft(), SHA256_SYSTEM_CONTRACT, _data);
-        require(returnData.length == 32, "sha returned invalid data");
+        if (returnData.length != 32) {
+            revert ShaInvalidReturnData();
+        }
         return bytes32(returnData);
     }
 

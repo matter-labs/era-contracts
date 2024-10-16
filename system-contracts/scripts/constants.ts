@@ -174,6 +174,46 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "Create2Factory",
     lang: Language.Solidity,
   },
+  L2GenesisUpgrade: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010001",
+    codeName: "L2GenesisUpgrade",
+    lang: Language.Solidity,
+  },
+  L2BridgeHub: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010002",
+    codeName: "Bridgehub",
+    lang: Language.Solidity,
+  },
+  L2AssetRouter: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010003",
+    codeName: "L2AssetRouter",
+    lang: Language.Solidity,
+  },
+  L2NativeTokenVault: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010004",
+    codeName: "L2NativeTokenVault",
+    lang: Language.Solidity,
+  },
+  L2MessageRouter: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010005",
+    codeName: "L2MessageRouter",
+    lang: Language.Solidity,
+  },
 } as const;
 
 export const EIP712_TX_ID = 113;
@@ -184,7 +224,7 @@ export const EIP712_DOMAIN = {
   name: "zkSync",
   version: "2",
   chainId: CHAIN_ID,
-  // zkSync contract doesn't verify EIP712 signatures.
+  // ZKsync contract doesn't verify EIP712 signatures.
 };
 
 export interface TransactionData {

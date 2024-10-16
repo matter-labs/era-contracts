@@ -10,10 +10,10 @@ import { applyL1ToL2Alias, getAddressFromEnv } from "../src.ts/utils";
 import * as fs from "fs";
 
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 
 const l2SharedBridgeABI = JSON.parse(
-  fs.readFileSync("../zksync/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json").toString()
+  fs.readFileSync("../zksync/artifacts-zk/contracts/bridge/L2AssetRouter.sol/L2SharedBridge.json").toString()
 ).abi;
 
 async function getERC20BeaconAddress(l2SharedBridgeAddress: string) {

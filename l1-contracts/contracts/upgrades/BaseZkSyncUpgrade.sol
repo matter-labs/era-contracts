@@ -2,15 +2,16 @@
 
 pragma solidity 0.8.24;
 
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, L2BytecodeHashMismatch, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "./ZkSyncUpgradeErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @notice The struct that represents the upgrade proposal.
@@ -32,7 +33,10 @@ struct ProposedUpgrade {
     bytes[] factoryDeps;
     bytes32 bootloaderHash;
     bytes32 defaultAccountHash;
-    address verifier;
+    address dualVerifier;
+    address plonkVerifier;
+    address fflonkVerifier;
+    uint256 fflonkProofLength;
     VerifierParams verifierParams;
     bytes l1ContractsUpgradeCalldata;
     bytes postUpgradeCalldata;
@@ -43,7 +47,7 @@ struct ProposedUpgrade {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
+abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -53,8 +57,17 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @notice Сhanges to the bytecode that is used in L2 as a default account
     event NewL2DefaultAccountBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
 
-    /// @notice Verifier address changed
-    event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
+    /// @notice DualVerifier address changed
+    event NewDualVerifier(address indexed oldDualVerifier, address indexed newDualVerifier);
+
+    /// @notice PlonkVerifier address changed
+    event NewPlonkVerifier(address indexed oldPlonkVerifier, address indexed newPlonkVerifier);
+
+    /// @notice FflonkVerifier address changed
+    event NewFflonkVerifier(address indexed oldFflonkVerifier, address indexed newFflonkVerifier);
+
+    /// @notice Fflonk Proof length changed
+    event NewFflonkProofLength(uint256 indexed oldFflonkProofLength, uint256 indexed newFflonkProofLength);
 
     /// @notice Verifier parameters changed
     event NewVerifierParams(VerifierParams oldVerifierParams, VerifierParams newVerifierParams);
@@ -71,11 +84,13 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
-        require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
+        if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
+            revert TimeNotReached(_proposedUpgrade.upgradeTimestamp, block.timestamp);
+        }
 
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
+        _upgradeVerifiers(_proposedUpgrade.dualVerifier, _proposedUpgrade.plonkVerifier, _proposedUpgrade.fflonkVerifier, _proposedUpgrade.fflonkProofLength, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
 
         txHash = _setL2SystemContractUpgrade(
@@ -98,7 +113,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return;
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set new default account");
+        if (_patchOnly) {
+            revert PatchUpgradeCantSetDefaultAccount();
+        }
 
         L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
 
@@ -118,7 +135,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return;
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set new bootloader");
+        if (_patchOnly) {
+            revert PatchUpgradeCantSetBootloader();
+        }
 
         L2ContractHelper.validateBytecodeHash(_l2BootloaderBytecodeHash);
 
@@ -130,20 +149,68 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         emit NewL2BootloaderBytecodeHash(previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
     }
 
-    /// @notice Change the address of the verifier smart contract
-    /// @param _newVerifier Verifier smart contract address
-    function _setVerifier(IVerifier _newVerifier) private {
+    /// @notice Change the address of the Wrapper verifier smart contract
+    /// @param _newDualVerifier DualVerifier smart contract address
+    function _setDualVerifier(IVerifier _newDualVerifier) private {
         // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
         // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
         // verifier is upgraded.
-        if (_newVerifier == IVerifier(address(0))) {
+        if (_newDualVerifier == IVerifier(address(0))) {
             return;
         }
 
-        IVerifier oldVerifier = s.verifier;
-        s.verifier = _newVerifier;
-        emit NewVerifier(address(oldVerifier), address(_newVerifier));
+        IVerifier oldDualVerifier = s.dualVerifier;
+        s.dualVerifier = _newDualVerifier;
+        emit NewDualVerifier(address(oldDualVerifier), address(_newDualVerifier));
+    }
+
+    /// @notice Change the address of the PLONK verifier smart contract
+    /// @param _newPlonkVerifier PlonkVerifier smart contract address
+    function _setPlonkVerifier(address _newPlonkVerifier) private {
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
+        // verifier is upgraded.
+        if (_newPlonkVerifier == address(0)) {
+            return;
+        }
+
+        address oldPlonkVerifier = s.plonkVerifier;
+        s.plonkVerifier = _newPlonkVerifier;
+        emit NewPlonkVerifier(oldPlonkVerifier, _newPlonkVerifier);
+    }
+
+    /// @notice Change the address of the FFLONK verifier smart contract
+    /// @param _newFflonkVerifier FflonkVerifier smart contract address
+    function _setFflonkVerifier(address _newFflonkVerifier) private {
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
+        // verifier is upgraded.
+        if (_newFflonkVerifier == address(0)) {
+            return;
+        }
+
+        address oldFflonkVerifier = s.fflonkVerifier;
+        s.fflonkVerifier = _newFflonkVerifier;
+        emit NewFflonkVerifier(oldFflonkVerifier, _newFflonkVerifier);
+    }
+
+    /// @notice Change the length of the FFLONK proof type
+    /// @param _newFflonkProofLength Fflonk proof length
+    function _setFflonkProofLength(uint256 _newFflonkProofLength) private {
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
+        // verifier is upgraded.
+        if (_newFflonkProofLength == 0) {
+            return;
+        }
+
+        uint256 oldFflonkProofLength = s.fflonkProofLength;
+        s.fflonkProofLength = _newFflonkProofLength;
+        emit NewFflonkProofLength(oldFflonkProofLength, _newFflonkProofLength);
     }
 
     /// @notice Change the verifier parameters
@@ -167,10 +234,16 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     }
 
     /// @notice Updates the verifier and the verifier params
-    /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
+    /// @param _newDualVerifier The address of the new Wrapper verifier. If 0, the verifier will not be updated.
+    /// @param _newPlonkVerifier The address of the new PLONK verifier. If 0, the verifier will not be updated.
+    /// @param _newFflonkVerifier The address of the new FFLONK verifier. If 0, the verifier will not be updated.
+    /// @param _newFflonkProofLength The length of new FFLONK proof. If 0, the length will not be updated.
     /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
-    function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
-        _setVerifier(IVerifier(_newVerifier));
+    function _upgradeVerifiers(address _newDualVerifier, address _newPlonkVerifier, address _newFflonkVerifier, uint256 _newFflonkProofLength, VerifierParams calldata _verifierParams) internal {
+        _setDualVerifier(IVerifier(_newDualVerifier));
+        _setPlonkVerifier(_newPlonkVerifier);
+        _setFflonkVerifier(_newFflonkVerifier);
+        _setFflonkProofLength(_newFflonkProofLength);
         _setVerifierParams(_verifierParams);
     }
 
@@ -202,9 +275,12 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return bytes32(0);
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set upgrade transaction");
-
-        require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 system upgrade tx type is wrong");
+        if (_l2ProtocolUpgradeTx.txType != SYSTEM_UPGRADE_L2_TX_TYPE) {
+            revert InvalidTxType(_l2ProtocolUpgradeTx.txType);
+        }
+        if (_patchOnly) {
+            revert PatchCantSetUpgradeTxn();
+        }
 
         bytes memory encodedTransaction = abi.encode(_l2ProtocolUpgradeTx);
 
@@ -219,10 +295,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         // We want the hashes of l2 system upgrade transactions to be unique.
         // This is why we require that the `nonce` field is unique to each upgrade.
-        require(
-            _l2ProtocolUpgradeTx.nonce == _newMinorProtocolVersion,
-            "The new protocol version should be included in the L2 system upgrade tx"
-        );
+        if (_l2ProtocolUpgradeTx.nonce != _newMinorProtocolVersion) {
+            revert L2UpgradeNonceNotEqualToNewProtocolVersion(_l2ProtocolUpgradeTx.nonce, _newMinorProtocolVersion);
+        }
 
         _verifyFactoryDeps(_factoryDeps, _l2ProtocolUpgradeTx.factoryDeps);
 
@@ -237,14 +312,19 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @param _factoryDeps The list of factory deps
     /// @param _expectedHashes The list of expected bytecode hashes
     function _verifyFactoryDeps(bytes[] calldata _factoryDeps, uint256[] calldata _expectedHashes) private pure {
-        require(_factoryDeps.length == _expectedHashes.length, "Wrong number of factory deps");
-        require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "Factory deps can be at most 32");
+        if (_factoryDeps.length != _expectedHashes.length) {
+            revert UnexpectedNumberOfFactoryDeps();
+        }
+        if (_factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
+            revert TooManyFactoryDeps();
+        }
+        uint256 length = _factoryDeps.length;
 
-        for (uint256 i = 0; i < _factoryDeps.length; ++i) {
-            require(
-                L2ContractHelper.hashL2Bytecode(_factoryDeps[i]) == bytes32(_expectedHashes[i]),
-                "Wrong factory dep hash"
-            );
+        for (uint256 i = 0; i < length; ++i) {
+            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[i]);
+            if (bytecodeHash != bytes32(_expectedHashes[i])) {
+                revert L2BytecodeHashMismatch(bytecodeHash, bytes32(_expectedHashes[i]));
+            }
         }
     }
 
@@ -254,20 +334,23 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         uint256 _newProtocolVersion
     ) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
-        require(
-            _newProtocolVersion > previousProtocolVersion,
-            "New protocol version is not greater than the current one"
-        );
+        if (_newProtocolVersion <= previousProtocolVersion) {
+            revert ProtocolVersionTooSmall();
+        }
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
             SafeCast.toUint96(previousProtocolVersion)
         );
-        require(previousMajorVersion == 0, "Implementation requires that the major version is 0 at all times");
+        if (previousMajorVersion != 0) {
+            revert PreviousProtocolMajorVersionNotZero();
+        }
 
         uint32 newMajorVersion;
         // slither-disable-next-line unused-return
         (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
-        require(newMajorVersion == 0, "Major must always be 0");
+        if (newMajorVersion != 0) {
+            revert NewProtocolMajorVersionNotZero();
+        }
 
         // Since `_newProtocolVersion > previousProtocolVersion`, and both old and new major version is 0,
         // the difference between minor versions is >= 0.
@@ -278,19 +361,22 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         }
 
         // While this is implicitly enforced by other checks above, we still double check just in case
-        require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
+        if (minorDelta > MAX_ALLOWED_MINOR_VERSION_DELTA) {
+            revert ProtocolVersionMinorDeltaTooBig(MAX_ALLOWED_MINOR_VERSION_DELTA, minorDelta);
+        }
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
-        // must be ensured in the other parts of the upgrade that the is not overridden.
+        // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-            // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
-            require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
-            require(
-                s.l2SystemContractsUpgradeBatchNumber == 0,
-                "The batch number of the previous upgrade has not been cleaned"
-            );
+            // Note it is important to keep this check, as otherwise ZK chains might skip upgrades by overwriting
+            if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
+                revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
+            }
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert PreviousUpgradeNotCleaned();
+            }
         }
 
         s.protocolVersion = _newProtocolVersion;

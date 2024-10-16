@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
 
-import {CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {CalldataForwardingMode, SystemContractsCaller, MIMIC_CALL_CALL_ADDRESS, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {IndexOutOfBounds, FailedToChargeGas} from "../SystemContractErrors.sol";
 
 uint256 constant UINT32_MASK = type(uint32).max;
 uint256 constant UINT64_MASK = type(uint64).max;
@@ -318,7 +319,10 @@ library SystemContractHelper {
     /// @dev It is equal to the value of the (N+2)-th register
     /// at the start of the call.
     function getExtraAbiData(uint256 index) internal view returns (uint256 extraAbiData) {
-        require(index < 10, "There are only 10 accessible registers");
+        // Note that there are only 10 accessible registers (indices 0-9 inclusively)
+        if (index > 9) {
+            revert IndexOutOfBounds();
+        }
 
         address callAddr = GET_EXTRA_ABI_DATA_ADDRESS;
         assembly {
@@ -350,6 +354,66 @@ library SystemContractHelper {
             _gasToPay,
             _pubdataToSpend
         );
-        require(precompileCallSuccess, "Failed to charge gas");
+        if (!precompileCallSuccess) {
+            revert FailedToChargeGas();
+        }
+    }
+
+    /// @notice Performs a `mimicCall` to an address.
+    /// @param _to The address to call.
+    /// @param _whoToMimic The address to mimic.
+    /// @param _data The data to pass to the call.
+    /// @return success Whether the call was successful.
+    /// @return returndata The return data of the call.
+    function mimicCall(
+        address _to,
+        address _whoToMimic,
+        bytes memory _data
+    ) internal returns (bool success, bytes memory returndata) {
+        // In zkSync, no memory-related values can exceed uint32, so it is safe to convert here
+        uint32 dataStart;
+        uint32 dataLength = uint32(_data.length);
+        assembly {
+            dataStart := add(_data, 0x20)
+        }
+
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: uint32(gasleft()),
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: false
+        });
+
+        address callAddr = MIMIC_CALL_CALL_ADDRESS;
+        uint256 rtSize;
+        assembly {
+            success := call(_to, callAddr, 0, farCallAbi, _whoToMimic, 0, 0)
+            rtSize := returndatasize()
+        }
+
+        returndata = new bytes(rtSize);
+        assembly {
+            returndatacopy(add(returndata, 0x20), 0, rtSize)
+        }
+    }
+
+    /// @notice Performs a `mimicCall` to an address, while ensuring that the call
+    /// was successful
+    /// @param _to The address to call.
+    /// @param _whoToMimic The address to mimic.
+    /// @param _data The data to pass to the call.
+    function mimicCallWithPropagatedRevert(address _to, address _whoToMimic, bytes memory _data) internal {
+        (bool success, bytes memory returnData) = mimicCall(_to, _whoToMimic, _data);
+        if (!success) {
+            // Propagate revert reason
+            assembly {
+                revert(add(returnData, 0x20), returndatasize())
+            }
+        }
     }
 }

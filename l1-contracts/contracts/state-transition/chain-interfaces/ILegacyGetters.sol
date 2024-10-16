@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "./IZKChainBase.sol";
 
 /// @author Matter Labs
-/// @dev This interface contains getters for the zkSync contract that should not be used,
+/// @dev This interface contains getters for the ZKsync contract that should not be used,
 /// but still are kept for backward compatibility.
 /// @custom:security-contact security@matterlabs.dev
-interface ILegacyGetters is IZkSyncHyperchainBase {
+interface ILegacyGetters is IZKChainBase {
     /// @return The total number of batches that were committed
     /// @dev It is a *deprecated* method, please use `getTotalBatchesCommitted` instead
     function getTotalBlocksCommitted() external view returns (uint256);

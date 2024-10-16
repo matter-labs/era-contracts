@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -24,7 +25,7 @@ import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
  * @dev The behavior of some of the methods depends on the nonce ordering of the account. Nonce ordering is a mere suggestion and all the checks that are present
  * here serve more as a help to users to prevent from doing mistakes, rather than any invariants.
  */
-contract NonceHolder is INonceHolder, ISystemContract {
+contract NonceHolder is INonceHolder, SystemContractBase {
     uint256 private constant DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
     /// The minNonce can be increased by 2^32 at a time to prevent it from
     /// overflowing beyond 2**128.
@@ -63,7 +64,9 @@ contract NonceHolder is INonceHolder, ISystemContract {
     /// @param _value The number by which to increase the minimal nonce for msg.sender.
     /// @return oldMinNonce The value of the minimal nonce for msg.sender before the increase.
     function increaseMinNonce(uint256 _value) public onlySystemCall returns (uint256 oldMinNonce) {
-        require(_value <= MAXIMAL_MIN_NONCE_INCREMENT, "The value for incrementing the nonce is too high");
+        if (_value > MAXIMAL_MIN_NONCE_INCREMENT) {
+            revert NonceIncreaseError(MAXIMAL_MIN_NONCE_INCREMENT, _value);
+        }
 
         uint256 addressAsKey = uint256(uint160(msg.sender));
         uint256 oldRawNonce = rawNonces[addressAsKey];
@@ -82,11 +85,15 @@ contract NonceHolder is INonceHolder, ISystemContract {
     function setValueUnderNonce(uint256 _key, uint256 _value) public onlySystemCall {
         IContractDeployer.AccountInfo memory accountInfo = DEPLOYER_SYSTEM_CONTRACT.getAccountInfo(msg.sender);
 
-        require(_value != 0, "Nonce value cannot be set to 0");
+        if (_value == 0) {
+            revert ZeroNonceError();
+        }
         // If an account has sequential nonce ordering, we enforce that the previous
         // nonce has already been used.
         if (accountInfo.nonceOrdering == IContractDeployer.AccountNonceOrdering.Sequential && _key != 0) {
-            require(isNonceUsed(msg.sender, _key - 1), "Previous nonce has not been used");
+            if (!isNonceUsed(msg.sender, _key - 1)) {
+                revert NonceJumpError();
+            }
         }
 
         uint256 addressAsKey = uint256(uint160(msg.sender));
@@ -112,7 +119,9 @@ contract NonceHolder is INonceHolder, ISystemContract {
         uint256 oldRawNonce = rawNonces[addressAsKey];
 
         (, uint256 oldMinNonce) = _splitRawNonce(oldRawNonce);
-        require(oldMinNonce == _expectedNonce, "Incorrect nonce");
+        if (oldMinNonce != _expectedNonce) {
+            revert ValueMismatch(_expectedNonce, oldMinNonce);
+        }
 
         unchecked {
             rawNonces[addressAsKey] = oldRawNonce + 1;
@@ -133,10 +142,9 @@ contract NonceHolder is INonceHolder, ISystemContract {
     /// @param _address The address of the account which to return the deploy nonce for.
     /// @return prevDeploymentNonce The deployment nonce at the time this function is called.
     function incrementDeploymentNonce(address _address) external returns (uint256 prevDeploymentNonce) {
-        require(
-            msg.sender == address(DEPLOYER_SYSTEM_CONTRACT),
-            "Only the contract deployer can increment the deployment nonce"
-        );
+        if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
         uint256 addressAsKey = uint256(uint160(_address));
         uint256 oldRawNonce = rawNonces[addressAsKey];
 
@@ -167,9 +175,9 @@ contract NonceHolder is INonceHolder, ISystemContract {
         bool isUsed = isNonceUsed(_address, _key);
 
         if (isUsed && !_shouldBeUsed) {
-            revert("Reusing the same nonce twice");
+            revert NonceAlreadyUsed(_address, _key);
         } else if (!isUsed && _shouldBeUsed) {
-            revert("The nonce was not set as used");
+            revert NonceNotUsed(_address, _key);
         }
     }
 

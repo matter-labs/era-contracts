@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -8,8 +9,9 @@ import {Utils} from "./Utils.sol";
 
 contract DeployPaymaster is Script {
     using stdToml for string;
-    Config config;
+    Config internal config;
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address bridgehubAddress;
         address l1SharedBridgeProxy;

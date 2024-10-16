@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
-pragma solidity 0.8.20;
+import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+import {MalformedBytecode, BytecodeError} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -51,6 +54,13 @@ interface IContractDeployer {
     /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
     /// @param _input the calldata to be sent to the constructor of the new contract
     function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
+
+    function getNewAddressCreate2(
+        address _sender,
+        bytes32 _bytecodeHash,
+        bytes32 _salt,
+        bytes calldata _input
+    ) external view returns (address newAddress);
 }
 
 /**
@@ -65,15 +75,55 @@ interface IBaseToken {
     function withdrawWithMessage(address _l1Receiver, bytes memory _additionalData) external payable;
 }
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice The interface for the Compressor contract, responsible for verifying the correctness of
+ * the compression of the state diffs and bytecodes.
+ */
+interface ICompressor {
+    function verifyCompressedStateDiffs(
+        uint256 _numberOfStateDiffs,
+        uint256 _enumerationIndexSize,
+        bytes calldata _stateDiffs,
+        bytes calldata _compressedStateDiffs
+    ) external returns (bytes32 stateDiffHash);
+}
+
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for contract responsible chunking pubdata into the appropriate size for EIP-4844 blobs.
+ */
+interface IPubdataChunkPublisher {
+    /// @notice Chunks pubdata into pieces that can fit into blobs.
+    /// @param _pubdata The total l2 to l1 pubdata that will be sent via L1 blobs.
+    /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
+    function chunkPubdataToBlobs(bytes calldata _pubdata) external pure returns (bytes32[] memory blobLinearHashes);
+}
+
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
+
+/// @dev The offset from which the built-in, but user space contracts are located.
+uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 
 address constant BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
+address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
+
+uint256 constant L1_CHAIN_ID = 1;
+
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
 IBaseToken constant L2_BASE_TOKEN_ADDRESS = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+
+ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
+
+IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x11)
+);
 
 /**
  * @author Matter Labs
@@ -112,9 +162,69 @@ library L2ContractHelper {
 
         return address(uint160(uint256(data)));
     }
+
+    /// @notice Validate the bytecode format and calculate its hash.
+    /// @param _bytecode The bytecode to hash.
+    /// @return hashedBytecode The 32-byte hash of the bytecode.
+    /// Note: The function reverts the execution if the bytecode has non expected format:
+    /// - Bytecode bytes length is not a multiple of 32
+    /// - Bytecode bytes length is not less than 2^21 bytes (2^16 words)
+    /// - Bytecode words length is not odd
+    function hashL2Bytecode(bytes calldata _bytecode) internal view returns (bytes32 hashedBytecode) {
+        // Note that the length of the bytecode must be provided in 32-byte words.
+        if (_bytecode.length % 32 != 0) {
+            revert MalformedBytecode(BytecodeError.Length);
+        }
+
+        uint256 bytecodeLenInWords = _bytecode.length / 32;
+        // bytecode length must be less than 2^16 words
+        if (bytecodeLenInWords >= 2 ** 16) {
+            revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+        // bytecode length in words must be odd
+        if (bytecodeLenInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
+        hashedBytecode =
+            EfficientCall.sha(_bytecode) &
+            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        // Setting the version of the hash
+        hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
+        // Setting the length
+        hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224);
+    }
+
+    /// @notice Validate the bytecode format and calculate its hash.
+    /// @param _bytecode The bytecode to hash.
+    /// @return hashedBytecode The 32-byte hash of the bytecode.
+    /// Note: The function reverts the execution if the bytecode has non expected format:
+    /// - Bytecode bytes length is not a multiple of 32
+    /// - Bytecode bytes length is not less than 2^21 bytes (2^16 words)
+    /// - Bytecode words length is not odd
+    function hashL2BytecodeMemory(bytes memory _bytecode) internal view returns (bytes32 hashedBytecode) {
+        // Note that the length of the bytecode must be provided in 32-byte words.
+        if (_bytecode.length % 32 != 0) {
+            revert MalformedBytecode(BytecodeError.Length);
+        }
+
+        uint256 bytecodeLenInWords = _bytecode.length / 32;
+        // bytecode length must be less than 2^16 words
+        if (bytecodeLenInWords >= 2 ** 16) {
+            revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+        // bytecode length in words must be odd
+        if (bytecodeLenInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
+        hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        // Setting the version of the hash
+        hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
+        // Setting the length
+        hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224);
+    }
 }
 
-/// @notice Structure used to represent a zkSync transaction.
+/// @notice Structure used to represent a ZKsync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;

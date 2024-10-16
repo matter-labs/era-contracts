@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Build hardhat artifacts
+        run: yarn l1 build
+
       - name: Build artifacts
         working-directory: ./l1-contracts
         run: forge build
@@ -35,13 +38,23 @@ jobs:
       - name: Build system-contract artifacts
         run: yarn sc build
 
+      - name: Build l2 artifacts
+        run: yarn l2 build
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/cache
             l1-contracts/out
+            l1-contracts/artifacts-zk
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
@@ -63,8 +76,12 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/cache
             l1-contracts/out
+            l1-contracts/artifacts-zk
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
@@ -76,7 +93,7 @@ jobs:
 
       - name: Copy configs from template
         working-directory: ./l1-contracts
-        run: cp -r deploy-script-config-template script-config
+        run: cp -r deploy-script-config-template/. script-config
 
       - name: Run anvil
         run: |
@@ -107,11 +124,11 @@ jobs:
         working-directory: ./l1-contracts
         run: forge script ./deploy-scripts/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 # TODO restore scripts verification
-#      - name: Run RegisterHyperchain script
+#      - name: Run RegisterZKChain script
 #        working-directory: ./l1-contracts
 #        run: |
-#          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-hyperchain.toml
-#          forge script ./deploy-scripts/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+#          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-zk-chain.toml
+#          forge script ./deploy-scripts/RegisterZKChain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 #      - name: Run InitializeL2WethToken script
 #        working-directory: ./l1-contracts-foundry
 #        run: forge script ./deploy-scripts/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY

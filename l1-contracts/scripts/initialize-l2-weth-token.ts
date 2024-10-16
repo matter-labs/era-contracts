@@ -16,11 +16,11 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l1-contracts/artifacts-zk/");
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "contracts/bridge/");
 const openzeppelinTransparentProxyArtifactsPath = path.join(
   contractArtifactsPath,
-  "@openzeppelin/contracts/proxy/transparent/"
+  "@openzeppelin/contracts-v4/proxy/transparent/"
 );
 
 function readInterface(path: string, fileName: string, solFileName?: string) {
@@ -34,7 +34,7 @@ const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2WrappedBaseTok
 const TRANSPARENT_UPGRADEABLE_PROXY = readInterface(
   openzeppelinTransparentProxyArtifactsPath,
   "ITransparentUpgradeableProxy",
-  "TransparentUpgradeableProxy"
+  "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
 );
 
 function getL2Calldata(l2SharedBridgeAddress: string, l1WethTokenAddress: string, l2WethTokenImplAddress: string) {

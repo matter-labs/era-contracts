@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
@@ -8,14 +8,16 @@ import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {IImmutableSimulator} from "./interfaces/IImmutableSimulator.sol";
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
+import {IBridgehub} from "./interfaces/IBridgehub.sol";
 import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
+import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 
-/// @dev All the system contracts introduced by zkSync have their addresses
+/// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
 
@@ -24,9 +26,13 @@ uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
 /// mainnet.
 uint160 constant REAL_SYSTEM_CONTRACTS_OFFSET = 0x8000;
 
+
 /// @dev All the system contracts must be located in the kernel space,
 /// i.e. their addresses must be below 2^16.
 uint160 constant MAX_SYSTEM_CONTRACT_ADDRESS = 0xffff; // 2^16 - 1
+
+/// @dev The offset from which the built-in, but user space contracts are located.
+uint160 constant USER_CONTRACTS_OFFSET = MAX_SYSTEM_CONTRACT_ADDRESS + 1;
 
 address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
@@ -35,7 +41,7 @@ address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 address constant ECPAIRING_SYSTEM_CONTRACT = address(0x08);
 
 
-/// @dev The number of ergs that need to be spent for a single byte of pubdata regardless of the pubdata price.
+/// @dev The number of gas that need to be spent for a single byte of pubdata regardless of the pubdata price.
 /// This variable is used to ensure the following:
 /// - That the long-term storage of the operator is compensated properly.
 /// - That it is not possible that the pubdata counter grows too high without spending proportional amount of computation.
@@ -66,6 +72,11 @@ address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 IBaseToken constant REAL_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
+
+address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
+IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
+address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
@@ -107,18 +118,12 @@ uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    TOTAL_L2_TO_L1_PUBDATA_KEY,
-    STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    BLOB_ONE_HASH_KEY,
-    BLOB_TWO_HASH_KEY,
-    BLOB_THREE_HASH_KEY,
-    BLOB_FOUR_HASH_KEY,
-    BLOB_FIVE_HASH_KEY,
-    BLOB_SIX_HASH_KEY,
+    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
