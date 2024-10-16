@@ -263,7 +263,9 @@ contract GatewayCTMFromL1 is Script {
         );
         console.log("Mailbox facet deployed at", mailboxFacet);
 
-        address executorFacet = address(_deployInternal(L2ContractsBytecodesLib.readExecutorFacetBytecode(), hex""));
+        address executorFacet = address(
+            _deployInternal(L2ContractsBytecodesLib.readExecutorFacetBytecode(), abi.encode(config.l1ChainId))
+        );
         console.log("ExecutorFacet facet deployed at", executorFacet);
 
         address gettersFacet = address(_deployInternal(L2ContractsBytecodesLib.readGettersFacetBytecode(), hex""));

@@ -5,6 +5,7 @@ import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.s
 pragma solidity 0.8.24;
 
 contract TestExecutor is ExecutorFacet {
+    constructor() ExecutorFacet(block.chainid) {}
     function setPriorityTreeStartIndex(uint256 _startIndex) external {
         s.priorityTree.startIndex = _startIndex;
     }

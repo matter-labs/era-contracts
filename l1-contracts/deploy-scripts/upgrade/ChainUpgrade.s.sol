@@ -68,11 +68,22 @@ contract ChainUpgrade is Script {
         // - Deploying new chain admin
 
         deployNewL2DAValidator();
-        deployL2GatewayUpgrade();
         deployNewChainAdmin();
         governanceMoveToNewChainAdmin();
 
         saveOutput(outputPath);
+    }
+
+    function run() public {
+        // TODO: maybe make it read from 1 exact input file,
+        // for now doing it this way is just faster
+
+        prepareChain(
+            "/script-config/gateway-upgrade-ecosystem.toml",
+            "/script-out/gateway-upgrade-ecosystem.toml",
+            "/script-config/gateway-upgrade-chain.toml",
+            "/script-out/gateway-upgrade-chain.toml"
+        );
     }
 
     function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
@@ -143,21 +154,8 @@ contract ChainUpgrade is Script {
         output.l2DAValidator = expectedL2DAValidator;
     }
 
-    function deployL2GatewayUpgrade() internal {
-        address expectedGatewayUpgrade = Utils.deployThroughL1Deterministic({
-            bytecode: L2ContractsBytecodesLib.readGatewayUpgradeBytecode(),
-            constructorargs: hex"",
-            create2salt: bytes32(0),
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: new bytes[](0),
-            chainId: config.chainChainId,
-            bridgehubAddress: config.bridgehubProxyAddress,
-            l1SharedBridgeProxy: config.oldSharedBridgeProxyAddress
-        });
-        require(expectedGatewayUpgrade == config.expectedL2GatewayUpgrade, "Invalid L2Gateway address");
-    }
-
     function deployNewChainAdmin() internal {
+        vm.broadcast(config.ownerAddress);
         AccessControlRestriction accessControlRestriction = new AccessControlRestriction(0, config.ownerAddress);
 
         address[] memory restrictions;
@@ -170,6 +168,7 @@ contract ChainUpgrade is Script {
             restrictions[0] = address(accessControlRestriction);
         }
 
+        vm.broadcast(config.ownerAddress);
         ChainAdmin newChainAdmin = new ChainAdmin(restrictions);
         output.chainAdmin = address(newChainAdmin);
         output.accessControlRestriction = address(accessControlRestriction);

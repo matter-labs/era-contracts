@@ -40,13 +40,7 @@ contract UpgradeTest is Test {
         console.log("Starting stage1 of the upgrade!");
         // Now, some time has passed and we are ready to start the upgrade of the
         // ecosystem.
-        // Stage 1 of the upgrade:
-        // - accept all the ownerships of the contracts
-        // - set the new upgrade data for chains + update validator timelock.
-        Call[] memory stage1Calls = mergeCalls(
-            generateUpgradeData.provideAcceptOwnershipCalls(),
-            generateUpgradeData.provideSetNewVersionUpgradeCall()
-        );
+        Call[] memory stage1Calls = generateUpgradeData.getStage1UpgradeCalls();
 
         governanceMulticall(generateUpgradeData.getOwnerAddress(), stage1Calls);
 
@@ -91,15 +85,5 @@ contract UpgradeTest is Test {
         }
 
         vm.stopBroadcast();
-    }
-
-    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
-        result = new Call[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
-        }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
-        }
     }
 }

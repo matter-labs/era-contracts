@@ -33,10 +33,18 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @inheritdoc IZKChainBase
     string public constant override getName = "ExecutorFacet";
 
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
     /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
     modifier chainOnCurrentBridgehub() {
         require(s.settlementLayer == address(0), "Chain was migrated");
         _;
+    }
+
+    constructor(uint256 l1ChainId) {
+        L1_CHAIN_ID = l1ChainId;
     }
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
@@ -392,16 +400,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
 
-        // Once the batch is executed, we include its message to the message root.
-        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
-
-        // IBridgehub bridgehub = IBridgehub(s.bridgehub);
-        // bridgehub.messageRoot().addChainBatchRoot(
-        //     s.chainId,
-        //     _storedBatch.l2LogsTreeRoot,
-        //     block.chainid != bridgehub.L1_CHAIN_ID()
-        // );
+        // During migration to the new protocol version, there will be a period when
+        // the bridgehub does not yet provide the `messageRoot` functionality.
+        // To ease up the migration, we never append messages to message root on L1.
+        if (block.chainid != L1_CHAIN_ID) {
+            // Once the batch is executed, we include its message to the message root.
+            IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+            messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+        }
     }
 
     /// @notice Executes one batch
@@ -423,9 +429,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
 
-        // Once the batch is executed, we include its message to the message root.
-        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+        // During migration to the new protocol version, there will be a period when
+        // the bridgehub does not yet provide the `messageRoot` functionality.
+        // To ease up the migration, we never append messages to message root on L1.
+        if (block.chainid != L1_CHAIN_ID) {
+            // Once the batch is executed, we include its message to the message root.
+            IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+            messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+        }
     }
 
     /// @inheritdoc IExecutor

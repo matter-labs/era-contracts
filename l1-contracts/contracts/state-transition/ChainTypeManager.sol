@@ -513,6 +513,17 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice return the chain contract address for a chainId
     function getHyperchain(uint256 _chainId) public view returns (address) {
+        // During upgrade, there will be a period when the zkChains mapping on
+        // bridgehub will not be filled yet, while the ValidatorTimelock
+        // will still query the address to obtain the chain id.
+        //
+        // To cover this case, we firstly use the existing storage and only then
+        // we use the bridgehub if the former was not present.
+        // This logic should be deleted in one of the future upgrades.
+        address legacyAddress = getZKChainLegacy(_chainId);
+        if (legacyAddress != address(0)) {
+            return legacyAddress;
+        }
         return getZKChain(_chainId);
     }
 }

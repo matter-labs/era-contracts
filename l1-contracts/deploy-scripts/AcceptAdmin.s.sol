@@ -11,7 +11,10 @@ import {AccessControlRestriction} from "contracts/governance/AccessControlRestri
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {stdToml} from "forge-std/StdToml.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -99,6 +102,59 @@ contract AcceptAdmin is Script {
         }
     }
 
+    function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) public {
+        IGovernance governance = IGovernance(governanceAddr);
+        Ownable2Step ownable = Ownable2Step(governanceAddr);
+
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: bytes32(0)
+        });
+
+        vm.startBroadcast(ownable.owner());
+        governance.scheduleTransparent(operation, 0);
+        // We assume that the total value is 0
+        governance.execute{value: 0}(operation);
+        vm.stopBroadcast();
+    }
+
+    function adminExecuteUpgrade(
+        bytes memory diamondCut,
+        address adminAddr,
+        address accessControlRestriction,
+        address chainDiamondProxy
+    ) public {
+        uint256 oldProtocolVersion = IZKChain(chainDiamondProxy).getProtocolVersion();
+        Diamond.DiamondCutData memory upgradeCutData = abi.decode(diamondCut, (Diamond.DiamondCutData));
+
+        Utils.adminExecute(
+            adminAddr,
+            accessControlRestriction,
+            chainDiamondProxy,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            0
+        );
+    }
+
+    function adminScheduleUpgrade(
+        address adminAddr,
+        address accessControlRestriction,
+        uint256 newProtocolVersion,
+        uint256 timestamp
+    ) public {
+        Utils.adminExecute(
+            adminAddr,
+            accessControlRestriction,
+            adminAddr,
+            // We do instant upgrades, but obviously it should be different in prod
+            abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (newProtocolVersion, timestamp)),
+            0
+        );
+    }
+
     function setDAValidatorPair(
         ChainAdmin chainAdmin,
         address target,
@@ -117,5 +173,24 @@ contract AcceptAdmin is Script {
         vm.startBroadcast();
         chainAdmin.multicall(calls, true);
         vm.stopBroadcast();
+    }
+
+    function updateValidator(
+        address adminAddr,
+        address accessControlRestriction,
+        address validatorTimelock,
+        uint256 chainId,
+        address validatorAddress,
+        bool addValidator
+    ) public {
+        bytes memory data;
+        // The interface should be compatible with both the new and the old ValidatorTimelock
+        if (addValidator) {
+            data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
+        } else {
+            data = abi.encodeCall(ValidatorTimelock.removeValidator, (chainId, validatorAddress));
+        }
+
+        Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
     }
 }
