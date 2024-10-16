@@ -161,7 +161,7 @@ contract DeployL2Script is Script {
             "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
 
-        contracts.timestampAsserterBytecode = Utils.readHardhatBytecode(
+        contracts.timestampAsserterBytecode = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/TimestampAsserter.sol/TimestampAsserter.json"
         );
     }
