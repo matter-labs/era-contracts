@@ -365,7 +365,6 @@ describe("L2 upgrade test", function () {
   });
 
   it("Should validate factory deps length isn't too large", async () => {
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
     const randomDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
 
     const wrongTx = buildL2CanonicalTransaction({

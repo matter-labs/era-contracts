@@ -83,7 +83,7 @@ library Utils {
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32("")  
+            bytes32("")
         );
         logs[4] = constructL2Log(
             true,

@@ -598,7 +598,12 @@ export class Deployer {
   }
 
   public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const contractAddress = await this.deployViaCreate2("ExecutorFacet", [await this.getL1ChainId()], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "ExecutorFacet",
+      [await this.getL1ChainId()],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
       console.log(`CONTRACTS_EXECUTOR_FACET_ADDR=${contractAddress}`);

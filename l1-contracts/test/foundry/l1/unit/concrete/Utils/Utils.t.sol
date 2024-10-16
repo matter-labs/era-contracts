@@ -86,7 +86,7 @@ contract UtilsTest is Test {
                 true,
                 L2_BOOTLOADER_ADDRESS,
                 uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-                bytes32("")  
+                bytes32("")
             ),
             "log[3] should be correct"
         );
