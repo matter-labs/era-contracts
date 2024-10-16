@@ -369,13 +369,13 @@ object "EvmEmulator" {
         
         function consumeEvmFrame() -> passGas, isStatic, callerEVM {
             // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
-            mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
+            mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
         
             let farCallAbi := getFarCallABI(
                 0,
                 0,
                 0,
-                4,
+                1,
                 gas(),
                 // Only rollup is supported for now
                 0,
@@ -391,14 +391,14 @@ object "EvmEmulator" {
                 revert(0, 0)
             }
         
-            returndatacopy(0,0,64)
+            let _returndatasize := returndatasize()
+            if _returndatasize {
+                callerEVM := true
         
-            let auxData := mload(32)
-            callerEVM := gt(auxData, 1)
-        
-            if callerEVM {
-                isStatic := and(auxData, 1)
+                returndatacopy(0, 0, 32)
                 passGas := mload(0)
+                
+                isStatic := gt(_returndatasize, 32)
             }
         }
         
@@ -604,29 +604,31 @@ object "EvmEmulator" {
         }
         
         function isSlotWarm(key) -> isWarm {
-            mstore(0, 0x482D2E7400000000000000000000000000000000000000000000000000000000)
-            mstore(4, key)
+            mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
+            mstore(1, key)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
         
-            isWarm := mload(0)
+            if returndatasize() {
+                isWarm := true
+            }
         }
         
         function warmSlot(key,currentValue) -> isWarm, originalValue {
-            mstore(0, 0xBDF7816000000000000000000000000000000000000000000000000000000000)
-            mstore(4, key)
-            mstore(36,currentValue)
+            mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
+            mstore(1, key)
+            mstore(33,currentValue)
         
             let farCallAbi := getFarCallABI(
                 0,
                 0,
                 0,
-                68,
+                65,
                 gas(),
                 // Only rollup is supported for now
                 0,
@@ -642,10 +644,11 @@ object "EvmEmulator" {
                 revert(0, 0)
             }
         
-            returndatacopy(0, 0, 64)
-        
-            isWarm := mload(0)
-            originalValue := mload(32)
+            if returndatasize() {
+                isWarm := true
+                returndatacopy(0, 0, 32)
+                originalValue := mload(0)
+            }
         }
         
         function getFarCallABI(
@@ -686,14 +689,13 @@ object "EvmEmulator" {
         }
         
         function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-            mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
-            mstore(4, addr)
+            mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff)) // 0x8DB2BA7800000000000000000000000000000000000000000000000000000000
         
             let farCallAbi := getFarCallABI(
                 0,
                 0,
                 0,
-                36,
+                32,
                 gas(),
                 // Only rollup is supported for now
                 0,
@@ -709,8 +711,9 @@ object "EvmEmulator" {
                 revert(0, 0)
             }
         
-            returndatacopy(0, 0, 32)
-            isWarm := mload(0)
+            if returndatasize() {
+                isWarm := true
+            }
         }
         
         function getRawNonce(addr) -> nonce {
@@ -749,15 +752,14 @@ object "EvmEmulator" {
         function _pushEVMFrame(_passGas, _isStatic) {
             // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
         
-            mstore(0, 0xEAD7715600000000000000000000000000000000000000000000000000000000)
-            mstore(4, _passGas)
-            mstore(36, _isStatic)
+            mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
+            mstore(32, _passGas)
         
             let farCallAbi := getFarCallABI(
                 0,
                 0,
                 0,
-                68,
+                64,
                 gas(),
                 // Only rollup is supported for now
                 0,
@@ -3203,13 +3205,13 @@ object "EvmEmulator" {
             
             function consumeEvmFrame() -> passGas, isStatic, callerEVM {
                 // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
-                mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
+                mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
             
                 let farCallAbi := getFarCallABI(
                     0,
                     0,
                     0,
-                    4,
+                    1,
                     gas(),
                     // Only rollup is supported for now
                     0,
@@ -3225,14 +3227,14 @@ object "EvmEmulator" {
                     revert(0, 0)
                 }
             
-                returndatacopy(0,0,64)
+                let _returndatasize := returndatasize()
+                if _returndatasize {
+                    callerEVM := true
             
-                let auxData := mload(32)
-                callerEVM := gt(auxData, 1)
-            
-                if callerEVM {
-                    isStatic := and(auxData, 1)
+                    returndatacopy(0, 0, 32)
                     passGas := mload(0)
+                    
+                    isStatic := gt(_returndatasize, 32)
                 }
             }
             
@@ -3438,29 +3440,31 @@ object "EvmEmulator" {
             }
             
             function isSlotWarm(key) -> isWarm {
-                mstore(0, 0x482D2E7400000000000000000000000000000000000000000000000000000000)
-                mstore(4, key)
+                mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
+                mstore(1, key)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
             
-                isWarm := mload(0)
+                if returndatasize() {
+                    isWarm := true
+                }
             }
             
             function warmSlot(key,currentValue) -> isWarm, originalValue {
-                mstore(0, 0xBDF7816000000000000000000000000000000000000000000000000000000000)
-                mstore(4, key)
-                mstore(36,currentValue)
+                mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
+                mstore(1, key)
+                mstore(33,currentValue)
             
                 let farCallAbi := getFarCallABI(
                     0,
                     0,
                     0,
-                    68,
+                    65,
                     gas(),
                     // Only rollup is supported for now
                     0,
@@ -3476,10 +3480,11 @@ object "EvmEmulator" {
                     revert(0, 0)
                 }
             
-                returndatacopy(0, 0, 64)
-            
-                isWarm := mload(0)
-                originalValue := mload(32)
+                if returndatasize() {
+                    isWarm := true
+                    returndatacopy(0, 0, 32)
+                    originalValue := mload(0)
+                }
             }
             
             function getFarCallABI(
@@ -3520,14 +3525,13 @@ object "EvmEmulator" {
             }
             
             function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-                mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
-                mstore(4, addr)
+                mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff)) // 0x8DB2BA7800000000000000000000000000000000000000000000000000000000
             
                 let farCallAbi := getFarCallABI(
                     0,
                     0,
                     0,
-                    36,
+                    32,
                     gas(),
                     // Only rollup is supported for now
                     0,
@@ -3543,8 +3547,9 @@ object "EvmEmulator" {
                     revert(0, 0)
                 }
             
-                returndatacopy(0, 0, 32)
-                isWarm := mload(0)
+                if returndatasize() {
+                    isWarm := true
+                }
             }
             
             function getRawNonce(addr) -> nonce {
@@ -3583,15 +3588,14 @@ object "EvmEmulator" {
             function _pushEVMFrame(_passGas, _isStatic) {
                 // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
             
-                mstore(0, 0xEAD7715600000000000000000000000000000000000000000000000000000000)
-                mstore(4, _passGas)
-                mstore(36, _isStatic)
+                mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
+                mstore(32, _passGas)
             
                 let farCallAbi := getFarCallABI(
                     0,
                     0,
                     0,
-                    68,
+                    64,
                     gas(),
                     // Only rollup is supported for now
                     0,
