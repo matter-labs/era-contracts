@@ -56,6 +56,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -92,6 +93,8 @@ contract DeployL1Script is Script, DeployUtils {
 
         instantiateCreate2Factory();
         deployIfNeededMulticall3();
+
+        deployBytecodesSupplier();
 
         deployVerifier();
 
@@ -144,6 +147,7 @@ contract DeployL1Script is Script, DeployUtils {
             config.contracts.multicall3Addr = MULTICALL3_ADDRESS;
         }
     }
+
     function deployDAValidators() internal {
         address contractAddress = deployViaCreate2(Utils.readRollupDAValidatorBytecode(), "");
         console.log("L1RollupDAValidator deployed at:", contractAddress);
@@ -544,6 +548,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "diamond_proxy_addr",

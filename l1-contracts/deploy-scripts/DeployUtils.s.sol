@@ -54,6 +54,7 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -266,6 +267,12 @@ contract DeployUtils is Script {
             );
     }
 
+    function deployBytecodesSupplier() internal {
+        address contractAddress = deployViaCreate2(type(BytecodesSupplier).creationCode, "");
+        console.log("BytecodesSupplier deployed at:", contractAddress);
+        addresses.stateTransition.bytecodesSupplier = contractAddress;
+    }
+
     function deployVerifier() internal {
         bytes memory code;
         if (config.testnetVerifier) {
@@ -345,7 +352,7 @@ contract DeployUtils is Script {
     }
 
     function deployStateTransitionDiamondFacets() internal {
-        address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode, abi.encode());
+        address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId));
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
