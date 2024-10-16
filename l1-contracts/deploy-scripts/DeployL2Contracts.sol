@@ -162,7 +162,7 @@ contract DeployL2Script is Script {
         );
 
         contracts.timestampAsserterBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/dev-contracts/TimestampAsserter.sol/TimestampAsserter.json"
+            "/../l2-contracts/zkout/TimestampAsserter.sol/TimestampAsserter.json"
         );
     }
 
