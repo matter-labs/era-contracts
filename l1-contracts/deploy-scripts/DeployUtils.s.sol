@@ -158,6 +158,7 @@ struct ContractsConfig {
     bytes diamondCutData;
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
+    uint256 fflonkProofLength;
 }
 
 struct TokensConfig {
@@ -434,7 +435,10 @@ contract DeployUtils is Script {
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(addresses.stateTransition.verifier),
+            dualVerifier: IVerifier(addresses.stateTransition.dualVerifier),
+            plonkVerifier: addresses.stateTransition.plonkVerifier,
+            fflonkVerifier: addresses.stateTransition.fflonkVerifier,
+            fflonkProofLength: config.contracts.fflonkProofLength,
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,

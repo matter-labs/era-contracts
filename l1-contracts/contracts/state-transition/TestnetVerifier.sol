@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Verifier} from "./Verifier.sol";
+import {DualVerifier} from "./DualVerifier.sol";
 import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
 /// @author Matter Labs
@@ -11,7 +11,7 @@ import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 /// @dev This contract is used to skip the zkp verification for the testnet environment.
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
-contract TestnetVerifier is Verifier {
+contract TestnetVerifier is DualVerifier {
     constructor() {
         assert(block.chainid != 1);
     }

@@ -217,6 +217,7 @@ contract EcosystemUpgrade is Script {
         address blobVersionedHashRetriever;
         address l2BridgeProxyOwnerAddress;
         address l2BridgedStandardERC20ProxyOwnerAddress;
+        uint256 fflonkProofLength;
     }
 
     struct TokensConfig {
@@ -1123,7 +1124,10 @@ contract EcosystemUpgrade is Script {
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(addresses.stateTransition.verifier),
+            dualVerifier: IVerifier(addresses.stateTransition.dualVerifier),
+            plonkVerifier: addresses.stateTransition.plonkVerifier,
+            fflonkVerifier: addresses.stateTransition.fflonkVerifier,
+            fflonkProofLength: config.contracts.fflonkProofLength,
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,

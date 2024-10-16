@@ -53,7 +53,9 @@ address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 struct StateTransitionDeployedAddresses {
     address chainTypeManagerProxy;
     address chainTypeManagerImplementation;
-    address verifier;
+    address dualVerifier;
+    address plonkVerifier;
+    address fflonkVerifier;
     address adminFacet;
     address mailboxFacet;
     address executorFacet;

@@ -33,7 +33,10 @@ struct ProposedUpgrade {
     bytes[] factoryDeps;
     bytes32 bootloaderHash;
     bytes32 defaultAccountHash;
-    address verifier;
+    address dualVerifier;
+    address plonkVerifier;
+    address fflonkVerifier;
+    uint256 fflonkProofLength;
     VerifierParams verifierParams;
     bytes l1ContractsUpgradeCalldata;
     bytes postUpgradeCalldata;
@@ -54,8 +57,17 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Сhanges to the bytecode that is used in L2 as a default account
     event NewL2DefaultAccountBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
 
-    /// @notice Verifier address changed
-    event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
+    /// @notice DualVerifier address changed
+    event NewDualVerifier(address indexed oldDualVerifier, address indexed newDualVerifier);
+
+    /// @notice PlonkVerifier address changed
+    event NewPlonkVerifier(address indexed oldPlonkVerifier, address indexed newPlonkVerifier);
+
+    /// @notice FflonkVerifier address changed
+    event NewFflonkVerifier(address indexed oldFflonkVerifier, address indexed newFflonkVerifier);
+
+    /// @notice Fflonk Proof length changed
+    event NewFflonkProofLength(uint256 indexed oldFflonkProofLength, uint256 indexed newFflonkProofLength);
 
     /// @notice Verifier parameters changed
     event NewVerifierParams(VerifierParams oldVerifierParams, VerifierParams newVerifierParams);
@@ -78,7 +90,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
+        _upgradeVerifiers(_proposedUpgrade.dualVerifier, _proposedUpgrade.plonkVerifier, _proposedUpgrade.fflonkVerifier, _proposedUpgrade.fflonkProofLength, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
 
         txHash = _setL2SystemContractUpgrade(
@@ -137,20 +149,68 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         emit NewL2BootloaderBytecodeHash(previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
     }
 
-    /// @notice Change the address of the verifier smart contract
-    /// @param _newVerifier Verifier smart contract address
-    function _setVerifier(IVerifier _newVerifier) private {
+    /// @notice Change the address of the Wrapper verifier smart contract
+    /// @param _newDualVerifier DualVerifier smart contract address
+    function _setDualVerifier(IVerifier _newDualVerifier) private {
         // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
         // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
         // verifier is upgraded.
-        if (_newVerifier == IVerifier(address(0))) {
+        if (_newDualVerifier == IVerifier(address(0))) {
             return;
         }
 
-        IVerifier oldVerifier = s.verifier;
-        s.verifier = _newVerifier;
-        emit NewVerifier(address(oldVerifier), address(_newVerifier));
+        IVerifier oldDualVerifier = s.dualVerifier;
+        s.dualVerifier = _newDualVerifier;
+        emit NewDualVerifier(address(oldDualVerifier), address(_newDualVerifier));
+    }
+
+    /// @notice Change the address of the PLONK verifier smart contract
+    /// @param _newPlonkVerifier PlonkVerifier smart contract address
+    function _setPlonkVerifier(address _newPlonkVerifier) private {
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
+        // verifier is upgraded.
+        if (_newPlonkVerifier == address(0)) {
+            return;
+        }
+
+        address oldPlonkVerifier = s.plonkVerifier;
+        s.plonkVerifier = _newPlonkVerifier;
+        emit NewPlonkVerifier(oldPlonkVerifier, _newPlonkVerifier);
+    }
+
+    /// @notice Change the address of the FFLONK verifier smart contract
+    /// @param _newFflonkVerifier FflonkVerifier smart contract address
+    function _setFflonkVerifier(address _newFflonkVerifier) private {
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
+        // verifier is upgraded.
+        if (_newFflonkVerifier == address(0)) {
+            return;
+        }
+
+        address oldFflonkVerifier = s.fflonkVerifier;
+        s.fflonkVerifier = _newFflonkVerifier;
+        emit NewFflonkVerifier(oldFflonkVerifier, _newFflonkVerifier);
+    }
+
+    /// @notice Change the length of the FFLONK proof type
+    /// @param _newFflonkProofLength Fflonk proof length
+    function _setFflonkProofLength(uint256 _newFflonkProofLength) private {
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
+        // verifier is upgraded.
+        if (_newFflonkProofLength == 0) {
+            return;
+        }
+
+        uint256 oldFflonkProofLength = s.fflonkProofLength;
+        s.fflonkProofLength = _newFflonkProofLength;
+        emit NewFflonkProofLength(oldFflonkProofLength, _newFflonkProofLength);
     }
 
     /// @notice Change the verifier parameters
@@ -176,8 +236,11 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Updates the verifier and the verifier params
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
     /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
-    function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
-        _setVerifier(IVerifier(_newVerifier));
+    function _upgradeVerifiers(address _newDualVerifier, address _newPlonkVerifier, address _newFflonkVerifier, uint256 _newFflonkProofLength, VerifierParams calldata _verifierParams) internal {
+        _setDualVerifier(IVerifier(_newDualVerifier));
+        _setPlonkVerifier(_newPlonkVerifier);
+        _setFflonkVerifier(_newFflonkVerifier);
+        _setFflonkProofLength(_newFflonkProofLength);
         _setVerifierParams(_verifierParams);
     }
 

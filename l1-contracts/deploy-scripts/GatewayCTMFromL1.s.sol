@@ -76,6 +76,7 @@ contract GatewayCTMFromL1 is Script {
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
         bytes forceDeploymentsData;
+        uint256 fflonkProofLength;
     }
 
     struct Output {
@@ -359,7 +360,10 @@ contract GatewayCTMFromL1 is Script {
         });
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(output.gatewayStateTransition.verifier),
+            dualVerifier: IVerifier(output.gatewayStateTransition.dualVerifier),
+            plonkVerifier: output.gatewayStateTransition.plonkVerifier,
+            fflonkVerifier: output.gatewayStateTransition.fflonkVerifier,
+            fflonkProofLength: config.fflonkProofLength,
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.defaultAAHash,

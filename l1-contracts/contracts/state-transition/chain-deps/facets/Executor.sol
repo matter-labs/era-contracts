@@ -17,7 +17,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, DelegateCallFailed} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -515,14 +515,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
-    function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
+    function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal {
         // We can only process 1 batch proof at a time.
         if (proofPublicInput.length != 1) {
             revert CanOnlyProcessOneBatch();
         }
 
-        bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
-        if (!successVerifyProof) {
+        (bool callSuccess, bytes memory successVerifyProof) = address(s.dualVerifier).delegatecall(abi.encodeWithSelector(s.dualVerifier.verify.selector, proofPublicInput, _proof));
+        if(!callSuccess){
+            revert DelegateCallFailed(successVerifyProof);
+        }
+        if (!abi.decode(successVerifyProof, (bool))) {
             revert InvalidProof();
         }
     }

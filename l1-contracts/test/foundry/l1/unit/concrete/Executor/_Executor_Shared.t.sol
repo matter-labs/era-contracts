@@ -22,6 +22,8 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {VerifierFflonk} from "contracts/state-transition/VerifierFflonk.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -86,35 +88,38 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](28);
-        selectors[0] = getters.getVerifier.selector;
-        selectors[1] = getters.getAdmin.selector;
-        selectors[2] = getters.getPendingAdmin.selector;
-        selectors[3] = getters.getTotalBlocksCommitted.selector;
-        selectors[4] = getters.getTotalBlocksVerified.selector;
-        selectors[5] = getters.getTotalBlocksExecuted.selector;
-        selectors[6] = getters.getTotalPriorityTxs.selector;
-        selectors[7] = getters.getFirstUnprocessedPriorityTx.selector;
-        selectors[8] = getters.getPriorityQueueSize.selector;
-        selectors[9] = getters.getTotalBatchesExecuted.selector;
-        selectors[10] = getters.isValidator.selector;
-        selectors[11] = getters.l2LogsRootHash.selector;
-        selectors[12] = getters.storedBatchHash.selector;
-        selectors[13] = getters.getL2BootloaderBytecodeHash.selector;
-        selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = getters.getVerifierParams.selector;
-        selectors[16] = getters.isDiamondStorageFrozen.selector;
-        selectors[17] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = getters.isEthWithdrawalFinalized.selector;
-        selectors[19] = getters.facets.selector;
-        selectors[20] = getters.facetFunctionSelectors.selector;
-        selectors[21] = getters.facetAddresses.selector;
-        selectors[22] = getters.facetAddress.selector;
-        selectors[23] = getters.isFunctionFreezable.selector;
-        selectors[24] = getters.isFacetFreezable.selector;
-        selectors[25] = getters.getTotalBatchesCommitted.selector;
-        selectors[26] = getters.getTotalBatchesVerified.selector;
-        selectors[27] = getters.storedBlockHash.selector;
+        bytes4[] memory selectors = new bytes4[](31);
+        selectors[0] = getters.getDualVerifier.selector;
+        selectors[1] = getters.getPlonkVerifier.selector;
+        selectors[2] = getters.getFflonkVerifier.selector;
+        selectors[3] = getters.getFflonkProofLength.selector;
+        selectors[4] = getters.getAdmin.selector;
+        selectors[5] = getters.getPendingAdmin.selector;
+        selectors[6] = getters.getTotalBlocksCommitted.selector;
+        selectors[7] = getters.getTotalBlocksVerified.selector;
+        selectors[8] = getters.getTotalBlocksExecuted.selector;
+        selectors[9] = getters.getTotalPriorityTxs.selector;
+        selectors[10] = getters.getFirstUnprocessedPriorityTx.selector;
+        selectors[11] = getters.getPriorityQueueSize.selector;
+        selectors[12] = getters.getTotalBatchesExecuted.selector;
+        selectors[13] = getters.isValidator.selector;
+        selectors[14] = getters.l2LogsRootHash.selector;
+        selectors[15] = getters.storedBatchHash.selector;
+        selectors[16] = getters.getL2BootloaderBytecodeHash.selector;
+        selectors[17] = getters.getL2DefaultAccountBytecodeHash.selector;
+        selectors[18] = getters.getVerifierParams.selector;
+        selectors[19] = getters.isDiamondStorageFrozen.selector;
+        selectors[20] = getters.getPriorityTxMaxGasLimit.selector;
+        selectors[21] = getters.isEthWithdrawalFinalized.selector;
+        selectors[22] = getters.facets.selector;
+        selectors[23] = getters.facetFunctionSelectors.selector;
+        selectors[24] = getters.facetAddresses.selector;
+        selectors[25] = getters.facetAddress.selector;
+        selectors[26] = getters.isFunctionFreezable.selector;
+        selectors[27] = getters.isFacetFreezable.selector;
+        selectors[28] = getters.getTotalBatchesCommitted.selector;
+        selectors[29] = getters.getTotalBatchesVerified.selector;
+        selectors[30] = getters.storedBlockHash.selector;
         return selectors;
     }
 
@@ -200,7 +205,10 @@ contract ExecutorTest is Test {
             validatorTimelock: validator,
             baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            verifier: IVerifier(testnetVerifier), // verifier
+            dualVerifier: IVerifier(testnetVerifier), // verifier
+            plonkVerifier: new Verifier(),
+            fflonkVerifier: new VerifierFflonk(),
+            fflonkProofLength: 0,
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: 0,
                 recursionLeafLevelVkHash: 0,
