@@ -75,23 +75,22 @@ library Utils {
         );
         logs[2] = constructL2Log(
             true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            bytes32("")
-        );
-        logs[3] = constructL2Log(
-            true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             keccak256("")
         );
-        logs[4] = constructL2Log(
+        logs[3] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+            bytes32("")  
+        );
+        logs[4] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32("")
         );
-
         logs[5] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,

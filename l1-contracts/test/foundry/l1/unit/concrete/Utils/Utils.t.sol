@@ -73,9 +73,9 @@ contract UtilsTest is Test {
             logs[2],
             Utils.constructL2Log(
                 true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-                bytes32("")
+                L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
+                keccak256("")
             ),
             "log[2] should be correct"
         );
@@ -85,8 +85,8 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-                keccak256("")
+                uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+                bytes32("")  
             ),
             "log[3] should be correct"
         );
@@ -95,8 +95,8 @@ contract UtilsTest is Test {
             logs[4],
             Utils.constructL2Log(
                 true,
-                L2_BOOTLOADER_ADDRESS,
-                uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
                 bytes32("")
             ),
             "log[4] should be correct"
