@@ -78,7 +78,10 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
             factoryDeps: _factoryDeps,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
-            verifier: address(0),
+            dualVerifier: address(0),
+            plonkVerifier: address(0),
+            fflonkVerifier: address(0),
+            fflonkProofLength: 0,
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
                 recursionLeafLevelVkHash: bytes32(0),

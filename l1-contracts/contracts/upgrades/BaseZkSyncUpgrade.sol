@@ -234,7 +234,10 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     }
 
     /// @notice Updates the verifier and the verifier params
-    /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
+    /// @param _newDualVerifier The address of the new Wrapper verifier. If 0, the verifier will not be updated.
+    /// @param _newPlonkVerifier The address of the new PLONK verifier. If 0, the verifier will not be updated.
+    /// @param _newFflonkVerifier The address of the new FFLONK verifier. If 0, the verifier will not be updated.
+    /// @param _newFflonkProofLength The length of new FFLONK proof. If 0, the length will not be updated.
     /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
     function _upgradeVerifiers(address _newDualVerifier, address _newPlonkVerifier, address _newFflonkVerifier, uint256 _newFflonkProofLength, VerifierParams calldata _verifierParams) internal {
         _setDualVerifier(IVerifier(_newDualVerifier));

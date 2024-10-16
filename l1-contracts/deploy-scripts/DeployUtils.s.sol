@@ -276,7 +276,7 @@ contract DeployUtils is Script {
         }
         address contractAddress = deployViaCreate2(code, "");
         console.log("Verifier deployed at:", contractAddress);
-        addresses.stateTransition.verifier = contractAddress;
+        addresses.stateTransition.dualVerifier = contractAddress;
     }
 
     function deployDefaultUpgrade() internal {
