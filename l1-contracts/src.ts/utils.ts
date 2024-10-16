@@ -167,7 +167,6 @@ export interface FeeParams {
 export interface ProposedUpgrade {
   // The tx for the upgrade call to the l2 system upgrade contract
   l2ProtocolUpgradeTx: L2CanonicalTransaction;
-  factoryDeps: BytesLike[];
   bootloaderHash: BytesLike;
   defaultAccountHash: BytesLike;
   verifier: string;

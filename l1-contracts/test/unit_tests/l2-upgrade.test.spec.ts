@@ -369,14 +369,13 @@ describe("L2 upgrade test", function () {
     const randomDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
 
     const wrongTx = buildL2CanonicalTransaction({
-      factoryDeps: Array(33).fill(randomDepHash),
+      factoryDeps: Array(65).fill(randomDepHash),
       nonce: 4 + initialMinorProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
-        factoryDeps: Array(65).fill(myFactoryDep),
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
       })
     );
@@ -411,7 +410,6 @@ describe("L2 upgrade test", function () {
       verifierParams: newerVerifierParams,
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
-      factoryDeps: [myFactoryDep],
       newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 5, 0),
     };
 
@@ -959,7 +957,6 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     l1ContractsUpgradeCalldata: "0x",
     postUpgradeCalldata: "0x",
     upgradeTimestamp: ethers.constants.Zero,
-    factoryDeps: [],
     newProtocolVersion,
     ...proposedUpgrade,
   };

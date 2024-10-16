@@ -228,12 +228,6 @@ export function createSystemLogs(
     ),
     constructL2Log(
       true,
-      L2_SYSTEM_CONTEXT_ADDRESS,
-      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
-    ),
-    constructL2Log(
-      true,
       L2_BOOTLOADER_ADDRESS,
       SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
       chainedPriorityTxHashKey ? chainedPriorityTxHashKey.toString() : EMPTY_STRING_KECCAK
@@ -244,7 +238,12 @@ export function createSystemLogs(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
-
+    constructL2Log(
+      true,
+      L2_SYSTEM_CONTEXT_ADDRESS,
+      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
+    ),
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
