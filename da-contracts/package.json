@@ -53,6 +53,7 @@
     "zksync-ethers": "5.8.0-beta.5"
   },
   "scripts": {
+    "test:foundry": "forge test --ffi",
     "build": "hardhat compile ",
     "build:foundry": "forge build",
     "clean": "hardhat clean",

@@ -1,0 +1,86 @@
+name: DA Contracts Foundry CI
+
+env:
+  ANVIL_RPC_URL: "http://127.0.0.1:8545"
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build DA contracts artifacts
+        working-directory: ./da-contracts
+        run: forge build
+
+      - name: Create cache for DA contracts
+        uses: actions/cache/save@v3
+        with:
+          key: artifacts-da-contracts-${{ github.sha }}
+          path: |
+            da-contracts/cache
+            da-contracts/out
+
+  tests:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-da-contracts-${{ github.sha }}
+          path: |
+            da-contracts/cache
+            da-contracts/out
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run anvil
+        run: |
+          anvil --silent &
+
+          ANVIL_READY=0
+          for i in {1..10}; do
+            if curl -s -o /dev/null $ANVIL_RPC_URL -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_chainId","id":1}'; then
+              echo "Anvil is ready"
+              ANVIL_READY=1
+              break
+            else
+              echo "Waiting for Anvil to become ready..."
+              sleep 1
+            fi
+          done
+
+          if [ $ANVIL_READY -ne 1 ]; then
+            echo "Anvil failed to become ready after 10 attempts."
+            exit 1
+          fi
+
+      - name: Run Foundry tests using yarn
+        working-directory: ./da-contracts
+        run: yarn test:foundry
