@@ -63,11 +63,13 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
+import {SystemContractsProcessing} from "./SystemContractsProcessing.s.sol";
+import {BytecodePublisher} from "./BytecodePublisher.s.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -121,6 +123,7 @@ contract EcosystemUpgrade is Script {
         address gatewayUpgrade;
         address create2Factory;
         address transitionaryOwner;
+        address bytecodesSupplier;
     }
 
     struct ExpectedL2Addresses {
@@ -193,7 +196,6 @@ contract EcosystemUpgrade is Script {
         bytes32 genesisRoot;
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
-        uint256 latestProtocolVersion;
         bytes32 recursionNodeLevelVkHash;
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
@@ -227,6 +229,15 @@ contract EcosystemUpgrade is Script {
     GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
 
+    uint256[] factoryDepsHashes;
+
+    struct CachedBytecodeHashes {
+        bytes32 sharedL2LegacyBridgeBytecodeHash;
+        bytes32 erc20StandardImplBytecodeHash;
+    }
+
+    CachedBytecodeHashes internal cachedBytecodeHashes;
+
     function prepareEcosystemContracts(string memory configPath, string memory outputPath) public {
         string memory root = vm.projectRoot();
         configPath = string.concat(root, configPath);
@@ -236,6 +247,8 @@ contract EcosystemUpgrade is Script {
 
         instantiateCreate2Factory();
 
+        deployBytecodesSupplier();
+        publishBytecodes();
         deployVerifier();
         deployDefaultUpgrade();
         deployGenesisUpgrade();
@@ -259,8 +272,9 @@ contract EcosystemUpgrade is Script {
 
         deployCTMDeploymentTracker();
 
-        initializeGeneratedData();
         initializeExpectedL2Addresses();
+        // Important, this must come after the initializeExpectedL2Addresses
+        initializeGeneratedData();
 
         deployChainTypeManagerContract();
         setChainTypeManagerInValidatorTimelock();
@@ -275,7 +289,10 @@ contract EcosystemUpgrade is Script {
     }
 
     function run() public {
-        console.log("Deploying L1 contracts");
+        prepareEcosystemContracts(
+            "/script-config/gateway-upgrade-ecosystem.toml",
+            "/script-out/gateway-upgrade-ecosystem.toml"
+        );
     }
 
     function provideAcceptOwnershipCalls() public returns (Call[] memory calls) {
@@ -328,7 +345,9 @@ contract EcosystemUpgrade is Script {
             // FIXME: dont use hardcoded values
             txType: 254,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(address(L2_COMPLEX_UPGRADER_ADDR))),
+            // Note, that we actually do force deployments to the ContractDeployer and not complex upgrader.
+            // The implementation of the ComplexUpgrader will be deployed during one of the force deployments.
+            to: uint256(uint160(address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR))),
             gasLimit: 72_000_000,
             gasPerPubdataByteLimit: 800,
             maxFeePerGas: 0,
@@ -341,7 +360,7 @@ contract EcosystemUpgrade is Script {
             data: new bytes(0),
             signature: new bytes(0),
             // All factory deps should've been published before
-            factoryDeps: new uint256[](0),
+            factoryDeps: factoryDepsHashes,
             paymasterInput: new bytes(0),
             // Reserved dynamic type for the future use-case. Using it should be avoided,
             // But it is still here, just in case we want to enable some additional functionality
@@ -354,7 +373,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function getOldProtocolDeadline() public returns (uint256) {
-        return 7 days;
+        // FIXME: no deadline until we can figure out how to test it locally
+        return type(uint256).max;
     }
 
     function getOldProtocolVersion() public returns (uint256) {
@@ -417,24 +437,64 @@ contract EcosystemUpgrade is Script {
             recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
         });
 
-        // TODO: we should fill this one up completely, but it is straightforward
-        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = new IL2ContractDeployer.ForceDeployment[](
-            0
+        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
+            .getBaseForceDeployments();
+
+        // This upgrade has complex upgrade. We do not know whether its implementation has been deployed.
+        // We will do the following trick:
+        // - Deploy the upgrade implementation into the address of the complex upgrader. And execute the upgrade inside the constructor.
+        // - Deploy back the original bytecode.
+        //
+        // Also, we need to predeploy the bridges implementation
+        IL2ContractDeployer.ForceDeployment[]
+            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](4);
+        additionalForceDeployments[0] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: cachedBytecodeHashes.sharedL2LegacyBridgeBytecodeHash,
+            newAddress: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
+            callConstructor: true,
+            value: 0,
+            input: ""
+        });
+        additionalForceDeployments[1] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: cachedBytecodeHashes.erc20StandardImplBytecodeHash,
+            newAddress: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
+            callConstructor: true,
+            value: 0,
+            input: ""
+        });
+        additionalForceDeployments[2] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()),
+            newAddress: L2_COMPLEX_UPGRADER_ADDR,
+            callConstructor: true,
+            value: 0,
+            input: ""
+        });
+        // Getting the contract back to normal
+        additionalForceDeployments[3] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(Utils.readSystemContractsBytecode("ComplexUpgrader")),
+            newAddress: L2_COMPLEX_UPGRADER_ADDR,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
+            baseForceDeployments,
+            additionalForceDeployments
         );
+
         address ctmDeployer = addresses.bridgehub.ctmDeploymentTrackerProxy;
 
+        GatewayUpgradeEncodedInput memory gateUpgradeInput = GatewayUpgradeEncodedInput({
+            forceDeployments: forceDeployments,
+            l2GatewayUpgradePosition: forceDeployments.length - 2,
+            ctmDeployer: ctmDeployer,
+            fixedForceDeploymentsData: generatedData.forceDeploymentsData,
+            oldValidatorTimelock: config.contracts.oldValidatorTimelock,
+            newValidatorTimelock: addresses.validatorTimelock
+        });
 
-        // FIXME
-        // GatewayUpgradeEncodedInput memory gateUpgradeInput = GatewayUpgradeEncodedInput({
-        //     baseForceDeployments: baseForceDeployments,
-        //     ctmDeployer: ctmDeployer,
-        //     fixedForceDeploymentsData: generatedData.forceDeploymentsData,
-        //     l2GatewayUpgrade: addresses.expectedL2Addresses.expectedL2GatewayUpgrade,
-        //     oldValidatorTimelock: config.contracts.oldValidatorTimelock,
-        //     newValidatorTimelock: addresses.validatorTimelock
-        // });
-
-        bytes memory postUpgradeCalldata = hex""; //abi.encode(gateUpgradeInput);
+        bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput);
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(),
@@ -455,6 +515,13 @@ contract EcosystemUpgrade is Script {
             initAddress: addresses.gatewayUpgrade,
             initCalldata: abi.encodeCall(GatewayUpgrade.upgrade, (proposedUpgrade))
         });
+    }
+
+    function getStage1UpgradeCalls() public returns (Call[] memory calls) {
+        // Stage 1 of the upgrade:
+        // - accept all the ownerships of the contracts
+        // - set the new upgrade data for chains + update validator timelock.
+        calls = mergeCalls(provideAcceptOwnershipCalls(), provideSetNewVersionUpgradeCall());
     }
 
     function getStage2UpgradeCalls() public returns (Call[] memory calls) {
@@ -489,6 +556,7 @@ contract EcosystemUpgrade is Script {
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (
+                    // Note, that we do not need to run the initializer
                     ITransparentUpgradeableProxy(payable(config.contracts.oldSharedBridgeProxyAddress)),
                     addresses.bridges.l1NullifierImplementation
                 )
@@ -573,7 +641,6 @@ contract EcosystemUpgrade is Script {
         config.contracts.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
         config.contracts.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
         config.contracts.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
-        config.contracts.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
         config.contracts.recursionNodeLevelVkHash = toml.readBytes32("$.contracts.recursion_node_level_vk_hash");
         config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.contracts.recursion_circuits_set_vks_hash");
@@ -671,12 +738,12 @@ contract EcosystemUpgrade is Script {
             ),
             l2SharedBridgeLegacyImpl: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()),
+                cachedBytecodeHashes.sharedL2LegacyBridgeBytecodeHash,
                 hex""
             ),
             l2BridgedStandardERC20Impl: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readStandardERC20Bytecode()),
+                cachedBytecodeHashes.erc20StandardImplBytecodeHash,
                 hex""
             ),
             expectedL2ProxyAdminDeployer: expectedL2ProxyAdminDeployer,
@@ -712,6 +779,60 @@ contract EcosystemUpgrade is Script {
         }
 
         addresses.create2Factory = contractAddress;
+    }
+
+    function deployBytecodesSupplier() internal {
+        address contractAddress = deployViaCreate2(type(BytecodesSupplier).creationCode);
+        console.log("BytecodesSupplier deployed at:", contractAddress);
+        addresses.bytecodesSupplier = contractAddress;
+    }
+
+    function getFullListOfFactoryDependencies() internal returns (bytes[] memory factoryDeps) {
+        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
+
+        // This upgrade will also require to publish:
+        // - L2GatewayUpgrade
+        // - new L2 shared bridge legacy implementation
+        // - new bridged erc20 token implementation
+        //
+        // Also, not strictly necessary, but better for consistency with the new chains:
+        // - UpgradeableBeacon
+        // - BeaconProxy
+
+        bytes[] memory upgradeSpecificDependencies = new bytes[](5);
+        upgradeSpecificDependencies[0] = L2ContractsBytecodesLib.readGatewayUpgradeBytecode();
+        upgradeSpecificDependencies[1] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
+        upgradeSpecificDependencies[2] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
+
+        upgradeSpecificDependencies[3] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
+        upgradeSpecificDependencies[4] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
+
+        cachedBytecodeHashes = CachedBytecodeHashes({
+            sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
+            erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2])
+        });
+
+        factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, upgradeSpecificDependencies);
+        factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
+    }
+
+    function publishBytecodes() internal {
+        bytes[] memory allDeps = getFullListOfFactoryDependencies();
+        BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(addresses.bytecodesSupplier), allDeps);
+
+        uint256[] memory factoryDeps = new uint256[](allDeps.length);
+
+        require(factoryDeps.length <= 64, "Too many deps");
+
+        for (uint256 i = 0; i < allDeps.length; i++) {
+            factoryDeps[i] = uint256(L2ContractHelper.hashL2Bytecode(allDeps[i]));
+        }
+
+        // Double check for consistency:
+        require(bytes32(factoryDeps[0]) == config.contracts.bootloaderHash, "bootloader hash factory dep mismatch");
+        require(bytes32(factoryDeps[1]) == config.contracts.defaultAAHash, "default aa hash factory dep mismatch");
+
+        factoryDepsHashes = factoryDeps;
     }
 
     function deployVerifier() internal {
@@ -867,7 +988,9 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployStateTransitionDiamondFacets() internal {
-        address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode);
+        address executorFacet = deployViaCreate2(
+            abi.encodePacked(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId))
+        );
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
@@ -964,10 +1087,11 @@ contract EcosystemUpgrade is Script {
     }
 
     function setL1LegacyBridge() internal {
-        vm.broadcast(msg.sender);
+        vm.startBroadcast();
         L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(
             L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress)
         );
+        vm.stopBroadcast();
     }
 
     function deployErc20BridgeImplementation() internal {
@@ -997,14 +1121,20 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployBridgedTokenBeacon() internal {
-        bytes memory bytecode = abi.encodePacked(
-            type(UpgradeableBeacon).creationCode,
-            // solhint-disable-next-line func-named-parameters
-            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
-        );
+        // bytes memory bytecode = abi.encodePacked(
+        //     type(UpgradeableBeacon).creationCode,
+        //     // solhint-disable-next-line func-named-parameters
+        //     abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        // );
+
+        // Note, that the `msg.sender` will be set as the owner.
+        // This means that we can not use a naive create2factory. It may be replaced
+        // with a more advanced one, but CREATE from a hot wallet is fine too.
+        vm.startBroadcast(msg.sender);
         UpgradeableBeacon beacon = new UpgradeableBeacon(addresses.bridges.bridgedStandardERC20Implementation);
-        address contractAddress = address(beacon);
         beacon.transferOwnership(config.ownerAddress);
+        vm.stopBroadcast();
+        address contractAddress = address(beacon);
         console.log("BridgedTokenBeacon deployed at:", contractAddress);
         addresses.bridges.bridgedTokenBeacon = contractAddress;
     }
@@ -1292,6 +1422,7 @@ contract EcosystemUpgrade is Script {
             "validium_l1_da_validator_addr",
             addresses.daAddresses.l1ValidiumDAValidator
         );
+        vm.serializeAddress("deployed_addresses", "l1_bytecodes_supplier_addr", addresses.bytecodesSupplier);
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
@@ -1306,6 +1437,11 @@ contract EcosystemUpgrade is Script {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
+
+        vm.serializeBytes("root", "governance_stage1_calls", abi.encode(getStage1UpgradeCalls()));
+        vm.serializeBytes("root", "governance_stage2_calls", abi.encode(getStage2UpgradeCalls()));
+        vm.serializeBytes("root", "chain_upgrade_diamond_cut", abi.encode(getChainUpgradeInfo()));
+
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
@@ -1342,6 +1478,16 @@ contract EcosystemUpgrade is Script {
         });
 
         return abi.encode(data);
+    }
+
+    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
+        result = new Call[](a.length + b.length);
+        for (uint256 i = 0; i < a.length; i++) {
+            result[i] = a[i];
+        }
+        for (uint256 i = 0; i < b.length; i++) {
+            result[a.length + i] = b[i];
+        }
     }
 
     // add this to be excluded from coverage report
