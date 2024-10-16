@@ -423,20 +423,21 @@ contract EcosystemUpgrade is Script {
         );
         address ctmDeployer = addresses.bridgehub.ctmDeploymentTrackerProxy;
 
-        GatewayUpgradeEncodedInput memory gateUpgradeInput = GatewayUpgradeEncodedInput({
-            baseForceDeployments: baseForceDeployments,
-            ctmDeployer: ctmDeployer,
-            fixedForceDeploymentsData: generatedData.forceDeploymentsData,
-            l2GatewayUpgrade: addresses.expectedL2Addresses.expectedL2GatewayUpgrade,
-            oldValidatorTimelock: config.contracts.oldValidatorTimelock,
-            newValidatorTimelock: addresses.validatorTimelock
-        });
 
-        bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput);
+        // FIXME
+        // GatewayUpgradeEncodedInput memory gateUpgradeInput = GatewayUpgradeEncodedInput({
+        //     baseForceDeployments: baseForceDeployments,
+        //     ctmDeployer: ctmDeployer,
+        //     fixedForceDeploymentsData: generatedData.forceDeploymentsData,
+        //     l2GatewayUpgrade: addresses.expectedL2Addresses.expectedL2GatewayUpgrade,
+        //     oldValidatorTimelock: config.contracts.oldValidatorTimelock,
+        //     newValidatorTimelock: addresses.validatorTimelock
+        // });
+
+        bytes memory postUpgradeCalldata = hex""; //abi.encode(gateUpgradeInput);
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(),
-            factoryDeps: new bytes[](0),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
             verifier: addresses.stateTransition.verifier,

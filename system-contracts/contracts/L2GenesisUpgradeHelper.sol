@@ -10,8 +10,8 @@ import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./
 library L2GenesisUpgradeHelper {
     function performForceDeployedContractsInit(
         address _ctmDeployer,
-        bytes calldata _fixedForceDeploymentsData,
-        bytes calldata _additionalForceDeploymentsData
+        bytes memory _fixedForceDeploymentsData,
+        bytes memory _additionalForceDeploymentsData
     ) internal {
         ForceDeployment[] memory forceDeployments = _getForceDeploymentsData(
             _fixedForceDeploymentsData,
@@ -45,8 +45,8 @@ library L2GenesisUpgradeHelper {
     }
 
     function _getForceDeploymentsData(
-        bytes calldata _fixedForceDeploymentsData,
-        bytes calldata _additionalForceDeploymentsData
+        bytes memory _fixedForceDeploymentsData,
+        bytes memory _additionalForceDeploymentsData
     ) internal view returns (ForceDeployment[] memory forceDeployments) {
         FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
             _fixedForceDeploymentsData,

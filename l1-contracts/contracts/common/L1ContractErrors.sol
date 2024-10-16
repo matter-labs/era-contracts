@@ -185,8 +185,6 @@ error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
 error L2BridgeNotDeployed(uint256 chainId);
 // 0xff8811ff
 error L2BridgeNotSet(uint256 chainId);
-// 0xcb5e4247
-error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0xd2c011d6
@@ -355,8 +353,6 @@ error TxnBodyGasLimitNotEnoughGas();
 error Unauthorized(address caller);
 // 0xe52478c7
 error UndefinedDiamondCutAction();
-// 0x07218375
-error UnexpectedNumberOfFactoryDeps();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
 //
@@ -416,6 +412,8 @@ error NotBridgehub(address addr);
 error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
+// 0xccdd18d2
+error BytecodeAlreadyPublished(bytes32 bytecodeHash);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

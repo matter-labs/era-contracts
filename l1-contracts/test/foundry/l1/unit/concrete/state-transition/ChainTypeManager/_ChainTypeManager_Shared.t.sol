@@ -89,7 +89,7 @@ contract ChainTypeManagerTest is Test {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new ExecutorFacet()),
+                facet: address(new ExecutorFacet(block.chainid)),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getExecutorSelectors()

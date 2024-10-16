@@ -12,6 +12,8 @@ import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-i
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
+    constructor() ExecutorFacet(block.chainid) {}
+    
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,

@@ -479,7 +479,7 @@ contract DeployL1Script is Script, DeployUtils {
         AdminFacet adminFacet = new AdminFacet(1);
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
-        ExecutorFacet executorFacet = new ExecutorFacet();
+        ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);

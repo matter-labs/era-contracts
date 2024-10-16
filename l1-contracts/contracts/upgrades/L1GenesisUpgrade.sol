@@ -75,7 +75,6 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         }
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            factoryDeps: _factoryDeps,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             verifier: address(0),
