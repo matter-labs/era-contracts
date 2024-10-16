@@ -46,9 +46,9 @@ object "EvmGasManager" {
                 mask :=  sub(shl(160, 1), 1)
             }
 
-            function $llvm_AlwaysInline_llvm$__getRawCodeHash(account) -> hash {
+            function $llvm_AlwaysInline_llvm$__getRawSenderCodeHash() -> hash {
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
-                mstore(4, account)
+                mstore(4, caller())
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
             
@@ -61,7 +61,7 @@ object "EvmGasManager" {
                 hash := mload(0)
             }
 
-            function $llvm_AlwaysInline_llvm$_onlyEvmSystemCall(sender) {
+            function $llvm_AlwaysInline_llvm$_onlyEvmSystemCall() {
                 let callFlags := verbatim_0i_1o("get_global::call_flags")
                 let notSystemCall := iszero(and(callFlags, 2))
 
@@ -69,10 +69,10 @@ object "EvmGasManager" {
                     revert(0, 0)
                 }
 
-                let transientSlot := or(IS_ACCOUNT_EVM_PREFIX(), sender)
+                let transientSlot := or(IS_ACCOUNT_EVM_PREFIX(), caller())
                 let isEVM := tload(transientSlot)
                 if iszero(isEVM) {
-                    let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(sender)
+                    let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawSenderCodeHash()
                     isEVM := eq(shr(248, versionedCodeHash), 2)
 
                     if iszero(isEVM) {
@@ -89,15 +89,13 @@ object "EvmGasManager" {
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
-            
-            let _sender := caller()
 
             let _calldata0Slot := calldataload(0)
 
             let functionSelector := shr(248, _calldata0Slot)
             switch functionSelector
             case 0 { // function warmAccount(address account)
-                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall(_sender)
+                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall()
 
                 let account := and(ADDRESS_MASK(), _calldata0Slot)
 
@@ -119,7 +117,7 @@ object "EvmGasManager" {
             }
             case 1 { // function isSlotWarm(uint256 _slot)
                 mstore(0, calldataload(1))
-                mstore(32, or(IS_SLOT_WARM_PREFIX(), _sender))
+                mstore(32, or(IS_SLOT_WARM_PREFIX(), caller()))
 
                 let transientSlot := keccak256(0, 64)
     
@@ -129,10 +127,10 @@ object "EvmGasManager" {
                 return(0x0, 0x0)
             }
             case 2 { // function warmSlot(uint256 _slot, uint256 _currentValue)
-                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall(_sender)
+                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall()
 
                 mstore(0, calldataload(1))
-                mstore(32, or(IS_SLOT_WARM_PREFIX(), _sender))
+                mstore(32, or(IS_SLOT_WARM_PREFIX(), caller()))
 
                 let transientSlot := keccak256(0, 64)
                 let isWarm := tload(transientSlot)
@@ -149,7 +147,7 @@ object "EvmGasManager" {
                 return(0x0, 0x0)
             }
             case 3 { // function pushEVMFrame(bool isStatic, uint256 passGas)
-                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall(_sender)
+                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall()
                 let isStatic := and(_calldata0Slot, 1)
                 let passGas := calldataload(32)
                 tstore(EVM_GAS_SLOT(), passGas)
@@ -157,7 +155,7 @@ object "EvmGasManager" {
                 return(0x0, 0x0)
             }
             case 4 { // function consumeEvmFrame()
-                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall(_sender)
+                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall()
 
                 let auxData := tload(EVM_AUX_DATA_SLOT())
 
@@ -175,7 +173,7 @@ object "EvmGasManager" {
                     return(0x0, 0x20)
                 }
 
-                let isSenderWarmSlot := or(IS_ACCOUNT_WARM_PREFIX(), _sender)
+                let isSenderWarmSlot := or(IS_ACCOUNT_WARM_PREFIX(), caller())
                 tstore(isSenderWarmSlot, 1)
                 return(0x0, 0x0)
             }
