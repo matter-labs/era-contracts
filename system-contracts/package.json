@@ -5,7 +5,7 @@
   "license": "MIT",
   "dependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.7.0",
-    "@matterlabs/hardhat-zksync-solc": "^1.1.4",
+    "@matterlabs/hardhat-zksync-solc": "^1.2.5",
     "@matterlabs/hardhat-zksync-verify": "^1.4.3",
     "commander": "^9.4.1",
     "eslint": "^8.51.0",

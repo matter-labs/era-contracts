@@ -109,7 +109,7 @@ library Utils {
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
+        return vm.readFile("../system-contracts/bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin");
     }
 
     /**

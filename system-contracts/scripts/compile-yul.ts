@@ -1,18 +1,11 @@
 // hardhat import should be the first import in the file
 import type { CompilerPaths } from "./utils";
-import {
-  spawn,
-  compilerLocation,
-  prepareCompilerPaths,
-  getSolcLocation,
-  needsRecompilation,
-  setCompilationTime,
-} from "./utils";
+import { spawn, compilerLocation, prepareCompilerPaths, needsRecompilation, setCompilationTime } from "./utils";
 import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
 
-const COMPILER_VERSION = "1.3.18";
+const COMPILER_VERSION = "1.5.6";
 const IS_COMPILER_PRE_RELEASE = true;
 const CONTRACTS_DIR = "contracts-preprocessed";
 const BOOTLOADER_DIR = "bootloader";
@@ -20,11 +13,9 @@ const TIMESTAMP_FILE_YUL = "last_compilation_yul.timestamp";
 const TIMESTAMP_FILE_BOOTLOADER = "last_compilation_bootloader.timestamp";
 
 export async function compileYul(paths: CompilerPaths, file: string) {
-  const solcCompilerPath = await getSolcLocation();
-
   const zksolcLocation = await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
   await spawn(
-    `${zksolcLocation} ${paths.absolutePathSources}/${file} --solc ${solcCompilerPath} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
+    `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 --enable-eravm-extensions --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
   );
 }
 
