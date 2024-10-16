@@ -4,12 +4,13 @@ pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {ZKChainBase} from "./ZKChainBase.sol";
+import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
@@ -17,17 +18,17 @@ import {InvalidSelector} from "../../../common/L1ContractErrors.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
+contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
-    /// @inheritdoc IZkSyncHyperchainBase
+    /// @inheritdoc IZKChainBase
     string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////
@@ -55,8 +56,8 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getStateTransitionManager() external view returns (address) {
-        return s.stateTransitionManager;
+    function getChainTypeManager() external view returns (address) {
+        return s.chainTypeManager;
     }
 
     /// @inheritdoc IGetters
@@ -66,7 +67,12 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        return s.baseToken;
+        return IBridgehub(s.bridgehub).baseToken(s.chainId);
+    }
+
+    /// @inheritdoc IGetters
+    function getBaseTokenAssetId() external view returns (bytes32) {
+        return s.baseTokenAssetId;
     }
 
     /// @inheritdoc IGetters
@@ -100,12 +106,13 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getTransactionFilterer() external view returns (address) {
+        return s.transactionFilterer;
+    }
+
+    /// @inheritdoc IGetters
     function getTotalPriorityTxs() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getTotalPriorityTxs();
-        } else {
-            return s.priorityQueue.getTotalPriorityTxs();
-        }
+        return _getTotalPriorityTxs();
     }
 
     /// @inheritdoc IGetters
@@ -227,7 +234,6 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getSettlementLayer() external view returns (address) {
-        // TODO: consider making private so that no one relies on it
         return s.settlementLayer;
     }
 

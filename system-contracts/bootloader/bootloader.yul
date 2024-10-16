@@ -2690,7 +2690,7 @@ object "Bootloader" {
 
                 // Third slot -- length of pubdata
                 let len := mload(add(ptr, 96))
-                // 4 bytes for selector, 32 bytes for ABI-encoded l2 DA validator address,
+                // 4 bytes for selector, 32 bytes for ABI-encoded L2 DA validator address,
                 // 32 bytes for array offset and 32 bytes for array length
                 let fullLen := add(len, 100)
 
@@ -3900,17 +3900,17 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function chainedPriorityTxnHashLogKey() -> ret {
-                ret := 5
+                ret := 3
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function numberOfLayer1TxsLogKey() -> ret {
-                ret := 6
+                ret := 4
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 9
+                ret := 7
             }
 
             ////////////////////////////////////////////////////////////////////////////

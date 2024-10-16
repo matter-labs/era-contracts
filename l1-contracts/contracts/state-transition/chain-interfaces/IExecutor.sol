@@ -2,14 +2,11 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
-import {PriorityOpsBatchInfo} from "../libraries/PriorityTree.sol";
+import {IZKChainBase} from "./IZKChainBase.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    TOTAL_L2_TO_L1_PUBDATA_KEY,
-    STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
@@ -50,7 +47,7 @@ uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 /// @title The interface of the ZKsync Executor contract capable of processing events emitted in the ZKsync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IExecutor is IZkSyncHyperchainBase {
+interface IExecutor is IZKChainBase {
     /// @notice Rollup batch stored data
     /// @param batchNumber Rollup batch number
     /// @param batchHash Hash of L2 batch
@@ -103,73 +100,53 @@ interface IExecutor is IZkSyncHyperchainBase {
         bytes operatorDAInput;
     }
 
-    /// @notice Recursive proof input data (individual commitments are constructed onchain)
-    struct ProofInput {
-        uint256[] recursiveAggregationInput;
-        uint256[] serializedProof;
-    }
-
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
     /// - Storing batch commitments.
-    /// @param _lastCommittedBatchData Stored data of the last committed batch.
-    /// @param _newBatchesData Data of the new batches to be committed.
-    function commitBatches(
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external;
-
-    /// @notice same as `commitBatches` but with the chainId so ValidatorTimelock can sort the inputs.
+    /// @param _chainId Chain ID of the chain.
+    /// @param _processFrom The batch number from which the processing starts.
+    /// @param _processTo The batch number at which the processing ends.
+    /// @param _commitData The encoded data of the new batches to be committed.
     function commitBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
     ) external;
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
-    /// @param _prevBatch Stored data of the last committed batch.
-    /// @param _committedBatches Stored data of the committed batches.
-    /// @param _proof The zero knowledge proof.
-    function proveBatches(
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external;
-
-    /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs.
+    /// @param _chainId Chain ID of the chain.
+    /// @param _processBatchFrom The batch number from which the verification starts.
+    /// @param _processBatchTo The batch number at which the verification ends.
+    /// @param _proofData The encoded data of the new batches to be verified.
     function proveBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata _proofData
     ) external;
 
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
-    /// @param _batchesData Data of the batches to be executed.
-    /// @param _priorityOpsData Merkle proofs of the priority operations for each batch.
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) external;
-
-    /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
+    /// @param _chainId Chain ID of the chain.
+    /// @param _processFrom The batch number from which the execution starts.
+    /// @param _processTo The batch number at which the execution ends.
+    /// @param _executeData The encoded data of the new batches to be executed.
     function executeBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _executeData
     ) external;
 
     /// @notice Reverts unexecuted batches
+    /// @param _chainId Chain ID of the chain
     /// @param _newLastBatch batch number after which batches should be reverted
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
-    function revertBatches(uint256 _newLastBatch) external;
-
-    /// @notice same as `revertBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed

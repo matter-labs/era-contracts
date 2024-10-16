@@ -157,7 +157,7 @@ this trick:
 #### L1 -> L2 Transaction filtering
 
 There is a mechanism for applying custom filters to the L1 -> L2 communication. It is achieved by having an address of
-the `TransactionFilterer` contract in the `ZkSyncHyperchainStorage`. If the filterer exists, it is being called in
+the `TransactionFilterer` contract in the `ZkSyncZKChainStorage`. If the filterer exists, it is being called in
 the `Mailbox` facet with the tx details and has to return whether the transaction can be executed or not. The filterer
 has to implement the `ITransactionFilterer` interface. The ones intended to use this feature, have to deploy the
 contract that implements `ITransactionFilterer` and use `setTransactionFilterer` function of `AdminFacet` to set the
@@ -178,12 +178,12 @@ Each L2 -> L1 system log will have a key that is part of the following:
 ```solidity
 enum SystemLogKey {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
-  TOTAL_L2_TO_L1_PUBDATA_KEY,
-  STATE_DIFF_HASH_KEY,
   PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
   PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
+  L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 ```

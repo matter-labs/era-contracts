@@ -22,7 +22,6 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.jso
 
 export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
-export const ADDRESS_TWO_NTV = "0x0000000000000000000000000000000000000002";
 export const ETH_ADDRESS_IN_CONTRACTS = ADDRESS_ONE;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 export const L2_BRIDGEHUB_ADDRESS = "0x0000000000000000000000000000000000010002";
@@ -35,12 +34,17 @@ const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate
 export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+export const STORED_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)";
+export const COMMIT_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, uint64 timestamp, uint64 indexRepeatedStorageChanges, bytes32 newStateRoot, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 bootloaderHeapInitialContentsHash, bytes32 eventsQueueStateHash, bytes systemLogs, bytes operatorDAInput)";
+export const PRIORITY_OPS_BATCH_INFO_ABI_STRING =
+  "tuple(bytes32[] leftPath, bytes32[] rightPath, bytes32[] itemHashes)";
 export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
 export const FORCE_DEPLOYMENT_ABI_STRING =
   "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
-export const HYPERCHAIN_COMMITMENT_ABI_STRING =
-  "tuple(uint256 totalBatchesExecuted, uint256 totalBatchesVerified, uint256 totalBatchesCommitted, bytes32 l2SystemContractsUpgradeTxHash, uint256 l2SystemContractsUpgradeBatchNumber, bytes32[] batchHashes, tuple(uint256 nextLeafIndex, uint256 startIndex, uint256 unprocessedIndex, bytes32[] sides) priorityTree)";
+export const BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes ctmData, bytes chainData)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
@@ -105,9 +109,12 @@ export function computeL2Create2Address(
   return ethers.utils.hexDataSlice(data, 12);
 }
 
-export function encodeNTVAssetId(chainId: number, assetData: BytesLike) {
+export function encodeNTVAssetId(chainId: number, tokenAddress: BytesLike) {
   return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["uint256", "address", "bytes32"], [chainId, ADDRESS_TWO_NTV, assetData])
+    ethers.utils.defaultAbiCoder.encode(
+      ["uint256", "address", "bytes32"],
+      [chainId, L2_NATIVE_TOKEN_VAULT_ADDRESS, ethers.utils.hexZeroPad(tokenAddress, 32)]
+    )
   );
 }
 
@@ -301,11 +308,11 @@ export function compileInitialCutHash(
     {
       chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
       bridgehub: "0x0000000000000000000000000000000000001234",
-      stateTransitionManager: "0x0000000000000000000000000000000000002234",
+      chainTypeManager: "0x0000000000000000000000000000000000002234",
       protocolVersion: "0x0000000000000000000000000000000000002234",
       admin: "0x0000000000000000000000000000000000003234",
       validatorTimelock: "0x0000000000000000000000000000000000004234",
-      baseToken: "0x0000000000000000000000000000000000004234",
+      baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000004234",
       baseTokenBridge: "0x0000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
       verifier,

@@ -16,7 +16,7 @@ import path from "path";
 import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
-import  fetch from 'node-fetch';
+import fetch from "node-fetch";
 
 export type HttpMethod = "POST" | "GET";
 

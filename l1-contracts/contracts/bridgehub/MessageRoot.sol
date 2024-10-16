@@ -14,7 +14,7 @@ import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
-import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
+import {MAX_NUMBER_OF_ZK_CHAINS} from "../common/Config.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -45,18 +45,11 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
 
-    /// @notice The mapping from chainId to chainIndex.
+    /// @notice The mapping from chainId to chainIndex. Note index 0 is maintained for the chain the contract is on.
     mapping(uint256 chainId => uint256 chainIndex) public chainIndex;
 
     /// @notice The mapping from chainIndex to chainId.
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
-
-    // There are two ways to distinguish chains:
-    // - Either by reserving the index 0 as a special value which denotes an unregistered chain
-    // - Use a separate mapping
-    // The second approach is used due to explicitness.
-    /// @notice The mapping from chainId to whether the chain is registered. Used because the chainIndex can be 0.
-    mapping(uint256 chainId => bool isRegistered) public chainRegistered;
 
     /// @notice The shared full merkle tree storing the aggregate hash.
     FullMerkle.FullTree public sharedTree;
@@ -73,7 +66,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @notice only the bridgehub can call
     /// @param _chainId the chainId of the chain
     modifier onlyChain(uint256 _chainId) {
-        require(msg.sender == BRIDGE_HUB.getHyperchain(_chainId), "MR: only chain");
+        require(msg.sender == BRIDGE_HUB.getZKChain(_chainId), "MR: only chain");
         _;
     }
 
@@ -91,16 +84,12 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
-        require(!chainRegistered[_chainId], "MR: chain exists");
+        require(!chainRegistered(_chainId), "MR: chain exists");
         _addNewChain(_chainId);
     }
 
-    /// @dev Adds a new chain to the message root if it has not been added yet.
-    /// @param _chainId the chainId of the chain
-    function addNewChainIfNeeded(uint256 _chainId) external onlyBridgehub {
-        if (!chainRegistered[_chainId]) {
-            _addNewChain(_chainId);
-        }
+    function chainRegistered(uint256 _chainId) public view returns (bool) {
+        return (_chainId == block.chainid || chainIndex[_chainId] != 0);
     }
 
     /// @dev add a new chainBatchRoot to the chainTree
@@ -109,7 +98,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
     ) external onlyChain(_chainId) {
-        require(chainRegistered[_chainId], "MR: not registered");
+        require(chainRegistered(_chainId), "MR: not registered");
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
@@ -124,6 +113,9 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     /// @dev Gets the aggregated root of all chains.
     function getAggregatedRoot() external view returns (bytes32) {
+        if (chainCount == 0) {
+            return SHARED_ROOT_TREE_EMPTY_HASH;
+        }
         return sharedTree.root();
     }
 
@@ -146,20 +138,14 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     function _initialize() internal {
         // slither-disable-next-line unused-return
         sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
+        _addNewChain(block.chainid);
     }
 
     /// @dev Adds a single chain to the message root.
     /// @param _chainId the chainId of the chain
     function _addNewChain(uint256 _chainId) internal {
-        // The chain itself can not be the part of the message root.
-        // The message root will only aggregate chains that settle on it.
-        require(_chainId != block.chainid, "MR: chainId is this chain");
-
-        chainRegistered[_chainId] = true;
-
-        // We firstly increment `chainCount` and then apply it to ensure that `0` is reserved for chains that are not present.
         uint256 cachedChainCount = chainCount;
-        require(cachedChainCount < MAX_NUMBER_OF_HYPERCHAINS, "MR: too many chains");
+        require(cachedChainCount < MAX_NUMBER_OF_ZK_CHAINS, "MR: too many chains");
 
         ++chainCount;
         chainIndex[_chainId] = cachedChainCount;
@@ -167,6 +153,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
         // slither-disable-next-line unused-return
         bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+
         // slither-disable-next-line unused-return
         sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
 

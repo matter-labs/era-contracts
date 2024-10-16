@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {FeeParams} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../common/Config.sol";
 
@@ -10,7 +10,7 @@ contract MailboxFacetTest is MailboxFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {
+    constructor(uint256 _eraChainId, uint256 _l1ChainId) MailboxFacet(_eraChainId, _l1ChainId) {
         s.admin = msg.sender;
     }
 

@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
-import { ADDRESS_ONE } from "../src.ts/utils";
+import { ADDRESS_ONE, encodeNTVAssetId } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const ETH_TOKEN_ADDRESS = ADDRESS_ONE;
@@ -55,7 +55,7 @@ const chooseBaseTokenAddress = async (name?: string, address?: string) => {
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("register-hyperchain").description("register hyperchains");
+  program.version("0.1.0").name("register-zk-chain").description("register zk-chains");
 
   program
     .option("--private-key <private-key>")
@@ -66,7 +66,7 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
-    .option("--use-governance <use-governance>")
+    .option("--use-governance")
     .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
@@ -92,18 +92,20 @@ async function main() {
         deployWallet,
         ownerAddress,
         verbose: true,
+        l1ChainId: process.env.CONTRACTS_L1_CHAIN_ID || "31337",
       });
 
       const baseTokenAddress = await chooseBaseTokenAddress(cmd.baseTokenName, cmd.baseTokenAddress);
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
       console.log(deployer.addresses.Bridgehub.BridgehubProxy);
-      if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
+      const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, baseTokenAddress);
+      if (!(await deployer.bridgehubContract(deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
-      await deployer.registerHyperchain(
-        baseTokenAddress,
+      await deployer.registerZKChain(
+        baseTokenAssetId,
         cmd.validiumMode,
         null,
         gasPrice,
@@ -114,7 +116,6 @@ async function main() {
       );
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
-
       if (tokenMultiplierSetterAddress != "") {
         console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
         await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);

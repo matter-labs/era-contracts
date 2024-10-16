@@ -112,10 +112,13 @@ bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGE
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
 /// @dev the maximum number of supported chains, this is an arbitrary limit.
-uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
+uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
 
-/// @dev Used to when there is no sender contract on L1. This is the alias we apply to L1->L2 messages.
-address constant VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS = address(uint160(0x1111000000000000000000000000000000001111));
+/// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
+address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
+
+/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
+uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
 
 struct PriorityTreeCommitment {
     uint256 nextLeafIndex;
@@ -125,7 +128,7 @@ struct PriorityTreeCommitment {
 }
 
 // Info that allows to restore a chain.
-struct HyperchainCommitment {
+struct ZKChainCommitment {
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
     /// (batch 0 is genesis)
     uint256 totalBatchesExecuted;
@@ -134,11 +137,17 @@ struct HyperchainCommitment {
     /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
     /// batch
     uint256 totalBatchesCommitted;
-    /// @notice
+    /// @notice The hash of the L2 system contracts ugpgrade transaction.
+    /// @dev It is non zero if the migration happens while the upgrade is not yet finalized.
     bytes32 l2SystemContractsUpgradeTxHash;
-    /// @notice
+    /// @notice The batch when the system contracts upgrade transaction was executed.
+    /// @dev It is non-zero if the migration happens while the batch where the upgrade tx was present
+    /// has not been finalized (executed) yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
+    /// @notice The hashes of the batches that are needed to keep the blockchain working.
+    /// @dev The length of the array is equal to the `totalBatchesCommitted - totalBatchesExecuted + 1`, i.e. we need
+    /// to store all the unexecuted batches' hashes + 1 latest executed one.
     bytes32[] batchHashes;
-    /// @notice Commitment to the priority merkle tree
+    /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
 }

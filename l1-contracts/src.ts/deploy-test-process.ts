@@ -15,7 +15,7 @@ import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   initialBridgehubDeployment,
-  registerHyperchain,
+  registerZKChain,
 } from "./deploy-process";
 import { deployTokens, getTokens } from "./deploy-token";
 
@@ -29,6 +29,7 @@ import {
   EMPTY_STRING_KECCAK,
   isCurrentNetworkLocal,
   ETH_ADDRESS_IN_CONTRACTS,
+  encodeNTVAssetId,
 } from "./utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
@@ -50,6 +51,7 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   // process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH = "1";
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
   process.env.CONTRACTS_ERA_CHAIN_ID = "270";
+  process.env.CONTRACTS_L1_CHAIN_ID = "31337";
   process.env.CONTRACTS_ERA_DIAMOND_PROXY_ADDR = ADDRESS_ONE;
   // CONTRACTS_ERA_DIAMOND_PROXY_ADDR;
   process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR = ADDRESS_ONE;
@@ -67,6 +69,7 @@ export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+    l1ChainId: process.env.CONTRACTS_L1_CHAIN_ID,
   });
 }
 
@@ -78,6 +81,7 @@ export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddr
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+    l1ChainId: process.env.CONTRACTS_L1_CHAIN_ID,
   });
   const l2_rpc_addr = "http://localhost:3050";
   const web3Provider = new zkethers.Provider(l2_rpc_addr);
@@ -106,12 +110,13 @@ export async function initialTestnetDeploymentProcess(
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
-  await registerHyperchainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
+  await registerZKChainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
   await registerTestDAValidators(deployer);
+
   return deployer;
 }
 
-export async function registerHyperchainWithBridgeRegistration(
+export async function registerZKChainWithBridgeRegistration(
   deployer: Deployer,
   onlyVerifier: boolean,
   extraFacets: FacetCut[],
@@ -120,7 +125,7 @@ export async function registerHyperchainWithBridgeRegistration(
   chainId?: string
 ) {
   chainId = chainId ?? deployer.chainId.toString();
-  await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
+  await registerZKChain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
   await registerTestDAValidators(deployer);
 }
 
@@ -135,7 +140,7 @@ async function registerTestDAValidators(deployer: Deployer) {
   ).wait();
 }
 
-// This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeHyperchain.sol
+// This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeZKChain.sol
 // This should be deleted after the migration
 export async function initialPreUpgradeContractsDeployment(
   deployWallet: Wallet,
@@ -181,8 +186,8 @@ export async function initialPreUpgradeContractsDeployment(
   // note we should also deploy the old ERC20Bridge here, but we can do that later.
 
   // // for Era we first deploy the DiamondProxy manually, set the vars manually,
-  // // and register it in the system via STM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)
-  // // note we just deploy the STM to get the storedBatchZero
+  // // and register it in the system via CTM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)
+  // // note we just deploy the CTM to get the storedBatchZero
 
   await deployer.deployDiamondProxy(extraFacets, {});
   // we have to know the address of the diamond proxy in the mailbox so we separate the deployment
@@ -192,7 +197,7 @@ export async function initialPreUpgradeContractsDeployment(
   );
 
   await deployer.deployStateTransitionDiamondFacets(create2Salt);
-  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZKChainDiamondCut());
   return deployer;
 }
 
@@ -228,15 +233,9 @@ export async function initialEraTestnetDeploymentProcess(
     "DummyAdminFacetNoOverlap",
     deployer.addresses.StateTransition.DiamondProxy
   );
-  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZKChainDiamondCut());
 
-  const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
-  const registerData = stateTransitionManager.interface.encodeFunctionData("registerAlreadyDeployedHyperchain", [
-    deployer.chainId,
-    deployer.addresses.StateTransition.DiamondProxy,
-  ]);
-  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, registerData);
-  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
+  await registerZKChain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
   return deployer;
 }
 
@@ -279,7 +278,7 @@ export class EraDeployer extends Deployer {
     await tx.wait();
   }
 
-  public async upgradeZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
+  public async upgradeZKChainDiamondCut(extraFacets?: FacetCut[]) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
@@ -331,11 +330,14 @@ export class EraDeployer extends Deployer {
       {
         chainId: this.chainId, // era chain Id
         bridgehub: this.addresses.Bridgehub.BridgehubProxy,
-        stateTransitionManager: this.addresses.StateTransition.StateTransitionProxy,
+        chainTypeManager: this.addresses.StateTransition.StateTransitionProxy,
         protocolVersion: CONTRACTS_GENESIS_PROTOCOL_VERSION,
         admin: this.ownerAddress,
         validatorTimelock: ADDRESS_ONE,
-        baseToken: ETH_ADDRESS_IN_CONTRACTS,
+        baseTokenAssetId: encodeNTVAssetId(
+          parseInt(process.env.CONTRACTS_L1_CHAIN_ID),
+          ethers.utils.hexZeroPad(ETH_ADDRESS_IN_CONTRACTS, 32)
+        ),
         baseTokenBridge: this.addresses.Bridges.SharedBridgeProxy,
         storedBatchZero,
         verifier: this.addresses.StateTransition.Verifier,

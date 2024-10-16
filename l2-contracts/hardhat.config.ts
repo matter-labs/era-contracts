@@ -12,7 +12,7 @@ if (!process.env.CHAIN_ETH_NETWORK) {
 
 export default {
   zksolc: {
-    version: "1.5.0",
+    version: "1.5.3",
     compilerSource: "binary",
     settings: {
       isSystem: true,

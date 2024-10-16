@@ -2,8 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IL1AssetRouter} from "./IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
+import {IL1Nullifier} from "./IL1Nullifier.sol";
+import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
@@ -61,9 +62,11 @@ interface IL1ERC20Bridge {
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 
-    function SHARED_BRIDGE() external view returns (IL1AssetRouter);
+    function L1_NULLIFIER() external view returns (IL1Nullifier);
 
-    function NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
+    function L1_ASSET_ROUTER() external view returns (IL1AssetRouter);
+
+    function L1_NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
 
     function l2TokenBeacon() external view returns (address);
 
