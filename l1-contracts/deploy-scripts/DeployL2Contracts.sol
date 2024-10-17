@@ -185,18 +185,15 @@ contract DeployL2Script is Script {
         factoryDeps[0] = contracts.l2StandardErc20FactoryBytecode;
         factoryDeps[1] = contracts.l2StandardErc20Bytecode;
         factoryDeps[2] = contracts.beaconProxy;
-        factoryDeps[3] = contracts.proxyAdminBytecode;
         Utils.publishBytecodes(factoryDeps, config.chainId, config.bridgehubAddress, config.l1SharedBridgeProxy);
     }
 
     function deployProxyAdmin() internal {
         bytes[] memory factoryDeps = new bytes[]();
 
-        bytes memory constructorData = abi.encode(config.governance);
-
         config.proxyAdminContract = Utils.deployThroughL1({
             bytecode: contracts.proxyAdminBytecode,
-            constructorargs: constructorData,
+            constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: factoryDeps,
@@ -204,6 +201,22 @@ contract DeployL2Script is Script {
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
+
+        bytes memory transferCalldata = abi.encodeWithSignature(
+            "transferOwnership(address)",
+            config.governance
+        );
+
+        runL1L2Transaction({
+            l2Calldata: transferCalldata,
+            l2GasLimit: l2GasLimit,
+            factoryDeps: _factoryDeps,
+            dstAddress: proxyAdminContract,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy
+        });
+
     }
 
     function deploySharedBridge() internal {
