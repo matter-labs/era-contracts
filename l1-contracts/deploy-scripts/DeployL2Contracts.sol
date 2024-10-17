@@ -189,7 +189,7 @@ contract DeployL2Script is Script {
     }
 
     function deployProxyAdmin() internal {
-        bytes[] memory factoryDeps = new bytes[]();
+        bytes[] memory factoryDeps = new bytes[](0);
 
         config.proxyAdminContract = Utils.deployThroughL1({
             bytecode: contracts.proxyAdminBytecode,
@@ -207,14 +207,14 @@ contract DeployL2Script is Script {
             config.governance
         );
 
-        runL1L2Transaction({
+        Utils.runL1L2Transaction({
             l2Calldata: transferCalldata,
-            l2GasLimit: l2GasLimit,
-            factoryDeps: _factoryDeps,
-            dstAddress: proxyAdminContract,
-            chainId: chainId,
-            bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: factoryDeps,
+            dstAddress: config.proxyAdminContract,
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
 
     }
