@@ -30,6 +30,7 @@ contract DeployL2Script is Script {
         address consensusRegistryProxy;
         address multicall3;
         address forceDeployUpgraderAddress;
+        address proxyAdminContract;
     }
 
     struct ContractsBytecodes {
@@ -38,6 +39,7 @@ contract DeployL2Script is Script {
         bytes l2StandardErc20Bytecode;
         bytes l2SharedBridgeBytecode;
         bytes l2SharedBridgeProxyBytecode;
+        bytes proxyAdminBytecode;
         bytes consensusRegistryBytecode;
         bytes consensusRegistryProxyBytecode;
         bytes multicall3Bytecode;
@@ -133,6 +135,10 @@ contract DeployL2Script is Script {
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
 
+        contracts.proxyAdminBytecode = Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol/ProxyAdmin.json"
+        );
+
         contracts.consensusRegistryBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/ConsensusRegistry.sol/ConsensusRegistry.json"
         );
@@ -179,7 +185,25 @@ contract DeployL2Script is Script {
         factoryDeps[0] = contracts.l2StandardErc20FactoryBytecode;
         factoryDeps[1] = contracts.l2StandardErc20Bytecode;
         factoryDeps[2] = contracts.beaconProxy;
+        factoryDeps[3] = contracts.proxyAdminBytecode;
         Utils.publishBytecodes(factoryDeps, config.chainId, config.bridgehubAddress, config.l1SharedBridgeProxy);
+    }
+
+    function deployProxyAdmin() internal {
+        bytes[] memory factoryDeps = new bytes[]();
+
+        bytes memory constructorData = abi.encode(config.governance);
+
+        config.proxyAdminContract = Utils.deployThroughL1({
+            bytecode: contracts.proxyAdminBytecode,
+            constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: factoryDeps,
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
     }
 
     function deploySharedBridge() internal {
@@ -215,7 +239,7 @@ contract DeployL2Script is Script {
     }
 
     function deploySharedBridgeProxy(bool legacyBridge) internal {
-        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+        address l2GovernorAddress = config.proxyAdminContract;
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
 
         string memory functionSignature;
