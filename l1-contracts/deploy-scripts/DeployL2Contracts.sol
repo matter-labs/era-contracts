@@ -202,9 +202,10 @@ contract DeployL2Script is Script {
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
 
+        address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         bytes memory transferCalldata = abi.encodeWithSignature(
             "transferOwnership(address)",
-            config.governance
+            aliasedGovernor
         );
 
         Utils.runL1L2Transaction({
