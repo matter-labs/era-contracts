@@ -83,6 +83,7 @@ contract DeployL2Script is Script {
         loadContracts(legacyBridge);
 
         deployFactoryDeps();
+        deployProxyAdmin();
         deploySharedBridge();
         deploySharedBridgeProxy(legacyBridge);
         initializeChain();
