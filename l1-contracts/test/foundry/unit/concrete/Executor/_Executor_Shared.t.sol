@@ -179,7 +179,8 @@ contract ExecutorTest is Test {
             l2DefaultAccountBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams(),
-            blobVersionedHashRetriever: blobVersionedHashRetriever
+            blobVersionedHashRetriever: blobVersionedHashRetriever,
+            batchCommitDeadline: 3 days
         });
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);

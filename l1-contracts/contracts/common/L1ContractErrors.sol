@@ -273,6 +273,8 @@ error STMNotRegistered();
 error SystemLogsSizeTooBig();
 // 0x08753982
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
+// 0xa4861a97
+error TimeReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0x2d50c33b
 error TimestampError();
 // 0x4f4b634e
@@ -327,6 +329,8 @@ error ZeroAddress();
 error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
+// 0x58e0b9ce
+error ZeroBatchCommitDeadline();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
