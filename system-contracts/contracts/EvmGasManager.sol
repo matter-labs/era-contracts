@@ -50,7 +50,7 @@ contract EvmGasManager {
                     // This error should never happen
                     revert(0, 0)
                 }
-                
+
                 rawCodeHash := mload(0)
             }
 

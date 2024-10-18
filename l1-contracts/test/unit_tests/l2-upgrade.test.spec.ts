@@ -42,7 +42,7 @@ import {
 } from "./utils";
 import { packSemver, unpackStringSemVer, addToProtocolVersion } from "../../scripts/utils";
 
-describe.only("L2 upgrade test", function () {
+describe("L2 upgrade test", function () {
   let proxyExecutor: ExecutorFacet;
   let proxyAdmin: AdminFacet;
   let proxyGetters: GettersFacet;
