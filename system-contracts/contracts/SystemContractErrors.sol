@@ -143,8 +143,6 @@ error NonMonotonicL2BlockTimestamp(uint128 l2BlockTimestamp, uint128 currentL2Bl
 
 error CurrentBatchNumberMustBeGreaterThanZero();
 
-error NonMonotonicTimestamp(uint128 newTimestamp, uint128 currentBlockTimestamp);
-
 error TimestampsShouldBeIncremental(uint128 newTimestamp, uint128 previousBatchTimestamp);
 
 error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);

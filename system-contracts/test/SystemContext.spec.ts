@@ -173,10 +173,7 @@ describe("SystemContext tests", () => {
       const expectedBlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber]));
       await expect(
         systemContext.connect(bootloaderAccount).setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, true, 1)
-      ).to.be.revertedWithCustomError(
-        systemContext,
-        "L2BlockAndBatchTimestampMismatch"
-      );
+      ).to.be.revertedWithCustomError(systemContext, "L2BlockAndBatchTimestampMismatch");
     });
 
     it("should revert There must be a virtual block created at the start of the batch", async () => {
@@ -186,10 +183,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(42), expectedBlockHash, true, 0)
-      ).to.be.revertedWithCustomError(
-        systemContext,
-        "NoVirtualBlocks"
-      );
+      ).to.be.revertedWithCustomError(systemContext, "NoVirtualBlocks");
     });
 
     it("should revert Upgrade transaction must be first", async () => {
@@ -330,10 +324,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, false, 0)
-      ).to.be.revertedWithCustomError(
-        systemContext,
-        "NonMonotonicL2BlockTimestamp"
-      );
+      ).to.be.revertedWithCustomError(systemContext, "NonMonotonicL2BlockTimestamp");
     });
 
     it("should set block again and check blockNumber & blockTimestamp also check getBlockHashEVM", async () => {

@@ -60,7 +60,10 @@ describe("CodeOracle tests", function () {
 
     const versionedHash = hashBytecode(unknownLargeBytecode);
     const keccakHash = ethers.utils.keccak256(unknownLargeBytecode);
-    await expect(codeOracleTest.codeOracleTest(versionedHash, keccakHash)).to.be.revertedWithCustomError(codeOracleTest, "CodeOracleCallFailed");
+    await expect(codeOracleTest.codeOracleTest(versionedHash, keccakHash)).to.be.revertedWithCustomError(
+      codeOracleTest,
+      "CodeOracleCallFailed"
+    );
   });
 
   after(async () => {

@@ -7,7 +7,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
-import {IncosistentNewBatchTimestamp, InvalidNewL2BlockNumber, IncorrectVirtualBlockInsideMiniblock, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, CannotReuseL2BlockNumberFromPreviousBatch, NoVirtualBlocks, L2BlockAndBatchTimestampMismatch, UpgradeTransactionMustBeFirst, L2BlockNumberZero, PreviousL2BlockHashIsIncorrect, CannotInitializeFirstVirtualBlock, IncorrectL2BlockHash, NonMonotonicL2BlockTimestamp, CurrentBatchNumberMustBeGreaterThanZero, NonMonotonicTimestamp, TimestampsShouldBeIncremental, ProvidedBatchNumberIsNotCorrect} from "contracts/SystemContractErrors.sol";
+import {IncosistentNewBatchTimestamp, InvalidNewL2BlockNumber, IncorrectVirtualBlockInsideMiniblock, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, CannotReuseL2BlockNumberFromPreviousBatch, NoVirtualBlocks, L2BlockAndBatchTimestampMismatch, UpgradeTransactionMustBeFirst, L2BlockNumberZero, PreviousL2BlockHashIsIncorrect, CannotInitializeFirstVirtualBlock, IncorrectL2BlockHash, NonMonotonicL2BlockTimestamp, CurrentBatchNumberMustBeGreaterThanZero, TimestampsShouldBeIncremental, ProvidedBatchNumberIsNotCorrect} from "contracts/SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
