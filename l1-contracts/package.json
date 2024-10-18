@@ -83,7 +83,7 @@
     "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
     "sync-layer": "ts-node scripts/sync-layer.ts",
     "size": "hardhat size-contracts",
-    "check-errors": "ts-node scripts/custom-errors-validator.ts"
+    "errors-lint": "ts-node scripts/errors-lint.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
