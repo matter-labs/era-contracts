@@ -34,7 +34,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
         _setBaseSystemContracts(
             _proposedUpgrade.bootloaderHash,
             _proposedUpgrade.defaultAccountHash,
-            _proposedUpgrade.evmSimulatorHash,
+            _proposedUpgrade.evmEmulatorHash,
             isPatchOnly
         );
 

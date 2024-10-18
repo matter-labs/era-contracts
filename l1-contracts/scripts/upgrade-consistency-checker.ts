@@ -68,7 +68,7 @@ const expectedRecursionLeafLevelVkHash = "0xf9664f4324c1400fa5c3822d667f30e873f5
 const expectedRecursionCircuitsSetVksHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
 const expectedBootloaderHash = "0x010008e7894d0dd14681c76bdb4d5e4e7f6b51bfe40c957d50eed3fec829fdb0";
 const expectedDefaultAccountHash = "0x0100058deb36e1f2eeb48bf3846d0e8eb38e9176754b73116bb41a472459a4dd";
-const expectedEvmSimulatorHash = "0x01000f197081a9906cc411d0698c4961aeb5c74877f37f7071681da6e8ef3f31";
+const expectedEvmEmulatorHash = "0x01000f197081a9906cc411d0698c4961aeb5c74877f37f7071681da6e8ef3f31";
 
 const validatorOne = process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR!;
 const validatorTwo = process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR!;
@@ -222,7 +222,7 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     recursionCircuitsSetVksHash,
     l2BootloaderBytecodeHash,
     l2DefaultAccountBytecodeHash,
-    l2EvmSimulatorBytecodeHash,
+    l2EvmEmulatorBytecodeHash,
     // priorityTxMaxGasLimit,
 
     // // We unpack fee params
@@ -279,8 +279,8 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     throw new Error("L2 default account bytecode hash is not correct");
   }
 
-  if (l2EvmSimulatorBytecodeHash.toLowerCase() !== expectedEvmSimulatorHash.toLowerCase()) {
-    throw new Error("L2 default account bytecode hash is not correct");
+  if (l2EvmEmulatorBytecodeHash.toLowerCase() !== expectedEvmEmulatorHash.toLowerCase()) {
+    throw new Error("L2 EVM emulator bytecode hash is not correct");
   }
 
   console.log("STM init data correct!");

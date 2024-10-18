@@ -32,15 +32,15 @@ contract ExecutorProvingTest is ExecutorFacet {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
-    /// Sets the DefaultAccount Hash and Bootloader Hash.
+    /// Sets the DefaultAccount Hash, Bootloader Hash and EVM emulator Hash.
     function setHashes(
         bytes32 l2DefaultAccountBytecodeHash,
         bytes32 l2BootloaderBytecodeHash,
-        bytes32 l2EvmSimulatorBytecode
+        bytes32 l2EvmEmulatorBytecode
     ) external {
         s.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
         s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
-        s.l2EvmSimulatorBytecodeHash = l2EvmSimulatorBytecode;
+        s.l2EvmEmulatorBytecodeHash = l2EvmEmulatorBytecode;
         s.zkPorterIsAvailable = false;
     }
 }

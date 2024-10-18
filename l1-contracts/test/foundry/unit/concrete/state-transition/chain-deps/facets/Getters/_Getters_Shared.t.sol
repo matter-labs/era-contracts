@@ -90,8 +90,8 @@ contract GettersFacetWrapper is GettersFacet {
         s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
     }
 
-    function utils_setL2EvmSimulatorBytecodeHash(bytes32 _l2EvmSimulatorBytecodeHash) external {
-        s.l2EvmSimulatorBytecodeHash = _l2EvmSimulatorBytecodeHash;
+    function utils_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
+        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
     }
 
     function util_setVerifierParams(VerifierParams memory _verifierParams) external {

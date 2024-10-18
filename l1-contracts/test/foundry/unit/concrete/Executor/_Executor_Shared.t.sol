@@ -83,7 +83,7 @@ contract ExecutorTest is Test {
         selectors[12] = getters.storedBatchHash.selector;
         selectors[13] = getters.getL2BootloaderBytecodeHash.selector;
         selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = getters.getL2EvmSimulatorBytecodeHash.selector;
+        selectors[15] = getters.getL2EvmEmulatorBytecodeHash.selector;
         selectors[16] = getters.getVerifierParams.selector;
         selectors[17] = getters.isDiamondStorageFrozen.selector;
         selectors[18] = getters.getPriorityTxMaxGasLimit.selector;
@@ -178,7 +178,7 @@ contract ExecutorTest is Test {
             }),
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmSimulatorBytecodeHash: dummyHash,
+            l2EvmEmulatorBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams(),
             blobVersionedHashRetriever: blobVersionedHashRetriever

@@ -5,9 +5,8 @@ import "@matterlabs/hardhat-zksync-verify";
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-typechain";
 
-// This version of system contracts requires a pre release of the compiler
-const COMPILER_VERSION = "vaz-cpr-1814-add-a-verbatim-to-return-arbitrary-data-from-the-constructor";
-const PRE_RELEASE_VERSION = "ac89867";
+const COMPILER_VERSION = "v1.5.6";
+const PRE_RELEASE_VERSION = "1.5.6";
 function getZksolcUrl(): string {
   // @ts-ignore
   const platform = { darwin: "macosx", linux: "linux", win32: "windows" }[process.platform];
@@ -26,8 +25,8 @@ export default {
     compilerSource: "binary",
     settings: {
       compilerPath: getZksolcUrl(),
-      isSystem: true,
-      suppressedErrors: ["sendtransfer"]
+      enableEraVMExtensions: true,
+      suppressedErrors: ["sendtransfer"],
     },
   },
   zkSyncDeploy: {

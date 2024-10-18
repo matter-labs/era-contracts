@@ -1,4 +1,4 @@
-object "EVMInterpreter" {
+object "EvmEmulator" {
     code {
         /// @dev This function is used to get the initCode.
         /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
@@ -48,7 +48,7 @@ object "EVMInterpreter" {
             returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
-        <!-- @include EvmInterpreterFunctions.template.yul -->
+        <!-- @include EvmEmulatorFunctions.template.yul -->
 
         function simulate(
             isCallerEVM,
@@ -59,7 +59,7 @@ object "EVMInterpreter" {
             returnOffset := MEM_OFFSET_INNER()
             returnLen := 0
 
-            <!-- @include EvmInterpreterLoop.template.yul -->
+            <!-- @include EvmEmulatorLoop.template.yul -->
 
             retGasLeft := evmGasLeft
         }
@@ -68,6 +68,8 @@ object "EVMInterpreter" {
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
 
+        pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
+        
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
         if isStatic {
@@ -90,9 +92,9 @@ object "EVMInterpreter" {
 
         verbatim_2i_0o("return_deployed", offset, add(len, 32))
     }
-    object "EVMInterpreter_deployed" {
+    object "EvmEmulator_deployed" {
         code {
-            <!-- @include EvmInterpreterFunctions.template.yul -->
+            <!-- @include EvmEmulatorFunctions.template.yul -->
 
             function $llvm_NoInline_llvm$_simulate(
                 isCallerEVM,
@@ -103,7 +105,7 @@ object "EVMInterpreter" {
                 returnOffset := MEM_OFFSET_INNER()
                 returnLen := 0
 
-                <!-- @include EvmInterpreterLoop.template.yul -->
+                <!-- @include EvmEmulatorLoop.template.yul -->
 
                 if eq(isCallerEVM, 1) {
                     // Includes gas
@@ -129,8 +131,6 @@ object "EVMInterpreter" {
             // First, copy the contract's bytecode to be executed into tEdhe `BYTECODE_OFFSET`
             // segment of memory.
             getDeployedBytecode()
-
-            pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
 
             let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
