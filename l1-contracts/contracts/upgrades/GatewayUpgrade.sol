@@ -53,7 +53,6 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
         (bool success, ) = THIS_ADDRESS.delegatecall(
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
         );
-        // solhint-disable-next-line gas-custom-errors
         if (!success) {
             revert GatewayUpgradeFailed();
         }
@@ -62,7 +61,6 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
-        // solhint-disable-next-line gas-custom-errors
         if (msg.sender != address(this)) {
             revert GatewayUpgradeInvalidMsgSender();
         }

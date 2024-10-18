@@ -2,12 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-// solhint-disable gas-custom-errors
-
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {PriorityTreeCommitment} from "../../common/Config.sol";
-import {RootMismatch, InvalidCommitment} from "../L1StateTransitionErrors.sol";
+import {RootMismatch, InvalidCommitment, InvalidStartIndex, InvalidUnprocessedIndex, InvalidNextLeafIndex} from "../L1StateTransitionErrors.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;
@@ -104,16 +102,28 @@ library PriorityTree {
 
     /// @notice Reinitialize the tree from a commitment on L1.
     function checkL1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal view {
-        require(_tree.startIndex == _commitment.startIndex, "PT: invalid start index");
-        require(_tree.unprocessedIndex >= _commitment.unprocessedIndex, "PT: invalid unprocessed index");
-        require(_tree.tree._nextLeafIndex >= _commitment.nextLeafIndex, "PT: invalid next leaf index");
+        if(_tree.startIndex != _commitment.startIndex) {
+            revert InvalidStartIndex(_tree.startIndex, _commitment.startIndex);
+        }
+        if(_tree.unprocessedIndex < _commitment.unprocessedIndex) {
+            revert InvalidUnprocessedIndex(_tree.unprocessedIndex, _commitment.unprocessedIndex);
+        }
+        if(_tree.tree._nextLeafIndex < _commitment.nextLeafIndex) {
+            revert InvalidNextLeafIndex(_tree.tree._nextLeafIndex, _commitment.nextLeafIndex);
+        }
     }
 
     /// @notice Reinitialize the tree from a commitment on GW.
     function checkGWReinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal view {
-        require(_tree.startIndex == _commitment.startIndex, "PT: invalid start index");
-        require(_tree.unprocessedIndex <= _commitment.unprocessedIndex, "PT: invalid unprocessed index");
-        require(_tree.tree._nextLeafIndex <= _commitment.nextLeafIndex, "PT: invalid next leaf index");
+        if(_tree.startIndex != _commitment.startIndex) {
+            revert InvalidStartIndex(_tree.startIndex, _commitment.startIndex);
+        }
+        if(_tree.unprocessedIndex > _commitment.unprocessedIndex) {
+            revert InvalidUnprocessedIndex(_tree.unprocessedIndex, _commitment.unprocessedIndex);
+        }
+        if(_tree.tree._nextLeafIndex > _commitment.nextLeafIndex) {
+            revert InvalidNextLeafIndex(_tree.tree._nextLeafIndex, _commitment.nextLeafIndex);
+        }
     }
 
     /// @notice Returns the commitment to the priority tree.

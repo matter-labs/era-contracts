@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable reason-string, gas-custom-errors
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
@@ -19,11 +18,9 @@ contract DecentralizeGovernanceUpgradeScript is Script {
         Governance _governance,
         address _newCtmImpl
     ) public {
-        // solhint-disable-next-line gas-custom-errors
         if (_proxyAdmin.getProxyAdmin(_ctmProxy) != address(_proxyAdmin)) {
             revert ProxyAdminIncorrect(_proxyAdmin.getProxyAdmin(_ctmProxy), address(_proxyAdmin));
         }
-        // solhint-disable-next-line gas-custom-errors
         if (_proxyAdmin.owner() != address(_governance)) {
             revert ProxyAdminIncorrectOwner(_proxyAdmin.owner(), address(_governance));
         }

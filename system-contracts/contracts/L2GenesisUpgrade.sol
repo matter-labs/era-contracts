@@ -18,7 +18,6 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         address _ctmDeployer,
         bytes calldata _forceDeploymentsData
     ) external payable {
-        // solhint-disable-next-line gas-custom-errors
         if (_chainId == 0) {
             revert InvalidChainId();
         }

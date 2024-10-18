@@ -11,6 +11,8 @@ import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecuto
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {BLS_MODULUS} from "da-contracts/DAUtils.sol";
+import {BLOB_DATA_OFFSET} from "da-contracts/CalldataDA.sol";
+import {OperatorDAInputLengthTooSmall} from "da-contracts/DAContractsErrors.sol";
 import {TimeNotReached, BatchNumberMismatch, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, PubdataCommitmentsEmpty, L2TimestampTooBig, EmptyBlobVersionHash, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs, InvalidPubdataLength, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "contracts/common/L1ContractErrors.sol";
 
 contract CommittingTest is ExecutorTest {
@@ -658,7 +660,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert("too small");
+        vm.expectRevert(abi.encodeWithSelector(OperatorDAInputLengthTooSmall.selector, operatorDAInput.length, BLOB_DATA_OFFSET));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray

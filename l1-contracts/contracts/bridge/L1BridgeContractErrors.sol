@@ -8,10 +8,6 @@ error EthTransferFailed();
 
 error NativeTokenVaultAlreadySet();
 
-error NativeTokenVaultZeroAddress();
-
-error LegacyClaimDepositNotSupported();
-
 error LegacyEthWithdrawalNotSupported();
 
 error LegacyTokenWithdrawal();
@@ -30,8 +26,10 @@ error EthOnlyAcceptedFromSharedBridge(address sharedBridge, address msgSender);
 
 error ZeroAmountToTransfer();
 
-error WrongAmountTransferred(uint256 balance, uint256 sharedBridgeBalance);
+error WrongAmountTransferred(uint256 balance, uint256 nullifierChainBalance);
 
-error EmptyToken(address token, address ethTokenAddress);
+error EmptyToken();
 
-error ClaimDepositFailed();
+error ClaimFailedDepositFailed();
+
+error WrongL2Sender(address providedL2Sender);

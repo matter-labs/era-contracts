@@ -59,7 +59,6 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     }
 
     function initialize(address _initialOwner) external initializer {
-        // solhint-disable-next-line gas-custom-errors, reason-string
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }

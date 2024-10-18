@@ -58,6 +58,8 @@ error PubdataTooLong(uint256 pubdataLength, uint256 blobSizeBytes);
 
 error InvalidPubdataHash();
 
+error InvalidPubdataSource(uint8 pubdataSource);
+
 error BlobHashBlobCommitmentMismatchValue();
 
 error L1DAValidatorInvalidSender(address msgSender);
@@ -79,3 +81,9 @@ error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVe
 error ChainWasMigrated();
 
 error NotL1(uint256 blockChainId);
+
+error InvalidStartIndex(uint256 treeStartIndex, uint256 commitmentStartIndex);
+
+error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUnprocessedIndex);
+
+error InvalidNextLeafIndex(uint256 treeNextLeafIndex, uint256 commitmentNextLeafIndex);

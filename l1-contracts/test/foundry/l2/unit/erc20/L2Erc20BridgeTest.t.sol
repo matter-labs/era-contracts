@@ -12,13 +12,14 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {TokenNotInitialized} from "contracts/L2ContractsErrors.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {L2Utils} from "../utils/L2Utils.sol";
+
+error TokenNotInitialized();
 
 contract L2Erc20BridgeTest is Test {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.

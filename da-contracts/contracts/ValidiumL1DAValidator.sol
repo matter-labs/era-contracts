@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {IL1DAValidator, L1DAValidatorOutput} from "../IL1DAValidator.sol";
 import {ValL1DAWrongInputLength} from "../../common/L1ContractErrors.sol";
 
