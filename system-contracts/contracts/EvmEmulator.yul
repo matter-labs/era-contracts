@@ -1180,8 +1180,6 @@ object "EvmEmulator" {
         }
         
         function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr {
-            pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
-        
             _eraseReturndataPointer()
         
             let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
@@ -2892,6 +2890,8 @@ object "EvmEmulator" {
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
 
+        pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
+        
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
         if isStatic {
@@ -4014,8 +4014,6 @@ object "EvmEmulator" {
             }
             
             function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr {
-                pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
-            
                 _eraseReturndataPointer()
             
                 let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
@@ -5743,8 +5741,6 @@ object "EvmEmulator" {
             // First, copy the contract's bytecode to be executed into tEdhe `BYTECODE_OFFSET`
             // segment of memory.
             getDeployedBytecode()
-
-            pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
 
             let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)

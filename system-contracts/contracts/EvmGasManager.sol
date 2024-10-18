@@ -146,17 +146,29 @@ contract EvmGasManager {
     }
 
     function consumeEvmFrame() external payable onlySystemEvm returns (uint256 passGas, uint256 auxDataRes) {
+        bool isFrameActive;
+        bytes32 auxData;
         assembly {
-            let auxData := tload(EVM_AUX_DATA_SLOT)
-            let isFrameActive := and(auxData, EVM_ACTIVE_FRAME_FLAG)
+            auxData := tload(EVM_AUX_DATA_SLOT)
+            isFrameActive := and(auxData, EVM_ACTIVE_FRAME_FLAG)
+        }
 
-            if isFrameActive {
+        if (isFrameActive) {
+            assembly {
                 passGas := tload(EVM_GAS_SLOT)
                 auxDataRes := auxData
 
                 tstore(EVM_AUX_DATA_SLOT, 0) // mark as consumed
             }
+        } else {
+            // add sender to the warm accounts
+            uint256 is_sender_warm_tslot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(msg.sender));
+            assembly {
+                tstore(is_sender_warm_tslot, 1)
+            }
+        }
 
+        assembly {
             mstore(0x0, passGas)
             mstore(0x20, auxDataRes)
             return(0x0, 0x40)

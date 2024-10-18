@@ -34,14 +34,18 @@ export interface DeployedDependency {
 
 export function readYulBytecode(description: YulContractDescription) {
   const contractName = description.codeName;
-  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul.zbin`;
-  return ethers.utils.hexlify(fs.readFileSync(path));
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul/${contractName}.yul.zbin`;
+  return readBytecodeUtf8(path);
 }
 
 export function readZasmBytecode(description: ZasmContractDescription) {
   const contractName = description.codeName;
-  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm.zbin`;
-  return ethers.utils.hexlify(fs.readFileSync(path));
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm/${contractName}.zasm.zbin`;
+  return readBytecodeUtf8(path);
+}
+
+export function readBytecodeUtf8(path: string) {
+  return ethers.utils.hexlify(fs.readFileSync(path).toString(), { allowMissingPrefix: true });
 }
 
 // The struct used to represent the parameters of a forced deployment -- a deployment during upgrade
