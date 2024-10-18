@@ -11,6 +11,7 @@ import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {BlobHashBlobCommitmentMismatchValue, L1DAValidatorInvalidSender} from "../L1StateTransitionErrors.sol";
 
 /// @notice The DA validator intended to be used in Era-environment.
 /// @dev For compatibility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
@@ -22,7 +23,9 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
     function _ensureOnlyChainSender(uint256 _chainId) internal view {
         // Note that this contract is only supposed to be deployed on L2, where the
         // bridgehub is predeployed at `L2_BRIDGEHUB_ADDR` address.
-        require(IBridgehub(L2_BRIDGEHUB_ADDR).getZKChain(_chainId) == msg.sender, "l1-da-validator/invalid-sender");
+        if (IBridgehub(L2_BRIDGEHUB_ADDR).getZKChain(_chainId) != msg.sender) {
+            revert L1DAValidatorInvalidSender(msg.sender);
+        }
     }
 
     /// @dev Relays the calldata to L1.
@@ -91,11 +94,12 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
         // or there are values for both.
         // This is mostly a sanity check and it is not strictly required.
         for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
-            require(
-                (output.blobsLinearHashes[i] == bytes32(0) && output.blobsOpeningCommitments[i] == bytes32(0)) ||
-                    (output.blobsLinearHashes[i] != bytes32(0) && output.blobsOpeningCommitments[i] != bytes32(0)),
-                "bh"
-            );
+            if (
+                (output.blobsLinearHashes[i] != bytes32(0) || output.blobsOpeningCommitments[i] != bytes32(0)) &&
+                (output.blobsLinearHashes[i] == bytes32(0) || output.blobsOpeningCommitments[i] == bytes32(0))
+            ) {
+                revert BlobHashBlobCommitmentMismatchValue();
+            }
         }
     }
 }

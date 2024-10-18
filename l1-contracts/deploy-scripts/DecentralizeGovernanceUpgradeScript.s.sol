@@ -10,6 +10,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {Governance} from "contracts/governance/Governance.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Utils} from "./Utils.sol";
+import {ProxyAdminIncorrect, ProxyAdminIncorrectOwner} from "./ZkSyncScriptErrors.sol";
 
 contract DecentralizeGovernanceUpgradeScript is Script {
     function upgradeCTM(
@@ -19,9 +20,13 @@ contract DecentralizeGovernanceUpgradeScript is Script {
         address _newCtmImpl
     ) public {
         // solhint-disable-next-line gas-custom-errors
-        require(_proxyAdmin.getProxyAdmin(_ctmProxy) == address(_proxyAdmin), "Proxy admin incorrect");
+        if (_proxyAdmin.getProxyAdmin(_ctmProxy) != address(_proxyAdmin)) {
+            revert ProxyAdminIncorrect(_proxyAdmin.getProxyAdmin(_ctmProxy), address(_proxyAdmin));
+        }
         // solhint-disable-next-line gas-custom-errors
-        require(_proxyAdmin.owner() == address(_governance), "Proxy admin owner incorrect");
+        if (_proxyAdmin.owner() != address(_governance)) {
+            revert ProxyAdminIncorrectOwner(_proxyAdmin.owner(), address(_governance));
+        }
 
         bytes memory proxyAdminUpgradeData = abi.encodeCall(ProxyAdmin.upgrade, (_ctmProxy, _newCtmImpl));
 

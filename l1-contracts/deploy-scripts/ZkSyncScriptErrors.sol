@@ -7,6 +7,9 @@ error FailedToDeployViaCreate2();
 error MissingAddress(ZksyncContract);
 error AddressHasNoCode(address);
 error MintFailed();
+error ProxyAdminIncorrect(address expectedProxyAdmin, address proxyAdmin);
+error ProxyAdminIncorrectOwner(address proxyAdmin, address governance);
+error FailedToDeployCreate2Factory();
 
 enum ZksyncContract {
     Create2Factory,

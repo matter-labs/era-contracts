@@ -6,6 +6,7 @@ pragma solidity 0.8.24;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {Merkle} from "./Merkle.sol";
+import {MerkleWrongIndex, MerkleWrongLength} from "../L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -76,7 +77,9 @@ library FullMerkle {
     function updateLeaf(FullTree storage self, uint256 _index, bytes32 _itemHash) internal returns (bytes32) {
         // solhint-disable-next-line gas-custom-errors
         uint256 maxNodeNumber = self._leafNumber - 1;
-        require(_index <= maxNodeNumber, "FMT, wrong index");
+        if (_index > maxNodeNumber) {
+            revert MerkleWrongIndex(_index, maxNodeNumber);
+        }
         self._nodes[0][_index] = _itemHash;
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < self._height; i = i.uncheckedInc()) {
@@ -101,7 +104,9 @@ library FullMerkle {
      */
     function updateAllLeaves(FullTree storage self, bytes32[] memory _newLeaves) internal returns (bytes32) {
         // solhint-disable-next-line gas-custom-errors
-        require(_newLeaves.length == self._leafNumber, "FMT, wrong length");
+        if (_newLeaves.length != self._leafNumber) {
+            revert MerkleWrongLength(_newLeaves.length, self._leafNumber);
+        }
         return updateAllNodesAtHeight(self, 0, _newLeaves);
     }
 

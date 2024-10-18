@@ -18,6 +18,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {ChainWasMigrated, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -35,7 +36,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
     modifier chainOnCurrentBridgehub() {
-        require(s.settlementLayer == address(0), "Chain was migrated");
+        if (s.settlementLayer != address(0)) {
+            revert ChainWasMigrated();
+        }
         _;
     }
 
@@ -199,7 +202,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
+                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
+                    revert MismatchL2DAValidator();
+                }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
@@ -413,7 +418,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         PriorityOpsBatchInfo memory _priorityOpsData,
         uint256 _executedBatchIdx
     ) internal {
-        require(_priorityOpsData.itemHashes.length == _storedBatch.numberOfLayer1Txs, "zxc");
+        if (_priorityOpsData.itemHashes.length != _storedBatch.numberOfLayer1Txs) {
+            revert MismatchNumberOfLayer1Txs(_priorityOpsData.itemHashes.length, _storedBatch.numberOfLayer1Txs);
+        }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
         s.priorityTree.processBatch(_priorityOpsData);
@@ -438,15 +445,23 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
             .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
-        require(batchesData.length == priorityOpsData.length, "bp");
+        if (batchesData.length != priorityOpsData.length) {
+            revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
+        }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
                 _executeOneBatch(batchesData[i], priorityOpsData[i], i);
             } else {
-                require(priorityOpsData[i].leftPath.length == 0, "le");
-                require(priorityOpsData[i].rightPath.length == 0, "re");
-                require(priorityOpsData[i].itemHashes.length == 0, "ih");
+                if (priorityOpsData[i].leftPath.length != 0) {
+                    revert PriorityOpsDataLeftPathLengthIsNotZero();
+                }
+                if (priorityOpsData[i].rightPath.length != 0) {
+                    revert PriorityOpsDataRightPathLengthIsNotZero();
+                }
+                if (priorityOpsData[i].itemHashes.length != 0) {
+                    revert PriorityOpsDataItemHashesLengthIsNotZero();
+                }
                 _executeOneBatch(batchesData[i], i);
             }
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
