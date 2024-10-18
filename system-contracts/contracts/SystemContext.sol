@@ -7,7 +7,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
-import {InvalidNewL2BlockNumber, CannotCreateVirtualBlocksInMiddleOfMiniblock, PreviousHashOfSameL2BlockMustBeSame, TimestampOfSameL2BlockMustBeSame, CannotReuseL2BlockNumberFromPreviousBatch, ThereMustBeVirtualBlockCreatedAtStartOfBatch, L2BlockAndBatchTimestampMismatch, UpgradeTransactionMustBeFirst, L2BlockNumberIsNeverExpectedToBeZero, PreviousL2BlockHashIsIncorrect, CannotInitializeFirstVirtualBlock, CurrentL2BlockHashIsIncorrect, NonMonotonicL2BlockTimestamp, CurrentBatchNumberMustBeGreaterThanZero, TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock, TimestampsShouldBeIncremental, ProvidedBatchNumberIsNotCorrect} from "contracts/SystemContractErrors.sol";
+import {IncosistentNewBatchTimestamp, InvalidNewL2BlockNumber, IncorrectVirtualBlockInsideMiniblock, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, CannotReuseL2BlockNumberFromPreviousBatch, NoVirtualBlocks, L2BlockAndBatchTimestampMismatch, UpgradeTransactionMustBeFirst, L2BlockNumberZero, PreviousL2BlockHashIsIncorrect, CannotInitializeFirstVirtualBlock, IncorrectL2BlockHash, NonMonotonicL2BlockTimestamp, CurrentBatchNumberMustBeGreaterThanZero, NonMonotonicTimestamp, TimestampsShouldBeIncremental, ProvidedBatchNumberIsNotCorrect} from "contracts/SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -250,7 +250,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
         // This is how it will be commonly done in practice, but it will simplify some logic later
         if (_l2BlockNumber == 0) {
-            revert L2BlockNumberIsNeverExpectedToBeZero();
+            revert L2BlockNumberZero();
         }
 
         unchecked {
@@ -366,7 +366,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
                 revert L2BlockAndBatchTimestampMismatch(_l2BlockTimestamp, currentBatchTimestamp);
             }
             if (_maxVirtualBlocksToCreate == 0) {
-                revert ThereMustBeVirtualBlockCreatedAtStartOfBatch();
+                revert NoVirtualBlocks();
             }
         }
 
@@ -383,16 +383,16 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
                 revert CannotReuseL2BlockNumberFromPreviousBatch();
             }
             if (currentL2BlockTimestamp != _l2BlockTimestamp) {
-                revert TimestampOfSameL2BlockMustBeSame(_l2BlockTimestamp, currentL2BlockTimestamp);
+                revert IncorrectSameL2BlockTimestamp(_l2BlockTimestamp, currentL2BlockTimestamp);
             }
             if (_expectedPrevL2BlockHash != _getLatest257L2blockHash(_l2BlockNumber - 1)) {
-                revert PreviousHashOfSameL2BlockMustBeSame(
+                revert IncorrectSameL2BlockPrevBlockHash(
                     _expectedPrevL2BlockHash,
                     _getLatest257L2blockHash(_l2BlockNumber - 1)
                 );
             }
             if (_maxVirtualBlocksToCreate != 0) {
-                revert CannotCreateVirtualBlocksInMiddleOfMiniblock();
+                revert IncorrectVirtualBlockInsideMiniblock();
             }
         } else if (currentL2BlockNumber + 1 == _l2BlockNumber) {
             // From the checks in _upgradeL2Blocks it is known that currentL2BlockNumber can not be 0
@@ -406,7 +406,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             );
 
             if (_expectedPrevL2BlockHash != pendingL2BlockHash) {
-                revert CurrentL2BlockHashIsIncorrect(_expectedPrevL2BlockHash, pendingL2BlockHash);
+                revert IncorrectL2BlockHash(_expectedPrevL2BlockHash, pendingL2BlockHash);
             }
             if (_l2BlockTimestamp <= currentL2BlockTimestamp) {
                 revert NonMonotonicL2BlockTimestamp(_l2BlockTimestamp, currentL2BlockTimestamp);
@@ -453,7 +453,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     function _ensureBatchConsistentWithL2Block(uint128 _newTimestamp) internal view {
         uint128 currentBlockTimestamp = currentL2BlockInfo.timestamp;
         if (_newTimestamp <= currentBlockTimestamp) {
-            revert TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock(_newTimestamp, currentBlockTimestamp);
+            revert IncosistentNewBatchTimestamp(_newTimestamp, currentBlockTimestamp);
         }
     }
 

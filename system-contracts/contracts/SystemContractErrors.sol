@@ -117,7 +117,7 @@ error InvalidChainId();
 
 error UpgradeTransactionMustBeFirst();
 
-error L2BlockNumberIsNeverExpectedToBeZero();
+error L2BlockNumberZero();
 
 error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
 
@@ -125,23 +125,25 @@ error CannotInitializeFirstVirtualBlock();
 
 error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 
-error ThereMustBeVirtualBlockCreatedAtStartOfBatch();
+error IncosistentNewBatchTimestamp(uint128 newBatchTimestamp, uint128 lastL2BlockTimestamp);
+
+error NoVirtualBlocks();
 
 error CannotReuseL2BlockNumberFromPreviousBatch();
 
-error TimestampOfSameL2BlockMustBeSame(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
+error IncorrectSameL2BlockTimestamp(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
 
-error PreviousHashOfSameL2BlockMustBeSame(bytes32 expectedPrevL2BlockHash, bytes32 latestL2blockHash);
+error IncorrectSameL2BlockPrevBlockHash(bytes32 expectedPrevL2BlockHash, bytes32 latestL2blockHash);
 
-error CannotCreateVirtualBlocksInMiddleOfMiniblock();
+error IncorrectVirtualBlockInsideMiniblock();
 
-error CurrentL2BlockHashIsIncorrect(bytes32 expectedPrevL2BlockHash, bytes32 pendingL2BlockHash);
+error IncorrectL2BlockHash(bytes32 expectedPrevL2BlockHash, bytes32 pendingL2BlockHash);
 
 error NonMonotonicL2BlockTimestamp(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
 
 error CurrentBatchNumberMustBeGreaterThanZero();
 
-error TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock(uint128 newTimestamp, uint128 currentBlockTimestamp);
+error NonMonotonicTimestamp(uint128 newTimestamp, uint128 currentBlockTimestamp);
 
 error TimestampsShouldBeIncremental(uint128 newTimestamp, uint128 previousBatchTimestamp);
 
