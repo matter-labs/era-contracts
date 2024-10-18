@@ -6,8 +6,6 @@ pragma solidity ^0.8.20;
 error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
-// 0xb7549616
-error CallerMustBeForceDeployer();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0x4f951510
@@ -26,8 +24,6 @@ error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
 error DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo();
 // 0x1c25715b
 error EmptyBytes32();
-// 0x92bf3cf8
-error EmptyVirtualBlocks();
 // 0xc06d5cb2
 error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
 // 0x2bfbfc11
@@ -36,8 +32,6 @@ error EncodedLengthNotFourTimesSmallerThanOriginal();
 error FailedToChargeGas();
 // 0x1f70c58f
 error FailedToPayOperator();
-// 0x9d5da395
-error FirstL2BlockInitializationError();
 // 0x9e4a3c8a
 error HashIsNonZero(bytes32);
 // 0x86302004
@@ -48,8 +42,6 @@ error IndexOutOfBounds();
 error IndexSizeError();
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
-// 0x1c26714c
-error InsufficientGas();
 // 0xae962d4e
 error InvalidCall();
 // 0x8cbd7f8b
@@ -62,8 +54,6 @@ error InvalidNonceOrderingChange();
 error InvalidSig(SigField, uint256);
 // 0xf4a271b5
 error Keccak256InvalidReturnData();
-// 0xd2906dd9
-error L2BlockMustBeGreaterThanZero();
 // 0xcea34703
 error MalformedBytecode(BytecodeError);
 // 0xe90aded4
@@ -104,12 +94,8 @@ error UnsupportedOperation();
 error UnsupportedPaymasterFlow();
 // 0x17a84415
 error UnsupportedTxType(uint256);
-// 0x5708aead
-error UpgradeMustBeFirstTxn();
 // 0x626ade30
 error ValueMismatch(uint256 expected, uint256 actual);
-// 0x460b9939
-error ValuesNotEqual(uint256 expected, uint256 actual);
 // 0x6818f3f9
 error ZeroNonceError();
 

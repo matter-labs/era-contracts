@@ -11,29 +11,8 @@ error EthTransferFailed();
 // 0x1c55230b
 error NativeTokenVaultAlreadySet();
 
-// 0xe3c3f6ac
-error LegacyEthWithdrawalNotSupported();
-
-// 0x7bbae404
-error LegacyTokenWithdrawal();
-
 // 0x61cdb17e
 error WrongMsgLength(uint256 expected, uint256 length);
-
-// 0xf01fa4d4
-error NotNTVorADT(address msgSender, address deploymentTracker);
-
-// 0x802e4e50
-error AssetHandlerNotSet();
-
-// 0x2bd50ff1
-error NewEncodingFormatNotYetSupportedForNTV(address deploymentTracker, address nativeTokenVault);
-
-// 0xfd56d779
-error AssetHandlerDoesNotExistForAssetId();
-
-// 0x8175b04c
-error EthOnlyAcceptedFromSharedBridge(address sharedBridge, address msgSender);
 
 // 0xe4742c42
 error ZeroAmountToTransfer();

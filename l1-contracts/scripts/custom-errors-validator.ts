@@ -15,7 +15,10 @@ const FILES_WITH_CUSTOM_ERRORS = [
 ]; // Replace with your file paths
 const CONTRACTS_DIRECTORIES = [
     'contracts',
-    'test/foundry'
+    'test/foundry',
+    '../l2-contracts/contracts',
+    '../system-contracts/contracts',
+    '../da-contracts/contracts'
 ]; // Replace with your directories
 
 // Function to extract the error signature
