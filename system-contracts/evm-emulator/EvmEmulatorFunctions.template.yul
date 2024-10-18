@@ -287,6 +287,7 @@ function getDeployedBytecode() {
 
 function consumeEvmFrame() -> passGas, isStatic, callerEVM {
     // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
+    // non-standard selector 0x04
     mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
 
     let farCallAbi := getFarCallABI(
@@ -522,6 +523,7 @@ function expandMemory(newSize) -> gasCost {
 }
 
 function isSlotWarm(key) -> isWarm {
+    // non-standard selector 0x01
     mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
     mstore(1, key)
 
@@ -538,6 +540,7 @@ function isSlotWarm(key) -> isWarm {
 }
 
 function warmSlot(key,currentValue) -> isWarm, originalValue {
+    // non-standard selector 0x02
     mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
     mstore(1, key)
     mstore(33,currentValue)
@@ -607,7 +610,10 @@ function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newS
 }
 
 function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-    mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff)) // 0x8DB2BA7800000000000000000000000000000000000000000000000000000000
+    // function warmAccount(address account)
+    // non-standard selector 0x00
+    // addr is packed in the same word with selector
+    mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
 
     let farCallAbi := getFarCallABI(
         0,
@@ -668,8 +674,8 @@ function _isEVM(_addr) -> isEVM {
 }
 
 function _pushEVMFrame(_passGas, _isStatic) {
-    // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
-
+    // function pushEVMFrame
+    // non-standard selector 0x03
     mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
     mstore(32, _passGas)
 
