@@ -59,7 +59,12 @@ export function web3Provider() {
 
 export function readBatchBootloaderBytecode() {
   const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts/bootloader");
-  return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul.zbin`);
+
+  return readBytecodeUtf8(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
+}
+
+export function readBytecodeUtf8(path: string) {
+  return ethers.utils.hexlify(fs.readFileSync(path).toString(), { allowMissingPrefix: true });
 }
 
 export function readSystemContractsBytecode(fileName: string) {
