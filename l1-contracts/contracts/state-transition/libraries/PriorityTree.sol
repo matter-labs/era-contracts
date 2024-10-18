@@ -27,7 +27,7 @@ library PriorityTree {
         DynamicIncrementalMerkle.Bytes32PushTree tree;
     }
 
-    /// @notice Returns zero if and only if no operations were processed from the queue
+    /// @notice Returns zero if and only if no operations were processed from the tree
     /// @return Index of the oldest priority operation that wasn't processed yet
     function getFirstUnprocessedPriorityTx(Tree storage _tree) internal view returns (uint256) {
         return _tree.startIndex + _tree.unprocessedIndex;

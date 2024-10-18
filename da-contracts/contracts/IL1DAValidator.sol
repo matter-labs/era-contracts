@@ -17,7 +17,7 @@ struct L1DAValidatorOutput {
 interface IL1DAValidator {
     /// @notice The function that checks the data availability for the given batch input.
     /// @param _chainId The chain id of the chain that is being committed.
-    /// @param _chainId The batch number for which the data availability is being checked.
+    /// @param _batchNumber The batch number for which the data availability is being checked.
     /// @param _l2DAValidatorOutputHash The hash of that was returned by the l2DAValidator.
     /// @param _operatorDAInput The DA input by the operator provided on L1.
     /// @param _maxBlobsSupported The maximal number of blobs supported by the chain.
