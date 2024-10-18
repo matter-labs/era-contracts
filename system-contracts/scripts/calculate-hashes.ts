@@ -65,7 +65,7 @@ const getSolidityContractsDetails = (dir: string): ContractDetails[] => {
 const YUL_ARTIFACTS_DIR = "artifacts";
 
 const getYulContractDetails = (dir: string, contractName: string): ContractDetails => {
-  const bytecodePath = join(dir, YUL_ARTIFACTS_DIR, contractName + ".yul.zbin");
+  const bytecodePath = join(dir, YUL_ARTIFACTS_DIR, contractName + ".yul", contractName + ".yul.zbin");
   const sourceCodePath = join(dir, contractName + ".yul");
   return {
     contractName,
@@ -102,7 +102,7 @@ const readBytecode = (details: ContractDetails): string => {
       const jsonFile = fs.readFileSync(absolutePath, "utf8");
       return ethers.utils.hexlify(JSON.parse(jsonFile).bytecode);
     } else {
-      return ethers.utils.hexlify(fs.readFileSync(absolutePath));
+      return ethers.utils.hexlify(fs.readFileSync(absolutePath).toString(), { allowMissingPrefix: true });
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
