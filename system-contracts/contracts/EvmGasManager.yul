@@ -67,7 +67,7 @@ object "EvmGasManager" {
                 let notSystemCall := iszero(and(callFlags, 2))
 
                 if notSystemCall {
-                    revert(0, 0)
+                    revert(0, 0) // TODO errors?
                 }
 
                 // SELFDESTRUCT is not supported, so it is ok to cache here
