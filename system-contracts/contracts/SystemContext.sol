@@ -251,7 +251,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         }
 
         // This is how it will be commonly done in practice, but it will simplify some logic later
-        if (_l2BlockNumber <= 0) {
+        if (_l2BlockNumber == 0) {
             revert L2BlockNumberIsNeverExpectedToBeZero();
         }
 
@@ -297,7 +297,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             // Remembering the batch number on which the upgrade to the virtual blocks has been done.
             virtualBlockUpgradeInfo.virtualBlockStartBatch = currentBatchNumber;
 
-            if (_maxVirtualBlocksToCreate <= 0) {
+            if (_maxVirtualBlocksToCreate == 0) {
                 revert CannotInitializeFirstVirtualBlock();
             }
             // solhint-disable-next-line gas-increment-by-one
@@ -370,7 +370,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
                     currentBatchTimestamp
                 );
             }
-            if (_maxVirtualBlocksToCreate <= 0) {
+            if (_maxVirtualBlocksToCreate == 0) {
                 revert ThereMustBeVirtualBlockCreatedAtStartOfBatch();
             }
         }
@@ -442,7 +442,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         (, uint128 currentL2BlockTimestamp) = getL2BlockNumberAndTimestamp();
 
         // The structure of the "setNewBatch" implies that currentBatchNumber > 0, but we still double check it
-        if (currentBatchNumber <= 0) {
+        if (currentBatchNumber == 0) {
             revert CurrentBatchNumberMustBeGreaterThanZero();
         }
 

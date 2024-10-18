@@ -144,7 +144,7 @@ library Utils {
         if (child == address(0)) {
             revert FailedToDeployCreate2Factory();
         }
-        if (child.code.length <= 0) {
+        if (child.code.length == 0) {
             revert FailedToDeployCreate2Factory();
         }
         return child;

@@ -23,7 +23,7 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {NotChainCTM, NotL1, NotRelayedSender, NotAssetRouter, TokenNotSet, ChainAlreadyPresent, ChainIdAlreadyPresent, ChainNotPresentInCTM, NotCtmDeployer, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAsset, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
+import {NotChainCTM, NotL1, NotRelayedSender, NotAssetRouter, TokenNotSet, ChainAlreadyPresent, ChainIdAlreadyPresent, ChainNotPresentInCTM, NotCtmDeployer, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
 import {NoCTMForAssetId, MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -110,7 +110,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyChainCTM(uint256 _chainId) {
         if (msg.sender != chainTypeManager[_chainId]) {
-            revert NotChainCTM(msg.sender, chainTypeManager[_chainId]);
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -237,7 +237,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (zkChainMap.contains(_chainId)) {
             revert ChainIdAlreadyPresent();
         }
-        /// Note we have to do this before CTM is upgraded.
         address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
         if (chainAddress == address(0)) {
             revert ChainNotPresentInCTM();
@@ -316,7 +315,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by l1CtmDeployer only
         if (sender != address(l1CtmDeployer)) {
-            revert NotCtmDeployer(sender, address(l1CtmDeployer));
+            revert Unauthorized(sender);
         }
         if (!chainTypeManagerIsRegistered[_assetAddress]) {
             revert CTMNotRegistered();
@@ -696,7 +695,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         if (_assetId != ctmAssetIdFromChainId(bridgehubData.chainId)) {
-            revert IncorrectChainAsset(_assetId, ctmAssetIdFromChainId(bridgehubData.chainId));
+            revert IncorrectChainAssetId(_assetId, ctmAssetIdFromChainId(bridgehubData.chainId));
         }
         if (settlementLayer[bridgehubData.chainId] != block.chainid) {
             revert NotCurrentSL(settlementLayer[bridgehubData.chainId], block.chainid);

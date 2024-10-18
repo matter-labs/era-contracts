@@ -34,7 +34,7 @@ error NotInGatewayMode();
 
 error SLNotWhitelisted();
 
-error IncorrectChainAsset(bytes32 assetId, bytes32 assetIdFromChainId);
+error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 
 error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
 
@@ -64,4 +64,4 @@ error OnlyBridgehub(address msgSender, address bridgehub);
 
 error OnlyChain(address msgSender, address zkChainAddress);
 
-error NotOwnerViaRouter(address msgSender);
+error NotOwnerViaRouter(address msgSender, address originalCaller);

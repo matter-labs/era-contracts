@@ -42,7 +42,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     modifier onlyOwnerViaRouter(address _originalCaller) {
         // solhint-disable-next-line gas-custom-errors
         if (msg.sender != address(L1_ASSET_ROUTER) || _originalCaller != owner()) {
-            revert NotOwnerViaRouter(msg.sender);
+            revert NotOwnerViaRouter(msg.sender, _originalCaller);
         }
         _;
     }

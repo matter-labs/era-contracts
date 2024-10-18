@@ -87,7 +87,7 @@ library Merkle {
         if (pathLength == 0 && (_startIndex != 0 || levelLen != 1)) {
             revert MerklePathEmpty();
         }
-        if (levelLen <= 0) {
+        if (levelLen == 0) {
             revert MerkleNothingToProve();
         }
         if (_startIndex + levelLen > (1 << pathLength)) {
