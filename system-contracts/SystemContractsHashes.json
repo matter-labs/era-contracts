@@ -59,8 +59,8 @@
     "contractName": "EvmGasManager",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/EvmGasManager.sol/EvmGasManager.json",
     "sourceCodePath": "contracts-preprocessed/EvmGasManager.sol",
-    "bytecodeHash": "0x01000081f69b17e3bd9c7216e8c1ac373ae12a5623ea990611a9e95dc933735c",
-    "sourceCodeHash": "0x55793c7ebed8f29f08ee552097c4413a555cee09b532d21ab243aa4dfb0f9d2f"
+    "bytecodeHash": "0x0100008148ea7fa07f7ba421637904013bb2421ff55367e8c440eed44df928ae",
+    "sourceCodeHash": "0x56e3898a4cd8af13abf91fa2296900e0b5f409ee3ca4296a0f08affbe31da244"
   },
   {
     "contractName": "ImmutableSimulator",
