@@ -6,6 +6,12 @@ import { ethers } from 'ethers';
 // Constant arrays
 const FILES_WITH_CUSTOM_ERRORS = [
     'contracts/common/L1ContractErrors.sol',
+    'contracts/bridge/L1BridgeContractErrors.sol',
+    'contracts/bridgehub/L1BridgehubErrors.sol',
+    'contracts/state-transition/L1StateTransitionErrors.sol',
+    '../l2-contracts/contracts/errors/L2ContractErrors.sol',
+    '../system-contracts/contracts/SystemContractErrors.sol',
+    '../da-contracts/contracts/DAContractsErrors.sol'
 ]; // Replace with your file paths
 const CONTRACTS_DIRECTORIES = [
     'contracts',

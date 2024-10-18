@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
+// 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
@@ -31,6 +32,7 @@ error Unimplemented();
 error UnsupportedPaymasterFlow();
 // 0x750b219c
 error WithdrawFailed();
+// 0xcea34703
 error MalformedBytecode(BytecodeError);
 
 enum BytecodeError {
