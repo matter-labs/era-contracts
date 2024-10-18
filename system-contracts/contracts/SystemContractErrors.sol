@@ -123,10 +123,7 @@ error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expec
 
 error CannotInitializeFirstVirtualBlock();
 
-error L2BlockAndBatchTimestampMismatch(
-    uint128 l2BlockTimestamp,
-    uint128 currentBatchTimestamp
-);
+error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 
 error ThereMustBeVirtualBlockCreatedAtStartOfBatch();
 
@@ -140,10 +137,7 @@ error CannotCreateVirtualBlocksInMiddleOfMiniblock();
 
 error CurrentL2BlockHashIsIncorrect(bytes32 expectedPrevL2BlockHash, bytes32 pendingL2BlockHash);
 
-error NonMonotonicL2BlockTimestamp(
-    uint128 l2BlockTimestamp,
-    uint128 currentL2BlockTimestamp
-);
+error NonMonotonicL2BlockTimestamp(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
 
 error CurrentBatchNumberMustBeGreaterThanZero();
 
@@ -178,6 +172,8 @@ error TransactionFailed();
 error NotEnoughGas();
 
 error TooMuchGas();
+
+error InvalidNewL2BlockNumber(uint256 l2BlockNumber);
 
 enum CodeHashReason {
     NotContractOnConstructor,

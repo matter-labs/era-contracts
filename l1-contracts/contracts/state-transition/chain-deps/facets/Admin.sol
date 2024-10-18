@@ -12,7 +12,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
-import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -274,7 +274,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (block.chainid != L1_CHAIN_ID) {
             // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
             // That's why we need to bound the gas that can be consumed during such a migration.
-            require(s.totalBatchesCommitted == s.totalBatchesExecuted, "Af: not all batches executed");
+            if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+                revert NotAllBatchesExecuted();
+            }
         }
 
         s.settlementLayer = _settlementLayer;
@@ -292,8 +294,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         uint256 currentProtocolVersion = s.protocolVersion;
         uint256 protocolVersion = ctm.protocolVersion();
-        require(currentProtocolVersion == protocolVersion, "CTM: protocolVersion not up to date");
-
+        if (currentProtocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, currentProtocolVersion);
+        }
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;
         uint256 batchesCommitted = _commitment.totalBatchesCommitted;
@@ -326,17 +329,24 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         if (block.chainid == L1_CHAIN_ID) {
             // L1 PTree contains all L1->L2 transactions.
-            require(
-                s.priorityTree.isHistoricalRoot(
+            if (
+                !s.priorityTree.isHistoricalRoot(
                     _commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]
-                ),
-                "Admin: not historical root"
-            );
-            require(_contractAlreadyDeployed, "Af: contract not deployed");
-            require(s.settlementLayer != address(0), "Af: not migrated");
+                )
+            ) {
+                revert NotHistoricalRoot();
+            }
+            if (!_contractAlreadyDeployed) {
+                revert ContractNotDeployed();
+            }
+            if (s.settlementLayer == address(0)) {
+                revert NotMigrated();
+            }
             s.priorityTree.checkL1Reinit(_commitment.priorityTree);
         } else if (_contractAlreadyDeployed) {
-            require(s.settlementLayer != address(0), "Af: not migrated 2");
+            if (s.settlementLayer == address(0)) {
+                revert NotMigrated();
+            }
             s.priorityTree.checkGWReinit(_commitment.priorityTree);
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         } else {
@@ -365,13 +375,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
-        require(s.settlementLayer != address(0), "Af: not migrated");
+        if (s.settlementLayer == address(0)) {
+            revert NotMigrated();
+        }
         // Sanity check that the _depositSender is the chain admin.
-        require(_depositSender == s.admin, "Af: not chainAdmin");
+        if (_depositSender != s.admin) {
+            revert NotChainAdmin(_depositSender, s.admin);
+        }
 
         uint256 currentProtocolVersion = s.protocolVersion;
-
-        require(currentProtocolVersion == protocolVersion, "CTM: protocolVersion not up to date");
+        if (currentProtocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, currentProtocolVersion);
+        }
 
         s.settlementLayer = address(0);
     }

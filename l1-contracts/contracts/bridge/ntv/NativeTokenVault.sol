@@ -90,7 +90,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (_nativeToken.code.length == 0) {
             revert EmptyToken();
         }
-        require(_nativeToken.code.length > 0, "NTV: empty token");
         _unsafeRegisterNativeToken(_nativeToken);
     }
 

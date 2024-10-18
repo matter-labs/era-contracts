@@ -193,7 +193,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assembly {
                 callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
             }
-            if(!callSuccess) {
+            if (!callSuccess) {
                 revert EthTransferFailed();
             }
         } else {
@@ -424,7 +424,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         if (_isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber)) {
             // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex);
-            if(alreadyFinalized) {
+            if (alreadyFinalized) {
                 revert WithdrawalAlreadyFinalized();
             }
         }
@@ -520,8 +520,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
 
             bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
-                    l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
-                    l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
+                l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
+                l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
             if (!isL2SenderCorrect) {
                 revert WrongL2Sender(l2Sender);
             }

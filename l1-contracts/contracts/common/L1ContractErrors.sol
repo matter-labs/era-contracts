@@ -31,8 +31,6 @@ error AddressAlreadySet(address addr);
 error AddressHasNoCode(address);
 //
 error AddressMismatch(address expected, address supplied);
-// 0x1eee5481
-error AddressTooLow(address);
 //
 error AmountMustBeGreaterThanZero();
 //
@@ -77,8 +75,6 @@ error ChainIdCantBeCurrentChain();
 error ChainIdMismatch();
 //
 error ChainIdNotRegistered(uint256 chainId);
-//
-error ChainNotLegacy();
 // 0x78d2ed02
 error ChainAlreadyLive();
 // 0x8f620a06

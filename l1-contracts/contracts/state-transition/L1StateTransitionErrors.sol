@@ -87,3 +87,11 @@ error InvalidStartIndex(uint256 treeStartIndex, uint256 commitmentStartIndex);
 error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUnprocessedIndex);
 
 error InvalidNextLeafIndex(uint256 treeNextLeafIndex, uint256 commitmentNextLeafIndex);
+
+error NotAllBatchesExecuted();
+
+error NotHistoricalRoot();
+
+error ContractNotDeployed();
+
+error NotMigrated();
