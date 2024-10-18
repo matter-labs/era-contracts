@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { renderFile } from "template-file";
 import { glob } from "fast-glob";
@@ -8,6 +8,7 @@ import { needsRecompilation, deleteDir, setCompilationTime, isFolderEmpty } from
 const CONTRACTS_DIR = "contracts";
 const OUTPUT_DIR = "contracts-preprocessed";
 const TIMESTAMP_FILE = "last_compilation_preprocessing.timestamp"; // File to store the last compilation time
+const LLVM_OPTIONS_FILE_EXTENSION = ".llvm.options";
 
 const params = {
   SYSTEM_CONTRACTS_OFFSET: "0x8000",
@@ -44,6 +45,9 @@ async function preprocess(testMode: boolean) {
       mkdirSync(directory, { recursive: true });
     }
     writeFileSync(fileName, preprocessed);
+    if (existsSync(contract + LLVM_OPTIONS_FILE_EXTENSION)) {
+      copyFileSync(contract + LLVM_OPTIONS_FILE_EXTENSION, fileName + LLVM_OPTIONS_FILE_EXTENSION);
+    }
   }
 
   console.log("System Contracts preprocessing done!");
