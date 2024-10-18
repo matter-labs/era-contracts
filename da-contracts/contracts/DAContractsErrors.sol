@@ -37,3 +37,5 @@ error InvalidPubdataHash(bytes32 fullPubdataHash, bytes32 pubdata);
 error BlobCommitmentNotPublished();
 
 error InvalidPubdataSource(uint8 pubdataSource);
+// 0x52595598
+error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);

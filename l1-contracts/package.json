@@ -82,7 +82,8 @@
     "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
     "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
     "sync-layer": "ts-node scripts/sync-layer.ts",
-    "size": "hardhat size-contracts"
+    "size": "hardhat size-contracts",
+    "check-errors": "ts-node scripts/custom-errors-validator.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

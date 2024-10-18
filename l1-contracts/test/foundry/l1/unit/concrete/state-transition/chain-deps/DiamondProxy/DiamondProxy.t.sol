@@ -12,7 +12,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
-import {FacetIsFrozen, ValueMismatch, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+import {ValueMismatch, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
 contract TestFacet is ZKChainBase {
     function func() public pure returns (bool) {

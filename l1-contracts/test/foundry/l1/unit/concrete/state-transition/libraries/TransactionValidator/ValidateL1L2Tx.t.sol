@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {PubdataGreaterThanLimit, TxnBodyGasLimitNotEnoughGas, ValidateTxnNotEnoughGas, NotEnoughGas, TooMuchGas, InvalidPubdataLength} from "contracts/common/L1ContractErrors.sol";
+import {PubdataGreaterThanLimit, TxnBodyGasLimitNotEnoughGas, ValidateTxnNotEnoughGas, NotEnoughGas, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
 import {OverheadForTransactionMustBeEqualToTxSlotOverhead} from "test/foundry/L1TestsErrors.sol";
 
 contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
