@@ -117,8 +117,8 @@ error CannotInitializeFirstVirtualBlock();
 // 0x5e9ad9b0
 error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 
-// 0x3dab3f90
-error IncosistentNewBatchTimestamp(uint128 newBatchTimestamp, uint128 lastL2BlockTimestamp);
+// 0x159a6f2e
+error InconsistentNewBatchTimestamp(uint128 newBatchTimestamp, uint128 lastL2BlockTimestamp);
 
 // 0xdcdfb0da
 error NoVirtualBlocks();

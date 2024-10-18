@@ -85,8 +85,8 @@ function processFile(filePath: string, fix: boolean, collectedErrors: Set<string
           } else {
             // Insert the selector line
             newLines.push(selectorComment);
-            modified = true;
           }
+          modified = true;
         } else {
           throw new Error(`Missing selector comment above error at ${filePath}:${lineNumber + 1}`);
         }
