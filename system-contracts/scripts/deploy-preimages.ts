@@ -246,7 +246,7 @@ class ZkSyncDeployer {
   }
 
   async processBootloader() {
-    const bootloaderCode = readBytecodeUtf8("./bootloader/build/artifacts/proved_batch.yul.zbin");
+    const bootloaderCode = readBytecodeUtf8("./bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin");
 
     await this.publishBootloader(bootloaderCode);
     await this.checkShouldUpgradeBootloader(bootloaderCode);

@@ -5,6 +5,7 @@ import "@matterlabs/hardhat-zksync-verify";
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-typechain";
 
+// This version of system contracts requires a pre release of the compiler
 const COMPILER_VERSION = "v1.5.6";
 const PRE_RELEASE_VERSION = "1.5.6";
 function getZksolcUrl(): string {
