@@ -30,6 +30,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
@@ -45,7 +46,9 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
-        require(users.length == 0, "Addresses already generated");
+        if (users.length != 0) {
+            revert AddressesAlreadyGenerated();
+        }
 
         for (uint256 i = 0; i < TEST_USERS_COUNT; i++) {
             address newAddress = makeAddr(string(abi.encode("account", i)));

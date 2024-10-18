@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-
 // solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
@@ -19,6 +18,8 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {L2Utils} from "../utils/L2Utils.sol";
+
+error TokenNotInitialized();
 
 contract L2Erc20BridgeTest is Test {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -86,7 +87,9 @@ contract L2Erc20BridgeTest is Test {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
         l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-        require(l2TokenAddress != address(0), "Token not initialized");
+        if (l2TokenAddress == address(0)) {
+            revert TokenNotInitialized();
+        }
     }
 
     function test_shouldFinalizeERC20Deposit() public {
@@ -121,7 +124,7 @@ contract L2Erc20BridgeTest is Test {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), 18);
     }
 
-    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
+    function test_governanceShouldlNotBeAbleToSkipInitializerVersions() public {
         address l2TokenAddress = initializeTokenByDeposit();
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({

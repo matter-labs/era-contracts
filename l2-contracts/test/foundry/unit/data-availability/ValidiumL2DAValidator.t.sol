@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {Test} from "forge-std/Test.sol";
 
 import {ValidiumL2DAValidator} from "contracts/data-availability/ValidiumL2DAValidator.sol";

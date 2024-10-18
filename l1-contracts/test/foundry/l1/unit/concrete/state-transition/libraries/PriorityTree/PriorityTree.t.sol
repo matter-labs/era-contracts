@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {PriorityTreeSharedTest, PriorityOpsBatchInfo} from "./_PriorityTree_Shared.t.sol";
 import {PriorityTreeCommitment} from "contracts/common/Config.sol";
+import {RootMismatch} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 bytes32 constant ZERO_LEAF_HASH = keccak256("");
 
@@ -83,7 +84,7 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
     function test_processBatch_shouldRevert() public {
         bytes32[] memory itemHashes = pushMockEntries(3);
 
-        vm.expectRevert("PT: root mismatch");
+        vm.expectRevert(RootMismatch.selector);
         priorityTree.processBatch(
             PriorityOpsBatchInfo({leftPath: new bytes32[](2), rightPath: new bytes32[](2), itemHashes: itemHashes})
         );

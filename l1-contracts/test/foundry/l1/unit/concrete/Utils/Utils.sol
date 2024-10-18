@@ -19,6 +19,7 @@ import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfac
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
+import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -480,8 +481,12 @@ library Utils {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        require(_blobCommitments.length == TOTAL_BLOBS_IN_COMMITMENT, "b10");
-        require(_blobHashes.length == TOTAL_BLOBS_IN_COMMITMENT, "b11");
+        if (_blobCommitments.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidBlobCommitmentsLength();
+        }
+        if (_blobHashes.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidBlobHashesLength();
+        }
 
         // for each blob we have:
         // linear hash (hash of preimage from system logs) and

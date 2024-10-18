@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.21;
 
-// 0x7a47c9a2
-error InvalidChainId();
 // 0xd7f8c13e
 error PreviousUpgradeBatchNotCleared();
 // 0x3c43ccce
@@ -46,3 +44,7 @@ error InvalidTxType(uint256 txType);
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0xd92e233d
 error ZeroAddress();
+
+error GatewayUpgradeInvalidMsgSender();
+
+error GatewayUpgradeFailed();

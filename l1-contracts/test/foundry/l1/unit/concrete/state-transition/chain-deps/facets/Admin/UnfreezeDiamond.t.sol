@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract UnfreezeDiamondTest is AdminTest {
     event Unfreeze();

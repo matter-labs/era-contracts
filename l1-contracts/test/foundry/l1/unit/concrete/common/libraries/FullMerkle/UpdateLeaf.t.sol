@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {FullMerkleTest} from "./_FullMerkle_Shared.t.sol";
+import {MerkleWrongIndex} from "contracts/common/L1ContractErrors.sol";
 
 contract UpdateLeafTest is FullMerkleTest {
     function test_revertWhen_wrongIndex() public {
@@ -15,7 +16,7 @@ contract UpdateLeafTest is FullMerkleTest {
         bytes32 newLeaf1 = keccak256("New Leaf 1");
 
         // Updating leaf 1 with wrong index
-        vm.expectRevert(bytes("FMT, wrong index"));
+        vm.expectRevert(abi.encodeWithSelector(MerkleWrongIndex.selector, 2, 1));
         merkleTest.updateLeaf(2, newLeaf1);
     }
 
