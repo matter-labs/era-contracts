@@ -26,10 +26,10 @@ const defaultUpgradeAddress = '0x534AF884A80fe457d1184DDD932474BEC9207470';
 const diamondProxyAddress = '0x5BBdEDe0F0bAc61AA64068b60379fe32ecc0F96C';
 
 const verifier = '0xCcB73Fdd0E3A3B9522631A1d8A168b5d9C532ceA';
-const proxyAdmin = process.env.CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR!;
+const proxyAdmin = '0x93aeee8d98fb0873f8ff595fdd534a1f288786d2';
 
-const bridgeHubImpl = process.env.CONTRACTS_BRIDGEHUB_IMPL_ADDR!;
-const bridgeHub = process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR!;
+const bridgeHubImpl = '0xcBb9F1B9Ae8A80DAD53fFe3368DFEE4fBA02D50F';
+const bridgeHub = '0x7bdf7970f17278a6ff75fdbc671e870b0728ae41';
 
 const executorFacet = '0xBB13642F795014E0EAC2b0d52ECD5162ECb66712';
 const adminFacet = '0x90C0A0a63d7ff47BfAA1e9F8fa554dabc986504a';
@@ -39,14 +39,14 @@ const gettersFacet = '0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9'!;
 
 const diamondInit = '0x4c17c0A1da9665D59EbE3a9e58459Ebe77041C64';
 
-const stmImplDeployTx = "0xe01c0bb497017a25c92bfc712e370e8f900554b107fe0b6022976d05c349f2b6";
-const stmImpl = process.env.CONTRACTS_STATE_TRANSITION_IMPL_ADDR!;
-const stmDeployTx = "0x514bbf46d227eee8567825bf5c8ee1855aa8a1916f7fee7b191e2e3d5ecba849";
-const stm = process.env.CONTRACTS_STATE_TRANSITION_PROXY_ADDR!;
+const stmImplDeployTx = "0x5f427ef61519d613b2362ec0b638c62c93f91a5aa485fdc39bee6414a4a8eb43";
+const stmImpl = '0xD306aB758F92B7f42180E14866FCd72a2E9AbD13';
+const stmDeployTx = "0xbad873087e897f8ad3b3a7611bd686adebaafcaa52fc778a87036b0c444ab3cb";
+const stm = '0x925dd0bc14552b0b261ca8a23ad26df9c6f2c8ba';
 
 const sharedBridgeImplDeployTx = "0x074204db79298c2f6beccae881c2ad7321c331e97fb4bd93adce2eb23bf17a17";
-const sharedBridgeImpl = process.env.CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR!;
-const sharedBridgeProxy = process.env.CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR!;
+const sharedBridgeImpl = '0xB4a56f82369366cad1a2747F1571BB306dFe48ee';
+const sharedBridgeProxy = '0xc488a65b400769295f8c4b762adcb3e6a036220b';
 
 const legacyBridgeImplDeployTx = "0x234da786f098fa2e44b9abaf41b7045b4a25570e1a34fd01a101d23570e84d61";
 const legacyBridgeImpl = process.env.CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR!;
@@ -703,7 +703,7 @@ async function checkDefaultUpgradeCalldata(initCalldata: any) {
   
 
   const upgradeTx = upgradeStruct.l2ProtocolUpgradeTx;
-  checkUpgradeTx(upgradeTx);
+  await checkUpgradeTx(upgradeTx);
 }
 
 async function checkScheduleData() { 
