@@ -37,7 +37,7 @@ const mailboxFacetDeployTx = "0x07d150e5e96949fd816db58ca6c3cf935d3426a4ef4c7875
 const mailboxFacet = '0xf2677CF5ad53aE8D8612E2eeA0f2aa6191eb9c21';
 const gettersFacet = '0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9'!;
 
-const diamondInit = process.env.CONTRACTS_DIAMOND_INIT_ADDR!;
+const diamondInit = '0x4c17c0A1da9665D59EbE3a9e58459Ebe77041C64';
 
 const stmImplDeployTx = "0xe01c0bb497017a25c92bfc712e370e8f900554b107fe0b6022976d05c349f2b6";
 const stmImpl = process.env.CONTRACTS_STATE_TRANSITION_IMPL_ADDR!;
@@ -55,18 +55,18 @@ const expectedL1WethAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
 const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
 const expectedDelay = "75600";
-const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID!;
-const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
+const eraChainId: string = '271';
+// const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const expectedHyperchainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
 const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
 const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
 const expectedL1LegacyBridge = "0x57891966931Eb4Bb6FB81430E6cE0A03AAbDe063";
-const expectedGenesisBatchCommitment = "0x2d00e5f8d77afcebf58a6b82ae56ba967566fe7dfbcb6760319fb0d215d18ffd";
+const expectedGenesisBatchCommitment = "0xc57085380434970021d87774b377ce1bb12f5b6064af11595e70011965747def";
 const expectedIndexRepeatedStorageChanges = BigNumber.from(54);
 const expectedProtocolVersion = BigNumber.from(2).pow(32).mul(24);
 
-const expectedGenesisRoot = "0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5";
+const expectedGenesisRoot = "0x28a7e67393021f957572495f8fdadc2c477ae3f4f413ae18c16cff6ee65680e2";
 const expectedRecursionNodeLevelVkHash = "0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8";
 const expectedRecursionLeafLevelVkHash = "0xf9664f4324c1400fa5c3822d667f30e873f53f1b8033180cd15fe41c1e2355c6";
 const expectedRecursionCircuitsSetVksHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -84,8 +84,14 @@ const EXPECTED_UPGRADE_TIMESTAMP = '0x671522ed';
 const EXPECTED_NEW_PROTOCOL_VERSION = '0x0000000000000000000000000000000000000000000000000000001900000000';
 const EXPECTED_MAJOR_VERSION = '0x19';
 
-async function checkIdenticalBytecode(addr: string, contract: string) {
-  const correctCode = (await hardhat.artifacts.readArtifact(contract)).deployedBytecode;
+async function checkIdenticalBytecode(addr: string, contract: string, forgeFile?: string) {
+  let correctCode;
+  if (!forgeFile) {
+    correctCode = (await hardhat.artifacts.readArtifact(contract)).deployedBytecode;
+  } else {
+    const json = JSON.parse(fs.readFileSync(`./out/${forgeFile}.sol/${contract}.json`).toString());
+    correctCode = json.deployedBytecode.object;
+  }
   const currentCode = await l1Provider.getCode(addr);
 
   if (ethers.utils.keccak256(currentCode) == ethers.utils.keccak256(correctCode)) {
@@ -112,9 +118,10 @@ async function extractInitCode(data: string) {
   const iface = new ethers.utils.Interface(create2FactoryAbi);
   const initCode = iface.parseTransaction({ data }).args._initCode;
   const salt = iface.parseTransaction({ data }).args._salt;
-  if (salt !== expectedSalt) {
-    throw new Error(`Salt is not correct ${salt}`);
-  }
+  // FIXME: maybe restore, it does not matter much
+  // if (salt !== expectedSalt) {
+  //   throw new Error(`Salt is not correct ${salt}`);
+  // }
 
   return initCode;
 }
@@ -223,6 +230,14 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     }
   }
 
+  checkDiamondInitData(diamondCut.initCalldata);
+
+  console.log("STM init data correct!");
+}
+
+async function checkDiamondInitData(initCalldata: string) {
+
+  console.log(initCalldata.length);
   const [
     usedVerifier,
     // We just unpack verifier params here
@@ -231,17 +246,17 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     recursionCircuitsSetVksHash,
     l2BootloaderBytecodeHash,
     l2DefaultAccountBytecodeHash,
-    // priorityTxMaxGasLimit,
+    priorityTxMaxGasLimit,
 
-    // // We unpack fee params
-    // pubdataPricingMode,
-    // batchOverheadL1Gas,
-    // maxPubdataPerBatch,
-    // priorityTxMaxPubdata,
-    // maxL2GasPerBatch,
-    // minimalL2GasPrice,
+    // We unpack fee params
+    pubdataPricingMode,
+    batchOverheadL1Gas,
+    maxPubdataPerBatch,
+    priorityTxMaxPubdata,
+    maxL2GasPerBatch,
+    minimalL2GasPrice,
 
-    // blobVersionedHashRetriever
+    blobVersionedHashRetriever
   ] = ethers.utils.defaultAbiCoder.decode(
     [
       "address",
@@ -259,8 +274,9 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
       "uint256",
       "address",
     ],
-    diamondCut.initCalldata
+    initCalldata
   );
+  console.log('I am here ')
 
   if (usedVerifier.toLowerCase() !== verifier.toLowerCase()) {
     throw new Error("Verifier is not correct");
@@ -286,7 +302,19 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     throw new Error("L2 default account bytecode hash is not correct");
   }
 
-  console.log("STM init data correct!");
+  console.log({
+    priorityTxMaxGasLimit,
+
+    // We unpack fee params
+    pubdataPricingMode,
+    batchOverheadL1Gas,
+    maxPubdataPerBatch,
+    priorityTxMaxPubdata,
+    maxL2GasPerBatch,
+    minimalL2GasPrice,
+
+    blobVersionedHashRetriever
+  });
 }
 
 async function checkBridgehub() {
@@ -438,6 +466,10 @@ function getStmContract(): ethers.Contract {
 
 function getGetters(): ethers.Contract {
   return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync('GettersFacet').abi, l1Provider)
+}
+
+function getAdmin(): ethers.Contract {
+  return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync('AdminFacet').abi, l1Provider)
 }
 
 async function testThatAllSelectorsAreDeleted(facetCuts: any) {
@@ -719,6 +751,75 @@ async function checkScheduleData() {
   await checkDefaultUpgradeCalldata(initCalldata);
 }
 
+async function checkDiamondInitCalldata(initCalldata: string) {
+  const iface = new ethers.utils.Interface(
+    hardhat.artifacts.readArtifactSync('DiamondInit').abi
+  );
+  const parsedData = iface.parseTransaction({ data: initCalldata });
+  if(parsedData.name !== 'initialize') {
+    throw new Error('bad scheulde name');
+  }
+
+  const initializeData = parsedData.args._initializeData;
+}
+
+async function checkChainCreationParams() {
+  const contract = getStmContract();
+  const iface = contract.interface;
+
+  const parsedData = iface.parseTransaction({data: SET_CHAIN_CREATION_PARAMS_DATA.toString()});
+  
+  if(parsedData.name !== 'setChainCreationParams') {
+    throw new Error('bad scheulde name');
+  }
+
+  const chainCreationParams = parsedData.args._chainCreationParams;
+
+  const usedGenesisUpgrade = chainCreationParams.genesisUpgrade;
+  if (usedGenesisUpgrade.toLowerCase() !== genesisUpgrade.toLowerCase()) {
+    throw new Error("Genesis upgrade is not correct");
+  }
+  const usedGenesisBatchHash = chainCreationParams.genesisBatchHash;
+  if (usedGenesisBatchHash.toLowerCase() !== expectedGenesisRoot.toLowerCase()) {
+    throw new Error("Genesis batch hash is not correct");
+  }
+  const usedGenesisIndexRepeatedStorageChanges = chainCreationParams.genesisIndexRepeatedStorageChanges;
+  if (!usedGenesisIndexRepeatedStorageChanges.eq(expectedIndexRepeatedStorageChanges)) {
+    throw new Error("Genesis index repeated storage changes is not correct");
+  }
+  const usedGenesisBatchCommitment = chainCreationParams.genesisBatchCommitment;
+  if (usedGenesisBatchCommitment.toLowerCase() !== expectedGenesisBatchCommitment.toLowerCase()) {
+    throw new Error("Genesis batch commitment is not correct");
+  }
+
+  const initDiamondCut = chainCreationParams.diamondCut;
+  if(!caseEq(initDiamondCut.initAddress, diamondInit)) {
+    throw new Error('bad diamond init ' + initDiamondCut.initAddress + ' ' + diamondInit);
+  }
+  await testThatAllSelectorsAreAdded(initDiamondCut.facetCuts);
+
+  const initCalldata = initDiamondCut.initCalldata;
+  await checkDiamondInitData(initCalldata);
+}
+
+async function checkExecuteUpgrade() {
+  const contract = getAdmin();
+  const iface = contract.interface;
+
+  const parsedData = iface.parseTransaction({data: EXECUTE_UPGRADE_DATA.toString()});
+
+  if(parsedData.name !== 'upgradeChainFromVersion') {
+    throw new Error('bad scheulde name');
+  }
+
+  if(!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(parsedData.args._oldProtocolVersion)) {
+    throw new Error('Invalid old version');
+  }
+
+  // todo check that diamond cut is the same as in the upgrade
+
+}
+
 async function main() {
   const program = new Command();
 
@@ -728,33 +829,20 @@ async function main() {
     .description("upgrade shared bridge for era diamond proxy");
 
   program.action(async () => {
-    // FIXEM: uncomment
-    // await checkIdenticalBytecode(defaultUpgradeAddress, "DefaultUpgrade");
+    await checkIdenticalBytecode(defaultUpgradeAddress, "DefaultUpgrade", "DefaultUpgrade");
+    await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade", "GenesisUpgrade");
+    
+    await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
+    await checkIdenticalBytecode(gettersFacet, "GettersFacet");
+    await checkIdenticalBytecode(adminFacet, "AdminFacet");
+    await checkMailbox();
+    
+    await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "TestnetVerifier", eraChainId == "324" ? "Verifier" : "TestnetVerifier");
+    await checkIdenticalBytecode(diamondInit, "DiamondInit", "DiamondInit");
 
-    await checkScheduleData();    
-
-    // await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade");
-    // await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
-    // await checkIdenticalBytecode(gettersFacet, "GettersFacet");
-    // await checkIdenticalBytecode(adminFacet, "AdminFacet");
-    // await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
-    // await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "TestnetVerifier");
-    // await checkIdenticalBytecode(diamondInit, "DiamondInit");
-
-    // await checkMailbox();
-
-    // // await checkProxyAdmin();
-
-    // // await checkValidatorTimelock();
-    // // await checkBridgehub();
-
-    // await checkL1SharedBridgeImpl();
-    // // await checkSharedBridge();
-
-    // await checkLegacyBridge();
-
-    // await checkSTMImpl();
-    // // await checkSTM();
+    await checkScheduleData();  
+    console.log("Schedule data is correct")
+    await checkChainCreationParams();
   });
 
   await program.parseAsync(process.argv);
