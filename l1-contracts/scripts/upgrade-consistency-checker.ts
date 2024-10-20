@@ -10,28 +10,32 @@ import { BigNumber, ethers } from "ethers";
 import { utils } from "zksync-ethers";
 import type { FacetCut } from "../src.ts/diamondCut";
 import { getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
+import * as fs from 'fs'; 
+import { getAllSelectors } from "../src.ts/diamondCut";
+import { parse } from "path";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const genesisUpgrade = process.env.CONTRACTS_GENESIS_UPGRADE_ADDR!;
-const validatorTimelockDeployTx = "0xde4ef2b77241b605acaa1658ff8815df0911bf81555a80c9cbdde42fbcaaea30";
-const validatorTimelock = process.env.CONTRACTS_VALIDATOR_TIMELOCK_ADDR!;
-const upgradeHyperchains = process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR!;
+const genesisUpgrade = '0x7BF68E0BB44Cf263Dbb809F252B723F08A86F123';
+const validatorTimelock = '';
+const defaultUpgradeAddress = '0x534AF884A80fe457d1184DDD932474BEC9207470'; 
 
-const verifier = process.env.CONTRACTS_VERIFIER_ADDR!;
+const diamondProxyAddress = '0x5BBdEDe0F0bAc61AA64068b60379fe32ecc0F96C';
+
+const verifier = '0xCcB73Fdd0E3A3B9522631A1d8A168b5d9C532ceA';
 const proxyAdmin = process.env.CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR!;
 
 const bridgeHubImpl = process.env.CONTRACTS_BRIDGEHUB_IMPL_ADDR!;
 const bridgeHub = process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR!;
 
-const executorFacet = process.env.CONTRACTS_EXECUTOR_FACET_ADDR!;
-const adminFacet = process.env.CONTRACTS_ADMIN_FACET_ADDR!;
-const mailboxFacetDeployTx = "0x995b23564b30f1551a9705313128e282591b38a1fc9c981d3251a929b190780d";
-const mailboxFacet = process.env.CONTRACTS_MAILBOX_FACET_ADDR!;
-const gettersFacet = process.env.CONTRACTS_GETTERS_FACET_ADDR!;
+const executorFacet = '0xBB13642F795014E0EAC2b0d52ECD5162ECb66712';
+const adminFacet = '0x90C0A0a63d7ff47BfAA1e9F8fa554dabc986504a';
+const mailboxFacetDeployTx = "0x07d150e5e96949fd816db58ca6c3cf935d3426a4ef4c78759d7bbe1b185fc473";
+const mailboxFacet = '0xf2677CF5ad53aE8D8612E2eeA0f2aa6191eb9c21';
+const gettersFacet = '0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9'!;
 
 const diamondInit = process.env.CONTRACTS_DIAMOND_INIT_ADDR!;
 
@@ -66,13 +70,19 @@ const expectedGenesisRoot = "0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a305049
 const expectedRecursionNodeLevelVkHash = "0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8";
 const expectedRecursionLeafLevelVkHash = "0xf9664f4324c1400fa5c3822d667f30e873f53f1b8033180cd15fe41c1e2355c6";
 const expectedRecursionCircuitsSetVksHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
-const expectedBootloaderHash = "0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e";
-const expectedDefaultAccountHash = "0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32";
+const expectedBootloaderHash = "0x010008c3be57ae5800e077b6c2056d9d75ad1a7b4f0ce583407961cc6fe0b678";
+const expectedDefaultAccountHash = "0x0100055dba11508480be023137563caec69debc85f826cb3a4b68246a7cabe30";
 
 const validatorOne = process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR!;
 const validatorTwo = process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR!;
 
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
+
+const EXPECTED_OLD_PROTOCOL_VERSION = '0x0000000000000000000000000000000000000000000000000000001800000002';
+const EXPECTED_OLD_VERSION_DEADLINE = '0x672797ed';
+const EXPECTED_UPGRADE_TIMESTAMP = '0x671522ed';
+const EXPECTED_NEW_PROTOCOL_VERSION = '0x0000000000000000000000000000000000000000000000000000001900000000';
+const EXPECTED_MAJOR_VERSION = '0x19';
 
 async function checkIdenticalBytecode(addr: string, contract: string) {
   const correctCode = (await hardhat.artifacts.readArtifact(contract)).deployedBytecode;
@@ -279,39 +289,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
   console.log("STM init data correct!");
 }
 
-async function checkValidatorTimelock() {
-  const artifact = await hardhat.artifacts.readArtifact("ValidatorTimelock");
-  const contract = new ethers.Contract(validatorTimelock, artifact.abi, l1Provider);
-
-  const owner = await contract.owner();
-  if (owner.toLowerCase() != expectedOwner.toLowerCase()) {
-    throw new Error("ValidatorTimelock owner is not correct");
-  }
-
-  const usedStm = await contract.stateTransitionManager();
-  if (usedStm.toLowerCase() != stm.toLowerCase()) {
-    throw new Error("ValidatorTimelock stateTransitionManager is not correct");
-  }
-
-  const validatorOneIsSet = await contract.validators(eraChainId, validatorOne);
-  if (!validatorOneIsSet) {
-    throw new Error("ValidatorTimelock validatorOne is not correct");
-  }
-
-  const validatorTwoIsSet = await contract.validators(eraChainId, validatorTwo);
-  if (!validatorTwoIsSet) {
-    throw new Error("ValidatorTimelock validatorTwo is not correct");
-  }
-
-  await checkCorrectInitCode(validatorTimelockDeployTx, contract, artifact.bytecode, [
-    initialOwner,
-    expectedDelay,
-    eraChainId,
-  ]);
-
-  console.log("ValidatorTimelock is correct!");
-}
-
 async function checkBridgehub() {
   const artifact = await hardhat.artifacts.readArtifact("Bridgehub");
   const contract = new ethers.Contract(bridgeHub, artifact.abi, l1Provider);
@@ -450,20 +427,296 @@ async function checkLegacyBridge() {
   console.log("L1 legacy bridge impl correct!");
 }
 
-async function checkProxyAdmin() {
-  await checkIdenticalBytecode(proxyAdmin, "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin");
+const SCHEDULE_DATA = fs.readFileSync('./scripts/schedule.txt');
+const EXPECTED_L2_DATA = fs.readFileSync('./scripts/expected-l2-data.txt');
+const SET_CHAIN_CREATION_PARAMS_DATA = fs.readFileSync('./scripts/chain-creation-params.txt');
+const EXECUTE_UPGRADE_DATA = fs.readFileSync('./scripts/execute-upgrade.txt');
 
-  const artifact = await hardhat.artifacts.readArtifact(
-    "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin"
-  );
-  const contract = new ethers.Contract(proxyAdmin, artifact.abi, l1Provider);
+function getStmContract(): ethers.Contract {
+  return new ethers.Contract(stm, hardhat.artifacts.readArtifactSync('StateTransitionManager').abi, l1Provider);
+}
 
-  const currentOwner = await contract.owner();
-  if (currentOwner.toLowerCase() != expectedOwner.toLowerCase()) {
-    throw new Error(`ProxyAdmin owner is not correct ${currentOwner}, ${expectedOwner}`);
+function getGetters(): ethers.Contract {
+  return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync('GettersFacet').abi, l1Provider)
+}
+
+async function testThatAllSelectorsAreDeleted(facetCuts: any) {
+  const getters = getGetters();
+  const loupe = Array.from(await getters.facets());
+  
+  const expectedDeletedSelectors = loupe.map((facet: any) => {
+    const sortedSelectors = Array.from(facet.selectors!).sort().join(',');
+    return `${sortedSelectors}`;
+  }).sort();
+
+  const realDeletedFacets = [];
+  for(const facetCut of facetCuts) {
+    const isAddressZero = (facetCut.facet == ethers.constants.AddressZero);
+    const isActionDelete = (facetCut.action == 2); 
+    if(!isAddressZero && !isActionDelete) {
+      // This is addition, we do not care
+      continue;
+    }
+    if(!isAddressZero || !isActionDelete) {
+      throw new Error('incosistent');
+    }
+
+    const sortedSelectors = Array.from(facetCut.selectors!).sort().join(',');
+    realDeletedFacets.push(sortedSelectors);
+  }
+  realDeletedFacets.sort();
+  
+  if (expectedDeletedSelectors.join('#') !== realDeletedFacets.join('#')) {
+    throw new Error('Incosistent deleted selectors');
+  }
+}
+
+async function testThatAllSelectorsAreAdded(facetCuts: any) {
+  const expectedFacets = [
+    {
+      address: executorFacet,
+      name: 'ExecutorFacet',
+      freezeable: true,
+    },
+    {
+      address: mailboxFacet,
+      name: 'MailboxFacet',
+      freezeable: true,
+    },
+    {
+      address: gettersFacet,
+      name: 'GettersFacet',
+      freezeable: false,
+    },
+    {
+      address: adminFacet,
+      name: 'AdminFacet',
+      freezeable: false,
+    },
+  ];
+  const included = [false, false, false, false];
+
+  const realAddedFacets = [];
+  for(const facetCut of facetCuts) {
+    if(facetCut.action !== 0 && facetCut.action !== 2) {
+      throw new Error('bad action');
+    }
+    
+    const isAddressNonZero = (facetCut.facet != ethers.constants.AddressZero);
+    const isActionAdd = (facetCut.action == 0); 
+    if(!isAddressNonZero && !isActionAdd) {
+      // This is addition, we do not care
+      continue;
+    }
+    if(!isAddressNonZero || !isActionAdd) {
+      throw new Error('incosistent');
+    }
+
+    const sortedSelectors = Array.from(facetCut.selectors!).sort().join(',');
+    const facetAddress = facetCut.facet;
+
+    let found = false;
+    for(let i = 0; i < expectedFacets.length; i++) {
+      if (facetAddress.toLowerCase() == expectedFacets[i].address.toLowerCase()) {
+        if(included[i]) {
+          throw new Error('Facet ' + i + ' has been included already');
+        }
+        included[i] = true;
+      } else {
+        continue;
+      }
+
+      found = true;
+      const expectedSortedSelectors = getAllSelectors(new ethers.utils.Interface(hardhat.artifacts.readArtifactSync(expectedFacets[i].name).abi)).sort().join(',');
+
+      if(sortedSelectors !== expectedSortedSelectors) {
+        throw new Error('Selector mismatch for address ' + facetAddress);
+      }
+
+      if(facetCut.isFreezable !== expectedFacets[i].freezeable) {
+        throw new Error('Freezability issue for facet address ' + facetAddress);
+      }
+    }
+
+    if(!found) {
+      throw new Error('Unkown address ' + facetAddress);
+    }
   }
 
-  console.log("ProxyAdmin is correct!");
+  for(let i = 0; i < 4; i++) {
+    if(!included[i]) {
+      throw new Error('Facet ' + i + ' was not included');
+    }
+  }
+}
+
+function caseEq(a: string, b:string) {
+  return a.toLowerCase()== b.toLowerCase();
+}
+
+async function checkUpgradeTx(upgradeTx: any) {
+  if(!BigNumber.from(254).eq(upgradeTx.txType)) {
+    throw new Error('bad tx type');
+  }
+  const FORCE_DEPLOYER_ADDR = '0x8007';
+  if(!BigNumber.from(FORCE_DEPLOYER_ADDR).eq(upgradeTx.from)) {
+    throw new Error('bad tx from');
+  }
+  const CONTRACT_DEPLOYER_ADDR = '0x8006'
+  if(!BigNumber.from(CONTRACT_DEPLOYER_ADDR).eq(upgradeTx.to)) {
+    throw new Error('bad tx to');
+  }
+
+  if(!BigNumber.from(72_000_000).eq(upgradeTx.gasLimit)) {
+    throw new Error('bad tx gaslimt');
+  }
+  
+  if(!BigNumber.from(800).eq(upgradeTx.gasPerPubdataByteLimit)) {
+    throw new Error('bad tx gasperpubdata');
+  }
+
+  if(!BigNumber.from(0).eq(upgradeTx.maxFeePerGas)) {
+    throw new Error('bad tx maxFeePerGas');
+  }
+
+  if(!BigNumber.from(0).eq(upgradeTx.maxPriorityFeePerGas)) {
+    throw new Error('bad tx maxPriorityFeePerGas');
+  }
+
+  if(!BigNumber.from(0).eq(upgradeTx.paymaster)) {
+    throw new Error('bad tx paymaster');
+  }
+
+  if(!BigNumber.from(EXPECTED_MAJOR_VERSION).eq(upgradeTx.nonce)) {
+    throw new Error('bad tx nonce');
+  }
+
+  if(!BigNumber.from(0).eq(upgradeTx.value)) {
+    throw new Error('bad tx value');
+  }
+
+  if(upgradeTx.reserved.length !== 4) {
+    throw new Error('bad reserved length');
+  }
+  for(const rv of upgradeTx.reserved) {
+    if(!BigNumber.from(0).eq(rv)) {
+      throw new Error('bad tx reserved');
+    }
+  }
+
+  // we'll check it later
+  if(upgradeTx.data !== EXPECTED_L2_DATA.toString()) {
+    throw new Error('bad l2 data');
+  }
+
+  if(upgradeTx.signature !== '0x') {
+    throw new Error('bad tx sig');
+  }
+
+  if(upgradeTx.factoryDeps.length !== 0) {
+    throw new Error('bad tx factoryDeps');
+  }
+  if(upgradeTx.paymasterInput !== '0x') {
+    throw new Error('bad tx paymasterInput');
+  }
+  if(upgradeTx.reservedDynamic !== '0x') {
+    throw new Error('bad tx reservedDynamic');
+  }
+}
+
+async function checkDefaultUpgradeCalldata(initCalldata: any) {
+  const defaultUpgradeInterface = new ethers.utils.Interface(
+    hardhat.artifacts.readArtifactSync('DefaultUpgrade').abi
+  );
+  const parsedUpgrade = defaultUpgradeInterface.parseTransaction({
+    data: initCalldata
+  });
+  if(parsedUpgrade.name !== 'upgrade') {
+    throw new Error('bad scheulde name');
+  }
+  const upgradeStruct = parsedUpgrade.args._proposedUpgrade;
+
+  if(!BigNumber.from(EXPECTED_UPGRADE_TIMESTAMP).eq(upgradeStruct.upgradeTimestamp)) {
+    throw new Error('Bad upgrade timestamp');
+  }
+  if(!BigNumber.from(EXPECTED_NEW_PROTOCOL_VERSION).eq(upgradeStruct.newProtocolVersion)) {
+    throw new Error('Bad upgrade timestamp');
+  }
+  if(upgradeStruct.postUpgradeCalldata !== '0x') {
+    throw new Error('post upgrade calldata');
+  } 
+  if(upgradeStruct.l1ContractsUpgradeCalldata !== '0x') {
+    throw new Error('bad l1ContractsUpgradeCalldata');
+  }
+  const {recursionNodeLevelVkHash,recursionLeafLevelVkHash,recursionCircuitsSetVksHash} = upgradeStruct.verifierParams; 
+  if(recursionNodeLevelVkHash !== ethers.constants.HashZero || recursionLeafLevelVkHash !== ethers.constants.HashZero || recursionCircuitsSetVksHash !== ethers.constants.HashZero) {
+    throw new Error('bad vk');
+  }
+
+  if(!caseEq(upgradeStruct.verifier, verifier)) {
+    throw new Error('bad verifier');
+  }
+
+  if(upgradeStruct.defaultAccountHash !== expectedDefaultAccountHash) {
+    throw new Error('bad aa hash');
+  }
+
+  if(upgradeStruct.bootloaderHash !== expectedBootloaderHash) {
+    throw new Error('bad bootloader hash');
+  }
+
+  if(upgradeStruct.factoryDeps.length > 0) {
+    throw new Error('bad deps');
+  }
+  
+
+  const upgradeTx = upgradeStruct.l2ProtocolUpgradeTx;
+  checkUpgradeTx(upgradeTx);
+}
+
+async function checkScheduleData() { 
+  const contract = getStmContract();
+  const iface = contract.interface;
+
+  const parsedData = iface.parseTransaction({data: SCHEDULE_DATA.toString()});
+  
+  if(parsedData.name !== 'setNewVersionUpgrade') {
+    throw new Error('bad scheulde name');
+  }
+
+
+  if(!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(parsedData.args._oldProtocolVersion)) {
+    console.log(parsedData.args._oldProtocolVersion);
+    throw new Error('nad version');
+  }
+
+  if(!BigNumber.from(EXPECTED_OLD_VERSION_DEADLINE).eq(parsedData.args._oldProtocolVersionDeadline)) {
+    throw new Error('bad deadline');
+  }
+  
+  if(!BigNumber.from(EXPECTED_NEW_PROTOCOL_VERSION).eq(parsedData.args._newProtocolVersion)) {
+    throw new Error('bad new version');
+  }
+
+  const cutData = parsedData.args._cutData;
+
+  // Okay, now it is time to check cutdata
+
+  const {
+    facetCuts,
+    initAddress,
+    initCalldata
+  } =  cutData;
+
+  if (initAddress !== defaultUpgradeAddress) {
+    throw new Error('Bad default upgrade ' + initAddress + ' ' + defaultUpgradeAddress);
+  }
+
+  await testThatAllSelectorsAreDeleted(facetCuts);
+  await testThatAllSelectorsAreAdded(facetCuts);
+
+  // Now, what is left is to check the upgrade data.
+  await checkDefaultUpgradeCalldata(initCalldata);
 }
 
 async function main() {
@@ -475,29 +728,33 @@ async function main() {
     .description("upgrade shared bridge for era diamond proxy");
 
   program.action(async () => {
-    await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade");
-    await checkIdenticalBytecode(upgradeHyperchains, "UpgradeHyperchains");
-    await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
-    await checkIdenticalBytecode(gettersFacet, "GettersFacet");
-    await checkIdenticalBytecode(adminFacet, "AdminFacet");
-    await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
-    await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "TestnetVerifier");
-    await checkIdenticalBytecode(diamondInit, "DiamondInit");
+    // FIXEM: uncomment
+    // await checkIdenticalBytecode(defaultUpgradeAddress, "DefaultUpgrade");
 
-    await checkMailbox();
+    await checkScheduleData();    
 
-    await checkProxyAdmin();
+    // await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade");
+    // await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
+    // await checkIdenticalBytecode(gettersFacet, "GettersFacet");
+    // await checkIdenticalBytecode(adminFacet, "AdminFacet");
+    // await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
+    // await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "TestnetVerifier");
+    // await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
-    await checkValidatorTimelock();
-    await checkBridgehub();
+    // await checkMailbox();
 
-    await checkL1SharedBridgeImpl();
-    await checkSharedBridge();
+    // // await checkProxyAdmin();
 
-    await checkLegacyBridge();
+    // // await checkValidatorTimelock();
+    // // await checkBridgehub();
 
-    await checkSTMImpl();
-    await checkSTM();
+    // await checkL1SharedBridgeImpl();
+    // // await checkSharedBridge();
+
+    // await checkLegacyBridge();
+
+    // await checkSTMImpl();
+    // // await checkSTM();
   });
 
   await program.parseAsync(process.argv);

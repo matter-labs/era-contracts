@@ -77,7 +77,7 @@
     "upgrade-system": "ts-node upgrade-system/index.ts",
     "token-migration": "ts-node scripts/token-migration.ts",
     "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
-    "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts"
+    "upgrade-consistency-checker": "ETH_CLIENT_WEB3_URL=$SEPOLIA ts-node scripts/upgrade-consistency-checker.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
