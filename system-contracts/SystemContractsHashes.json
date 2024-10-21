@@ -171,8 +171,8 @@
     "contractName": "Identity",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/Identity.yul/Identity.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/Identity.yul",
-    "bytecodeHash": "0x0100000d1664d5bcd213f1c4174084868052d7f74d1f8d3013f0a3cf13dbd082",
-    "sourceCodeHash": "0x403393f735ee63c406bdcdc1de885b48dcbd254741499157b3f5c441d752caa9"
+    "bytecodeHash": "0x0100000d3cc11217da589db87c1cb3fda76701b7923b334b465eafd2e018b1b1",
+    "sourceCodeHash": "0xcdf59308c83593ed41d9742411fdf41cfd9863932f948d20d08a11f6dcbd8f46"
   },
   {
     "contractName": "Keccak256",
