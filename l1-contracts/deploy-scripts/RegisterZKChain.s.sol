@@ -288,7 +288,8 @@ contract RegisterZKChainScript is Script {
     function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        // bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        bytes32 baseTokenAssetId = 0x83d26252627b75f1b0828354775d22cfcdb838fa9a77a210f2031d4921b32e0e;
 
         if (bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
             console.log("Base token asset id already registered on Bridgehub");
@@ -308,13 +309,17 @@ contract RegisterZKChainScript is Script {
 
     function registerTokenOnNTV() internal {
         INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
-        // Ownable ownable = Ownable(config.nativeTokenVault);
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
+        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
+
+        // If it hasn't been registered already with ntv
+        if (baseTokenAssetId == bytes32(0)) {
+            baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        }
         config.baseTokenAssetId = baseTokenAssetId;
         if (ntv.tokenAddress(baseTokenAssetId) != address(0) || config.baseToken == ETH_TOKEN_ADDRESS) {
             console.log("Token already registered on NTV");
         } else {
-            // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));
             vm.broadcast();
             ntv.registerToken(config.baseToken);
             console.log("Token registered on NTV");
