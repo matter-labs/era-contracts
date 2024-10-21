@@ -337,10 +337,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             return;
         }
         bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
-        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
+        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
     function _handleChainBalanceIncrease(
