@@ -48,7 +48,6 @@ contract L2GatewayUpgrade {
         );
 
         address l2LegacyBridgeAddress = additionalForceDeploymentsData.l2LegacySharedBridge;
-        address l2WethAddress = additionalForceDeploymentsData.l2Weth;
         if (l2LegacyBridgeAddress != address(0)) {
             forceUpgradeProxy(
                 l2LegacyBridgeAddress,
@@ -62,15 +61,6 @@ contract L2GatewayUpgrade {
                 // We are sure that `impl` is deployed, since it is supposed to included
                 // as part of the "usual" force deployments array.
                 fixedForceDeploymentsData.l2BridgedStandardERC20Impl
-            );
-        }
-
-        if (l2WethAddress != address(0)) {
-            forceUpgradeProxy(
-                l2WethAddress,
-                // We are sure that `impl` is deployed, since it is supposed to included
-                // as part of the "usual" force deployments array.
-                fixedForceDeploymentsData.l2WethTokenImpl
             );
         }
     }
@@ -95,25 +85,4 @@ contract L2GatewayUpgrade {
             upgradeData
         );
     }
-
-    function forceUpgradeAndCallProxy(
-        address _proxyAddr,
-        address _newImpl,
-        bytes memory _initializeData
-    ) internal {
-        bytes memory upgradeData = abi.encodeCall(
-            ITransparentUpgradeableProxy.upgradeToAndCall,
-            (_newImpl, _initializeData)
-        );
-        address proxyAdmin = address(uint160(uint256(SystemContractHelper.forcedSload(
-            address(_proxyAddr),
-            PROXY_ADMIN_SLOT
-        ))));
-        SystemContractHelper.mimicCallWithPropagatedRevert(
-            address(_proxyAddr),
-            proxyAdmin,
-            upgradeData
-        );
-    }
-
 }

@@ -16,8 +16,7 @@ library GatewayHelper {
         ZKChainSpecificForceDeploymentsData
             memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
                 baseTokenAssetId: s.baseTokenAssetId,
-                l2LegacySharedBridge: legacySharedBridge,
-                l2Weth: address(0) // kl todo
+                l2LegacySharedBridge: legacySharedBridge
             });
         return abi.encode(additionalForceDeploymentsData);
     }

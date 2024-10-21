@@ -233,7 +233,6 @@ contract EcosystemUpgrade is Script {
     struct CachedBytecodeHashes {
         bytes32 sharedL2LegacyBridgeBytecodeHash;
         bytes32 erc20StandardImplBytecodeHash;
-        bytes32 l2WrappedBaseTokenBytecodehHash;
     }
 
     CachedBytecodeHashes internal cachedBytecodeHashes;
@@ -447,7 +446,7 @@ contract EcosystemUpgrade is Script {
         //
         // Also, we need to predeploy the bridges implementation
         IL2ContractDeployer.ForceDeployment[]
-            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](5);
+            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](4);
         additionalForceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: cachedBytecodeHashes.sharedL2LegacyBridgeBytecodeHash,
             newAddress: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
@@ -463,13 +462,6 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
         additionalForceDeployments[2] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: cachedBytecodeHashes.l2WrappedBaseTokenBytecodehHash,
-            newAddress: addresses.expectedL2Addresses.l2WethImpl,
-            callConstructor: true,
-            value: 0,
-            input: ""
-        });
-        additionalForceDeployments[3] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()),
             newAddress: L2_COMPLEX_UPGRADER_ADDR,
             callConstructor: true,
@@ -477,7 +469,7 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
         // Getting the contract back to normal
-        additionalForceDeployments[4] = IL2ContractDeployer.ForceDeployment({
+        additionalForceDeployments[3] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(Utils.readSystemContractsBytecode("ComplexUpgrader")),
             newAddress: L2_COMPLEX_UPGRADER_ADDR,
             callConstructor: false,
@@ -806,15 +798,13 @@ contract EcosystemUpgrade is Script {
         upgradeSpecificDependencies[0] = L2ContractsBytecodesLib.readGatewayUpgradeBytecode();
         upgradeSpecificDependencies[1] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
         upgradeSpecificDependencies[2] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        upgradeSpecificDependencies[3] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
 
-        upgradeSpecificDependencies[4] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
-        upgradeSpecificDependencies[5] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
+        upgradeSpecificDependencies[3] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
+        upgradeSpecificDependencies[4] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
 
         cachedBytecodeHashes = CachedBytecodeHashes({
             sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
             erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2]),
-            l2WrappedBaseTokenBytecodehHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[3])
         });
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, upgradeSpecificDependencies);

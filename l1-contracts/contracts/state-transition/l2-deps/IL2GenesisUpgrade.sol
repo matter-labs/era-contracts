@@ -18,7 +18,6 @@ struct ForceDeployment {
 struct ZKChainSpecificForceDeploymentsData {
     bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;
-    address l2Weth;
 }
 
 /// @author Matter Labs
