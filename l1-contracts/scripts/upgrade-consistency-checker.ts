@@ -18,6 +18,8 @@ import { parse } from "path";
 // 1. Contracts must be verified.
 // 2. Getter methods in STM.
 
+const EXECUTE_UPGRADE_DATA = fs.readFileSync("./scripts/execute-upgrade.txt");
+
 const WETH_L1_ADDRESS = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
 
 // List the contracts that should become the upgrade targets
@@ -299,6 +301,28 @@ async function checkDiamondInitData(initCalldata: string) {
     initCalldata
   );
 
+  const systemConfig = JSON.parse(SYSTEM_CONFIG.toString());
+
+  if (batchOverheadL1Gas != systemConfig.BATCH_OVERHEAD_L1_GAS) {
+    throw new Error("BatchOverheadL1Gas is not correct");
+  }
+
+  if (maxPubdataPerBatch != systemConfig.PRIORITY_TX_PUBDATA_PER_BATCH) {
+    throw new Error("maxPubdataPerBatch is not correct");
+  }
+
+  if (priorityTxMaxPubdata != systemConfig.PRIORITY_TX_MAX_PUBDATA) {
+    throw new Error("priorityTxMaxPubdata is not correct");
+  }
+
+  if (maxL2GasPerBatch != systemConfig.MAX_GAS_PER_TRANSACTION) {
+    throw new Error("maxL2GasPerBatch is not correct");
+  }
+
+  if (minimalL2GasPrice != systemConfig.PRIORITY_TX_MINIMAL_GAS_PRICE) {
+    throw new Error("minimalL2GasPrice is not correct");
+  }
+
   if (usedVerifier.toLowerCase() !== verifier.toLowerCase()) {
     throw new Error("Verifier is not correct");
   }
@@ -490,7 +514,7 @@ async function checkLegacyBridge() {
 const SCHEDULE_DATA = fs.readFileSync("./scripts/schedule.txt");
 const EXPECTED_L2_DATA = fs.readFileSync("./scripts/expected-l2-data.txt");
 const SET_CHAIN_CREATION_PARAMS_DATA = fs.readFileSync("./scripts/chain-creation-params.txt");
-const EXECUTE_UPGRADE_DATA = fs.readFileSync("./scripts/execute-upgrade.txt");
+const SYSTEM_CONFIG = fs.readFileSync("../SystemConfig.json");
 
 function getStmContract(): ethers.Contract {
   return new ethers.Contract(stm, hardhat.artifacts.readArtifactSync("StateTransitionManager").abi, l1Provider);
@@ -853,7 +877,7 @@ async function checkExecuteUpgrade() {
   if (parsedData.args._calls.length > 1) {
     throw new Error("Too many calls");
   }
-  
+
   let callData = parsedData.args._calls[0].data;
   iface = adminContract.interface;
   const upgradeParsedData = iface.parseTransaction({ data: callData });
@@ -868,7 +892,7 @@ async function checkExecuteUpgrade() {
 
   // todo check that diamond cut is the same as in the upgrade
   const cutData = upgradeParsedData.args._diamondCut;
-  
+
   const { facetCuts, initAddress, initCalldata } = cutData;
 
   if (initAddress !== defaultUpgradeAddress) {
@@ -924,7 +948,6 @@ async function main() {
     await checkImpl("L1ERC20Bridge", [sharedBridgeProxy], legacyBridgeImpl, legacyBridgeImplDeployTx);
 
     await checkBridgehub();
-
   });
 
   await program.parseAsync(process.argv);
