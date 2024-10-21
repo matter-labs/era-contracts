@@ -333,6 +333,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal {
+        bytes32 oldAssetId = assetId[_nativeToken];
+        if (originChainId[oldAssetId] != block.chainid && originChainId[oldAssetId] != 0) {
+            return;
+        }
         bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[newAssetId] = _nativeToken;

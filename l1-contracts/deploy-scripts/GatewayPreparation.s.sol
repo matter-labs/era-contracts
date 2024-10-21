@@ -7,6 +7,10 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+// It's required to disable lints to force the compiler to compile the contracts
+// solhint-disable no-unused-import
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -24,9 +28,13 @@ import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/a
 import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L2AssetRouter, IL2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
@@ -245,6 +253,32 @@ contract GatewayPreparation is Script {
     /// @dev Calling this function requires private key to the admin of the chain
     function migrateChainToGateway(address chainAdmin, address accessControlRestriction, uint256 chainId) public {
         initializeConfig();
+
+        IBridgehub bridgehubContract = IBridgehub(config.bridgehub);
+        bytes32 gatewayBaseTokenAssetId = bridgehubContract.baseTokenAssetId(config.gatewayChainId);
+        bytes32 ethTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+
+        // Fund chain admin with tokens
+        if (gatewayBaseTokenAssetId != ethTokenAssetId) {
+            deployerAddress = msg.sender;
+            L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
+            IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
+            address baseTokenAddress = nativeTokenVault.tokenAddress(gatewayBaseTokenAssetId);
+            uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(gatewayBaseTokenAssetId);
+
+            TestnetERC20Token baseToken = TestnetERC20Token(baseTokenAddress);
+            uint256 deployerBalance = baseToken.balanceOf(deployerAddress);
+            console.log("Base token origin id: ", baseTokenOriginChainId);
+            vm.startBroadcast();
+            if (baseTokenOriginChainId == block.chainid) { 
+                baseToken.mint(chainAdmin, deployerBalance / 3);
+            } else {
+                baseToken.transfer(chainAdmin, deployerBalance / 3);
+            }
+            vm.stopBroadcast();
+        }
+
+        console.log("Chain Admin address:", chainAdmin );
 
         // TODO(EVM-746): Use L2-based chain admin contract
         address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);

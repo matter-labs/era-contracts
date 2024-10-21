@@ -7,6 +7,10 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+// It's required to disable lints to force the compiler to compile the contracts
+// solhint-disable no-unused-import
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -16,6 +20,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -55,6 +61,9 @@ contract GatewayCTMFromL1 is Script {
         address chainTypeManagerProxy;
         address sharedBridgeProxy;
         address governance;
+        address governanceAddr;
+        address deployerAddr;
+        address baseToken;
         uint256 chainChainId;
         uint256 eraChainId;
         uint256 l1ChainId;
@@ -93,6 +102,9 @@ contract GatewayCTMFromL1 is Script {
         console.log("Setting up the Gateway script");
 
         initializeConfig();
+        if (config.baseToken != ADDRESS_ONE) {
+            distributeBaseToken();
+        }
         deployGatewayContracts();
 
         saveOutput();
@@ -137,8 +149,44 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
-            forceDeploymentsData: toml.readBytes("$.force_deployments_data")
+            forceDeploymentsData: toml.readBytes("$.force_deployments_data"),
+            governanceAddr: address(0),
+            deployerAddr: address(0),
+            baseToken: address(0)
         });
+
+        path = string.concat(root, vm.envString("L1_OUTPUT"));
+        toml = vm.readFile(path);
+
+        config.governanceAddr = toml.readAddress("$.deployed_addresses.governance_addr");
+        config.deployerAddr = toml.readAddress("$.deployer_addr");
+
+        path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
+        toml = vm.readFile(path);
+        config.baseToken = toml.readAddress("$.chain.base_token_addr");
+    }
+
+    function distributeBaseToken() internal {
+        deployerAddress = msg.sender;
+        console.log("Deployer address: ", deployerAddress);
+        console.log("Gornance address: ", config.governance);
+
+        L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
+        console.log("L1 AR address", address(l1AR));
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
+        bytes32 baseTokenAssetID = nativeTokenVault.assetId(config.baseToken);
+        uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetID);
+
+        TestnetERC20Token baseToken = TestnetERC20Token(config.baseToken);
+        uint256 deployerBalance = baseToken.balanceOf(deployerAddress);
+        console.log("Base token origin id: ", baseTokenOriginChainId);
+        vm.startBroadcast();
+        if (baseTokenOriginChainId == block.chainid) { 
+            baseToken.mint(config.governanceAddr, deployerBalance / 3);
+        } else {
+            baseToken.transfer(config.governanceAddr, deployerBalance / 3);
+        }
+        vm.stopBroadcast();
     }
 
     function saveOutput() internal {
@@ -202,8 +250,9 @@ contract GatewayCTMFromL1 is Script {
 
     /// @dev The sender may not have any privileges
     function deployGatewayContracts() public {
+        console.log("Step 1");
         output.multicall3 = _deployInternal(L2ContractsBytecodesLib.readMulticall3Bytecode(), hex"");
-
+        console.log("Step 2");
         deployGatewayFacets();
 
         output.gatewayStateTransition.verifier = deployGatewayVerifier();
