@@ -24,16 +24,16 @@ import {ZeroAddress, Unauthorized, BridgeMintNotImplemented, WithdrawFailed} fro
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
 contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBridgedStandardToken {
-    /// @dev Address of the L2 WETH Bridge.
+    /// @notice The address of the L2 asset router. The old name is retained for backwards compatibility.
     address public override l2Bridge;
 
-    /// @dev Address of the L1 base token. It can be deposited to mint this L2 token.
+    /// @notice Address of the L1 base token. It can be deposited to mint this L2 token.
     address public override l1Address;
 
-    /// @dev Address of the native token vault.
+    /// @notice Address of the native token vault.
     address public override nativeTokenVault;
 
-    /// @dev The assetId of the base token. The wrapped token does not have its own assetId.
+    /// @notice The assetId of the base token. The wrapped token does not have its own assetId.
     bytes32 public baseTokenAssetId;
 
     modifier onlyBridge() {
@@ -62,13 +62,13 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// @param _l2Bridge Address of the L2 bridge
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
-    function initializeV2(
+    function initializeV3(
         string calldata name_,
         string calldata symbol_,
         address _l2Bridge,
         address _l1Address,
         bytes32 _baseTokenAssetId
-    ) external reinitializer(2) {
+    ) external reinitializer(3) {
         if (_l2Bridge == address(0)) {
             revert ZeroAddress();
         }

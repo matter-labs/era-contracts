@@ -693,11 +693,11 @@ contract DeployL1Script is Script, DeployUtils {
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
-            // For newly created chains it it is expected that the following bridges are not present
+            // For newly created chains it it is expected that the following bridges are not present at the moment
+            // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
-            l2BridgeProxyOwnerAddress: address(0),
-            l2BridgedStandardERC20ProxyOwnerAddress: address(0)
+            l2WethTokenImpl: address(0)
         });
 
         return abi.encode(data);

@@ -2,7 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
+import {MAX_SYSTEM_CONTRACT_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
+import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeployer.sol";
+import {SloadContract} from "../SloadContract.sol";
 
 import {CalldataForwardingMode, SystemContractsCaller, MIMIC_CALL_CALL_ADDRESS, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
 import {IndexOutOfBounds, FailedToChargeGas} from "../SystemContractErrors.sol";
@@ -400,6 +402,70 @@ library SystemContractHelper {
         assembly {
             returndatacopy(add(returndata, 0x20), 0, rtSize)
         }
+    }
+
+    /// @notice Force deploys an address
+    function forceDeployNoConstructor(
+        address _addr,
+        bytes32 _bytecodeHash
+    ) internal {
+        ForceDeployment[] memory deployments = new ForceDeployment[](1);
+        deployments[0] = ForceDeployment({
+            bytecodeHash: _bytecodeHash,
+            newAddress: _addr,
+            callConstructor: false,
+            value: 0,
+            input: hex""
+        });
+        mimicCallWithPropagatedRevert(
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            FORCE_DEPLOYER,
+            abi.encodeCall(
+                IContractDeployer.forceDeployOnAddresses,
+                deployments
+            )
+        );
+    }
+
+    /// @notice Reads a certain number of slots from a contract
+    function forcedSload(
+        address _addr,
+        bytes32 _key
+    ) internal returns (bytes32 result) {
+        bytes32 sloadContractBytecodeHash; 
+        address sloadContractAddress = SLOAD_CONTRACT_ADDRESS;
+        assembly {
+            sloadContractBytecodeHash := extcodehash(sloadContractAddress)
+        }
+
+        // Just in case, that the `sloadContractBytecodeHash` is known
+        if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(sloadContractBytecodeHash) == 0) {
+            // todo use custom error
+            revert("sload contract not supported");
+        }
+
+        bytes32 previoushHash;
+        assembly {
+            previoushHash := extcodehash(_addr)
+        }
+
+        // Just in case, double checking that the previous bytecode is known.
+        // It may be needed since `previoushHash` could be non-zero and unknown if it is
+        // equal to keccak(""). It is the case for used default accounts.
+        if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(previoushHash) == 0) {
+            // todo use custom error
+            revert("bad prev code");
+        }
+
+        forceDeployNoConstructor(
+            _addr,
+            sloadContractBytecodeHash
+        );
+        result = SloadContract(_addr).sload(_key);
+        forceDeployNoConstructor(
+            _addr,
+            previoushHash
+        );
     }
 
     /// @notice Performs a `mimicCall` to an address, while ensuring that the call

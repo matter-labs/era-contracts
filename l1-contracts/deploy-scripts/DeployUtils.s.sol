@@ -67,10 +67,10 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 sloadContractBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
-    address l2BridgeProxyOwnerAddress;
-    address l2BridgedStandardERC20ProxyOwnerAddress;
+    address l2WethTokenImpl;
 }
 
 // solhint-disable-next-line gas-struct-packing

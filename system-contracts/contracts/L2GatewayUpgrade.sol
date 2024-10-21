@@ -10,6 +10,9 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
+/// @dev Storage slot with the admin of the contract used for EIP1967 proxies (e.g. TUP, BeaconProxy, etc).
+bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
 /// @notice The contract that is used for facilitating the upgrade of the L2
@@ -39,37 +42,78 @@ contract L2GatewayUpgrade {
             _additionalForceDeploymentsData,
             (ZKChainSpecificForceDeploymentsData)
         );
+        FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
+            _fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
 
         address l2LegacyBridgeAddress = additionalForceDeploymentsData.l2LegacySharedBridge;
-
+        address l2WethAddress = additionalForceDeploymentsData.l2Weth;
         if (l2LegacyBridgeAddress != address(0)) {
-            FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
-                _fixedForceDeploymentsData,
-                (FixedForceDeploymentsData)
-            );
-
-            // Firstly, upgrade the legacy L2SharedBridge
-            bytes memory bridgeUpgradeData = abi.encodeCall(
-                ITransparentUpgradeableProxy.upgradeTo,
-                (fixedForceDeploymentsData.l2SharedBridgeLegacyImpl)
-            );
-            SystemContractHelper.mimicCallWithPropagatedRevert(
+            forceUpgradeProxy(
                 l2LegacyBridgeAddress,
-                fixedForceDeploymentsData.l2BridgeProxyOwnerAddress,
-                bridgeUpgradeData
+                // We are sure that `impl` is deployed, since it is supposed to included
+                // as part of the "usual" force deployments array.
+                fixedForceDeploymentsData.l2SharedBridgeLegacyImpl
             );
 
-            // Secondly, upgrade the tokens
-            UpgradeableBeacon upgradableBeacon = IL2SharedBridgeLegacy(l2LegacyBridgeAddress).l2TokenBeacon();
-            bytes memory beaconUpgradeData = abi.encodeCall(
-                UpgradeableBeacon.upgradeTo,
-                (fixedForceDeploymentsData.l2BridgedStandardERC20Impl)
+            forceUpgradeProxy(
+                address(IL2SharedBridgeLegacy(l2LegacyBridgeAddress).l2TokenBeacon()),
+                // We are sure that `impl` is deployed, since it is supposed to included
+                // as part of the "usual" force deployments array.
+                fixedForceDeploymentsData.l2BridgedStandardERC20Impl
             );
-            SystemContractHelper.mimicCallWithPropagatedRevert(
-                address(upgradableBeacon),
-                fixedForceDeploymentsData.l2BridgedStandardERC20ProxyOwnerAddress,
-                beaconUpgradeData
+        }
+
+        if (l2WethAddress != address(0)) {
+            forceUpgradeProxy(
+                l2WethAddress,
+                // We are sure that `impl` is deployed, since it is supposed to included
+                // as part of the "usual" force deployments array.
+                fixedForceDeploymentsData.l2WethTokenImpl
             );
         }
     }
+
+    function forceUpgradeProxy(
+        address _proxyAddr,
+        address _newImpl
+    ) internal {
+        // Note, that here we use the fact that the `upgrade` method signature is the same for both 
+        // `UpgradeableBeacon` and `ITransparentUpgradeableProxy`
+        bytes memory upgradeData = abi.encodeCall(
+            ITransparentUpgradeableProxy.upgradeTo,
+            (_newImpl)
+        );
+        address proxyAdmin = address(uint160(uint256(SystemContractHelper.forcedSload(
+            address(_proxyAddr),
+            PROXY_ADMIN_SLOT
+        ))));
+        SystemContractHelper.mimicCallWithPropagatedRevert(
+            address(_proxyAddr),
+            proxyAdmin,
+            upgradeData
+        );
+    }
+
+    function forceUpgradeAndCallProxy(
+        address _proxyAddr,
+        address _newImpl,
+        bytes memory _initializeData
+    ) internal {
+        bytes memory upgradeData = abi.encodeCall(
+            ITransparentUpgradeableProxy.upgradeToAndCall,
+            (_newImpl, _initializeData)
+        );
+        address proxyAdmin = address(uint160(uint256(SystemContractHelper.forcedSload(
+            address(_proxyAddr),
+            PROXY_ADMIN_SLOT
+        ))));
+        SystemContractHelper.mimicCallWithPropagatedRevert(
+            address(_proxyAddr),
+            proxyAdmin,
+            upgradeData
+        );
+    }
+
 }

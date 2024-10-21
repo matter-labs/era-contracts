@@ -107,8 +107,6 @@ describe("L2GenesisUpgrade tests", function () {
           // For genesis upgrade these values will always be zero
           l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
           l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
-          l2BridgeProxyOwnerAddress: ethers.constants.AddressZero,
-          l2BridgedStandardERC20ProxyOwnerAddress: ethers.constants.AddressZero,
         },
       ]
     );

@@ -82,10 +82,10 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 sloadContractBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
-    address l2BridgeProxyOwnerAddress;
-    address l2BridgedStandardERC20ProxyOwnerAddress;
+    address l2WethTokenImpl;
 }
 
 // A subset of the ones used for tests
@@ -132,6 +132,7 @@ contract EcosystemUpgrade is Script {
         address expectedL2GatewayUpgrade;
         address l2SharedBridgeLegacyImpl;
         address l2BridgedStandardERC20Impl;
+        address l2WethImpl;
         // In reality, the following addresses need to be
         // deployed only on a settlement layer, i.e. the Gateway.
         address expectedL2ProxyAdminDeployer;
@@ -217,8 +218,6 @@ contract EcosystemUpgrade is Script {
         address transparentProxyAdmin;
         address eraDiamondProxy;
         address blobVersionedHashRetriever;
-        address l2BridgeProxyOwnerAddress;
-        address l2BridgedStandardERC20ProxyOwnerAddress;
     }
 
     struct TokensConfig {
@@ -234,6 +233,7 @@ contract EcosystemUpgrade is Script {
     struct CachedBytecodeHashes {
         bytes32 sharedL2LegacyBridgeBytecodeHash;
         bytes32 erc20StandardImplBytecodeHash;
+        bytes32 l2WrappedBaseTokenBytecodehHash;
     }
 
     CachedBytecodeHashes internal cachedBytecodeHashes;
@@ -447,7 +447,7 @@ contract EcosystemUpgrade is Script {
         //
         // Also, we need to predeploy the bridges implementation
         IL2ContractDeployer.ForceDeployment[]
-            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](4);
+            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](5);
         additionalForceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: cachedBytecodeHashes.sharedL2LegacyBridgeBytecodeHash,
             newAddress: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
@@ -463,6 +463,13 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
         additionalForceDeployments[2] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: cachedBytecodeHashes.l2WrappedBaseTokenBytecodehHash,
+            newAddress: addresses.expectedL2Addresses.l2WethImpl,
+            callConstructor: true,
+            value: 0,
+            input: ""
+        });
+        additionalForceDeployments[3] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()),
             newAddress: L2_COMPLEX_UPGRADER_ADDR,
             callConstructor: true,
@@ -470,7 +477,7 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
         // Getting the contract back to normal
-        additionalForceDeployments[3] = IL2ContractDeployer.ForceDeployment({
+        additionalForceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(Utils.readSystemContractsBytecode("ComplexUpgrader")),
             newAddress: L2_COMPLEX_UPGRADER_ADDR,
             callConstructor: false,
@@ -673,10 +680,6 @@ contract EcosystemUpgrade is Script {
         config.contracts.oldValidatorTimelock = toml.readAddress("$.contracts.old_validator_timelock");
         // FIXME: value stored there is incorrect at the moment, figure out the correct value
         config.contracts.blobVersionedHashRetriever = toml.readAddress("$.contracts.blob_versioned_hash_retriever");
-        config.contracts.l2BridgeProxyOwnerAddress = toml.readAddress("$.contracts.l2_bridge_proxy_owner_address");
-        config.contracts.l2BridgedStandardERC20ProxyOwnerAddress = toml.readAddress(
-            "$.contracts.l2_bridged_standard_erc20_proxy_owner_address"
-        );
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
@@ -803,13 +806,15 @@ contract EcosystemUpgrade is Script {
         upgradeSpecificDependencies[0] = L2ContractsBytecodesLib.readGatewayUpgradeBytecode();
         upgradeSpecificDependencies[1] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
         upgradeSpecificDependencies[2] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
+        upgradeSpecificDependencies[3] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
 
-        upgradeSpecificDependencies[3] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
-        upgradeSpecificDependencies[4] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
+        upgradeSpecificDependencies[4] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
+        upgradeSpecificDependencies[5] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
 
         cachedBytecodeHashes = CachedBytecodeHashes({
             sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
-            erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2])
+            erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2]),
+            l2WrappedBaseTokenBytecodehHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[3])
         });
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, upgradeSpecificDependencies);
@@ -1473,8 +1478,6 @@ contract EcosystemUpgrade is Script {
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
             l2SharedBridgeLegacyImpl: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
-            l2BridgeProxyOwnerAddress: config.contracts.l2BridgeProxyOwnerAddress,
-            l2BridgedStandardERC20ProxyOwnerAddress: config.contracts.l2BridgedStandardERC20ProxyOwnerAddress
         });
 
         return abi.encode(data);
