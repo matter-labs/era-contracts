@@ -1056,7 +1056,11 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       "CTMDeploymentTracker",
-      [this.addresses.Bridgehub.BridgehubProxy,this.addresses.Bridgehub.InteropCenterProxy, this.addresses.Bridges.SharedBridgeProxy],
+      [
+        this.addresses.Bridgehub.BridgehubProxy,
+        this.addresses.Bridgehub.InteropCenterProxy,
+        this.addresses.Bridges.SharedBridgeProxy,
+      ],
       create2Salt,
       ethTxOptions
     );

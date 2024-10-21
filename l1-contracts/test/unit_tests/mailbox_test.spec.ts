@@ -10,6 +10,7 @@ import {
   MailboxFacetFactory,
   MailboxFacetTestFactory,
   MockExecutorFacetFactory,
+  InteropCenter,
 } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
@@ -29,6 +30,7 @@ import {
 
 describe("Mailbox tests", function () {
   let mailbox: IMailbox;
+  let interopCenter: InteropCenter;
   let proxyAsMockExecutor: MockExecutorFacet;
   let bridgehub: Bridgehub;
   let owner: ethers.Signer;
@@ -60,6 +62,7 @@ describe("Mailbox tests", function () {
 
     const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
+    interopCenter = await deployer.interopCenter(deployWallet);
     chainId = deployer.chainId;
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
@@ -85,7 +88,9 @@ describe("Mailbox tests", function () {
         "0x",
         ethers.BigNumber.from(1000000),
         [new Uint8Array(32)],
-        ethers.constants.AddressZero
+        ethers.constants.AddressZero,
+        undefined,
+        interopCenter
       )
     );
     expect(revertReason).equal(DEFAULT_REVERT_REASON);
@@ -101,7 +106,9 @@ describe("Mailbox tests", function () {
         "0x",
         ethers.BigNumber.from(100000),
         [new Uint8Array(63)],
-        ethers.constants.AddressZero
+        ethers.constants.AddressZero,
+        undefined,
+        interopCenter
       )
     );
 
@@ -118,7 +125,9 @@ describe("Mailbox tests", function () {
         "0x",
         ethers.BigNumber.from(100000),
         [new Uint8Array(64)],
-        ethers.constants.AddressZero
+        ethers.constants.AddressZero,
+        undefined,
+        interopCenter
       )
     );
 
@@ -270,7 +279,9 @@ describe("Mailbox tests", function () {
           "0x",
           l2GasLimit,
           [new Uint8Array(32)],
-          refundRecipient
+          refundRecipient,
+          undefined,
+          interopCenter
         ),
         expectedSender: await owner.getAddress(),
       };
