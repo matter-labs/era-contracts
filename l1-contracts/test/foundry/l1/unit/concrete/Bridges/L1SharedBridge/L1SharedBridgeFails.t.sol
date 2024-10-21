@@ -622,7 +622,11 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             amount
         );
 
-        vm.mockCall(interopCenterAddress, abi.encode(IInteropCenter.proveL2MessageInclusion.selector), abi.encode(true));
+        vm.mockCall(
+            interopCenterAddress,
+            abi.encode(IInteropCenter.proveL2MessageInclusion.selector),
+            abi.encode(true)
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch)

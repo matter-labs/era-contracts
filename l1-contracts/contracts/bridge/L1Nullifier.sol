@@ -157,7 +157,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IInteropCenter _interopCenter, uint256 _eraChainId, address _eraDiamondProxy) reentrancyGuardInitializer {
+    constructor(
+        IBridgehub _bridgehub,
+        IInteropCenter _interopCenter,
+        uint256 _eraChainId,
+        address _eraDiamondProxy
+    ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         INTEROP_CENTER = _interopCenter;

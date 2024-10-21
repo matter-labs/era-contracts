@@ -10,7 +10,7 @@ contract L1NullifierDev is L1Nullifier {
         IInteropCenter _interopCenter,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    ) L1Nullifier(_bridgehub, _interopCenter,  _eraChainId, _eraDiamondProxy) {}
+    ) L1Nullifier(_bridgehub, _interopCenter, _eraChainId, _eraDiamondProxy) {}
 
     function setL2LegacySharedBridge(uint256 _chainId, address _l2Bridge) external {
         __DEPRECATED_l2BridgeAddress[_chainId] = _l2Bridge;

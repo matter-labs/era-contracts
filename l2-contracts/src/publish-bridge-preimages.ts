@@ -38,7 +38,7 @@ async function main() {
       console.log(`Using gas price: ${gasPrice}`);
 
       const deployer = new Deployer({ deployWallet: wallet });
-      const bridgehub = deployer.bridgehubContract(wallet);
+      const interopCenter = deployer.interopCenter(wallet);
 
       const publishL2SharedBridgeTx = await interopCenter.requestL2TransactionDirect(
         {

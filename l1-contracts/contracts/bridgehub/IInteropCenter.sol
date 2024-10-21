@@ -12,11 +12,10 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from ".
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
+    function setAddresses(address assetRouter) external;
+    /// Mailbox forwarder
 
-    function setAddresses( address assetRouter) external;
-     /// Mailbox forwarder
-
-     function proveL2MessageInclusion(
+    function proveL2MessageInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _index,
@@ -51,7 +50,7 @@ interface IInteropCenter {
     ) external payable returns (bytes32 canonicalTxHash);
 
     function requestL2TransactionDirectSender(
-        address _sender, 
+        address _sender,
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 

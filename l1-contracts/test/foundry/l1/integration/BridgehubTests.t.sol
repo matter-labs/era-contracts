@@ -19,7 +19,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from  "contracts/bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";

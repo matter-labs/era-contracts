@@ -183,7 +183,7 @@ contract ZKChainDeployer is L1ContractDeployer {
                 bytes32(uint256(uint160(address(this))))
             );
         }
-        { 
+        {
             initData2 = bytes.concat(
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),
@@ -195,7 +195,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         }
         bytes memory initData;
         {
-            initData =  bytes.concat(initData1, initData2);
+            initData = bytes.concat(initData1, initData2);
         }
 
         diamondCut.initCalldata = initData;

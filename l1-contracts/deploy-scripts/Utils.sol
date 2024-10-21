@@ -557,7 +557,7 @@ library Utils {
             (l2TransactionRequest)
         );
 
-        address interopCenter = Bridgehub(bridgehubAddress).interopCenter();
+        address interopCenter = address(Bridgehub(bridgehubAddress).interopCenter());
         console.log("Executing transaction");
         vm.recordLogs();
         executeUpgrade(governor, salt, interopCenter, l2TransactionRequestCalldata, requiredValueToDeploy, 0);

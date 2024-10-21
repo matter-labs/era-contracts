@@ -168,7 +168,7 @@ async function main() {
         verbose: true,
       });
 
-      const bridgehub = deployer.bridgehubContract(deployWallet);
+      const interopCenter = deployer.interopCenter(deployWallet);
       const requiredValueToInitializeBridge = await interopCenter.l2TransactionBaseCost(
         chainId,
         gasPrice,

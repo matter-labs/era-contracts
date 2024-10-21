@@ -100,10 +100,7 @@ library L2Utils {
             _args.l2TokenBeacon,
             _args.contractsDeployedAlready
         );
-        forceDeployInteropCenter(
-            _args.l1ChainId,
-            _args.aliasedOwner
-        );
+        forceDeployInteropCenter(_args.l1ChainId, _args.aliasedOwner);
     }
 
     function forceDeployMessageRoot() internal {
@@ -131,17 +128,16 @@ library L2Utils {
         );
     }
 
-    function forceDeployInteropCenter(
-        uint256 _l1ChainId,
-        address _aliasedOwner
-    ) internal {
+    function forceDeployInteropCenter(uint256 _l1ChainId, address _aliasedOwner) internal {
         new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _l1ChainId, _aliasedOwner);
-        forceDeployWithConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, _l1ChainId, _aliasedOwner));
+        forceDeployWithConstructor(
+            "InteropCenter",
+            L2_INTEROP_CENTER_ADDR,
+            abi.encode(L2_BRIDGEHUB_ADDR, _l1ChainId, _aliasedOwner)
+        );
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         vm.prank(_aliasedOwner);
-        interopCenter.setAddresses(
-            L2_ASSET_ROUTER_ADDR
-        );
+        interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.

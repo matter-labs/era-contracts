@@ -8,7 +8,7 @@ import "forge-std/console.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {InteropCenter, IInteropCenter} from  "contracts/bridgehub/InteropCenter.sol";
+import {InteropCenter, IInteropCenter} from "contracts/bridgehub/InteropCenter.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
@@ -227,7 +227,12 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(bridgeOwner);
         bridgehub.addChainTypeManager(address(mockCTM));
         bridgehub.addTokenAssetId(tokenAssetId);
-        bridgehub.setAddresses(sharedBridgeAddress, ICTMDeploymentTracker(address(0)), messageRoot, address(interopCenter));
+        bridgehub.setAddresses(
+            sharedBridgeAddress,
+            ICTMDeploymentTracker(address(0)),
+            messageRoot,
+            address(interopCenter)
+        );
         interopCenter.setAddresses(sharedBridgeAddress);
         vm.stopPrank();
 
@@ -430,7 +435,12 @@ contract ExperimentalBridgeTest is Test {
 
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);
-        bridgehub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)), address(0));
+        bridgehub.setAddresses(
+            address(mockSharedBridge),
+            ICTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0)),
+            address(0)
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
@@ -464,7 +474,12 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         vm.startPrank(bridgeOwner);
-        bridgehub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)), address(0));
+        bridgehub.setAddresses(
+            address(mockSharedBridge),
+            ICTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0)),
+            address(0)
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
@@ -994,8 +1009,12 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.l2TransactionBaseCost(mockChainId, mockGasPrice, mockL2GasLimit, mockL2GasPerPubdataByteLimit) ==
-                mockL2TxnCost
+            interopCenter.l2TransactionBaseCost(
+                mockChainId,
+                mockGasPrice,
+                mockL2GasLimit,
+                mockL2GasPerPubdataByteLimit
+            ) == mockL2TxnCost
         );
         vm.clearMockedCalls();
     }
@@ -1691,7 +1710,7 @@ contract ExperimentalBridgeTest is Test {
 
         L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
 
-         vm.mockCall(
+        vm.mockCall(
             address(interopCenter),
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
@@ -1741,7 +1760,7 @@ contract ExperimentalBridgeTest is Test {
             randomValue: randomValue
         });
 
-         vm.mockCall(
+        vm.mockCall(
             address(interopCenter),
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(

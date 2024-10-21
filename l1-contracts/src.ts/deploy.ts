@@ -69,7 +69,13 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { BridgehubFactory, ChainAdminFactory, ERC20Factory, ChainTypeManagerFactory, InteropCenterFactory } from "../typechain";
+import {
+  BridgehubFactory,
+  ChainAdminFactory,
+  ERC20Factory,
+  ChainTypeManagerFactory,
+  InteropCenterFactory,
+} from "../typechain";
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
@@ -460,7 +466,10 @@ export class Deployer {
     this.addresses.Bridgehub.BridgehubProxy = contractAddress;
   }
 
-  public async deployInteropCenterImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployInteropCenterImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     const contractAddress = await this.deployViaCreate2(
       "InteropCenter",
       [this.addresses.Bridgehub.BridgehubProxy, await this.getL1ChainId(), this.addresses.Governance],
@@ -1104,11 +1113,11 @@ export class Deployer {
       this.addresses.Bridges.SharedBridgeProxy,
       this.addresses.Bridgehub.CTMDeploymentTrackerProxy,
       this.addresses.Bridgehub.MessageRootProxy,
-      this.addresses.Bridgehub.InteropCenterProxy
+      this.addresses.Bridgehub.InteropCenterProxy,
     ]);
     const upgradeData2 = await interopCenter.interface.encodeFunctionData("setAddresses", [
-      this.addresses.Bridges.SharedBridgeProxy
-    ])
+      this.addresses.Bridges.SharedBridgeProxy,
+    ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
     await this.executeUpgrade(this.addresses.Bridgehub.InteropCenterProxy, 0, upgradeData2);
     if (this.verbose) {
@@ -1192,8 +1201,8 @@ export class Deployer {
     await this.deployBridgehubProxy(create2Salt, { gasPrice });
     await this.deployMessageRootImplementation(create2Salt, { gasPrice });
     await this.deployMessageRootProxy(create2Salt, { gasPrice });
-    await this.deployInteropCenterImplementation(create2Salt, {gasPrice});
-    await this.deployInteropCenterProxy(create2Salt, {gasPrice});
+    await this.deployInteropCenterImplementation(create2Salt, { gasPrice });
+    await this.deployInteropCenterProxy(create2Salt, { gasPrice });
   }
 
   public async deployChainTypeManagerContract(

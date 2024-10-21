@@ -50,7 +50,9 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         // we deploy the code to get the contract code with immutables which we then vm.etch
         address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR)));
         address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
-        address interopCenter = address(new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner));
+        address interopCenter = address(
+            new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner)
+        );
         address assetRouter = address(
             new L2AssetRouter(
                 _args.l1ChainId,

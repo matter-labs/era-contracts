@@ -7,7 +7,7 @@ import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from  "contracts/bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";

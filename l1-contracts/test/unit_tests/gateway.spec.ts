@@ -89,7 +89,12 @@ describe("Gateway", function () {
     const ctm = migratingDeployer.chainTypeManagerContract(migratingDeployer.deployWallet);
     const gasPrice = await migratingDeployer.deployWallet.provider.getGasPrice();
     const value = (
-      await interopCenter.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+      await interopCenter.l2TransactionBaseCost(
+        chainId,
+        gasPrice,
+        priorityTxMaxGasLimit,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+      )
     ).mul(10);
 
     const ctmDeploymentTracker = migratingDeployer.ctmDeploymentTracker(migratingDeployer.deployWallet);

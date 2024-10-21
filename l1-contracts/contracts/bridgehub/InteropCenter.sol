@@ -47,8 +47,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @notice The contract that stores the cross-chain message root for each chain and the aggregated root.
     /// @dev Note that the message root does not contain messages from the chain it is deployed on. It may
     /// be added later on if needed.
-    // IMessageRoot public messageRoot;  
-    
+    // IMessageRoot public messageRoot;
+
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
             revert Unauthorized(msg.sender);
@@ -102,14 +102,17 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     // / @param _messageRoot the message root address
     function setAddresses(
         address _assetRouter
+    )
+        external
         // ICTMDeploymentTracker _l1CtmDeployer,
         // IMessageRoot _messageRoot
-    ) external onlyOwner {
+        onlyOwner
+    {
         assetRouter = _assetRouter;
         // l1CtmDeployer = _l1CtmDeployer;
         // messageRoot = _messageRoot;
     }
-       /*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
                         Mailbox forwarder
     //////////////////////////////////////////////////////////////*/
 
@@ -121,14 +124,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override returns (bytes32 canonicalTxHash) {
-        _requestL2TransactionDirect(msg.sender, _request);
+       return _requestL2TransactionDirect(msg.sender, _request);
     }
 
     function requestL2TransactionDirectSender(
-        address _sender, 
+        address _sender,
         L2TransactionRequestDirect calldata _request
     ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
-        _requestL2TransactionDirect(_sender, _request);
+        return _requestL2TransactionDirect(_sender, _request);
     }
 
     /// @notice the mailbox is called directly after the assetRouter received the deposit
@@ -194,14 +197,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override returns (bytes32 canonicalTxHash) {
-        _requestL2TransactionTwoBridges(msg.sender, _request);
+        return _requestL2TransactionTwoBridges(msg.sender, _request);
     }
-    
+
     function requestL2TransactionTwoBridgesSender(
         address _sender,
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
-        _requestL2TransactionTwoBridges(_sender, _request);
+        return _requestL2TransactionTwoBridges(_sender, _request);
     }
 
     function _requestL2TransactionTwoBridges(
@@ -221,7 +224,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 }
                 baseTokenMsgValue = _request.mintValue;
             } else {
-
                 if (msg.value != _request.secondBridgeValue) {
                     revert MsgValueMismatch(_request.secondBridgeValue, msg.value);
                 }

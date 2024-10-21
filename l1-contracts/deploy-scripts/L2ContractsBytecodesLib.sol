@@ -18,7 +18,7 @@ library L2ContractsBytecodesLib {
     function readInteropCenterBytecode() internal view returns (bytes memory) {
         return
             Utils.readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridgehub/InteropCenter.sol/InteropCenteru.json"
+                "/../l1-contracts/artifacts-zk/contracts/bridgehub/InteropCenter.sol/InteropCenter.json"
             );
     }
 

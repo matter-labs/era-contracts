@@ -374,7 +374,10 @@ contract DeployUtils is Script {
 
     function deployChainTypeManagerImplementation() internal {
         bytes memory bytecode = type(ChainTypeManager).creationCode;
-        bytes memory constructorArgs = abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy);
+        bytes memory constructorArgs = abi.encode(
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridgehub.interopCenterProxy
+        );
         address contractAddress = deployViaCreate2(bytecode, constructorArgs);
         console.log("ChainTypeManagerImplementation deployed at:", contractAddress);
         addresses.stateTransition.chainTypeManagerImplementation = contractAddress;

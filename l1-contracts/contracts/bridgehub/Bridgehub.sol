@@ -465,7 +465,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-       return interopCenter.requestL2TransactionTwoBridgesSender(msg.sender, _request);
+        return interopCenter.requestL2TransactionTwoBridgesSender(msg.sender, _request);
     }
 
     /// @notice This function is used to send a request to the ZK chain.
