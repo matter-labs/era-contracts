@@ -448,7 +448,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        return interopCenter.requestL2TransactionDirectSender(msg.sender, _request);
+        return interopCenter.requestL2TransactionDirectSender{value:msg.value}(msg.sender, _request);
     }
 
     /// @notice After depositing funds to the assetRouter, the secondBridge is called
@@ -465,7 +465,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        return interopCenter.requestL2TransactionTwoBridgesSender(msg.sender, _request);
+        return interopCenter.requestL2TransactionTwoBridgesSender{value:msg.value}(msg.sender, _request);
     }
 
     /// @notice This function is used to send a request to the ZK chain.

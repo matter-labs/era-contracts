@@ -3,7 +3,7 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub } from "../../typechain";
+import type { Bridgehub, InteropCenter } from "../../typechain";
 import { BridgehubFactory } from "../../typechain";
 
 import {
@@ -23,6 +23,7 @@ import type { Deployer } from "../../src.ts/deploy";
 
 describe("Gateway", function () {
   let bridgehub: Bridgehub;
+  let interopCenter: InteropCenter;
   // let stateTransition: ChainTypeManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
@@ -59,6 +60,7 @@ describe("Gateway", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    interopCenter = migratingDeployer.interopCenter(deployWallet);
 
     gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     gatewayDeployer.chainId = 10;

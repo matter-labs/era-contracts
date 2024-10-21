@@ -8,6 +8,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IInteropCenter} from "./IInteropCenter.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
@@ -25,13 +26,16 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
+    /// @dev Interop Center contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    IInteropCenter public immutable override INTEROP_CENTER;
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
+    modifier onlyInteropCenter() {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(BRIDGE_HUB), "CTM DT: not BH");
+        require(msg.sender == address(INTEROP_CENTER), "CTM DT: not BH");
         _;
     }
 
@@ -44,9 +48,10 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IAssetRouterBase _sharedBridge) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, IInteropCenter _interopCenter, IAssetRouterBase _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
         L1_ASSET_ROUTER = _sharedBridge;
     }
 
@@ -85,7 +90,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         address _originalCaller,
         uint256,
         bytes calldata _data
-    ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory request) {
         // solhint-disable-next-line gas-custom-errors
 
         require(msg.value == 0, "CTMDT: no eth allowed");

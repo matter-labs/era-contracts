@@ -1056,7 +1056,7 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       "CTMDeploymentTracker",
-      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.SharedBridgeProxy],
+      [this.addresses.Bridgehub.BridgehubProxy,this.addresses.Bridgehub.InteropCenterProxy, this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
@@ -1293,6 +1293,7 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
+    const interopCenter = this.interopCenter(this.deployWallet);
     const expectedCost = (
       await interopCenter.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);

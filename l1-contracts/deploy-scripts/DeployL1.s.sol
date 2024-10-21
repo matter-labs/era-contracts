@@ -218,7 +218,7 @@ contract DeployL1Script is Script, DeployUtils {
     function deployCTMDeploymentTracker() internal {
         address ctmDTImplementation = deployViaCreate2(
             type(CTMDeploymentTracker).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.sharedBridgeProxy)
+            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy, addresses.bridges.sharedBridgeProxy)
         );
         console.log("CTM Deployment Tracker Implementation deployed at:", ctmDTImplementation);
         addresses.bridgehub.ctmDeploymentTrackerImplementation = ctmDTImplementation;

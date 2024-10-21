@@ -124,7 +124,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override returns (bytes32 canonicalTxHash) {
-       return _requestL2TransactionDirect(msg.sender, _request);
+        return _requestL2TransactionDirect(msg.sender, _request);
     }
 
     function requestL2TransactionDirectSender(
