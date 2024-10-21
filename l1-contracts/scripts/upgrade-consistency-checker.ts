@@ -42,8 +42,8 @@ const gettersFacet = "0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9"!;
 
 const diamondInit = "0x4c17c0A1da9665D59EbE3a9e58459Ebe77041C64";
 
-const stmImplDeployTx = "0x22761aaeabb45acd4861cfc0ee3a9158e06d0b37d3c45d1da66468551f3d0755";
-const stmImpl = "0xDcE92A3D72dD5a631e1E5439FAb6cD6E2522a785";
+const stmImplDeployTx = "0x5f427ef61519d613b2362ec0b638c62c93f91a5aa485fdc39bee6414a4a8eb43";
+const stmImpl = "0xD306aB758F92B7f42180E14866FCd72a2E9AbD13";
 const stmDeployTx = "0xbad873087e897f8ad3b3a7611bd686adebaafcaa52fc778a87036b0c444ab3cb";
 const stm = "0x925dd0bc14552b0b261ca8a23ad26df9c6f2c8ba";
 
