@@ -42,8 +42,8 @@ const gettersFacet = "0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9"!;
 
 const diamondInit = "0x4c17c0A1da9665D59EbE3a9e58459Ebe77041C64";
 
-const stmImplDeployTx = "0x5f427ef61519d613b2362ec0b638c62c93f91a5aa485fdc39bee6414a4a8eb43";
-const stmImpl = "0xD306aB758F92B7f42180E14866FCd72a2E9AbD13";
+const stmImplDeployTx = "0x22761aaeabb45acd4861cfc0ee3a9158e06d0b37d3c45d1da66468551f3d0755";
+const stmImpl = "0xDcE92A3D72dD5a631e1E5439FAb6cD6E2522a785";
 const stmDeployTx = "0xbad873087e897f8ad3b3a7611bd686adebaafcaa52fc778a87036b0c444ab3cb";
 const stm = "0x925dd0bc14552b0b261ca8a23ad26df9c6f2c8ba";
 
@@ -59,6 +59,7 @@ const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
 const expectedOwner = "0xbD36971E336914167C6BD3A1Fc9B0960860AB1C7"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
 const expectedDelay = "75600";
 const eraChainId: string = "271";
+const eraDiamondProxyAddress = "0x5BBdEDe0F0bAc61AA64068b60379fe32ecc0F96C";
 // const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const expectedHyperchainAddr = "0x5bbdede0f0bac61aa64068b60379fe32ecc0f96c";
 const maxNumberOfHyperchains = 100;
@@ -259,7 +260,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
 }
 
 async function checkDiamondInitData(initCalldata: string) {
-  console.log(initCalldata.length);
   const [
     usedVerifier,
     // We just unpack verifier params here
@@ -298,7 +298,6 @@ async function checkDiamondInitData(initCalldata: string) {
     ],
     initCalldata
   );
-  console.log("I am here ");
 
   if (usedVerifier.toLowerCase() !== verifier.toLowerCase()) {
     throw new Error("Verifier is not correct");
@@ -918,7 +917,7 @@ async function main() {
     await checkImpl("Bridgehub", [], bridgeHubImpl, bridgeHubImplDeployTxn);
     await checkImpl(
       "L1SharedBridge",
-      [WETH_L1_ADDRESS, bridgeHub, 271, diamondProxyAddress],
+      [WETH_L1_ADDRESS, bridgeHub, eraChainId, eraDiamondProxyAddress],
       sharedBridgeImpl,
       sharedBridgeImplDeployTx
     );
