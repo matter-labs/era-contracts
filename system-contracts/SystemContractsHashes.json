@@ -66,8 +66,8 @@
     "contractName": "KnownCodesStorage",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/KnownCodesStorage.sol/KnownCodesStorage.json",
     "sourceCodePath": "contracts-preprocessed/KnownCodesStorage.sol",
-    "bytecodeHash": "0x010000c1242abf7683aa2be6c873109d418e5e1fd76d8a54a27d30248fbcdb4f",
-    "sourceCodeHash": "0xd19ebf4cf153de38a62229e4663b73fbeaaa7195527eb9ebb07214ce4c6751ea"
+    "bytecodeHash": "0x010000c16012ea2c31038b2a944f7d5d0b4192a61074555068a6bed5978cd481",
+    "sourceCodeHash": "0xeb83e3a2ea2f50b93122363b8dd56fbcfe821d11723d849eecbde3d6af1147de"
   },
   {
     "contractName": "L1Messenger",
