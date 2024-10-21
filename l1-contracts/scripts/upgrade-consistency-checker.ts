@@ -505,6 +505,10 @@ function getAdmin(): ethers.Contract {
   return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync("AdminFacet").abi, l1Provider);
 }
 
+function getChainAdmin(): ethers.Contract {
+  return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync("ChainAdmin").abi, l1Provider);
+}
+
 async function testThatAllSelectorsAreDeleted(facetCuts: any) {
   const getters = getGetters();
   const loupe = Array.from(await getters.facets());
@@ -837,20 +841,46 @@ async function checkChainCreationParams() {
 }
 
 async function checkExecuteUpgrade() {
-  const contract = getAdmin();
-  const iface = contract.interface;
+  const chainAdminContract = getChainAdmin();
+  const adminContract = getAdmin();
+  let iface = chainAdminContract.interface;
 
-  const parsedData = iface.parseTransaction({ data: EXECUTE_UPGRADE_DATA.toString() });
+  let parsedData = iface.parseTransaction({ data: EXECUTE_UPGRADE_DATA.toString() });
 
-  if (parsedData.name !== "upgradeChainFromVersion") {
+  if (parsedData.name !== "multicall") {
+    throw new Error("bad upgrade name");
+  }
+
+  if (parsedData.args._calls.length > 1) {
+    throw new Error("Too many calls");
+  }
+  
+  let callData = parsedData.args._calls[0].data;
+  iface = adminContract.interface;
+  const upgradeParsedData = iface.parseTransaction({ data: callData });
+
+  if (upgradeParsedData.name !== "upgradeChainFromVersion") {
     throw new Error("bad scheulde name");
   }
 
-  if (!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(parsedData.args._oldProtocolVersion)) {
+  if (!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(upgradeParsedData.args._oldProtocolVersion)) {
     throw new Error("Invalid old version");
   }
 
   // todo check that diamond cut is the same as in the upgrade
+  const cutData = upgradeParsedData.args._diamondCut;
+  
+  const { facetCuts, initAddress, initCalldata } = cutData;
+
+  if (initAddress !== defaultUpgradeAddress) {
+    throw new Error("Bad default upgrade " + initAddress + " " + defaultUpgradeAddress);
+  }
+
+  await testThatAllSelectorsAreDeleted(facetCuts);
+  await testThatAllSelectorsAreAdded(facetCuts);
+
+  // Now, what is left is to check the upgrade data.
+  await checkDefaultUpgradeCalldata(initCalldata);
 }
 
 async function main() {
@@ -879,6 +909,9 @@ async function main() {
 
     await checkScheduleData();
     console.log("Schedule data is correct");
+    await checkExecuteUpgrade();
+    console.log("Execute data is correct");
+
     await checkChainCreationParams();
 
     await checkImpl("StateTransitionManager", [bridgeHub, maxNumberOfHyperchains], stmImpl, stmImplDeployTx);
@@ -892,6 +925,7 @@ async function main() {
     await checkImpl("L1ERC20Bridge", [sharedBridgeProxy], legacyBridgeImpl, legacyBridgeImplDeployTx);
 
     await checkBridgehub();
+
   });
 
   await program.parseAsync(process.argv);
