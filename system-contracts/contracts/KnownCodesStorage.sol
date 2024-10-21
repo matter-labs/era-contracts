@@ -104,7 +104,7 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
                 sstore(vesionedBytecodeHash, 1)
             }
 
-            emit MarkedAsKnown(vesionedBytecodeHash, true);
+            emit MarkedAsKnown(vesionedBytecodeHash, false);
         }
 
         assembly {
