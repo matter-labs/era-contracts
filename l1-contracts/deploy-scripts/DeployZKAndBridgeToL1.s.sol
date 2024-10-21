@@ -57,8 +57,6 @@ contract DeployZKScript is Script {
     Config internal config;
 
     function run() public {
-        console.log("Deploying ZK Token");
-
         initializeConfig();
         deployZkToken();
         saveOutput();
@@ -95,32 +93,21 @@ contract DeployZKScript is Script {
         config.l1SharedBridge = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
         config.chainId = toml.readUint("$.chain.chain_chain_id");
-
-        // Grab config from custom config file
-        // path = string.concat(root, vm.envString("L2_CONFIG"));
-        // toml = vm.readFile(path);
-        // config.anotherOwner = toml.readAddress("$.consensus_registry_owner");
-        // console.log("Another owner: ", config.anotherOwner);
     }
 
     function initializeAdditionalConfig() internal {
         string memory root = vm.projectRoot();
-        // string memory path = string.concat(root, vm.envString("ZK_CHAIN_OUTPUT"));
-        // string memory toml = vm.readFile(path);
-        // config.chainAdmin = toml.readAddress("$.chain_admin_addr");
-
         string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
         string memory toml = vm.readFile(path);
-        // config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
-        // config.deployer = toml.readAddress("$.deployer_addr");
+
         config.owner = toml.readAddress("$.owner_address");
     }
 
     function deployZkToken() internal {
-        uint256 amount = 90000000000000000000;
-
+        uint256 someBigAmount = 100000000000000000000000000000000;
         TokenDescription storage token = config.zkToken;
         console.log("Deploying token:", token.name);
+
         vm.startBroadcast();
         address zkTokenAddress = deployErc20({
             name: token.name,
@@ -134,24 +121,21 @@ contract DeployZKScript is Script {
         token.addr = zkTokenAddress;
         address deployer = msg.sender;
         TestnetERC20Token zkToken = TestnetERC20Token(zkTokenAddress);
-        zkToken.mint(deployer, amount * 1000000000000);
+        zkToken.mint(deployer, someBigAmount);
         uint256 deployerBalance = zkToken.balanceOf(deployer);
-        console.log("Deployed balance:", deployerBalance);
-
+        console.log("Deployer balance:", deployerBalance);
         L2AssetRouter l2AR = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
         L2NativeTokenVault l2NTV = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         l2NTV.registerToken(zkTokenAddress);
         bytes32 zkTokenAssetId = l2NTV.assetId(zkTokenAddress);
         config.zkToken.assetId = zkTokenAssetId;
         console.log("zkTokenAssetId:", uint256(zkTokenAssetId));
-        zkToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount * 1000000000000);
+        zkToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, someBigAmount);
         vm.stopBroadcast();
 
         vm.broadcast();
-        l2AR.withdraw(zkTokenAssetId, abi.encode(amount * 1000000000000, deployer));
-
+        l2AR.withdraw(zkTokenAssetId, abi.encode(someBigAmount, deployer));
         uint256 deployerBalanceAfterWithdraw = zkToken.balanceOf(deployer);
-
         console.log("Deployed balance after withdraw:", deployerBalanceAfterWithdraw);
     }
 
@@ -218,20 +202,6 @@ contract DeployZKScript is Script {
         uint256 balance = l1ZK.balanceOf(config.deployerAddress);
         vm.broadcast();
         l1ZK.transfer(config.owner, balance / 2);
-        // config.chainAdmin = address(0x31E624977B531BE0d88f6eF4D6588B1fc80c0762);
-        // address[3] memory addressesForTransfers = [
-        //     // config.anotherOwner,
-        //     // config.chainAdmin,
-        //     config.governance,
-        //     config.deployer,
-        //     config.owner
-        // ];
-
-        // vm.startBroadcast(config.deployerAddress);
-        // for (uint i = 0; i < addressesForTransfers.length; ++i) {
-        //     l1ZK.transfer(addressesForTransfers[i], balance / 4);
-        // }
-        // vm.stopBroadcast();
         string memory tokenInfo = vm.serializeAddress("ZK", "l1Address", l1ZKAddress);
         vm.writeToml(tokenInfo, path, ".ZK.l1Address");
     }

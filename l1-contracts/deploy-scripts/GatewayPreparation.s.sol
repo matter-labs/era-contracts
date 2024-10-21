@@ -265,12 +265,12 @@ contract GatewayPreparation is Script {
             IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
             address baseTokenAddress = nativeTokenVault.tokenAddress(gatewayBaseTokenAssetId);
             uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(gatewayBaseTokenAssetId);
-
             TestnetERC20Token baseToken = TestnetERC20Token(baseTokenAddress);
             uint256 deployerBalance = baseToken.balanceOf(deployerAddress);
             console.log("Base token origin id: ", baseTokenOriginChainId);
+
             vm.startBroadcast();
-            if (baseTokenOriginChainId == block.chainid) { 
+            if (baseTokenOriginChainId == block.chainid) {
                 baseToken.mint(chainAdmin, deployerBalance / 3);
             } else {
                 baseToken.transfer(chainAdmin, deployerBalance / 3);
@@ -278,7 +278,7 @@ contract GatewayPreparation is Script {
             vm.stopBroadcast();
         }
 
-        console.log("Chain Admin address:", chainAdmin );
+        console.log("Chain Admin address:", chainAdmin);
 
         // TODO(EVM-746): Use L2-based chain admin contract
         address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);

@@ -168,20 +168,15 @@ contract GatewayCTMFromL1 is Script {
 
     function distributeBaseToken() internal {
         deployerAddress = msg.sender;
-        console.log("Deployer address: ", deployerAddress);
-        console.log("Gornance address: ", config.governance);
-
         L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
-        console.log("L1 AR address", address(l1AR));
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
         bytes32 baseTokenAssetID = nativeTokenVault.assetId(config.baseToken);
         uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetID);
-
         TestnetERC20Token baseToken = TestnetERC20Token(config.baseToken);
         uint256 deployerBalance = baseToken.balanceOf(deployerAddress);
-        console.log("Base token origin id: ", baseTokenOriginChainId);
+
         vm.startBroadcast();
-        if (baseTokenOriginChainId == block.chainid) { 
+        if (baseTokenOriginChainId == block.chainid) {
             baseToken.mint(config.governanceAddr, deployerBalance / 3);
         } else {
             baseToken.transfer(config.governanceAddr, deployerBalance / 3);
@@ -250,9 +245,7 @@ contract GatewayCTMFromL1 is Script {
 
     /// @dev The sender may not have any privileges
     function deployGatewayContracts() public {
-        console.log("Step 1");
         output.multicall3 = _deployInternal(L2ContractsBytecodesLib.readMulticall3Bytecode(), hex"");
-        console.log("Step 2");
         deployGatewayFacets();
 
         output.gatewayStateTransition.verifier = deployGatewayVerifier();
