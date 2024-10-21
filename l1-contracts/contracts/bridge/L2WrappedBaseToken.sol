@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
-import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
+import {ILegacyBridgedStandardToken} from "./interfaces/ILegacyBridgedStandardToken.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 
 import {ZeroAddress, Unauthorized, BridgeMintNotImplemented, WithdrawFailed} from "../common/L1ContractErrors.sol";
@@ -23,18 +23,14 @@ import {ZeroAddress, Unauthorized, BridgeMintNotImplemented, WithdrawFailed} fro
 ///
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
-contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBridgedStandardToken {
+/// @dev Since no new functionality has been added to the WETH contract, to avoid unneeded changes, 
+/// it only supports `ILegacyBridgedStandardToken`.
+contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, ILegacyBridgedStandardToken {
     /// @notice The address of the L2 asset router. The old name is retained for backwards compatibility.
     address public override l2Bridge;
 
     /// @notice Address of the L1 base token. It can be deposited to mint this L2 token.
     address public override l1Address;
-
-    /// @notice Address of the native token vault.
-    address public override nativeTokenVault;
-
-    /// @notice The assetId of the base token. The wrapped token does not have its own assetId.
-    bytes32 public baseTokenAssetId;
 
     modifier onlyBridge() {
         if (msg.sender != l2Bridge) {
@@ -62,13 +58,12 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// @param _l2Bridge Address of the L2 bridge
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
-    function initializeV3(
+    function initializeV2(
         string calldata name_,
         string calldata symbol_,
         address _l2Bridge,
-        address _l1Address,
-        bytes32 _baseTokenAssetId
-    ) external reinitializer(3) {
+        address _l1Address
+    ) external reinitializer(2) {
         if (_l2Bridge == address(0)) {
             revert ZeroAddress();
         }
@@ -76,13 +71,8 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         if (_l1Address == address(0)) {
             revert ZeroAddress();
         }
-        if (_baseTokenAssetId == bytes32(0)) {
-            revert ZeroAddress();
-        }
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
-        nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
-        baseTokenAssetId = _baseTokenAssetId;
 
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(name_, symbol_);
@@ -139,13 +129,5 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         if (!success) {
             revert WithdrawFailed();
         }
-    }
-
-    function originToken() external view override returns (address) {
-        return l1Address;
-    }
-
-    function assetId() external view override returns (bytes32) {
-        return baseTokenAssetId;
     }
 }
