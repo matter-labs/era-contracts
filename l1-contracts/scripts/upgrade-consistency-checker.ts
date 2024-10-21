@@ -10,7 +10,7 @@ import { BigNumber, ethers } from "ethers";
 import { utils } from "zksync-ethers";
 import type { FacetCut } from "../src.ts/diamondCut";
 import { getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
-import * as fs from 'fs'; 
+import * as fs from "fs";
 import { getAllSelectors } from "../src.ts/diamondCut";
 import { parse } from "path";
 
@@ -18,46 +18,49 @@ import { parse } from "path";
 // 1. Contracts must be verified.
 // 2. Getter methods in STM.
 
+const WETH_L1_ADDRESS = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
+
 // List the contracts that should become the upgrade targets
-const genesisUpgrade = '0x7BF68E0BB44Cf263Dbb809F252B723F08A86F123';
-const validatorTimelock = '';
-const defaultUpgradeAddress = '0x534AF884A80fe457d1184DDD932474BEC9207470'; 
+const genesisUpgrade = "0x7BF68E0BB44Cf263Dbb809F252B723F08A86F123";
+const validatorTimelock = "";
+const defaultUpgradeAddress = "0x534AF884A80fe457d1184DDD932474BEC9207470";
 
-const diamondProxyAddress = '0x5BBdEDe0F0bAc61AA64068b60379fe32ecc0F96C';
+const diamondProxyAddress = "0x5BBdEDe0F0bAc61AA64068b60379fe32ecc0F96C";
 
-const verifier = '0xCcB73Fdd0E3A3B9522631A1d8A168b5d9C532ceA';
-const proxyAdmin = '0x93aeee8d98fb0873f8ff595fdd534a1f288786d2';
+const verifier = "0xCcB73Fdd0E3A3B9522631A1d8A168b5d9C532ceA";
+const proxyAdmin = "0x93aeee8d98fb0873f8ff595fdd534a1f288786d2";
 
-const bridgeHubImpl = '0xcBb9F1B9Ae8A80DAD53fFe3368DFEE4fBA02D50F';
-const bridgeHub = '0x7bdf7970f17278a6ff75fdbc671e870b0728ae41';
+const bridgeHubImplDeployTxn = "0x4bfe72902267228247b9fb05850e9918214f95ddd1b27e0ad76aaba7028a68cd";
+const bridgeHubImpl = "0xcBb9F1B9Ae8A80DAD53fFe3368DFEE4fBA02D50F";
+const bridgeHub = "0x7bdf7970f17278a6ff75fdbc671e870b0728ae41";
 
-const executorFacet = '0xBB13642F795014E0EAC2b0d52ECD5162ECb66712';
-const adminFacet = '0x90C0A0a63d7ff47BfAA1e9F8fa554dabc986504a';
+const executorFacet = "0xBB13642F795014E0EAC2b0d52ECD5162ECb66712";
+const adminFacet = "0x90C0A0a63d7ff47BfAA1e9F8fa554dabc986504a";
 const mailboxFacetDeployTx = "0x07d150e5e96949fd816db58ca6c3cf935d3426a4ef4c78759d7bbe1b185fc473";
-const mailboxFacet = '0xf2677CF5ad53aE8D8612E2eeA0f2aa6191eb9c21';
-const gettersFacet = '0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9'!;
+const mailboxFacet = "0xf2677CF5ad53aE8D8612E2eeA0f2aa6191eb9c21";
+const gettersFacet = "0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9"!;
 
-const diamondInit = '0x4c17c0A1da9665D59EbE3a9e58459Ebe77041C64';
+const diamondInit = "0x4c17c0A1da9665D59EbE3a9e58459Ebe77041C64";
 
 const stmImplDeployTx = "0x5f427ef61519d613b2362ec0b638c62c93f91a5aa485fdc39bee6414a4a8eb43";
-const stmImpl = '0xD306aB758F92B7f42180E14866FCd72a2E9AbD13';
+const stmImpl = "0xD306aB758F92B7f42180E14866FCd72a2E9AbD13";
 const stmDeployTx = "0xbad873087e897f8ad3b3a7611bd686adebaafcaa52fc778a87036b0c444ab3cb";
-const stm = '0x925dd0bc14552b0b261ca8a23ad26df9c6f2c8ba';
+const stm = "0x925dd0bc14552b0b261ca8a23ad26df9c6f2c8ba";
 
-const sharedBridgeImplDeployTx = "0x074204db79298c2f6beccae881c2ad7321c331e97fb4bd93adce2eb23bf17a17";
-const sharedBridgeImpl = '0xB4a56f82369366cad1a2747F1571BB306dFe48ee';
-const sharedBridgeProxy = '0xc488a65b400769295f8c4b762adcb3e6a036220b';
+const sharedBridgeImplDeployTx = "0x4338dc6ed82131d02f136f8d66f3f5187e443b120c8cd2511ac8b04af00eebea";
+const sharedBridgeImpl = "0xB4a56f82369366cad1a2747F1571BB306dFe48ee";
+const sharedBridgeProxy = "0xc488a65b400769295f8c4b762adcb3e6a036220b";
 
-const legacyBridgeImplDeployTx = "0x234da786f098fa2e44b9abaf41b7045b4a25570e1a34fd01a101d23570e84d61";
-const legacyBridgeImpl = process.env.CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR!;
+const legacyBridgeImplDeployTx = "0x621e5cea3b4b0544283d25f3aa1d849ace2555f07f45372b7feb2a535ba00273";
+const legacyBridgeImpl = "0xCA48598aA0EdaF0FD9Eb1304041b87b0Daa1F648";
 
 const expectedL1WethAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
-const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
+const expectedOwner = "0xbD36971E336914167C6BD3A1Fc9B0960860AB1C7"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
 const expectedDelay = "75600";
-const eraChainId: string = '271';
+const eraChainId: string = "271";
 // const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
-const expectedHyperchainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
+const expectedHyperchainAddr = "0x5bbdede0f0bac61aa64068b60379fe32ecc0f96c";
 const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
 const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
@@ -78,11 +81,11 @@ const validatorTwo = process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR!;
 
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
-const EXPECTED_OLD_PROTOCOL_VERSION = '0x0000000000000000000000000000000000000000000000000000001800000002';
-const EXPECTED_OLD_VERSION_DEADLINE = '0x672797ed';
-const EXPECTED_UPGRADE_TIMESTAMP = '0x671522ed';
-const EXPECTED_NEW_PROTOCOL_VERSION = '0x0000000000000000000000000000000000000000000000000000001900000000';
-const EXPECTED_MAJOR_VERSION = '0x19';
+const EXPECTED_OLD_PROTOCOL_VERSION = "0x0000000000000000000000000000000000000000000000000000001800000002";
+const EXPECTED_OLD_VERSION_DEADLINE = "0x672797ed";
+const EXPECTED_UPGRADE_TIMESTAMP = "0x671522ed";
+const EXPECTED_NEW_PROTOCOL_VERSION = "0x0000000000000000000000000000000000000000000000000000001900000000";
+const EXPECTED_MAJOR_VERSION = "0x19";
 
 async function checkIdenticalBytecode(addr: string, contract: string, forgeFile?: string) {
   let correctCode;
@@ -101,10 +104,30 @@ async function checkIdenticalBytecode(addr: string, contract: string, forgeFile?
   }
 }
 
+async function foundryBytecode(contract: string, forgeFile?: string) {
+  const json = JSON.parse(fs.readFileSync(`./out/${forgeFile}.sol/${contract}.json`).toString());
+  return json.bytecode.object;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkCorrectInitCode(txHash: string, contract: ethers.Contract, bytecode: string, params: any[]) {
   const deployTx = await l1Provider.getTransaction(txHash);
   const usedInitCode = await extractInitCode(deployTx.data);
+  const correctConstructorData = contract.interface.encodeDeploy(params);
+  const correctInitCode = ethers.utils.hexConcat([bytecode, correctConstructorData]);
+  if (usedInitCode.toLowerCase() !== correctInitCode.toLowerCase()) {
+    throw new Error("Init code is not correct");
+  }
+}
+
+async function checkCorrectInitCodeNonFactory(
+  txHash: string,
+  contract: ethers.Contract,
+  bytecode: string,
+  params: any[]
+) {
+  const deployTx = await l1Provider.getTransaction(txHash);
+  const usedInitCode = deployTx.data;
   const correctConstructorData = contract.interface.encodeDeploy(params);
   const correctInitCode = ethers.utils.hexConcat([bytecode, correctConstructorData]);
   if (usedInitCode.toLowerCase() !== correctInitCode.toLowerCase()) {
@@ -236,7 +259,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
 }
 
 async function checkDiamondInitData(initCalldata: string) {
-
   console.log(initCalldata.length);
   const [
     usedVerifier,
@@ -256,7 +278,7 @@ async function checkDiamondInitData(initCalldata: string) {
     maxL2GasPerBatch,
     minimalL2GasPrice,
 
-    blobVersionedHashRetriever
+    blobVersionedHashRetriever,
   ] = ethers.utils.defaultAbiCoder.decode(
     [
       "address",
@@ -276,7 +298,7 @@ async function checkDiamondInitData(initCalldata: string) {
     ],
     initCalldata
   );
-  console.log('I am here ')
+  console.log("I am here ");
 
   if (usedVerifier.toLowerCase() !== verifier.toLowerCase()) {
     throw new Error("Verifier is not correct");
@@ -313,7 +335,7 @@ async function checkDiamondInitData(initCalldata: string) {
     maxL2GasPerBatch,
     minimalL2GasPrice,
 
-    blobVersionedHashRetriever
+    blobVersionedHashRetriever,
   });
 }
 
@@ -374,6 +396,17 @@ async function checkSTMImpl() {
   await checkCorrectInitCode(stmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfHyperchains]);
 
   console.log("STM impl correct!");
+}
+
+async function checkImpl(contractName: string, args: any[], implAddress: string, deployTx: string) {
+  const artifact = await hardhat.artifacts.readArtifact(contractName);
+  const contract = new ethers.Contract(implAddress, artifact.abi, l1Provider);
+
+  let bytecode = await foundryBytecode(contractName, contractName);
+
+  await checkCorrectInitCodeNonFactory(deployTx, contract, bytecode, args);
+
+  console.log(`${contractName} impl correct!`);
 }
 
 async function checkSTM() {
@@ -455,51 +488,53 @@ async function checkLegacyBridge() {
   console.log("L1 legacy bridge impl correct!");
 }
 
-const SCHEDULE_DATA = fs.readFileSync('./scripts/schedule.txt');
-const EXPECTED_L2_DATA = fs.readFileSync('./scripts/expected-l2-data.txt');
-const SET_CHAIN_CREATION_PARAMS_DATA = fs.readFileSync('./scripts/chain-creation-params.txt');
-const EXECUTE_UPGRADE_DATA = fs.readFileSync('./scripts/execute-upgrade.txt');
+const SCHEDULE_DATA = fs.readFileSync("./scripts/schedule.txt");
+const EXPECTED_L2_DATA = fs.readFileSync("./scripts/expected-l2-data.txt");
+const SET_CHAIN_CREATION_PARAMS_DATA = fs.readFileSync("./scripts/chain-creation-params.txt");
+const EXECUTE_UPGRADE_DATA = fs.readFileSync("./scripts/execute-upgrade.txt");
 
 function getStmContract(): ethers.Contract {
-  return new ethers.Contract(stm, hardhat.artifacts.readArtifactSync('StateTransitionManager').abi, l1Provider);
+  return new ethers.Contract(stm, hardhat.artifacts.readArtifactSync("StateTransitionManager").abi, l1Provider);
 }
 
 function getGetters(): ethers.Contract {
-  return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync('GettersFacet').abi, l1Provider)
+  return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync("GettersFacet").abi, l1Provider);
 }
 
 function getAdmin(): ethers.Contract {
-  return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync('AdminFacet').abi, l1Provider)
+  return new ethers.Contract(diamondProxyAddress, hardhat.artifacts.readArtifactSync("AdminFacet").abi, l1Provider);
 }
 
 async function testThatAllSelectorsAreDeleted(facetCuts: any) {
   const getters = getGetters();
   const loupe = Array.from(await getters.facets());
-  
-  const expectedDeletedSelectors = loupe.map((facet: any) => {
-    const sortedSelectors = Array.from(facet.selectors!).sort().join(',');
-    return `${sortedSelectors}`;
-  }).sort();
+
+  const expectedDeletedSelectors = loupe
+    .map((facet: any) => {
+      const sortedSelectors = Array.from(facet.selectors!).sort().join(",");
+      return `${sortedSelectors}`;
+    })
+    .sort();
 
   const realDeletedFacets = [];
-  for(const facetCut of facetCuts) {
-    const isAddressZero = (facetCut.facet == ethers.constants.AddressZero);
-    const isActionDelete = (facetCut.action == 2); 
-    if(!isAddressZero && !isActionDelete) {
+  for (const facetCut of facetCuts) {
+    const isAddressZero = facetCut.facet == ethers.constants.AddressZero;
+    const isActionDelete = facetCut.action == 2;
+    if (!isAddressZero && !isActionDelete) {
       // This is addition, we do not care
       continue;
     }
-    if(!isAddressZero || !isActionDelete) {
-      throw new Error('incosistent');
+    if (!isAddressZero || !isActionDelete) {
+      throw new Error("incosistent");
     }
 
-    const sortedSelectors = Array.from(facetCut.selectors!).sort().join(',');
+    const sortedSelectors = Array.from(facetCut.selectors!).sort().join(",");
     realDeletedFacets.push(sortedSelectors);
   }
   realDeletedFacets.sort();
-  
-  if (expectedDeletedSelectors.join('#') !== realDeletedFacets.join('#')) {
-    throw new Error('Incosistent deleted selectors');
+
+  if (expectedDeletedSelectors.join("#") !== realDeletedFacets.join("#")) {
+    throw new Error("Incosistent deleted selectors");
   }
 }
 
@@ -507,51 +542,51 @@ async function testThatAllSelectorsAreAdded(facetCuts: any) {
   const expectedFacets = [
     {
       address: executorFacet,
-      name: 'ExecutorFacet',
+      name: "ExecutorFacet",
       freezeable: true,
     },
     {
       address: mailboxFacet,
-      name: 'MailboxFacet',
+      name: "MailboxFacet",
       freezeable: true,
     },
     {
       address: gettersFacet,
-      name: 'GettersFacet',
+      name: "GettersFacet",
       freezeable: false,
     },
     {
       address: adminFacet,
-      name: 'AdminFacet',
+      name: "AdminFacet",
       freezeable: false,
     },
   ];
   const included = [false, false, false, false];
 
   const realAddedFacets = [];
-  for(const facetCut of facetCuts) {
-    if(facetCut.action !== 0 && facetCut.action !== 2) {
-      throw new Error('bad action');
+  for (const facetCut of facetCuts) {
+    if (facetCut.action !== 0 && facetCut.action !== 2) {
+      throw new Error("bad action");
     }
-    
-    const isAddressNonZero = (facetCut.facet != ethers.constants.AddressZero);
-    const isActionAdd = (facetCut.action == 0); 
-    if(!isAddressNonZero && !isActionAdd) {
+
+    const isAddressNonZero = facetCut.facet != ethers.constants.AddressZero;
+    const isActionAdd = facetCut.action == 0;
+    if (!isAddressNonZero && !isActionAdd) {
       // This is addition, we do not care
       continue;
     }
-    if(!isAddressNonZero || !isActionAdd) {
-      throw new Error('incosistent');
+    if (!isAddressNonZero || !isActionAdd) {
+      throw new Error("incosistent");
     }
 
-    const sortedSelectors = Array.from(facetCut.selectors!).sort().join(',');
+    const sortedSelectors = Array.from(facetCut.selectors!).sort().join(",");
     const facetAddress = facetCut.facet;
 
     let found = false;
-    for(let i = 0; i < expectedFacets.length; i++) {
+    for (let i = 0; i < expectedFacets.length; i++) {
       if (facetAddress.toLowerCase() == expectedFacets[i].address.toLowerCase()) {
-        if(included[i]) {
-          throw new Error('Facet ' + i + ' has been included already');
+        if (included[i]) {
+          throw new Error("Facet " + i + " has been included already");
         }
         included[i] = true;
       } else {
@@ -559,189 +594,190 @@ async function testThatAllSelectorsAreAdded(facetCuts: any) {
       }
 
       found = true;
-      const expectedSortedSelectors = getAllSelectors(new ethers.utils.Interface(hardhat.artifacts.readArtifactSync(expectedFacets[i].name).abi)).sort().join(',');
+      const expectedSortedSelectors = getAllSelectors(
+        new ethers.utils.Interface(hardhat.artifacts.readArtifactSync(expectedFacets[i].name).abi)
+      )
+        .sort()
+        .join(",");
 
-      if(sortedSelectors !== expectedSortedSelectors) {
-        throw new Error('Selector mismatch for address ' + facetAddress);
+      if (sortedSelectors !== expectedSortedSelectors) {
+        throw new Error("Selector mismatch for address " + facetAddress);
       }
 
-      if(facetCut.isFreezable !== expectedFacets[i].freezeable) {
-        throw new Error('Freezability issue for facet address ' + facetAddress);
+      if (facetCut.isFreezable !== expectedFacets[i].freezeable) {
+        throw new Error("Freezability issue for facet address " + facetAddress);
       }
     }
 
-    if(!found) {
-      throw new Error('Unkown address ' + facetAddress);
+    if (!found) {
+      throw new Error("Unkown address " + facetAddress);
     }
   }
 
-  for(let i = 0; i < 4; i++) {
-    if(!included[i]) {
-      throw new Error('Facet ' + i + ' was not included');
+  for (let i = 0; i < 4; i++) {
+    if (!included[i]) {
+      throw new Error("Facet " + i + " was not included");
     }
   }
 }
 
-function caseEq(a: string, b:string) {
-  return a.toLowerCase()== b.toLowerCase();
+function caseEq(a: string, b: string) {
+  return a.toLowerCase() == b.toLowerCase();
 }
 
 async function checkUpgradeTx(upgradeTx: any) {
-  if(!BigNumber.from(254).eq(upgradeTx.txType)) {
-    throw new Error('bad tx type');
+  if (!BigNumber.from(254).eq(upgradeTx.txType)) {
+    throw new Error("bad tx type");
   }
-  const FORCE_DEPLOYER_ADDR = '0x8007';
-  if(!BigNumber.from(FORCE_DEPLOYER_ADDR).eq(upgradeTx.from)) {
-    throw new Error('bad tx from');
+  const FORCE_DEPLOYER_ADDR = "0x8007";
+  if (!BigNumber.from(FORCE_DEPLOYER_ADDR).eq(upgradeTx.from)) {
+    throw new Error("bad tx from");
   }
-  const CONTRACT_DEPLOYER_ADDR = '0x8006'
-  if(!BigNumber.from(CONTRACT_DEPLOYER_ADDR).eq(upgradeTx.to)) {
-    throw new Error('bad tx to');
-  }
-
-  if(!BigNumber.from(72_000_000).eq(upgradeTx.gasLimit)) {
-    throw new Error('bad tx gaslimt');
-  }
-  
-  if(!BigNumber.from(800).eq(upgradeTx.gasPerPubdataByteLimit)) {
-    throw new Error('bad tx gasperpubdata');
+  const CONTRACT_DEPLOYER_ADDR = "0x8006";
+  if (!BigNumber.from(CONTRACT_DEPLOYER_ADDR).eq(upgradeTx.to)) {
+    throw new Error("bad tx to");
   }
 
-  if(!BigNumber.from(0).eq(upgradeTx.maxFeePerGas)) {
-    throw new Error('bad tx maxFeePerGas');
+  if (!BigNumber.from(72_000_000).eq(upgradeTx.gasLimit)) {
+    throw new Error("bad tx gaslimt");
   }
 
-  if(!BigNumber.from(0).eq(upgradeTx.maxPriorityFeePerGas)) {
-    throw new Error('bad tx maxPriorityFeePerGas');
+  if (!BigNumber.from(800).eq(upgradeTx.gasPerPubdataByteLimit)) {
+    throw new Error("bad tx gasperpubdata");
   }
 
-  if(!BigNumber.from(0).eq(upgradeTx.paymaster)) {
-    throw new Error('bad tx paymaster');
+  if (!BigNumber.from(0).eq(upgradeTx.maxFeePerGas)) {
+    throw new Error("bad tx maxFeePerGas");
   }
 
-  if(!BigNumber.from(EXPECTED_MAJOR_VERSION).eq(upgradeTx.nonce)) {
-    throw new Error('bad tx nonce');
+  if (!BigNumber.from(0).eq(upgradeTx.maxPriorityFeePerGas)) {
+    throw new Error("bad tx maxPriorityFeePerGas");
   }
 
-  if(!BigNumber.from(0).eq(upgradeTx.value)) {
-    throw new Error('bad tx value');
+  if (!BigNumber.from(0).eq(upgradeTx.paymaster)) {
+    throw new Error("bad tx paymaster");
   }
 
-  if(upgradeTx.reserved.length !== 4) {
-    throw new Error('bad reserved length');
+  if (!BigNumber.from(EXPECTED_MAJOR_VERSION).eq(upgradeTx.nonce)) {
+    throw new Error("bad tx nonce");
   }
-  for(const rv of upgradeTx.reserved) {
-    if(!BigNumber.from(0).eq(rv)) {
-      throw new Error('bad tx reserved');
+
+  if (!BigNumber.from(0).eq(upgradeTx.value)) {
+    throw new Error("bad tx value");
+  }
+
+  if (upgradeTx.reserved.length !== 4) {
+    throw new Error("bad reserved length");
+  }
+  for (const rv of upgradeTx.reserved) {
+    if (!BigNumber.from(0).eq(rv)) {
+      throw new Error("bad tx reserved");
     }
   }
 
   // we'll check it later
-  if(upgradeTx.data !== EXPECTED_L2_DATA.toString()) {
-    throw new Error('bad l2 data');
+  if (upgradeTx.data !== EXPECTED_L2_DATA.toString()) {
+    throw new Error("bad l2 data");
   }
 
-  if(upgradeTx.signature !== '0x') {
-    throw new Error('bad tx sig');
+  if (upgradeTx.signature !== "0x") {
+    throw new Error("bad tx sig");
   }
 
-  if(upgradeTx.factoryDeps.length !== 0) {
-    throw new Error('bad tx factoryDeps');
+  if (upgradeTx.factoryDeps.length !== 0) {
+    throw new Error("bad tx factoryDeps");
   }
-  if(upgradeTx.paymasterInput !== '0x') {
-    throw new Error('bad tx paymasterInput');
+  if (upgradeTx.paymasterInput !== "0x") {
+    throw new Error("bad tx paymasterInput");
   }
-  if(upgradeTx.reservedDynamic !== '0x') {
-    throw new Error('bad tx reservedDynamic');
+  if (upgradeTx.reservedDynamic !== "0x") {
+    throw new Error("bad tx reservedDynamic");
   }
 }
 
 async function checkDefaultUpgradeCalldata(initCalldata: any) {
-  const defaultUpgradeInterface = new ethers.utils.Interface(
-    hardhat.artifacts.readArtifactSync('DefaultUpgrade').abi
-  );
+  const defaultUpgradeInterface = new ethers.utils.Interface(hardhat.artifacts.readArtifactSync("DefaultUpgrade").abi);
   const parsedUpgrade = defaultUpgradeInterface.parseTransaction({
-    data: initCalldata
+    data: initCalldata,
   });
-  if(parsedUpgrade.name !== 'upgrade') {
-    throw new Error('bad scheulde name');
+  if (parsedUpgrade.name !== "upgrade") {
+    throw new Error("bad scheulde name");
   }
   const upgradeStruct = parsedUpgrade.args._proposedUpgrade;
 
-  if(!BigNumber.from(EXPECTED_UPGRADE_TIMESTAMP).eq(upgradeStruct.upgradeTimestamp)) {
-    throw new Error('Bad upgrade timestamp');
+  if (!BigNumber.from(EXPECTED_UPGRADE_TIMESTAMP).eq(upgradeStruct.upgradeTimestamp)) {
+    throw new Error("Bad upgrade timestamp");
   }
-  if(!BigNumber.from(EXPECTED_NEW_PROTOCOL_VERSION).eq(upgradeStruct.newProtocolVersion)) {
-    throw new Error('Bad upgrade timestamp');
+  if (!BigNumber.from(EXPECTED_NEW_PROTOCOL_VERSION).eq(upgradeStruct.newProtocolVersion)) {
+    throw new Error("Bad upgrade timestamp");
   }
-  if(upgradeStruct.postUpgradeCalldata !== '0x') {
-    throw new Error('post upgrade calldata');
-  } 
-  if(upgradeStruct.l1ContractsUpgradeCalldata !== '0x') {
-    throw new Error('bad l1ContractsUpgradeCalldata');
+  if (upgradeStruct.postUpgradeCalldata !== "0x") {
+    throw new Error("post upgrade calldata");
   }
-  const {recursionNodeLevelVkHash,recursionLeafLevelVkHash,recursionCircuitsSetVksHash} = upgradeStruct.verifierParams; 
-  if(recursionNodeLevelVkHash !== ethers.constants.HashZero || recursionLeafLevelVkHash !== ethers.constants.HashZero || recursionCircuitsSetVksHash !== ethers.constants.HashZero) {
-    throw new Error('bad vk');
+  if (upgradeStruct.l1ContractsUpgradeCalldata !== "0x") {
+    throw new Error("bad l1ContractsUpgradeCalldata");
   }
-
-  if(!caseEq(upgradeStruct.verifier, verifier)) {
-    throw new Error('bad verifier');
-  }
-
-  if(upgradeStruct.defaultAccountHash !== expectedDefaultAccountHash) {
-    throw new Error('bad aa hash');
+  const { recursionNodeLevelVkHash, recursionLeafLevelVkHash, recursionCircuitsSetVksHash } =
+    upgradeStruct.verifierParams;
+  if (
+    recursionNodeLevelVkHash !== ethers.constants.HashZero ||
+    recursionLeafLevelVkHash !== ethers.constants.HashZero ||
+    recursionCircuitsSetVksHash !== ethers.constants.HashZero
+  ) {
+    throw new Error("bad vk");
   }
 
-  if(upgradeStruct.bootloaderHash !== expectedBootloaderHash) {
-    throw new Error('bad bootloader hash');
+  if (!caseEq(upgradeStruct.verifier, verifier)) {
+    throw new Error("bad verifier");
   }
 
-  if(upgradeStruct.factoryDeps.length > 0) {
-    throw new Error('bad deps');
+  if (upgradeStruct.defaultAccountHash !== expectedDefaultAccountHash) {
+    throw new Error("bad aa hash");
   }
-  
+
+  if (upgradeStruct.bootloaderHash !== expectedBootloaderHash) {
+    throw new Error("bad bootloader hash");
+  }
+
+  if (upgradeStruct.factoryDeps.length > 0) {
+    throw new Error("bad deps");
+  }
 
   const upgradeTx = upgradeStruct.l2ProtocolUpgradeTx;
   await checkUpgradeTx(upgradeTx);
 }
 
-async function checkScheduleData() { 
+async function checkScheduleData() {
   const contract = getStmContract();
   const iface = contract.interface;
 
-  const parsedData = iface.parseTransaction({data: SCHEDULE_DATA.toString()});
-  
-  if(parsedData.name !== 'setNewVersionUpgrade') {
-    throw new Error('bad scheulde name');
+  const parsedData = iface.parseTransaction({ data: SCHEDULE_DATA.toString() });
+
+  if (parsedData.name !== "setNewVersionUpgrade") {
+    throw new Error("bad scheulde name");
   }
 
-
-  if(!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(parsedData.args._oldProtocolVersion)) {
+  if (!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(parsedData.args._oldProtocolVersion)) {
     console.log(parsedData.args._oldProtocolVersion);
-    throw new Error('nad version');
+    throw new Error("nad version");
   }
 
-  if(!BigNumber.from(EXPECTED_OLD_VERSION_DEADLINE).eq(parsedData.args._oldProtocolVersionDeadline)) {
-    throw new Error('bad deadline');
+  if (!BigNumber.from(EXPECTED_OLD_VERSION_DEADLINE).eq(parsedData.args._oldProtocolVersionDeadline)) {
+    throw new Error("bad deadline");
   }
-  
-  if(!BigNumber.from(EXPECTED_NEW_PROTOCOL_VERSION).eq(parsedData.args._newProtocolVersion)) {
-    throw new Error('bad new version');
+
+  if (!BigNumber.from(EXPECTED_NEW_PROTOCOL_VERSION).eq(parsedData.args._newProtocolVersion)) {
+    throw new Error("bad new version");
   }
 
   const cutData = parsedData.args._cutData;
 
   // Okay, now it is time to check cutdata
 
-  const {
-    facetCuts,
-    initAddress,
-    initCalldata
-  } =  cutData;
+  const { facetCuts, initAddress, initCalldata } = cutData;
 
   if (initAddress !== defaultUpgradeAddress) {
-    throw new Error('Bad default upgrade ' + initAddress + ' ' + defaultUpgradeAddress);
+    throw new Error("Bad default upgrade " + initAddress + " " + defaultUpgradeAddress);
   }
 
   await testThatAllSelectorsAreDeleted(facetCuts);
@@ -752,12 +788,10 @@ async function checkScheduleData() {
 }
 
 async function checkDiamondInitCalldata(initCalldata: string) {
-  const iface = new ethers.utils.Interface(
-    hardhat.artifacts.readArtifactSync('DiamondInit').abi
-  );
+  const iface = new ethers.utils.Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
   const parsedData = iface.parseTransaction({ data: initCalldata });
-  if(parsedData.name !== 'initialize') {
-    throw new Error('bad scheulde name');
+  if (parsedData.name !== "initialize") {
+    throw new Error("bad scheulde name");
   }
 
   const initializeData = parsedData.args._initializeData;
@@ -767,10 +801,10 @@ async function checkChainCreationParams() {
   const contract = getStmContract();
   const iface = contract.interface;
 
-  const parsedData = iface.parseTransaction({data: SET_CHAIN_CREATION_PARAMS_DATA.toString()});
-  
-  if(parsedData.name !== 'setChainCreationParams') {
-    throw new Error('bad scheulde name');
+  const parsedData = iface.parseTransaction({ data: SET_CHAIN_CREATION_PARAMS_DATA.toString() });
+
+  if (parsedData.name !== "setChainCreationParams") {
+    throw new Error("bad scheulde name");
   }
 
   const chainCreationParams = parsedData.args._chainCreationParams;
@@ -793,8 +827,8 @@ async function checkChainCreationParams() {
   }
 
   const initDiamondCut = chainCreationParams.diamondCut;
-  if(!caseEq(initDiamondCut.initAddress, diamondInit)) {
-    throw new Error('bad diamond init ' + initDiamondCut.initAddress + ' ' + diamondInit);
+  if (!caseEq(initDiamondCut.initAddress, diamondInit)) {
+    throw new Error("bad diamond init " + initDiamondCut.initAddress + " " + diamondInit);
   }
   await testThatAllSelectorsAreAdded(initDiamondCut.facetCuts);
 
@@ -806,18 +840,17 @@ async function checkExecuteUpgrade() {
   const contract = getAdmin();
   const iface = contract.interface;
 
-  const parsedData = iface.parseTransaction({data: EXECUTE_UPGRADE_DATA.toString()});
+  const parsedData = iface.parseTransaction({ data: EXECUTE_UPGRADE_DATA.toString() });
 
-  if(parsedData.name !== 'upgradeChainFromVersion') {
-    throw new Error('bad scheulde name');
+  if (parsedData.name !== "upgradeChainFromVersion") {
+    throw new Error("bad scheulde name");
   }
 
-  if(!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(parsedData.args._oldProtocolVersion)) {
-    throw new Error('Invalid old version');
+  if (!BigNumber.from(EXPECTED_OLD_PROTOCOL_VERSION).eq(parsedData.args._oldProtocolVersion)) {
+    throw new Error("Invalid old version");
   }
 
   // todo check that diamond cut is the same as in the upgrade
-
 }
 
 async function main() {
@@ -831,18 +864,34 @@ async function main() {
   program.action(async () => {
     await checkIdenticalBytecode(defaultUpgradeAddress, "DefaultUpgrade", "DefaultUpgrade");
     await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade", "GenesisUpgrade");
-    
+
     await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
     await checkIdenticalBytecode(adminFacet, "AdminFacet");
     await checkMailbox();
-    
-    await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "TestnetVerifier", eraChainId == "324" ? "Verifier" : "TestnetVerifier");
+
+    await checkIdenticalBytecode(
+      verifier,
+      eraChainId == "324" ? "Verifier" : "TestnetVerifier",
+      eraChainId == "324" ? "Verifier" : "TestnetVerifier"
+    );
     await checkIdenticalBytecode(diamondInit, "DiamondInit", "DiamondInit");
 
-    await checkScheduleData();  
-    console.log("Schedule data is correct")
+    await checkScheduleData();
+    console.log("Schedule data is correct");
     await checkChainCreationParams();
+
+    await checkImpl("StateTransitionManager", [bridgeHub, maxNumberOfHyperchains], stmImpl, stmImplDeployTx);
+    await checkImpl("Bridgehub", [], bridgeHubImpl, bridgeHubImplDeployTxn);
+    await checkImpl(
+      "L1SharedBridge",
+      [WETH_L1_ADDRESS, bridgeHub, 271, diamondProxyAddress],
+      sharedBridgeImpl,
+      sharedBridgeImplDeployTx
+    );
+    await checkImpl("L1ERC20Bridge", [sharedBridgeProxy], legacyBridgeImpl, legacyBridgeImplDeployTx);
+
+    await checkBridgehub();
   });
 
   await program.parseAsync(process.argv);
