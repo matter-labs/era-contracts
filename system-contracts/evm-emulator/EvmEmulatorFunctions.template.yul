@@ -786,74 +786,6 @@ function _saveReturndataAfterZkEVMCall() {
     mstore(lastRtSzOffset, returndatasize())
 }
 
-function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
-    let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
-
-    popStackCheck(oldSp, evmGasLeft, 6)
-    gasToPass, sp := popStackItemWithoutCheck(oldSp)
-    addr, sp := popStackItemWithoutCheck(sp)
-    argsOffset, sp := popStackItemWithoutCheck(sp)
-    argsSize, sp := popStackItemWithoutCheck(sp)
-    retOffset, sp := popStackItemWithoutCheck(sp)
-    retSize, sp := popStackItemWithoutCheck(sp)
-
-    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-
-    checkOverflow(argsOffset,argsSize, evmGasLeft)
-    checkOverflow(retOffset, retSize, evmGasLeft)
-
-    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-
-    extraCost := 0
-    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        extraCost := 2500
-    }
-
-    {
-        let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
-        extraCost := add(extraCost,maxExpand)
-    }
-    let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
-    if gt(gasToPass, maxGasToPass) { 
-        gasToPass := maxGasToPass
-    }
-
-    let frameGasLeft
-    let success
-    switch _isEVM(addr)
-    case 0 {
-        // zkEVM native
-        gasToPass := _getZkEVMGas(gasToPass, addr)
-        let zkevmGasBefore := gas()
-        success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
-        _saveReturndataAfterZkEVMCall()
-
-        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-
-        frameGasLeft := 0
-        if gt(gasToPass, gasUsed) {
-            frameGasLeft := sub(gasToPass, gasUsed)
-        }
-    }
-    default {
-        _pushEVMFrame(gasToPass, true)
-        success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
-
-        frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-    }
-
-    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-    switch iszero(precompileCost)
-    case 1 {
-        extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
-    }
-    default {
-        extraCost := add(extraCost, precompileCost)
-    }
-
-    sp := pushStackItem(sp, success, evmGasLeft)
-}
 function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
     let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
     gasToPass := oldGasToPass
@@ -873,50 +805,8 @@ function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpa
     }
 }
 
-function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize,isStatic) -> success, frameGasLeft, gasToPassNew{
-    gasToPassNew := gasToPass
-    let is_evm := _isEVM(addr)
-
-    switch isStatic
-    case 0 {
-        switch is_evm
-        case 0 {
-            // zkEVM native
-            gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-            let zkevmGasBefore := gas()
-            success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
-            _saveReturndataAfterZkEVMCall()
-            let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-    
-            frameGasLeft := 0
-            if gt(gasToPassNew, gasUsed) {
-                frameGasLeft := sub(gasToPassNew, gasUsed)
-            }
-        }
-        default {
-            _pushEVMFrame(gasToPassNew, isStatic)
-            success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-            frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-        }
-    }
-    default {
-        if value {
-            revertWithGas(gasToPassNew)
-        }
-        success, frameGasLeft:= _performStaticCall(
-            is_evm,
-            gasToPassNew,
-            addr,
-            argsOffset,
-            argsSize,
-            retOffset,
-            retSize
-        )
-    }
-}
-
-function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
-    let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
+function performCall(oldSp, evmGasLeft) -> newGasLeft, sp {
+    let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, evmGasLeft, 7)
     gasToPass, sp := popStackItemWithoutCheck(oldSp)
@@ -936,65 +826,125 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
     // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
 
-    extraCost := 0
+    let gasUsed := 100 // warm address access cost
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        extraCost := 2500
+        gasUsed := 2600 // cold address access cost
     }
 
     if gt(value, 0) {
-        extraCost := add(extraCost,6700)
-        gasToPass := add(gasToPass,2300)
+        gasUsed := add(gasUsed, 6700) // positive_value_cost - stipend
+        gasToPass := add(gasToPass, 2300) // stipend TODO
+
+        if isAddrEmpty(addr) {
+            gasUsed := add(gasUsed, 25000) // value_to_empty_account_cost
+        }
     }
 
-    if and(isAddrEmpty(addr), gt(value, 0)) {
-        extraCost := add(extraCost,25000)
-    }
     {
-        let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
-        extraCost := add(extraCost,maxExpand)
+        let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+        gasUsed := add(gasUsed, maxExpand)
     }
-    gasToPass := capGas(evmGasLeft,gasToPass)
 
-    argsOffset := add(argsOffset,MEM_OFFSET_INNER())
-    retOffset := add(retOffset,MEM_OFFSET_INNER())
+    evmGasLeft := chargeGas(evmGasLeft, gasUsed)
 
+    gasToPass := capGas(evmGasLeft, gasToPass)
+    
     checkOverflow(argsOffset,argsSize, evmGasLeft)
-    checkOverflow(retOffset,retSize, evmGasLeft)
+    checkOverflow(retOffset, retSize, evmGasLeft)
 
-    checkMemOverflow(add(argsOffset, argsSize), evmGasLeft)
-    checkMemOverflow(add(retOffset, retSize), evmGasLeft)
+    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
 
     let success, frameGasLeft 
-    success, frameGasLeft, gasToPass:= _performCall(
+    success, frameGasLeft, gasToPass := _performCall(
         addr,
         gasToPass,
         value,
-        argsOffset,
+        add(argsOffset, MEM_OFFSET_INNER()),
         argsSize,
-        retOffset,
-        retSize,
-        isStatic
+        add(retOffset, MEM_OFFSET_INNER()),
+        retSize
     )
+
+    let gasUsed := 0
+
+    // TODO should return nothing
+    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+    switch iszero(precompileCost)
+    case 1 {
+        gasUsed := sub(gasToPass, frameGasLeft)
+    }
+    default {
+        gasUsed := precompileCost
+    }
+
+    newGasLeft := chargeGas(evmGasLeft, gasUsed)
+    sp := pushStackItem(sp, success, newGasLeft)
+}
+
+function performStaticCall(oldSp, evmGasLeft) -> newEvmGasLeft, sp {
+    let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+
+    popStackCheck(oldSp, evmGasLeft, 6)
+    gasToPass, sp := popStackItemWithoutCheck(oldSp)
+    addr, sp := popStackItemWithoutCheck(sp)
+    argsOffset, sp := popStackItemWithoutCheck(sp)
+    argsSize, sp := popStackItemWithoutCheck(sp)
+    retOffset, sp := popStackItemWithoutCheck(sp)
+    retSize, sp := popStackItemWithoutCheck(sp)
+
+    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+
+    checkOverflow(argsOffset,argsSize, evmGasLeft)
+    checkOverflow(retOffset, retSize, evmGasLeft)
+
+    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+
+    let gasUsed := 100
+    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+        gasUsed := 2600
+    }
+
+    {
+        let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+        gasUsed := add(gasUsed, maxExpand)
+    }
+
+    evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+    gasToPass := capGas(evmGasLeft, gasToPass)
+
+    let success, frameGasLeft := _performStaticCall(
+        _isEVM(addr),
+        gasToPass,
+        addr,
+        add(MEM_OFFSET_INNER(), argsOffset),
+        argsSize,
+        add(MEM_OFFSET_INNER(), retOffset),
+        retSize
+    )
+
+    let gasUsed := 0
 
     let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
     switch iszero(precompileCost)
     case 1 {
-        extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+        gasUsed := sub(gasToPass, frameGasLeft)
     }
     default {
-        extraCost := add(extraCost, precompileCost)
+        gasUsed := precompileCost
     }
-    sp := pushStackItem(sp,success, evmGasLeft) 
+
+    newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
+    sp := pushStackItem(sp, success, newEvmGasLeft)
 }
 
-function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost {
+function performDelegateCall(oldSp, evmGasLeft, isStatic) -> newEvmGasLeft, sp {
     let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
 
-    sp := oldSp
-    isStatic := oldIsStatic
-
-    popStackCheck(sp, evmGasLeft, 6)
-    gasToPass, sp := popStackItemWithoutCheck(sp)
+    popStackCheck(oldSp, evmGasLeft, 6)
+    gasToPass, sp := popStackItemWithoutCheck(oldSp)
     addr, sp := popStackItemWithoutCheck(sp)
     argsOffset, sp := popStackItemWithoutCheck(sp)
     argsSize, sp := popStackItemWithoutCheck(sp)
@@ -1013,16 +963,19 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
         revertWithGas(evmGasLeft)
     }
 
-    extraCost := 0
+    let gasUsed := 100
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        extraCost := 2500
+        gasUsed := 2600
     }
 
     {
-        let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
-        extraCost := add(extraCost,maxExpand)
+        let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+        gasUsed := add(gasUsed, maxExpand)
     }
-    gasToPass := capGas(evmGasLeft,gasToPass)
+
+    evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+    gasToPass := capGas(evmGasLeft, gasToPass)
 
     _pushEVMFrame(gasToPass, isStatic)
     let success := delegatecall(
@@ -1037,15 +990,34 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
 
     let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
 
-    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-    switch iszero(precompileCost)
-    case 1 {
-        extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+    let gasUsed := sub(gasToPass, frameGasLeft)
+    newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+    sp := pushStackItem(sp, success, newEvmGasLeft)
+}
+
+function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft, gasToPassNew {
+    gasToPassNew := gasToPass
+
+    switch _isEVM(addr)
+    case 0 {
+        // zkEVM native
+        gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
+        let zkevmGasBefore := gas()
+        success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+        _saveReturndataAfterZkEVMCall()
+        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+
+        frameGasLeft := 0
+        if gt(gasToPassNew, gasUsed) {
+            frameGasLeft := sub(gasToPassNew, gasUsed) // TODO check
+        }
     }
     default {
-        extraCost := add(extraCost, precompileCost)
+        _pushEVMFrame(gasToPassNew, false)
+        success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
     }
-    sp := pushStackItem(sp, success, evmGasLeft)
 }
 
 function _performStaticCall(
