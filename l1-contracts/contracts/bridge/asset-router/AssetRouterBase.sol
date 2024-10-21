@@ -15,6 +15,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 import {Unauthorized, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -26,6 +27,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
+
+    /// @dev InteropCenter smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    IInteropCenter public immutable override INTEROP_CENTER;
 
     /// @dev Chain ID of L1 for bridging reasons
     uint256 public immutable L1_CHAIN_ID;
@@ -53,8 +57,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     uint256[47] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
+    modifier onlyInteropCenter() {
+        if (msg.sender != address(INTEROP_CENTER)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -62,10 +66,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub) {
+    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub, IInteropCenter _interopCenter) {
         L1_CHAIN_ID = _l1ChainId;
         ERA_CHAIN_ID = _eraChainId;
         BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
     }
 
     /// @inheritdoc IAssetRouterBase

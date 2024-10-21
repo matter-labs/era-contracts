@@ -123,7 +123,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 chainTypeManager.protocolVersion(),
                 chainTypeManager.storedBatchZero(),
-                address(bridgehub)
+                address(bridgehub),
+                address(interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
@@ -154,7 +155,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 chainTypeManager.protocolVersion(),
                 chainTypeManager.storedBatchZero(),
-                address(bridgehub.sharedBridge())
+                address(bridgehub.sharedBridge()),
+                address(interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();

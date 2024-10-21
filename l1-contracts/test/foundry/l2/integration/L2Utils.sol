@@ -7,7 +7,7 @@ import "forge-std/console.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -17,6 +17,7 @@ import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter, IInteropCenter} from "contracts/bridgehub/InteropCenter.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -99,6 +100,10 @@ library L2Utils {
             _args.l2TokenBeacon,
             _args.contractsDeployedAlready
         );
+        forceDeployInteropCenter(
+            _args.l1ChainId,
+            _args.aliasedOwner
+        );
     }
 
     function forceDeployMessageRoot() internal {
@@ -121,7 +126,21 @@ library L2Utils {
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_l1CtmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            L2_INTEROP_CENTER_ADDR
+        );
+    }
+
+    function forceDeployInteropCenter(
+        uint256 _l1ChainId,
+        address _aliasedOwner
+    ) internal {
+        new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _l1ChainId, _aliasedOwner);
+        forceDeployWithConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, _l1ChainId, _aliasedOwner));
+        InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+        vm.prank(_aliasedOwner);
+        interopCenter.setAddresses(
+            L2_ASSET_ROUTER_ADDR
         );
     }
 

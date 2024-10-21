@@ -89,7 +89,7 @@ describe("Gateway", function () {
     const ctm = migratingDeployer.chainTypeManagerContract(migratingDeployer.deployWallet);
     const gasPrice = await migratingDeployer.deployWallet.provider.getGasPrice();
     const value = (
-      await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+      await interopCenter.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(10);
 
     const ctmDeploymentTracker = migratingDeployer.ctmDeploymentTracker(migratingDeployer.deployWallet);
@@ -138,7 +138,7 @@ describe("Gateway", function () {
 
   it("Check start message to L3 on L1", async () => {
     const amount = ethers.utils.parseEther("2");
-    await bridgehub.requestL2TransactionDirect(
+    await interopCenter.requestL2TransactionDirect(
       {
         chainId: migratingDeployer.chainId,
         mintValue: amount,
@@ -179,6 +179,6 @@ describe("Gateway", function () {
       paymasterInput: "0x",
       reservedDynamic: "0x",
     };
-    bridgehub.forwardTransactionOnGateway(mintChainId, tx, [], ethers.constants.HashZero, 0);
+    interopCenter.forwardTransactionOnGateway(mintChainId, tx, [], ethers.constants.HashZero, 0);
   });
 });

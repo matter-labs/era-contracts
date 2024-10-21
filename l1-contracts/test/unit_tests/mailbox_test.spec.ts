@@ -278,7 +278,7 @@ describe("Mailbox tests", function () {
 
     const overrides: ethers.PayableOverrides = {};
     overrides.gasPrice = await bridgehub.provider.getGasPrice();
-    overrides.value = await bridgehub.l2TransactionBaseCost(
+    overrides.value = await interopCenter.l2TransactionBaseCost(
       chainId,
       overrides.gasPrice,
       l2GasLimit,

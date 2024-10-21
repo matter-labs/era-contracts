@@ -57,7 +57,7 @@ library L2GenesisUpgradeHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployments = new ForceDeployment[](4);
+        forceDeployments = new ForceDeployment[](5);
 
         forceDeployments[0] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.messageRootBytecodeHash,
@@ -111,6 +111,18 @@ library L2GenesisUpgradeHelper {
                 false,
                 additionalForceDeploymentsData.l2Weth,
                 additionalForceDeploymentsData.baseTokenAssetId
+            )
+        });
+
+        forceDeployments[1] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.interopCenterBytecodeHash,
+            newAddress: address(L2_INTEROP_CENTER_ADDR),
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(
+                L2_BRIDGE_HUB,
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance,
             )
         });
     }

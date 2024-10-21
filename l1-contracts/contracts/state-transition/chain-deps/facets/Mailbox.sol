@@ -27,6 +27,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDG
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
@@ -65,7 +66,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     /// @inheritdoc IMailbox
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
-    ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
+    ) external onlyInteropCenter returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
@@ -386,7 +387,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlyBridgehub {
+    ) external override onlyInteropCenter {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
     }
@@ -398,7 +399,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub(s.bridgehub).forwardTransactionOnGateway,
+            IInteropCenter(s.interopCenter).forwardTransactionOnGateway,
             (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return

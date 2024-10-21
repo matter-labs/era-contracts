@@ -137,7 +137,7 @@ export async function requestExecute(
   overrides.gasPrice ??= bridgehub.provider.getGasPrice();
   // overrides.gasLimit ??= 30000000;
   if (!overrides.value) {
-    const baseCost = await bridgehub.l2TransactionBaseCost(
+    const baseCost = await interopCenter.l2TransactionBaseCost(
       chainId,
       await overrides.gasPrice,
       l2GasLimit,
@@ -146,7 +146,7 @@ export async function requestExecute(
     overrides.value = baseCost.add(l2Value);
   }
 
-  return await bridgehub.requestL2TransactionDirect(
+  return await interopCenter.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: to,

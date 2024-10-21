@@ -169,4 +169,6 @@ struct ZKChainStorage {
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
+    /// @dev Interop Center, responsible for starting L1->L2 messages
+    address interopCenter;
 }

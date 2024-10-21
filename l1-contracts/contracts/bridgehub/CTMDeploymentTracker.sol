@@ -67,12 +67,12 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.
-    /// @dev The function is called by the Bridgehub contract during the `Bridgehub.requestL2TransactionTwoBridges`.
+    /// @dev The function is called by the Bridgehub contract during the `InteropCenter.requestL2TransactionTwoBridges`.
     /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
-    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the CTMDeploymentTracker to
+    /// - via the `InteropCenter.requestL2TransactionDirect`. However, this would require the CTMDeploymentTracker to
     /// handle the ERC20 balances to be used in the transaction.
-    /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
+    /// - via the `InteropCenter.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.

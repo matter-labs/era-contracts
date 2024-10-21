@@ -7,6 +7,7 @@ import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
+import {IInteropCenter} from "./IInteropCenter.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -108,6 +109,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function messageRoot() external view returns (IMessageRoot);
 
+    function interopCenter() external view returns (IInteropCenter);
+
     function getZKChain(uint256 _chainId) external view returns (address);
 
     function getAllZKChains() external view returns (address[] memory);
@@ -182,7 +185,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function setAddresses(
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot
+        IMessageRoot _messageRoot,
+        address _interopCenter
     ) external;
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
@@ -208,12 +212,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     //     ZKChainCommitment calldata _commitment,
     //     bytes calldata _diamondCut
     // ) external;
-
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
 
     function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
