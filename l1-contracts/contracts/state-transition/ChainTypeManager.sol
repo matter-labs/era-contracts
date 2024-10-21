@@ -211,7 +211,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
     /// @param _validatorTimelock the new validatorTimelock address
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
