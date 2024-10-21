@@ -126,10 +126,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
-        // Validium mode can be set only before the first batch is processed
-        if (s.totalBatchesCommitted != 0) {
-            revert ChainAlreadyLive();
-        }
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
