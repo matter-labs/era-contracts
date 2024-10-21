@@ -109,3 +109,20 @@ function TEST_systemLogKeys() {
     testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
     testing_assertEq(protocolUpgradeTxHashKey, 13, "Invalid protocol upgrade txn hash log key")
 }
+
+function TEST_safeAdd() {
+    testing_assertEq(safeAdd(1, 2, "Addition with overflow"), 3, "Invalid addition")
+}
+
+function TEST_safeAddAssert() {
+    testing_testWillFailWith("Addition with overflow")
+    // We use the max value in 256 bit and then add 1 to make it overflow
+    let x := 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    let y := 1
+    safeAdd(x, y, "Addition with overflow")
+}
+
+function TEST_saturatingSub() {
+    testing_assertEq(saturatingSub(4, 2), 2, "Invalid subtraction")
+    testing_assertEq(saturatingSub(2, 4), 0, "Invalid subtraction")
+}
