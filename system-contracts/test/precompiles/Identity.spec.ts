@@ -13,9 +13,7 @@ describe.only("EcAdd tests", function () {
     it("Returns data", async () => {
       const data = "0xff00ff00ff00ff00ff";
       const returnData = await callFallback(identity, data);
-      expect(returnData).to.be.equal(
-        data
-      );
+      expect(returnData).to.be.equal(data);
     });
   });
 });
