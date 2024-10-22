@@ -422,7 +422,10 @@ error DeadlineNotYetPassed();
 error NewDeadlineNotGreaterThanCurrent();
 // 0x8b7e144a
 error NewDeadlineExceedsMaxDeadline();
-
+// 0x2a5989a0
+error AlreadyPermanentRollup();
+// 0x92daded2
+error InvalidDAForPermanentRollup();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

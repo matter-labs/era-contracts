@@ -13,7 +13,8 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {InvalidDAForPermanentRollup, AlreadyPermanentRollup, Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -31,6 +32,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
+
+    /// @notice The address that is responsible for determining whether a certain DA pair is allowed for rollups.
+    RollupDAManager internal immutable ROLLUP_DA_MANAGER;
 
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
@@ -153,7 +157,26 @@ contract AdminFacet is ZKChainBase, IAdmin {
         require(_l1DAValidator != address(0), "AdminFacet: L1DAValidator address is zero");
         require(_l2DAValidator != address(0), "AdminFacet: L2DAValidator address is zero");
 
+        if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DAValidator)) {
+            revert InvalidDAForPermanentRollup();
+        }
+    
         _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
+    }
+
+    /// @inheritdoc IAdmin
+    function makePermanentRollup() external onlyAdmin {
+        if (s.isPermanentRollup) {
+            revert AlreadyPermanentRollup();
+        }
+
+        
+        if(!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
+            // The correct data availability pair should be set beforehand.
+            revert InvalidDAForPermanentRollup();
+        }
+
+        s.isPermanentRollup = true;
     }
 
     /*//////////////////////////////////////////////////////////////
