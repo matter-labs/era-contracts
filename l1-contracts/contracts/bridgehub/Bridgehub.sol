@@ -605,12 +605,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 to: uint256(uint160(_request.contractL2)),
                 gasLimit: _request.l2GasLimit,
                 gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                maxFeePerGas: uint256(0), // todo change in the bootloader
-                maxPriorityFeePerGas: uint256(0),
+                maxFeePerGas: uint256(276250000), // todo change in the bootloader
+                maxPriorityFeePerGas: uint256(140000000),
                 paymaster: uint256(0),
                 nonce: uint256(0), //todo
                 value: _request.l2Value,
-                reserved: [_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
+                reserved: [81667768061025231231209905783624370749440, uint256(uint160(refundRecipient)), 0, 0], //[_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
                 data: _request.l2Calldata,
                 signature: new bytes(0),
                 factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
@@ -618,8 +618,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 reservedDynamic: new bytes(0)
             });
             /// Fixme this does not have a unique hash atm.
-            // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(_request)); 
-            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction)); 
+            // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(_request));
+            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
 
             // solhint-disable-next-line func-named-parameters
             emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
