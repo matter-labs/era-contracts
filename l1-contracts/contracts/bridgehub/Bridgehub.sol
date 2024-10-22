@@ -297,7 +297,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Used to set the assetAddress for a given assetInfo.
     /// @param _additionalData the additional data to identify the asset
     /// @param _assetAddress the asset handler address
-    function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external {
+    function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external {
         // It is a simplified version of the logic used by the AssetRouter to manage asset handlers.
         // CTM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, l1CtmDeployer, ctmAddress))`.
         // And the l1CtmDeployer is considered the deployment tracker for the CTM asset.
@@ -320,7 +320,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         bytes32 ctmAssetId = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
         ctmAssetIdToAddress[ctmAssetId] = _assetAddress;
-        ctmAssetIdFromAddress[_assetAddress] = ctmAssetId;
         emit AssetRegistered(ctmAssetId, _assetAddress, _additionalData, msg.sender);
     }
 

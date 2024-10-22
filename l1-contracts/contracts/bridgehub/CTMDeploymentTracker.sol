@@ -63,7 +63,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
         require(BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress), "CTMDT: ctm not registered");
         L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
+        BRIDGE_HUB.setCTMAssetAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.
@@ -128,7 +128,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeCall(
-            IBridgehub.setAssetHandlerAddress,
+            IBridgehub.setCTMAssetAddress,
             (bytes32(uint256(uint160(_ctmL1Address))), _ctmL2Address)
         );
 
