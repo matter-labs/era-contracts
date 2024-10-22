@@ -114,7 +114,7 @@ library L2GenesisUpgradeHelper {
             )
         });
 
-        forceDeployments[1] = ForceDeployment({
+        forceDeployments[4] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.interopCenterBytecodeHash,
             newAddress: address(L2_INTEROP_CENTER_ADDR),
             callConstructor: true,
