@@ -1383,28 +1383,28 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0xF1 { // OP_CALL
-        evmGasLeft := chargeGas(evmGasLeft, 100)
-
-        let gasUsed
-
         // A function was implemented in order to avoid stack depth errors.
-        gasUsed, sp := performCall(sp, evmGasLeft, isStatic)
-
-        // Check if the following is ok
-        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        switch isStatic
+        case 0 {
+            evmGasLeft, sp := performCall(sp, evmGasLeft)
+        }
+        default {
+            evmGasLeft, sp := performStaticCall(sp, evmGasLeft)
+        }
+        
         ip := add(ip, 1)
     }
     case 0xF3 { // OP_RETURN
-        let offset,size
+        let offset, size
 
         popStackCheck(sp, evmGasLeft, 2)
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        checkOverflow(offset,size, evmGasLeft)
-        evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+        checkOverflow(offset, size, evmGasLeft)
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
 
-        checkMemOverflowByOffset(add(offset,size), evmGasLeft)
+        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
 
         returnLen := size
         
@@ -1413,12 +1413,7 @@ for { } true { } {
         break
     }
     case 0xF4 { // OP_DELEGATECALL
-        evmGasLeft := chargeGas(evmGasLeft, 100)
-
-        let gasUsed
-        sp, isStatic, gasUsed := delegateCall(sp, isStatic, evmGasLeft)
-
-        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        evmGasLeft, sp := performDelegateCall(sp, evmGasLeft, isStatic)
         ip := add(ip, 1)
     }
     case 0xF5 { // OP_CREATE2
@@ -1430,11 +1425,7 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0xFA { // OP_STATICCALL
-        evmGasLeft := chargeGas(evmGasLeft, 100)
-
-        let gasUsed
-        gasUsed, sp := performStaticCall(sp,evmGasLeft)
-        evmGasLeft := chargeGas(evmGasLeft,gasUsed)
+        evmGasLeft, sp := performStaticCall(sp, evmGasLeft)
         ip := add(ip, 1)
     }
     case 0xFD { // OP_REVERT
