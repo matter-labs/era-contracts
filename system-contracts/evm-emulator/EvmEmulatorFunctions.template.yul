@@ -27,7 +27,7 @@ function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
 }
 
 function STACK_OFFSET() -> offset {
-    offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 32)
+    offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
 }
 
 function BYTECODE_OFFSET() -> offset {
@@ -62,23 +62,8 @@ function MAX_UINT() -> max_uint {
     max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 }
 
-// Essentially a NOP that will not get optimized away by the compiler
-function $llvm_NoInline_llvm$_unoptimized() {
-    pop(1)
-}
-
-function printHex(value) {
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
-    mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
-    $llvm_NoInline_llvm$_unoptimized()
-}
-
-function printString(value) {
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
-    mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
-    mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
-    $llvm_NoInline_llvm$_unoptimized()
+function $llvm_NoInline_llvm$_revert() {
+    revert(0, 0)
 }
 
 // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
@@ -97,71 +82,62 @@ function readBytes(start, maxAcceptablePos,length) -> value {
     value := shr(mul(8,sub(32,length)),mload(start))
 }
 
-function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
+function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
     evmGasLeft := chargeGas(evmGas, 3)
     let tempSp := sub(sp, mul(0x20, sub(position, 1)))
 
-    if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+    if lt(tempSp, STACK_OFFSET())  {
         revertWithGas(evmGasLeft)
     }
 
-    if lt(tempSp, STACK_OFFSET()) {
-        revertWithGas(evmGasLeft)
-    }
-
-    let dup := mload(tempSp)                    
-
+    mstore(sp, oldStackHead)
+    stackHead := mload(tempSp)
     newSp := add(sp, 0x20)
-    mstore(newSp, dup)
 }
 
-function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
+function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stackHead {
     evmGasLeft := chargeGas(evmGas, 3)
     let tempSp := sub(sp, mul(0x20, position))
 
-    if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+    if lt(tempSp, STACK_OFFSET())  {
         revertWithGas(evmGasLeft)
     }
 
-    if lt(tempSp, STACK_OFFSET()) {
-        revertWithGas(evmGasLeft)
-    }
-
-
-    let s2 := mload(sp)
-    let s1 := mload(tempSp)                    
-
-    mstore(sp, s1)
-    mstore(tempSp, s2)
+    stackHead := mload(tempSp)                    
+    mstore(tempSp, oldStackHead)
 }
 
-function popStackItem(sp, evmGasLeft) -> a, newSp {
+function popStackItem(sp, evmGasLeft, oldStackHead) -> a, newSp, stackHead {
     // We can not return any error here, because it would break compatibility
     if lt(sp, STACK_OFFSET()) {
         revertWithGas(evmGasLeft)
     }
 
-    a := mload(sp)
+    a := oldStackHead
     newSp := sub(sp, 0x20)
+    stackHead := mload(newSp)
 }
 
-function pushStackItem(sp, item, evmGasLeft) -> newSp {
-    if or(gt(sp, BYTECODE_OFFSET()), eq(sp, BYTECODE_OFFSET())) {
+function pushStackItem(sp, item, evmGasLeft, oldStackHead) -> newSp, stackHead {
+    if iszero(lt(sp, BYTECODE_OFFSET())) {
         revertWithGas(evmGasLeft)
     }
 
+    mstore(sp, oldStackHead)
+    stackHead := item
     newSp := add(sp, 0x20)
-    mstore(newSp, item)
 }
 
-function popStackItemWithoutCheck(sp) -> a, newSp {
-    a := mload(sp)
+function popStackItemWithoutCheck(sp, oldStackHead) -> a, newSp, stackHead {
+    a := oldStackHead
     newSp := sub(sp, 0x20)
+    stackHead := mload(newSp)
 }
 
-function pushStackItemWithoutCheck(sp, item) -> newSp {
+function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
+    mstore(sp, oldStackHead)
+    stackHead := item
     newSp := add(sp, 0x20)
-    mstore(newSp, item)
 }
 
 function popStackCheck(sp, evmGasLeft, numInputs) {
@@ -805,17 +781,16 @@ function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> 
     }
 }
 
-function performCall(oldSp, evmGasLeft) -> newGasLeft, sp {
+function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
     let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, evmGasLeft, 7)
-    gasToPass, sp := popStackItemWithoutCheck(oldSp)
-    addr, sp := popStackItemWithoutCheck(sp)
-    value, sp := popStackItemWithoutCheck(sp)
-    argsOffset, sp := popStackItemWithoutCheck(sp)
-    argsSize, sp := popStackItemWithoutCheck(sp)
-    retOffset, sp := popStackItemWithoutCheck(sp)
-    retSize, sp := popStackItemWithoutCheck(sp)
+    gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+    addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
@@ -879,19 +854,18 @@ function performCall(oldSp, evmGasLeft) -> newGasLeft, sp {
     }
 
     newGasLeft := chargeGas(evmGasLeft, gasUsed)
-    sp := pushStackItem(sp, success, newGasLeft)
+    stackHead := success
 }
 
-function performStaticCall(oldSp, evmGasLeft) -> newEvmGasLeft, sp {
+function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
     let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, evmGasLeft, 6)
-    gasToPass, sp := popStackItemWithoutCheck(oldSp)
-    addr, sp := popStackItemWithoutCheck(sp)
-    argsOffset, sp := popStackItemWithoutCheck(sp)
-    argsSize, sp := popStackItemWithoutCheck(sp)
-    retOffset, sp := popStackItemWithoutCheck(sp)
-    retSize, sp := popStackItemWithoutCheck(sp)
+    gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+    addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+    argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
@@ -935,20 +909,21 @@ function performStaticCall(oldSp, evmGasLeft) -> newEvmGasLeft, sp {
         gasUsed := precompileCost
     }
 
-    newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
-    sp := pushStackItem(sp, success, newEvmGasLeft)
+    newGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+    stackHead := success
 }
 
-function performDelegateCall(oldSp, evmGasLeft, isStatic) -> newEvmGasLeft, sp {
+
+function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEvmGasLeft, sp, stackHead {
     let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, evmGasLeft, 6)
-    gasToPass, sp := popStackItemWithoutCheck(oldSp)
-    addr, sp := popStackItemWithoutCheck(sp)
-    argsOffset, sp := popStackItemWithoutCheck(sp)
-    argsSize, sp := popStackItemWithoutCheck(sp)
-    retOffset, sp := popStackItemWithoutCheck(sp)
-    retSize, sp := popStackItemWithoutCheck(sp)
+    gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+    addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
@@ -992,7 +967,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic) -> newEvmGasLeft, sp {
 
     newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
 
-    sp := pushStackItem(sp, success, newEvmGasLeft)
+    stackHead := success
 }
 
 function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
@@ -1061,7 +1036,7 @@ function _fetchConstructorReturnGas() -> gasLeft {
     gasLeft := mload(0)
 }
 
-function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr {
+function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt, oldStackHead) -> result, evmGasLeft, addr, stackHead  {
     _eraseReturndataPointer()
 
     let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
@@ -1073,10 +1048,10 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
     offset := add(MEM_OFFSET_INNER(), offset)
 
     pushStackCheck(sp, evmGasLeftOld, 4)
-    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)))
-    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)))
-    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)))
-    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)))
+    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
+    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
+    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
+    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
 
     _pushEVMFrame(gasForTheCall, false)
 
@@ -1124,13 +1099,13 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
     let back
 
     // skipping check since we pushed exactly 4 items earlier
-    back, sp := popStackItemWithoutCheck(sp)
+    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     mstore(sub(offset, 0x20), back)
-    back, sp := popStackItemWithoutCheck(sp)
+    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     mstore(sub(offset, 0x40), back)
-    back, sp := popStackItemWithoutCheck(sp)
+    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     mstore(sub(offset, 0x60), back)
-    back, sp := popStackItemWithoutCheck(sp)
+    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     mstore(sub(offset, 0x80), back)
 }
 
@@ -1173,15 +1148,15 @@ function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
     }
 }
 
-function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
+function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
     evmGasLeft := chargeGas(evmGas, 100)
 
     let addr, dest, offset, len
     popStackCheck(oldSp, evmGasLeft, 4)
-    addr, sp := popStackItemWithoutCheck(oldSp)
-    dest, sp := popStackItemWithoutCheck(sp)
-    offset, sp := popStackItemWithoutCheck(sp)
-    len, sp := popStackItemWithoutCheck(sp)
+    addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+    dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
     // minimum_word_size = (size + 31) / 32
@@ -1203,7 +1178,7 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     }
 }
 
-function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
+function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
@@ -1213,9 +1188,8 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     let value, offset, size
 
     popStackCheck(oldSp, evmGasLeft, 3)
-    value, sp := popStackItemWithoutCheck(oldSp)
-    offset, sp := popStackItemWithoutCheck(sp)
-    size, sp := popStackItemWithoutCheck(sp)
+    value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
 
     checkOverflow(offset, size, evmGasLeft)
     checkMemOverflowByOffset(add(offset, size), evmGasLeft)
@@ -1239,14 +1213,14 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
     let result, addr
-    result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, false, 0)
+    result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, false, 0, stackHead)
 
     switch result
-        case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
-        default { sp := pushStackItem(sp, addr, evmGasLeft) }
+        case 0 { stackHead := 0 }
+        default { stackHead := addr }
 }
 
-function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr{
+function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, result, addr, stackHead {
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
@@ -1256,10 +1230,10 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr
     let value, offset, size, salt
 
     popStackCheck(oldSp, evmGasLeft, 4)
-    value, sp := popStackItemWithoutCheck(oldSp)
-    offset, sp := popStackItemWithoutCheck(sp)
-    size, sp := popStackItemWithoutCheck(sp)
-    salt, sp := popStackItemWithoutCheck(sp)
+    value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
     checkOverflow(offset, size, evmGasLeft)
     checkMemOverflowByOffset(add(offset, size), evmGasLeft)
@@ -1282,5 +1256,5 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr
         shr(2, add(size, 31))
     ))
 
-    result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt)
+    result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt, stackHead)
 }
