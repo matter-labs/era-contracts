@@ -3,10 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "./IBridgehub.sol";
 
 /// @author Matter Labs
