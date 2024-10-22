@@ -48,8 +48,8 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyInteropCenter() {
-        if (msg.sender != s.interopCenter) {
+    modifier onlyBridgehubOrInteropCenter() {
+        if ((msg.sender != s.interopCenter) && (msg.sender != s.interopCenter)) {
             revert Unauthorized(msg.sender);
         }
         _;

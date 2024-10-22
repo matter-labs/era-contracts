@@ -131,14 +131,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-    modifier onlyBridgehubOrEra(uint256 _chainId) {
-        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
         if (msg.sender != address(legacyBridge)) {

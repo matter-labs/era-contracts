@@ -66,7 +66,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     /// @inheritdoc IMailbox
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
-    ) external onlyInteropCenter returns (bytes32 canonicalTxHash) {
+    ) external onlyBridgehubOrInteropCenter returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
@@ -387,7 +387,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlyInteropCenter {
+    ) external override onlyBridgehubOrInteropCenter {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
     }

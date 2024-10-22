@@ -9,7 +9,7 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData, RouteBridgehubDepositStruct} from "./IBridgehub.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -130,6 +130,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyAssetRouter() {
         if (msg.sender != assetRouter) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyInteropCenter() {
+        if (msg.sender != address(interopCenter)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -440,6 +447,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Mailbox forwarder
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice the mailbox is called directly after the assetRouter received the deposit
     /// this assumes that either ether is the base token or
     /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
@@ -451,6 +459,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return interopCenter.requestL2TransactionDirectSender{value: msg.value}(msg.sender, _request);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice After depositing funds to the assetRouter, the secondBridge is called
     ///  to return the actual L2 message which is sent to the Mailbox.
     ///  This assumes that either ether is the base token or
@@ -466,6 +475,35 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
         return interopCenter.requestL2TransactionTwoBridgesSender{value: msg.value}(msg.sender, _request);
+    }
+
+    /// @notice Used to route BridgehubDeposits to legacy bridges
+    /// @param _request the forwarded bridgehubDepositRequest
+    function routeBridgehubDeposit(
+        RouteBridgehubDepositStruct calldata _request
+    ) external payable onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory outputRequest) {
+        // slither-disable-next-line arbitrary-send-eth
+        outputRequest = IL1AssetRouter(_request.secondBridgeAddress).bridgehubDeposit{value: msg.value}(
+            _request.chainId,
+            _request.sender,
+            _request.l2Value,
+            _request.secondBridgeCalldata
+        );
+    }
+
+    /// @notice Used to route confirmL2Transaction to legacy bridges
+    /// @notice Used by the InteropCenter to route the bridgehubConfirmL2Transaction.
+    /// @param _secondBridgeAddress the address of the bridge
+    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _canonicalTxHash The hash of the L1->L2 transaction to confirm the deposit.
+    function routeBridgehubConfirmL2Transaction(
+        address _secondBridgeAddress,
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _canonicalTxHash
+    ) external override onlyInteropCenter {
+        IL1AssetRouter(_secondBridgeAddress).bridgehubConfirmL2Transaction(_chainId, _txDataHash, _canonicalTxHash);
     }
 
     /// @notice This function is used to send a request to the ZK chain.
@@ -485,6 +523,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 message inclusion.
     /// @param _batchNumber The executed L2 batch number in which the message appeared
@@ -503,6 +542,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 log inclusion.
     /// @param _batchNumber The executed L2 batch number in which the log appeared
@@ -521,6 +561,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L1->L2 tx status.
     /// @param _l2TxHash The L2 canonical transaction hash
@@ -552,6 +593,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             });
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     function l2TransactionBaseCost(
         uint256 _chainId,

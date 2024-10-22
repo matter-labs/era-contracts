@@ -54,6 +54,14 @@ struct BridgehubBurnCTMAssetData {
     bytes chainData;
 }
 
+struct RouteBridgehubDepositStruct {
+    address secondBridgeAddress;
+    uint256 chainId;
+    address sender;
+    uint256 l2Value;
+    bytes secondBridgeCalldata;
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehub is IAssetHandler, IL1AssetHandler {
@@ -234,4 +242,15 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     /// @notice return the ZK chain contract for a chainId
     /// @dev It is a legacy method. Do not use!
     function getHyperchain(uint256 _chainId) external view returns (address);
+
+    function routeBridgehubConfirmL2Transaction(
+        address _secondBridgeAddress,
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _canonicalTxHash
+    ) external;
+
+    function routeBridgehubDeposit(
+        RouteBridgehubDepositStruct calldata _request
+    ) external payable returns (L2TransactionRequestTwoBridgesInner memory outputRequest);
 }

@@ -2,14 +2,12 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData, RouteBridgehubDepositStruct} from "./IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
@@ -44,11 +42,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
     address public assetRouter;
 
-    /// @notice The contract that stores the cross-chain message root for each chain and the aggregated root.
-    /// @dev Note that the message root does not contain messages from the chain it is deployed on. It may
-    /// be added later on if needed.
-    // IMessageRoot public messageRoot;
-
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
             revert Unauthorized(msg.sender);
@@ -65,6 +58,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyNotL1() {
+        if (L1_CHAIN_ID == block.chainid) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -96,21 +96,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     /// @notice To set the addresses of some of the ecosystem contracts, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, other contracts, and then we call this.
+    /// the order of deployment is InteropCenter, other contracts, and then we call this.
     /// @param _assetRouter the shared bridge address
-    // / @param _l1CtmDeployer the ctm deployment tracker address. Note, that the address of the L1 CTM deployer is provided.
-    // / @param _messageRoot the message root address
-    function setAddresses(
-        address _assetRouter
-    )
-        external
-        // ICTMDeploymentTracker _l1CtmDeployer,
-        // IMessageRoot _messageRoot
-        onlyOwner
-    {
+    function setAddresses(address _assetRouter) external onlyOwner {
         assetRouter = _assetRouter;
-        // l1CtmDeployer = _l1CtmDeployer;
-        // messageRoot = _messageRoot;
     }
     /*//////////////////////////////////////////////////////////////
                         Mailbox forwarder
@@ -238,15 +227,23 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 _request.mintValue
             );
         }
-
-        // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
-            .bridgehubDeposit{value: _request.secondBridgeValue}(
-            _request.chainId,
-            _sender,
-            _request.l2Value,
-            _request.secondBridgeCalldata
-        );
+        L2TransactionRequestTwoBridgesInner memory outputRequest;
+        if (_request.secondBridgeAddress == address(assetRouter)) {
+            // slither-disable-next-line arbitrary-send-eth
+            outputRequest = IL1AssetRouter(_request.secondBridgeAddress).bridgehubDeposit{
+                value: _request.secondBridgeValue
+            }(_request.chainId, _sender, _request.l2Value, _request.secondBridgeCalldata);
+        } else {
+            outputRequest = BRIDGE_HUB.routeBridgehubDeposit{value: _request.secondBridgeValue}(
+                RouteBridgehubDepositStruct({
+                    secondBridgeAddress: _request.secondBridgeAddress,
+                    chainId: _request.chainId,
+                    sender: _sender,
+                    l2Value: _request.l2Value,
+                    secondBridgeCalldata: _request.secondBridgeCalldata
+                })
+            );
+        }
 
         if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
             revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
@@ -268,11 +265,20 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             })
         );
 
-        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-            _request.chainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
+        if (_request.secondBridgeAddress == address(assetRouter)) {
+            IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+                _request.chainId,
+                outputRequest.txDataHash,
+                canonicalTxHash
+            );
+        } else {
+            BRIDGE_HUB.routeBridgehubConfirmL2Transaction(
+                _request.secondBridgeAddress,
+                _request.chainId,
+                outputRequest.txDataHash,
+                canonicalTxHash
+            );
+        }
     }
 
     /// @notice This function is used to send a request to the ZK chain.
@@ -300,8 +306,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlySettlementLayerRelayedSender {
-        require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
+    ) external override onlySettlementLayerRelayedSender onlyNotL1 {
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
