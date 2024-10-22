@@ -70,10 +70,10 @@ describe("ContractDeployer tests", function () {
   });
 
   describe("constructor", function () {
-    it("successfully updated AllowedBytecodesModes", async () => {
+    it("successfully updated allowedBytecodeTypesToDeploy", async () => {
       let newContractDeployer = await deployContract("ContractDeployer", ["0x0000000000000000000000000000000000000000000000000000000000000001"]);
 
-      expect(await newContractDeployer.allowedBytecodesToDeploy()).to.be.eq(1);
+      expect(await newContractDeployer.allowedBytecodeTypesToDeploy()).to.be.eq(1);
     });
   })
 

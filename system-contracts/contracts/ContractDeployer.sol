@@ -12,7 +12,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {Unauthorized, InvalidAllowedBytecodeTypesMode, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -24,18 +24,13 @@ import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, N
  * do not need to be published anymore.
  */
 contract ContractDeployer is IContractDeployer, SystemContractBase {
-    enum AllowedBytecodesModes {
-        EraVm,
-        EraVmAndEVM
-    }
-
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
 
     uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
-    uint256 private constant CONSTRUCTOR_RETURN_GAS_SLOT = 1;
-    uint256 private constant ALLOWED_BYTECODES_MODE_SLOT = 2;
+    uint256 private constant CONSTRUCTOR_RETURN_GAS_TSLOT = 1;
+    uint256 private constant ALLOWED_BYTECODE_TYPES_MODE_SLOT = 2;
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
@@ -44,13 +39,20 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         _;
     }
 
-    constructor(uint256 newAllowedBytecodesMode) {
-        if (newAllowedBytecodesMode != uint256(AllowedBytecodesModes.EraVm) && newAllowedBytecodesMode != uint256(AllowedBytecodesModes.EraVmAndEVM)) {
-            revert("Invalid Bytecode mode");
+    /// @notice Can be used only during upgrades.
+    /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
+    /// @dev Changes what types of bytecodes are allowed to be deployed on the chain.
+    constructor(uint256 newAllowedBytecodeTypes) {
+        if (newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVm) && newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVmAndEVM)) {
+            revert InvalidAllowedBytecodeTypesMode();
         }
 
-        assembly {
-            sstore(ALLOWED_BYTECODES_MODE_SLOT, newAllowedBytecodesMode)
+        if (uint256(_getAllowedBytecodeTypesMode()) != newAllowedBytecodeTypes) {
+            assembly {
+                sstore(ALLOWED_BYTECODE_TYPES_MODE_SLOT, newAllowedBytecodeTypes)
+            }
+    
+            emit AllowedBytecodeTypesModeUpdated(AllowedBytecodeTypes(newAllowedBytecodeTypes));
         }
     }
 
@@ -58,14 +60,14 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         _hash = _getEvmCodeHash(_address);
     }
 
-    function allowedBytecodesToDeploy() external view returns (AllowedBytecodesModes mode) {
-        // TODO interface
-        mode = _getAllowedBytecodesDeployMode();
+    /// @notice Returns what types of bytecode are allowed to be deployed on this chain
+    function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode) {
+        mode = _getAllowedBytecodeTypesMode();
     }
 
     function constructorReturnGas() external view returns (uint256 returnGas) {
         assembly {
-            returnGas := tload(CONSTRUCTOR_RETURN_GAS_SLOT)
+            returnGas := tload(CONSTRUCTOR_RETURN_GAS_TSLOT)
         }
     }
 
@@ -357,7 +359,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     function _evmDeployOnAddress(address _newAddress, bytes calldata _initCode) internal {
-        require(_getAllowedBytecodesDeployMode() == AllowedBytecodesModes.EraVmAndEVM, "EVM emulation not supported");
+        if (_getAllowedBytecodeTypesMode() != AllowedBytecodeTypes.EraVmAndEVM) {
+            revert EVMEmulationNotSupported();
+        }
 
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
@@ -539,7 +543,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         _setEvmCodeHash(_newAddress, evmBytecodeHash);
 
         assembly {
-            tstore(CONSTRUCTOR_RETURN_GAS_SLOT, constructorReturnGas)
+            tstore(CONSTRUCTOR_RETURN_GAS_TSLOT, constructorReturnGas)
         }
 
         emit ContractDeployed(_sender, evmBytecodeHash, _newAddress);
@@ -559,9 +563,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
     }
 
-    function _getAllowedBytecodesDeployMode() internal view returns (AllowedBytecodesModes mode) {
+    function _getAllowedBytecodeTypesMode() internal view returns (AllowedBytecodeTypes mode) {
         assembly {
-            mode := sload(ALLOWED_BYTECODES_MODE_SLOT)
+            mode := sload(ALLOWED_BYTECODE_TYPES_MODE_SLOT)
         }
     }
 }

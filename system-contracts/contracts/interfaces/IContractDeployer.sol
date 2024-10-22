@@ -25,6 +25,14 @@ interface IContractDeployer {
         Arbitrary
     }
 
+    /// @notice Defines what types of bytecode are allowed to be deployed on this chain
+    /// - `EraVm` means that only native contracts can be deployed
+    /// - `EraVmAndEVM` means that native contracts and EVM contracts can be deployed
+    enum AllowedBytecodeTypes {
+        EraVm,
+        EraVmAndEVM
+    }
+
     struct AccountInfo {
         AccountAbstractionVersion supportedAAVersion;
         AccountNonceOrdering nonceOrdering;
@@ -39,6 +47,11 @@ interface IContractDeployer {
     event AccountNonceOrderingUpdated(address indexed accountAddress, AccountNonceOrdering nonceOrdering);
 
     event AccountVersionUpdated(address indexed accountAddress, AccountAbstractionVersion aaVersion);
+
+    event AllowedBytecodeTypesModeUpdated(AllowedBytecodeTypes mode);
+
+    /// @notice Returns what types of bytecode are allowed to be deployed on this chain
+    function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode);
 
     function getNewAddressCreate2(
         address _sender,
