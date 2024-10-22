@@ -13,7 +13,8 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {InvalidDAForPermanentRollup, AlreadyPermanentRollup, Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -32,8 +33,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
-    constructor(uint256 _l1ChainId) {
+    /// @notice The address that is responsible for determining whether a certain DA pair is allowed for rollups.
+    RollupDAManager internal immutable ROLLUP_DA_MANAGER;
+
+    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager) {
         L1_CHAIN_ID = _l1ChainId;
+        ROLLUP_DA_MANAGER = _rollupDAManager;
     }
 
     modifier onlyL1() {
@@ -126,10 +131,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
-        // Validium mode can be set only before the first batch is processed
-        if (s.totalBatchesCommitted != 0) {
-            revert ChainAlreadyLive();
-        }
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
@@ -157,7 +158,26 @@ contract AdminFacet is ZKChainBase, IAdmin {
         require(_l1DAValidator != address(0), "AdminFacet: L1DAValidator address is zero");
         require(_l2DAValidator != address(0), "AdminFacet: L2DAValidator address is zero");
 
+        if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DAValidator)) {
+            revert InvalidDAForPermanentRollup();
+        }
+    
         _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
+    }
+
+    /// @inheritdoc IAdmin
+    function makePermanentRollup() external onlyAdmin {
+        if (s.isPermanentRollup) {
+            revert AlreadyPermanentRollup();
+        }
+
+        
+        if(!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
+            // The correct data availability pair should be set beforehand.
+            revert InvalidDAForPermanentRollup();
+        }
+
+        s.isPermanentRollup = true;
     }
 
     /*//////////////////////////////////////////////////////////////

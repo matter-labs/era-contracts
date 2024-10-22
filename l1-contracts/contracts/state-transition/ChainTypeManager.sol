@@ -123,7 +123,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
-        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
         validatorTimelock = _initializeData.validatorTimelock;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
@@ -231,8 +231,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
-        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
+        _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
@@ -245,11 +245,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
-    /// @dev set the protocol version timestamp
+    /// @notice Set the protocol version deadline
     /// @param _protocolVersion the protocol version
     /// @param _timestamp the timestamp is the deadline
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        _setProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -505,6 +505,17 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ) external {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.
+    }
+
+    /// @notice Set the protocol version deadline
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
+    function _setProtocolVersionDeadline(
+        uint256 _protocolVersion,
+        uint256 _timestamp
+    ) internal {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
     /*//////////////////////////////////////////////////////////////

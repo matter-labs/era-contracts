@@ -67,10 +67,8 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
-    bytes32 sloadContractBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
-    address l2WethTokenImpl;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -356,6 +354,7 @@ contract DeployUtils is Script {
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
+        // FIXME: deploy RollupDAManager and use it
         address adminFacet = deployViaCreate2(type(AdminFacet).creationCode, abi.encode(config.l1ChainId));
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;

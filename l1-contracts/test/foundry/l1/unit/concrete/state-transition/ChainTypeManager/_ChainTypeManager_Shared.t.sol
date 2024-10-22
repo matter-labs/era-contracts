@@ -31,6 +31,7 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
@@ -81,7 +82,7 @@ contract ChainTypeManagerTest is Test {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid)),
+                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getAdminSelectors()
