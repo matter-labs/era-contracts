@@ -43,7 +43,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
     /// @dev Changes what types of bytecodes are allowed to be deployed on the chain.
     constructor(uint256 newAllowedBytecodeTypes) {
-        if (newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVm) && newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVmAndEVM)) {
+        if (
+            newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVm) &&
+            newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVmAndEVM)
+        ) {
             revert InvalidAllowedBytecodeTypesMode();
         }
 
@@ -51,7 +54,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             assembly {
                 sstore(ALLOWED_BYTECODE_TYPES_MODE_SLOT, newAllowedBytecodeTypes)
             }
-    
+
             emit AllowedBytecodeTypesModeUpdated(AllowedBytecodeTypes(newAllowedBytecodeTypes));
         }
     }

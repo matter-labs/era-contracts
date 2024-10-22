@@ -117,7 +117,12 @@ async function deployBytecode(bytecode: string): Promise<Contract> {
   );
 }
 
-export async function deployContractOnAddress(address: string, name: string, callConstructor: boolean = true, input = "0x") {
+export async function deployContractOnAddress(
+  address: string,
+  name: string,
+  callConstructor: boolean = true,
+  input = "0x"
+) {
   const artifact = await loadArtifact(name);
   await setCode(address, artifact.bytecode, callConstructor, input);
 }

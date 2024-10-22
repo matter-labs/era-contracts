@@ -71,11 +71,13 @@ describe("ContractDeployer tests", function () {
 
   describe("constructor", function () {
     it("successfully updated allowedBytecodeTypesToDeploy", async () => {
-      let newContractDeployer = await deployContract("ContractDeployer", ["0x0000000000000000000000000000000000000000000000000000000000000001"]);
+      let newContractDeployer = await deployContract("ContractDeployer", [
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+      ]);
 
       expect(await newContractDeployer.allowedBytecodeTypesToDeploy()).to.be.eq(1);
     });
-  })
+  });
 
   describe("updateAccountVersion", function () {
     it("non system call failed", async () => {
