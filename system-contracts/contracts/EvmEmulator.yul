@@ -316,25 +316,7 @@ object "EvmEmulator" {
             // non-standard selector 0x04
             mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
         
-            let farCallAbi := getFarCallABI(
-                0,
-                0,
-                0,
-                1,
-                gas(),
-                // Only rollup is supported for now
-                0,
-                0,
-                0,
-                1
-            )
-            let to := EVM_GAS_MANAGER_CONTRACT()
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-        
-            if iszero(success) {
-                // Should never happen
-                revert(0, 0)
-            }
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 1)
         
             let _returndatasize := returndatasize()
             if _returndatasize {
@@ -571,25 +553,7 @@ object "EvmEmulator" {
             mstore(1, key)
             mstore(33,currentValue)
         
-            let farCallAbi := getFarCallABI(
-                0,
-                0,
-                0,
-                65,
-                gas(),
-                // Only rollup is supported for now
-                0,
-                0,
-                0,
-                1
-            )
-            let to := EVM_GAS_MANAGER_CONTRACT()
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
         
             if returndatasize() {
                 isWarm := true
@@ -598,27 +562,27 @@ object "EvmEmulator" {
             }
         }
         
-        function getFarCallABI(
-            dataOffset,
-            memoryPage,
-            dataStart,
+        function performSystemCall(
+            to,
             dataLength,
-            gasPassed,
-            shardId,
-            forwardingMode,
-            isConstructorCall,
-            isSystemCall
         ) -> ret {
-            let farCallAbi := 0
-            farCallAbi :=  or(farCallAbi, dataOffset)
-            farCallAbi :=  or(farCallAbi, shl(64, dataStart))
+            let farCallAbi := shl(248, 1) // system call
+            // dataOffset is 0
+            // dataStart is 0
             farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-            farCallAbi :=  or(farCallAbi, shl(192, gasPassed))
-            farCallAbi :=  or(farCallAbi, shl(224, shardId))
-            farCallAbi :=  or(farCallAbi, shl(232, forwardingMode))
-            farCallAbi :=  or(farCallAbi, shl(248, 1))
-            ret := farCallAbi
+            farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+            // shardId is 0
+            // forwardingMode is 0
+            // not constructor call
+        
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
         }
+        
         
         function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
             newOffset := offset
@@ -641,25 +605,7 @@ object "EvmEmulator" {
             // addr is packed in the same word with selector
             mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
         
-            let farCallAbi := getFarCallABI(
-                0,
-                0,
-                0,
-                32,
-                gas(),
-                // Only rollup is supported for now
-                0,
-                0,
-                0,
-                1
-            )
-            let to := EVM_GAS_MANAGER_CONTRACT()
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
         
             if returndatasize() {
                 isWarm := true
@@ -705,26 +651,7 @@ object "EvmEmulator" {
             mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
             mstore(32, _passGas)
         
-            let farCallAbi := getFarCallABI(
-                0,
-                0,
-                0,
-                64,
-                gas(),
-                // Only rollup is supported for now
-                0,
-                0,
-                0,
-                1
-            )
-        
-            let to := EVM_GAS_MANAGER_CONTRACT()
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
         }
         
         // Each evm gas is 5 zkEVM one
@@ -3387,25 +3314,7 @@ object "EvmEmulator" {
                 // non-standard selector 0x04
                 mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
             
-                let farCallAbi := getFarCallABI(
-                    0,
-                    0,
-                    0,
-                    1,
-                    gas(),
-                    // Only rollup is supported for now
-                    0,
-                    0,
-                    0,
-                    1
-                )
-                let to := EVM_GAS_MANAGER_CONTRACT()
-                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            
-                if iszero(success) {
-                    // Should never happen
-                    revert(0, 0)
-                }
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 1)
             
                 let _returndatasize := returndatasize()
                 if _returndatasize {
@@ -3642,25 +3551,7 @@ object "EvmEmulator" {
                 mstore(1, key)
                 mstore(33,currentValue)
             
-                let farCallAbi := getFarCallABI(
-                    0,
-                    0,
-                    0,
-                    65,
-                    gas(),
-                    // Only rollup is supported for now
-                    0,
-                    0,
-                    0,
-                    1
-                )
-                let to := EVM_GAS_MANAGER_CONTRACT()
-                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
             
                 if returndatasize() {
                     isWarm := true
@@ -3669,27 +3560,27 @@ object "EvmEmulator" {
                 }
             }
             
-            function getFarCallABI(
-                dataOffset,
-                memoryPage,
-                dataStart,
+            function performSystemCall(
+                to,
                 dataLength,
-                gasPassed,
-                shardId,
-                forwardingMode,
-                isConstructorCall,
-                isSystemCall
             ) -> ret {
-                let farCallAbi := 0
-                farCallAbi :=  or(farCallAbi, dataOffset)
-                farCallAbi :=  or(farCallAbi, shl(64, dataStart))
+                let farCallAbi := shl(248, 1) // system call
+                // dataOffset is 0
+                // dataStart is 0
                 farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-                farCallAbi :=  or(farCallAbi, shl(192, gasPassed))
-                farCallAbi :=  or(farCallAbi, shl(224, shardId))
-                farCallAbi :=  or(farCallAbi, shl(232, forwardingMode))
-                farCallAbi :=  or(farCallAbi, shl(248, 1))
-                ret := farCallAbi
+                farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+                // shardId is 0
+                // forwardingMode is 0
+                // not constructor call
+            
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
             }
+            
             
             function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
                 newOffset := offset
@@ -3712,25 +3603,7 @@ object "EvmEmulator" {
                 // addr is packed in the same word with selector
                 mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
             
-                let farCallAbi := getFarCallABI(
-                    0,
-                    0,
-                    0,
-                    32,
-                    gas(),
-                    // Only rollup is supported for now
-                    0,
-                    0,
-                    0,
-                    1
-                )
-                let to := EVM_GAS_MANAGER_CONTRACT()
-                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
             
                 if returndatasize() {
                     isWarm := true
@@ -3776,26 +3649,7 @@ object "EvmEmulator" {
                 mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
                 mstore(32, _passGas)
             
-                let farCallAbi := getFarCallABI(
-                    0,
-                    0,
-                    0,
-                    64,
-                    gas(),
-                    // Only rollup is supported for now
-                    0,
-                    0,
-                    0,
-                    1
-                )
-            
-                let to := EVM_GAS_MANAGER_CONTRACT()
-                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
             }
             
             // Each evm gas is 5 zkEVM one
