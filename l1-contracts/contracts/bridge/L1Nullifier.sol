@@ -408,9 +408,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
         isWithdrawalFinalized[chainId][l2BatchNumber][l2MessageIndex] = true;
 
-        // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         (bytes32 assetId, bytes memory transferData) = _verifyWithdrawal(_finalizeWithdrawalParams);
-
+        
+        // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         if (_isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber)) {
             // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex);
