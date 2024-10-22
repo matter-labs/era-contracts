@@ -43,7 +43,7 @@ describe("ContractDeployer tests", function () {
     await prepareEnvironment();
     wallet = getWallets()[0];
 
-    await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer");
+    await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer", false);
     contractDeployer = ContractDeployerFactory.connect(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, wallet);
 
     const contractDeployerSystemCallContract = await deployContract("SystemCaller", [contractDeployer.address]);
@@ -63,6 +63,16 @@ describe("ContractDeployer tests", function () {
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
       params: [TEST_FORCE_DEPLOYER_ADDRESS],
+    });
+  });
+
+  describe("constructor", function () {
+    it("successfully updated allowedBytecodeTypesToDeploy", async () => {
+      const newContractDeployer = await deployContract("ContractDeployer", [
+        "0x0000000000000000000000000000000000000000000000000000000000000001",
+      ]);
+
+      expect(await newContractDeployer.allowedBytecodeTypesToDeploy()).to.be.eq(1);
     });
   });
 
