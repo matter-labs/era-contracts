@@ -2,7 +2,7 @@ import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
 import { callFallback, deployContractYul } from "../shared/utils";
 
-describe.only("EcAdd tests", function () {
+describe("Identity tests", function () {
   let identity: Contract;
 
   before(async () => {

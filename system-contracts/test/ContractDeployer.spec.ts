@@ -7,8 +7,11 @@ import type { ContractDeployer } from "../typechain";
 import { ContractDeployerFactory, DeployableFactory } from "../typechain";
 import {
   ONE_BYTES32_HEX,
+  REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
+  TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
   TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   TEST_FORCE_DEPLOYER_ADDRESS,
+  TEST_IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT_ADDRESS,
 } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import {
@@ -43,7 +46,7 @@ describe("ContractDeployer tests", function () {
     await prepareEnvironment();
     wallet = getWallets()[0];
 
-    await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer");
+    await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer", false);
     contractDeployer = ContractDeployerFactory.connect(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, wallet);
 
     const contractDeployerSystemCallContract = await deployContract("SystemCaller", [contractDeployer.address]);
@@ -65,6 +68,14 @@ describe("ContractDeployer tests", function () {
       params: [TEST_FORCE_DEPLOYER_ADDRESS],
     });
   });
+
+  describe("constructor", function () {
+    it("successfully updated AllowedBytecodesModes", async () => {
+      let newContractDeployer = await deployContract("ContractDeployer", ["0x0000000000000000000000000000000000000000000000000000000000000001"]);
+
+      expect(await newContractDeployer.allowedBytecodesToDeploy()).to.be.eq(1);
+    });
+  })
 
   describe("updateAccountVersion", function () {
     it("non system call failed", async () => {

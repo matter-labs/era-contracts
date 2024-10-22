@@ -24,12 +24,18 @@ import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, N
  * do not need to be published anymore.
  */
 contract ContractDeployer is IContractDeployer, SystemContractBase {
+    enum AllowedBytecodesModes {
+        EraVm,
+        EraVmAndEVM
+    }
+
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
 
     uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
     uint256 private constant CONSTRUCTOR_RETURN_GAS_SLOT = 1;
+    uint256 private constant ALLOWED_BYTECODES_MODE_SLOT = 2;
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
@@ -38,8 +44,23 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         _;
     }
 
+    constructor(uint256 newAllowedBytecodesMode) {
+        if (newAllowedBytecodesMode != uint256(AllowedBytecodesModes.EraVm) && newAllowedBytecodesMode != uint256(AllowedBytecodesModes.EraVmAndEVM)) {
+            revert("Invalid Bytecode mode");
+        }
+
+        assembly {
+            sstore(ALLOWED_BYTECODES_MODE_SLOT, newAllowedBytecodesMode)
+        }
+    }
+
     function evmCodeHash(address _address) external view returns (bytes32 _hash) {
         _hash = _getEvmCodeHash(_address);
+    }
+
+    function allowedBytecodesToDeploy() external view returns (AllowedBytecodesModes mode) {
+        // TODO interface
+        mode = _getAllowedBytecodesDeployMode();
     }
 
     function constructorReturnGas() external view returns (uint256 returnGas) {
@@ -336,6 +357,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     function _evmDeployOnAddress(address _newAddress, bytes calldata _initCode) internal {
+        require(_getAllowedBytecodesDeployMode() == AllowedBytecodesModes.EraVmAndEVM, "EVM emulation not supported");
+
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
@@ -533,6 +556,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         assembly {
             let slot := or(EVM_HASHES_PREFIX, _address)
             _hash := sload(slot)
+        }
+    }
+
+    function _getAllowedBytecodesDeployMode() internal view returns (AllowedBytecodesModes mode) {
+        assembly {
+            mode := sload(ALLOWED_BYTECODES_MODE_SLOT)
         }
     }
 }
