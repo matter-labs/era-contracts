@@ -233,6 +233,8 @@ contract EcosystemUpgrade is Script {
     struct CachedBytecodeHashes {
         bytes32 sharedL2LegacyBridgeBytecodeHash;
         bytes32 erc20StandardImplBytecodeHash;
+        bytes32 rollupL2DAValidatorBytecodeHash;
+        bytes32 validiumL2DAValidatorBytecodeHash;
     }
 
     CachedBytecodeHashes internal cachedBytecodeHashes;
@@ -446,7 +448,7 @@ contract EcosystemUpgrade is Script {
         //
         // Also, we need to predeploy the bridges implementation
         IL2ContractDeployer.ForceDeployment[]
-            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](4);
+            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](6);
         additionalForceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: cachedBytecodeHashes.sharedL2LegacyBridgeBytecodeHash,
             newAddress: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
@@ -462,6 +464,20 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
         additionalForceDeployments[2] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: cachedBytecodeHashes.rollupL2DAValidatorBytecodeHash,
+            newAddress: addresses.expectedL2Addresses.expectedRollupL2DAValidator,
+            callConstructor: true,
+            value: 0,
+            input: ""
+        });
+        additionalForceDeployments[3] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: cachedBytecodeHashes.validiumL2DAValidatorBytecodeHash,
+            newAddress: addresses.expectedL2Addresses.expectedValidiumL2DAValidator,
+            callConstructor: true,
+            value: 0,
+            input: ""
+        });
+        additionalForceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readGatewayUpgradeBytecode()),
             newAddress: L2_COMPLEX_UPGRADER_ADDR,
             callConstructor: true,
@@ -469,7 +485,7 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
         // Getting the contract back to normal
-        additionalForceDeployments[3] = IL2ContractDeployer.ForceDeployment({
+        additionalForceDeployments[5] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(Utils.readSystemContractsBytecode("ComplexUpgrader")),
             newAddress: L2_COMPLEX_UPGRADER_ADDR,
             callConstructor: false,
@@ -718,12 +734,12 @@ contract EcosystemUpgrade is Script {
         addresses.expectedL2Addresses = ExpectedL2Addresses({
             expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
+                cachedBytecodeHashes.rollupL2DAValidatorBytecodeHash,
                 hex""
             ),
             expectedValidiumL2DAValidator: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode()),
+                cachedBytecodeHashes.validiumL2DAValidatorBytecodeHash,
                 hex""
             ),
             expectedL2GatewayUpgrade: Utils.getL2AddressViaCreate2Factory(
@@ -794,7 +810,7 @@ contract EcosystemUpgrade is Script {
         // - UpgradeableBeacon
         // - BeaconProxy
 
-        bytes[] memory upgradeSpecificDependencies = new bytes[](5);
+        bytes[] memory upgradeSpecificDependencies = new bytes[](7);
         upgradeSpecificDependencies[0] = L2ContractsBytecodesLib.readGatewayUpgradeBytecode();
         upgradeSpecificDependencies[1] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
         upgradeSpecificDependencies[2] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
@@ -802,9 +818,16 @@ contract EcosystemUpgrade is Script {
         upgradeSpecificDependencies[3] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
         upgradeSpecificDependencies[4] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
 
+        // We do not know whether the chain will be a rollup or a validium, just in case, we'll deploy
+        // both of the validators.
+        upgradeSpecificDependencies[5] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
+        upgradeSpecificDependencies[6] = L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode();
+
         cachedBytecodeHashes = CachedBytecodeHashes({
             sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
             erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2]),
+            rollupL2DAValidatorBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[5]),
+            validiumL2DAValidatorBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[6])
         });
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, upgradeSpecificDependencies);
