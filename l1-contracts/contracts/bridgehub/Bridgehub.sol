@@ -437,7 +437,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// this assumes that either ether is the base token or
     /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
+    /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
