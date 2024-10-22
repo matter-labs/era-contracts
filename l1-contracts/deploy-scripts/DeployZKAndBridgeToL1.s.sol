@@ -113,7 +113,6 @@ contract DeployZKScript is Script {
             name: token.name,
             symbol: token.symbol,
             decimals: token.decimals,
-            implementation: token.implementation,
             mint: token.mint,
             additionalAddressesForMinting: config.additionalAddressesForMinting
         });
@@ -153,6 +152,18 @@ contract DeployZKScript is Script {
             config.bridgehub,
             config.l1SharedBridge
         );
+        // bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
+        //     Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
+        //     msg.sender,
+        //     "",
+        //     "",
+        //     Utils.MAX_PRIORITY_TX_GAS,
+        //     new bytes[](0),
+        //     addr,
+        //     config.chainId,
+        //     config.bridgehub,
+        //     config.l1SharedBridge
+        // );
     }
 
     function finalizeZkTokenWithdrawal(
@@ -210,18 +221,9 @@ contract DeployZKScript is Script {
         string memory name,
         string memory symbol,
         uint256 decimals,
-        string memory implementation,
         uint256 mint,
         address[] storage additionalAddressesForMinting
     ) internal returns (address) {
-        bytes memory args;
-        // WETH9 constructor has no arguments
-        if (keccak256(bytes(implementation)) != keccak256(bytes("WETH9.sol"))) {
-            args = abi.encode(name, symbol, decimals);
-        }
-
-        bytes memory bytecode = abi.encodePacked(vm.getCode(implementation), args);
-
         address tokenAddress = address(new TestnetERC20Token(name, symbol, uint8(decimals))); // No salt for testing
 
         if (mint > 0) {
