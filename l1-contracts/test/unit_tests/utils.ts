@@ -21,7 +21,6 @@ import {
 import { packSemver } from "../../scripts/utils";
 import { keccak256, hexConcat, defaultAbiCoder } from "ethers/lib/utils";
 import type { IInteropCenter } from "../../typechain/IInteropCenter";
-import { IInteropCenterFactory } from "../../typechain/IInteropCenterFactory";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
