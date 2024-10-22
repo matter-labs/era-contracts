@@ -2746,6 +2746,7 @@ object "EvmEmulator" {
             
                     revertWithGas(evmGasLeft)
                 }
+                // We explicitly add unused opcodes to optimize the jump table by compiler.
                 case 0x0C { // Unused opcode
                     $llvm_NoInline_llvm$_revert()
                 }
@@ -5816,6 +5817,7 @@ object "EvmEmulator" {
                 
                         revertWithGas(evmGasLeft)
                     }
+                    // We explicitly add unused opcodes to optimize the jump table by compiler.
                     case 0x0C { // Unused opcode
                         $llvm_NoInline_llvm$_revert()
                     }
