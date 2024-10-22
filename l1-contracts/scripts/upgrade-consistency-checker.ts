@@ -347,6 +347,10 @@ async function checkDiamondInitData(initCalldata: string) {
     throw new Error("L2 default account bytecode hash is not correct");
   }
 
+  if (blobVersionedHashRetriever === ethers.constants.AddressZero) {
+    throw new Error("BlobVersionedHashGetter is empty");
+  }
+
   console.log({
     priorityTxMaxGasLimit,
 
