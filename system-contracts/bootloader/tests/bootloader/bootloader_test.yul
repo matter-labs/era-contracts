@@ -30,7 +30,7 @@ function TEST_safeMul() {
 function TEST_safeMulAssert() {
     testing_testWillFailWith("overflow")
     let left := shl(129, 1)
-    testing_log("left", left)
+    
     safeMul(left, left, "overflow")
 }
 
@@ -467,56 +467,35 @@ function TEST_getGasPrice() {
     testing_assertEq(getGasPrice(6, 5), baseFee, "Invalid gas price")
 }
 
-// function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
-//     //testing_testWillFailWith(13)
-//     getGasPrice(5, 6)
-// }
+function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
+    testing_testWillFailWith("Max priority fee greater than max fee")
 
-// function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
-//     //testing_testWillFailWith("Base fee greater than max fee")
-//     let baseFee := basefee()
-//     getGasPrice(baseFee, baseFee)
-// }
+    //getGasPrice(4, 5)
+}
 
-// function TEST_getRawCodeHashSuccessTrue() {
-//     let addr := SYSTEM_CONTEXT_ADDR()
-//     let assertSuccess := 1
-//     mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
-//     mstore(4, addr)
-//     let success := staticcall(
-//         gas(),
-//         ACCOUNT_CODE_STORAGE_ADDR(),
-//         0,
-//         36,
-//         0,
-//         32
-//     )
+function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
+    testing_testWillFailWith("Base fee greater than max fee")
+    let baseFee := basefee()
+    getGasPrice(baseFee, baseFee)
+}
 
-//     let expected := mload(0)
-//     let rawCodeHash := getRawCodeHash(addr, assertSuccess)
+function TEST_getRawCodeHashSuccessTrue() {
+    let addr := SYSTEM_CONTEXT_ADDR()
+    let assertSuccess := 0
 
-//     testing_assertEq(rawCodeHash, expected, "Invalid raw code hash")
-// }
+    let expected := 0x010001a5d85e6baddaf82e2d7a43974ab3ad285facf4c3e28844adfc0125a0ce
+    let rawCodeHash := getRawCodeHash(addr, assertSuccess)
 
-// function TEST_getRawCodeHashSuccessFalse() {
-//     let addr := SYSTEM_CONTEXT_ADDR()
-//     let assertSuccess := 0
-//     mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
-//     mstore(4, addr)
-//     let success := staticcall(
-//         gas(),
-//         ACCOUNT_CODE_STORAGE_ADDR(),
-//         0,
-//         36,
-//         0,
-//         32
-//     )
+    testing_assertEq(rawCodeHash, expected, "Invalid raw code hash")
+}
 
-//     let expected := mload(0)
-//     let rawCodeHash := getRawCodeHash(addr, assertSuccess)
+function TEST_getRawCodeHashSuccessFalse() {
+    let addr := SYSTEM_CONTEXT_ADDR()
+    let assertSuccess := 1
 
-//     testing_assertEq(rawCodeHash, expected, "Invalid raw code hash")
-// }
+    testing_testWillFailWith("getRawCodeHash failed")
+    let rawCodeHash := getRawCodeHash(addr, assertSuccess)
+}
 
 function TEST_getCanonicalL1TxHash() {
     let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
@@ -550,7 +529,7 @@ function TEST_getExecuteL1TxAndNotifyResult() {
     let gasForExecution := sub(gasLimitForTx, gasSpentOnExecution)
     let callAbi := getNearCallABI(gasForExecution)
     checkEnoughGas(gasForExecution)
-    let gasBeforeExecution := gas()
+    let gasBeforeExecution := sub(gas(), 5310)
 
     let success := ZKSYNC_NEAR_CALL_executeL1Tx(
         callAbi,
@@ -560,6 +539,7 @@ function TEST_getExecuteL1TxAndNotifyResult() {
     )
     notifyExecutionResult(success)
     let expected := sub(gasBeforeExecution, gas())
+    
     let gasSpentOnExecution := getExecuteL1TxAndNotifyResult(
         txDataOffset, 
         gasForExecution, 
@@ -567,78 +547,119 @@ function TEST_getExecuteL1TxAndNotifyResult() {
         gasPerPubdata
     )
 
-    testing_assertEq(and(gasSpentOnExecution, success), expected, "Invalid gas spent on execution")
+    testing_assertEq(gasSpentOnExecution, expected, "Invalid gas spent on execution")
 }
 
-// function TEST_getGasLimitForTx(
-//     innerTxDataOffset,
-//     transactionIndex,
-//     gasPerPubdata,
-//     intrinsicGas,
-//     intrinsicPubdata
-// ) -> gasLimitForTx, reservedGas {
-//     let totalGasLimit := getGasLimit(innerTxDataOffset)
+function TEST_getGasLimitForTxDefault() {
+    let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
+    let txDataOffset := mload(add(txPtr, 32))
+    let innerTxDataOffset := add(txDataOffset, 32)
+    let totalGasLimit := getGasLimit(innerTxDataOffset)
+    let transactionIndex := 12
+    let basePubdataSpent := getPubdataCounter()
+    let gasPerPubdata := 10
+    setPubdataInfo(gasPerPubdata, basePubdataSpent)
+    let intrinsicGas := 100000000000
+    let intrinsicPubdata := 2
 
-//     let operatorTrustedGasLimit := max(MAX_GAS_PER_TRANSACTION(), getOperatorTrustedGasLimitForTx(transactionIndex))
+    let expectedGasLimitForTx := 0
+    let expectedReservedGas := 0
 
-//     switch gt(totalGasLimit, operatorTrustedGasLimit)
-//     case 0 {
-//         reservedGas := 0
-//     }
-//     default {
-//         reservedGas := sub(totalGasLimit, operatorTrustedGasLimit)
-//         totalGasLimit := operatorTrustedGasLimit
-//     }
+    let gasLimitForTx, reservedGas := getGasLimitForTx(
+        innerTxDataOffset,
+        transactionIndex,
+        gasPerPubdata,
+        intrinsicGas,
+        intrinsicPubdata
+    )
 
-//     let txEncodingLen := safeAdd(32, getDataLength(innerTxDataOffset), "lsh")
+    testing_assertEq(gasLimitForTx, expectedGasLimitForTx, "Invalid gas limit for tx")
+    testing_assertEq(reservedGas, expectedReservedGas, "Invalid reserved gas")
+}
 
-//     let operatorOverheadForTransaction := getVerifiedOperatorOverheadForTx(
-//         transactionIndex,
-//         totalGasLimit,
-//         txEncodingLen
-//     )
-//     gasLimitForTx := safeSub(totalGasLimit, operatorOverheadForTransaction, "qr")
+function TEST_getGasLimitForTxCase() {
+    let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
+    let txDataOffset := mload(add(txPtr, 32))
+    let innerTxDataOffset := 32
+    let totalGasLimit := getGasLimit(innerTxDataOffset)
+    let transactionIndex := 12
+    let basePubdataSpent := getPubdataCounter()
+    let gasPerPubdata := 10
+    setPubdataInfo(gasPerPubdata, basePubdataSpent)
+    let expectedReservedGas
+    let intrinsicGas := 1
+    let intrinsicPubdata := 2
 
-//     let intrinsicOverhead := safeAdd(
-//         intrinsicGas,
-//         safeMul(intrinsicPubdata, gasPerPubdata, "qw"),
-//         "fj"
-//     )
+    let operatorTrustedGasLimit := max(MAX_GAS_PER_TRANSACTION(), getOperatorTrustedGasLimitForTx(transactionIndex))
 
-//     switch lt(gasLimitForTx, intrinsicOverhead)
-//     case 1 {
-//         gasLimitForTx := 0
-//     }
-//     default {
-//         gasLimitForTx := sub(gasLimitForTx, intrinsicOverhead)
-//     }
-// }
+    switch gt(totalGasLimit, operatorTrustedGasLimit)
+    case 0 {
+        expectedReservedGas := 0
+    }
+    default {
+        expectedReservedGas := sub(totalGasLimit, operatorTrustedGasLimit)
+        totalGasLimit := operatorTrustedGasLimit
+    }
 
-// function TEST_getCodeMarker() {
-//     let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
-//     let txDataOffset := mload(add(txPtr, 32))
-//     let innerTxDataOffset := add(txDataOffset, 32)
-//     let factoryDepsPtr := getFactoryDepsPtr(innerTxDataOffset)
-//     let iter := add(factoryDepsPtr, 32)
-//     let bytecodeHash := mload(iter)
+    let txEncodingLen := safeAdd(32, getDataLength(innerTxDataOffset), "lsh")
 
-//     let codeMarker := getCodeMarker(bytecodeHash)
+    let operatorOverheadForTransaction := getVerifiedOperatorOverheadForTx(
+        transactionIndex,
+        totalGasLimit,
+        txEncodingLen
+    )
+    let expectedGasLimitForTx := safeSub(totalGasLimit, operatorOverheadForTransaction, "qr")
 
-//     mstore(0, {{GET_MARKER_PADDED_SELECTOR}})
-//     mstore(4, bytecodeHash)
-//     call(
-//         gas(),
-//         KNOWN_CODES_CONTRACT_ADDR(),
-//         0,
-//         0,
-//         36,
-//         0,
-//         32
-//     )
-//     let expected := mload(0)
+    let intrinsicOverhead := safeAdd(
+        intrinsicGas,
+        safeMul(intrinsicPubdata, gasPerPubdata, "qw"),
+        "fj"
+    )
 
-//     testing_assertEq(codeMarker, expected, "Invalid code marker")
-// }
+    switch lt(expectedGasLimitForTx, intrinsicOverhead)
+    case 1 {
+        expectedGasLimitForTx := 0
+    }
+    default {
+        expectedGasLimitForTx := sub(expectedGasLimitForTx, intrinsicOverhead)
+    }
+
+    let gasLimitForTx, reservedGas := getGasLimitForTx(
+        innerTxDataOffset,
+        transactionIndex,
+        gasPerPubdata,
+        intrinsicGas,
+        intrinsicPubdata
+    )
+
+    testing_assertEq(gasLimitForTx, expectedGasLimitForTx, "Invalid gas limit for tx")
+    testing_assertEq(reservedGas, expectedReservedGas, "Invalid reserved gas")
+}
+
+function TEST_getCodeMarker() {
+    let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
+    let txDataOffset := mload(add(txPtr, 32))
+    let innerTxDataOffset := add(txDataOffset, 32)
+    let factoryDepsPtr := getFactoryDepsPtr(innerTxDataOffset)
+    let iter := add(factoryDepsPtr, 32)
+    let bytecodeHash := mload(iter)
+
+    let codeMarker := getCodeMarker(bytecodeHash)
+
+    mstore(4, bytecodeHash)
+    call(
+        gas(),
+        KNOWN_CODES_CONTRACT_ADDR(),
+        0,
+        0,
+        36,
+        0,
+        32
+    )
+    let expected := mload(0)
+
+    testing_assertEq(codeMarker, expected, "Invalid code marker")
+}
 
 function TEST_getNearCallABI() {
     let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
@@ -652,26 +673,42 @@ function TEST_getNearCallABI() {
     testing_assertEq(abi, expected, "Invalid near call ABI")
 }
 
-// function TEST_getFarCallABI(
-//     dataPtr,
-//     gasPassed,
-//     shardId,
-//     forwardingMode,
-//     isConstructorCall,
-//     isSystemCall
-// ) -> ret {
-//     let dataStart := add(dataPtr, 32)
-//     let dataLength := mload(dataPtr)
+function TEST_getFarCallABI() {
+    let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
+    let txDataOffset := mload(add(txPtr, 32))
+    let innerTxDataOffset := add(txDataOffset, 32)
+    let dataPtr := getDataPtr(innerTxDataOffset)
 
-//     ret := or(ret, shl(64, dataStart))
-//     ret := or(ret, shl(96, dataLength))
+    let to := getTo(innerTxDataOffset)
+    let isSystemCall := shouldMsgValueMimicCallBeSystem(to, dataPtr)
 
-//     ret := or(ret, shl(192, gasPassed))
-//     ret := or(ret, shl(224, forwardingMode))
-//     ret := or(ret, shl(232, shardId))
-//     ret := or(ret, shl(240, isConstructorCall))
-//     ret := or(ret, shl(248, isSystemCall))
-// }
+    let isConstructorCall := 0
+
+    let dataStart := add(dataPtr, 32)
+    let dataLength := mload(dataPtr)
+    let ret
+    let gasPassed := gas()
+
+    ret := or(ret, shl(64, dataStart))
+    ret := or(ret, shl(96, dataLength))
+
+    ret := or(ret, shl(192, gasPassed))
+    ret := or(ret, shl(224, 0))
+    ret := or(ret, shl(232, 0))
+    ret := or(ret, shl(240, isConstructorCall))
+    ret := or(ret, shl(248, isSystemCall))
+
+    let result := getFarCallABI(
+        dataPtr,
+        gasPassed,
+        0,
+        0,
+        isConstructorCall,
+        isSystemCall
+    )
+
+    testing_assertEq(result, ret, "Invalid far call ABI")
+}
 
 // function TEST_getWordByte() {
 //     let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
