@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainBaseTest, ERROR_ONLY_BRIDGEHUB} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest} from "./_Base_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract OnlyBridgehubTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonBridgehub() public {
         address nonBridgehub = makeAddr("nonBridgehub");
 
-        vm.expectRevert(ERROR_ONLY_BRIDGEHUB);
-
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonBridgehub));
         vm.startPrank(nonBridgehub);
         testBaseFacet.functionWithOnlyBridgehubModifier();
     }

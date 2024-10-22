@@ -2,7 +2,7 @@ import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hre from "hardhat";
-import { Provider, Wallet } from "zksync-web3";
+import { Provider, Wallet } from "zksync-ethers";
 import type { L2WrappedBaseToken } from "../typechain/L2WrappedBaseToken";
 import type { L2SharedBridge } from "../typechain/L2SharedBridge";
 import { L2SharedBridgeFactory } from "../typechain/L2SharedBridgeFactory";
@@ -28,16 +28,18 @@ describe("WETH token & WETH bridge", function () {
     const wethBridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
     const randomAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
-    const wethTokenProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      wethTokenImpl.address,
-      randomAddress,
-      "0x",
-    ]);
-    const wethBridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      wethBridgeImpl.address,
-      randomAddress,
-      "0x",
-    ]);
+    const wethTokenProxy = await deployer.deploy(
+      await deployer.loadArtifact(
+        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+      ),
+      [wethTokenImpl.address, randomAddress, "0x"]
+    );
+    const wethBridgeProxy = await deployer.deploy(
+      await deployer.loadArtifact(
+        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+      ),
+      [wethBridgeImpl.address, randomAddress, "0x"]
+    );
 
     wethToken = L2WrappedBaseTokenFactory.connect(wethTokenProxy.address, wallet);
     wethBridge = L2SharedBridgeFactory.connect(wethBridgeProxy.address, wallet);

@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {PubdataGreaterThanLimit, TxnBodyGasLimitNotEnoughGas, ValidateTxnNotEnoughGas, NotEnoughGas, TooMuchGas, InvalidPubdataLength} from "contracts/common/L1ContractErrors.sol";
 
 contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     function test_BasicRequestL1L2() public pure {
@@ -16,7 +17,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createTestTransaction();
         // The limit is so low, that it doesn't even cover the overhead
         testTx.gasLimit = 0;
-        vm.expectRevert(bytes("my"));
+        vm.expectRevert(TxnBodyGasLimitNotEnoughGas.selector);
         validateL1ToL2Transaction(testTx, 500000, 100000);
     }
 
@@ -27,7 +28,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // before checking that it is below the max gas limit.
         uint256 priorityTxMaxGasLimit = 500000;
         testTx.gasLimit = priorityTxMaxGasLimit + 1000000;
-        vm.expectRevert(bytes("ui"));
+        vm.expectRevert(TooMuchGas.selector);
         validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 
@@ -41,7 +42,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // So if the pubdata costs per byte is 1 - then this transaction could produce 500k of pubdata.
         // (hypothetically, assuming all the gas was spent on writing).
         testTx.gasPerPubdataByteLimit = 1;
-        vm.expectRevert(bytes("uk"));
+        vm.expectRevert(abi.encodeWithSelector(PubdataGreaterThanLimit.selector, 100000, 490000));
         validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 
@@ -49,7 +50,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createTestTransaction();
         uint256 priorityTxMaxGasLimit = 500000;
         testTx.gasLimit = 200000;
-        vm.expectRevert(bytes("up"));
+        vm.expectRevert(ValidateTxnNotEnoughGas.selector);
         validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 

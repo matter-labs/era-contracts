@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 object "EcPairing" {
     code {
         return(0, 0)

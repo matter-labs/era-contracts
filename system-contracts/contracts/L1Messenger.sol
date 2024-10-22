@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
+import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -22,7 +23,7 @@ import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMP
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-contract L1Messenger is IL1Messenger, ISystemContract {
+contract L1Messenger is IL1Messenger, SystemContractBase {
     /// @notice Sequential hash of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedLogsHash;
@@ -87,7 +88,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
         // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) + 2 * keccakGasCost(64);
-        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), 0);
+        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(L2_TO_L1_LOG_SERIALIZE_SIZE));
     }
 
     /// @notice Internal function to send L2ToL1Log.
@@ -107,7 +108,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
 
         logIdInMerkleTree = numberOfLogsToProcess;
-        numberOfLogsToProcess++;
+        ++numberOfLogsToProcess;
 
         emit L2ToL1LogSent(_l2ToL1Log);
     }
@@ -198,11 +199,17 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         /// Check logs
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        require(numberOfL2ToL1Logs <= L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, "Too many L2->L1 logs");
+        if (numberOfL2ToL1Logs > L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
+            revert ReconstructionMismatch(
+                PubdataField.NumberOfLogs,
+                bytes32(L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                bytes32(uint256(numberOfL2ToL1Logs))
+            );
+        }
         calldataPtr += 4;
 
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
-        bytes32 reconstructedChainedLogsHash;
+        bytes32 reconstructedChainedLogsHash = bytes32(0);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
                 _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
@@ -211,10 +218,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             l2ToL1LogsTreeArray[i] = hashedLog;
             reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
         }
-        require(
-            reconstructedChainedLogsHash == chainedLogsHash,
-            "reconstructedChainedLogsHash is not equal to chainedLogsHash"
-        );
+        if (reconstructedChainedLogsHash != chainedLogsHash) {
+            revert ReconstructionMismatch(PubdataField.LogsHash, chainedLogsHash, reconstructedChainedLogsHash);
+        }
         for (uint256 i = numberOfL2ToL1Logs; i < L2_TO_L1_LOGS_MERKLE_TREE_LEAVES; ++i) {
             l2ToL1LogsTreeArray[i] = L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH;
         }
@@ -232,7 +238,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;
-        bytes32 reconstructedChainedMessagesHash;
+        bytes32 reconstructedChainedMessagesHash = bytes32(0);
         for (uint256 i = 0; i < numberOfMessages; ++i) {
             uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
             calldataPtr += 4;
@@ -242,15 +248,14 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             calldataPtr += currentMessageLength;
             reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
         }
-        require(
-            reconstructedChainedMessagesHash == chainedMessagesHash,
-            "reconstructedChainedMessagesHash is not equal to chainedMessagesHash"
-        );
+        if (reconstructedChainedMessagesHash != chainedMessagesHash) {
+            revert ReconstructionMismatch(PubdataField.MsgHash, chainedMessagesHash, reconstructedChainedMessagesHash);
+        }
 
         /// Check bytecodes
         uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;
-        bytes32 reconstructedChainedL1BytecodesRevealDataHash;
+        bytes32 reconstructedChainedL1BytecodesRevealDataHash = bytes32(0);
         for (uint256 i = 0; i < numberOfBytecodes; ++i) {
             uint32 currentBytecodeLength = uint32(
                 bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
@@ -266,28 +271,36 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             );
             calldataPtr += currentBytecodeLength;
         }
-        require(
-            reconstructedChainedL1BytecodesRevealDataHash == chainedL1BytecodesRevealDataHash,
-            "reconstructedChainedL1BytecodesRevealDataHash is not equal to chainedL1BytecodesRevealDataHash"
-        );
+        if (reconstructedChainedL1BytecodesRevealDataHash != chainedL1BytecodesRevealDataHash) {
+            revert ReconstructionMismatch(
+                PubdataField.Bytecode,
+                chainedL1BytecodesRevealDataHash,
+                reconstructedChainedL1BytecodesRevealDataHash
+            );
+        }
 
         /// Check State Diffs
         /// encoding is as follows:
         /// header (1 byte version, 3 bytes total len of compressed, 1 byte enumeration index size)
         /// body (`compressedStateDiffSize` bytes, 4 bytes number of state diffs, `numberOfStateDiffs` * `STATE_DIFF_ENTRY_SIZE` bytes for the uncompressed state diffs)
         /// encoded state diffs: [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
-        require(
-            uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))) ==
-                STATE_DIFF_COMPRESSION_VERSION_NUMBER,
-            "state diff compression version mismatch"
-        );
-        calldataPtr++;
+        if (
+            uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))) !=
+            STATE_DIFF_COMPRESSION_VERSION_NUMBER
+        ) {
+            revert ReconstructionMismatch(
+                PubdataField.StateDiffCompressionVersion,
+                bytes32(STATE_DIFF_COMPRESSION_VERSION_NUMBER),
+                bytes32(uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))))
+            );
+        }
+        ++calldataPtr;
 
         uint24 compressedStateDiffSize = uint24(bytes3(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 3]));
         calldataPtr += 3;
 
         uint8 enumerationIndexSize = uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]));
-        calldataPtr++;
+        ++calldataPtr;
 
         bytes calldata compressedStateDiffs = _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr +
             compressedStateDiffSize];
@@ -310,7 +323,13 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         );
 
         /// Check for calldata strict format
-        require(calldataPtr == _totalL2ToL1PubdataAndStateDiffs.length, "Extra data in the totalL2ToL1Pubdata array");
+        if (calldataPtr != _totalL2ToL1PubdataAndStateDiffs.length) {
+            revert ReconstructionMismatch(
+                PubdataField.ExtraData,
+                bytes32(calldataPtr),
+                bytes32(_totalL2ToL1PubdataAndStateDiffs.length)
+            );
+        }
 
         PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
 

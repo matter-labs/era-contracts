@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import type { Wallet } from "zksync-ethers";
 import * as zksync from "zksync-ethers";
-import { serialize } from "zksync-web3/build/src/utils";
+import { serialize } from "zksync-ethers/build/utils";
 import type { DefaultAccount, DelegateCaller, MockContract } from "../typechain";
 import { DefaultAccountFactory } from "../typechain";
 import { TEST_BOOTLOADER_FORMAL_ADDRESS } from "./shared/constants";

@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
+import {QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 
 contract OnEmptyQueueTest is PriorityQueueSharedTest {
     function test_gets() public {
@@ -13,12 +14,12 @@ contract OnEmptyQueueTest is PriorityQueueSharedTest {
     }
 
     function test_failGetFront() public {
-        vm.expectRevert(bytes("D"));
+        vm.expectRevert(QueueIsEmpty.selector);
         priorityQueue.front();
     }
 
     function test_failPopFront() public {
-        vm.expectRevert(bytes("s"));
+        vm.expectRevert(QueueIsEmpty.selector);
         priorityQueue.popFront();
     }
 }
