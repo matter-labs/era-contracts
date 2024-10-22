@@ -82,10 +82,8 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
-    bytes32 sloadContractBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
-    address l2WethTokenImpl;
 }
 
 // A subset of the ones used for tests
@@ -132,14 +130,14 @@ contract EcosystemUpgrade is Script {
         address expectedL2GatewayUpgrade;
         address l2SharedBridgeLegacyImpl;
         address l2BridgedStandardERC20Impl;
-        address l2WethImpl;
+        // address l2WethImpl;
         // In reality, the following addresses need to be
         // deployed only on a settlement layer, i.e. the Gateway.
-        address expectedL2ProxyAdminDeployer;
-        address expectedL2ProxyAdmin;
-        address expectedL2AdminFactory;
-        address expectedL2PermanentRestrictionImpl;
-        address expectedL2PermanentRestrictionProxy;
+        // address expectedL2ProxyAdminDeployer;
+        // address expectedL2ProxyAdmin;
+        // address expectedL2AdminFactory;
+        // address expectedL2PermanentRestrictionImpl;
+        // address expectedL2PermanentRestrictionProxy;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -278,7 +276,7 @@ contract EcosystemUpgrade is Script {
         deployChainTypeManagerContract();
         setChainTypeManagerInValidatorTimelock();
 
-        deployPermanentRollupRestriction();
+        // deployPermanentRollupRestriction();
 
         deployTransitionaryOwner();
 
@@ -740,16 +738,16 @@ contract EcosystemUpgrade is Script {
                 bytes32(0),
                 cachedBytecodeHashes.erc20StandardImplBytecodeHash,
                 hex""
-            ),
-            expectedL2ProxyAdminDeployer: expectedL2ProxyAdminDeployer,
-            expectedL2ProxyAdmin: expectedL2ProxyAdmin,
-            expectedL2AdminFactory: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AdminFactoryBytecode()),
-                abi.encode(requiredL2Restrictions)
-            ),
-            expectedL2PermanentRestrictionImpl: permanentRestrictionImpl,
-            expectedL2PermanentRestrictionProxy: permanentRestrictionProxy
+            )
+            // expectedL2ProxyAdminDeployer: expectedL2ProxyAdminDeployer,
+            // expectedL2ProxyAdmin: expectedL2ProxyAdmin,
+            // expectedL2AdminFactory: Utils.getL2AddressViaCreate2Factory(
+            //     bytes32(0),
+            //     L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AdminFactoryBytecode()),
+            //     abi.encode(requiredL2Restrictions)
+            // ),
+            // expectedL2PermanentRestrictionImpl: permanentRestrictionImpl,
+            // expectedL2PermanentRestrictionProxy: permanentRestrictionProxy
         });
     }
 
@@ -804,7 +802,7 @@ contract EcosystemUpgrade is Script {
 
         cachedBytecodeHashes = CachedBytecodeHashes({
             sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
-            erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2]),
+            erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2])
         });
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, upgradeSpecificDependencies);
@@ -872,26 +870,26 @@ contract EcosystemUpgrade is Script {
         addresses.daAddresses.l1ValidiumDAValidator = contractAddress;
     }
 
-    function deployPermanentRollupRestriction() internal {
-        bytes memory bytecode = abi.encodePacked(
-            type(PermanentRestriction).creationCode,
-            abi.encode(config.contracts.bridgehubProxyAddress, addresses.expectedL2Addresses.expectedL2AdminFactory)
-        );
-        address implementationAddress = deployViaCreate2(bytecode);
+    // function deployPermanentRollupRestriction() internal {
+    //     bytes memory bytecode = abi.encodePacked(
+    //         type(PermanentRestriction).creationCode,
+    //         abi.encode(config.contracts.bridgehubProxyAddress, addresses.expectedL2Addresses.expectedL2AdminFactory)
+    //     );
+    //     address implementationAddress = deployViaCreate2(bytecode);
 
-        bytes memory proxyBytecode = abi.encodePacked(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                implementationAddress,
-                config.contracts.transparentProxyAdmin,
-                abi.encodeCall(PermanentRestriction.initialize, (config.deployerAddress))
-            )
-        );
+    //     bytes memory proxyBytecode = abi.encodePacked(
+    //         type(TransparentUpgradeableProxy).creationCode,
+    //         abi.encode(
+    //             implementationAddress,
+    //             config.contracts.transparentProxyAdmin,
+    //             abi.encodeCall(PermanentRestriction.initialize, (config.deployerAddress))
+    //         )
+    //     );
 
-        address proxyAddress = deployViaCreate2(proxyBytecode);
-        addresses.permanentRollupRestriction = proxyAddress;
-        // FIXME: supply restrictions
-    }
+    //     address proxyAddress = deployViaCreate2(proxyBytecode);
+    //     addresses.permanentRollupRestriction = proxyAddress;
+    //     // FIXME: supply restrictions
+    // }
 
     function deployValidatorTimelock() internal {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
@@ -1467,7 +1465,7 @@ contract EcosystemUpgrade is Script {
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
             l2SharedBridgeLegacyImpl: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
-            l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
+            l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl
         });
 
         return abi.encode(data);
