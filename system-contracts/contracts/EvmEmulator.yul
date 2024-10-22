@@ -761,7 +761,7 @@ object "EvmEmulator" {
         function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
         
         function _calcEVMGas(_zkevmGas) -> calczkevmGas {
-            calczkevmGas := div(_zkevmGas, GAS_DIVISOR())
+            calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
         }
         
         function getEVMGas() -> evmGas {
@@ -844,9 +844,9 @@ object "EvmEmulator" {
             }
         }
         
-        function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpand{
+        function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
             maxExpand := add(retOffset, retSize)
-            switch lt(maxExpand,add(argsOffset, argsSize)) 
+            switch lt(maxExpand, add(argsOffset, argsSize)) 
             case 0 {
                 maxExpand := expandMemory(maxExpand)
             }
@@ -868,6 +868,13 @@ object "EvmEmulator" {
             retSize, sp := popStackItemWithoutCheck(sp)
         
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+        
+        
+            checkOverflow(argsOffset,argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
+        
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
         
             // static_gas = 0
             // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -891,22 +898,15 @@ object "EvmEmulator" {
             }
         
             {
-                let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+                let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
                 gasUsed := add(gasUsed, maxExpand)
             }
         
             evmGasLeft := chargeGas(evmGasLeft, gasUsed)
         
             gasToPass := capGas(evmGasLeft, gasToPass)
-            
-            checkOverflow(argsOffset,argsSize, evmGasLeft)
-            checkOverflow(retOffset, retSize, evmGasLeft)
         
-            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-        
-            let success, frameGasLeft 
-            success, frameGasLeft, gasToPass := _performCall(
+            let success, frameGasLeft := _performCall(
                 addr,
                 gasToPass,
                 value,
@@ -918,7 +918,7 @@ object "EvmEmulator" {
         
             let gasUsed := 0
         
-            // TODO should return nothing
+            // TODO precompile should be called, but return nothing if gasPassed is too low
             let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
             switch iszero(precompileCost)
             case 1 {
@@ -957,7 +957,7 @@ object "EvmEmulator" {
             }
         
             {
-                let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+                let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
                 gasUsed := add(gasUsed, maxExpand)
             }
         
@@ -966,9 +966,8 @@ object "EvmEmulator" {
             gasToPass := capGas(evmGasLeft, gasToPass)
         
             let success, frameGasLeft := _performStaticCall(
-                _isEVM(addr),
-                gasToPass,
                 addr,
+                gasToPass,
                 add(MEM_OFFSET_INNER(), argsOffset),
                 argsSize,
                 add(MEM_OFFSET_INNER(), retOffset),
@@ -1019,7 +1018,7 @@ object "EvmEmulator" {
             }
         
             {
-                let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+                let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
                 gasUsed := add(gasUsed, maxExpand)
             }
         
@@ -1039,67 +1038,52 @@ object "EvmEmulator" {
             )
         
             let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-        
             let gasUsed := sub(gasToPass, frameGasLeft)
+        
             newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
         
             sp := pushStackItem(sp, success, newEvmGasLeft)
         }
         
-        function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft, gasToPassNew {
-            gasToPassNew := gasToPass
-        
+        function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
             switch _isEVM(addr)
             case 0 {
                 // zkEVM native
-                gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-                let zkevmGasBefore := gas()
-                success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+                let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
+                let zkEvmGasBefore := gas()
+                success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
-                let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+                let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
         
-                frameGasLeft := 0
-                if gt(gasToPassNew, gasUsed) {
-                    frameGasLeft := sub(gasToPassNew, gasUsed) // TODO check
+                if gt(gasToPass, gasUsed) {
+                    frameGasLeft := sub(gasToPass, gasUsed) // TODO check
                 }
             }
             default {
-                _pushEVMFrame(gasToPassNew, false)
+                _pushEVMFrame(gasToPass, false)
                 success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
                 frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
             }
         }
         
-        function _performStaticCall(
-            _calleeIsEVM,
-            _calleeGas,
-            _callee,
-            _inputOffset,
-            _inputLen,
-            _outputOffset,
-            _outputLen
-        ) ->  success, _gasLeft {
-            switch _calleeIsEVM
+        function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
+            switch _isEVM(addr)
             case 0 {
                 // zkEVM native
-                _calleeGas := _getZkEVMGas(_calleeGas, _callee)
-                let zkevmGasBefore := gas()
-                success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
-        
+                let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
+                let zkEvmGasBefore := gas()
+                success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
+                let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
         
-                let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-        
-                _gasLeft := 0
-                if gt(_calleeGas, gasUsed) {
-                    _gasLeft := sub(_calleeGas, gasUsed)
+                if gt(gasToPass, gasUsed) {
+                    frameGasLeft := sub(gasToPass, gasUsed) // TODO check
                 }
             }
             default {
-                _pushEVMFrame(_calleeGas, true)
-                success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
-        
-                _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+                _pushEVMFrame(gasToPass, true)
+                success := staticcall(EVM_GAS_STIPEND(), addr, argsOffset, argsSize, 0, 0)
+                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
             }
         }
         
@@ -1273,7 +1257,7 @@ object "EvmEmulator" {
             evmGasLeft := chargeGas(evmGas, 32000)
         
             if isStatic {
-                revertWithGas(evmGasLeft)
+                revertWithGas(evmGasLeft) // TODO review
             }
         
             let value, offset, size
@@ -3568,7 +3552,7 @@ object "EvmEmulator" {
             function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
             
             function _calcEVMGas(_zkevmGas) -> calczkevmGas {
-                calczkevmGas := div(_zkevmGas, GAS_DIVISOR())
+                calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
             }
             
             function getEVMGas() -> evmGas {
@@ -3651,9 +3635,9 @@ object "EvmEmulator" {
                 }
             }
             
-            function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpand{
+            function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
                 maxExpand := add(retOffset, retSize)
-                switch lt(maxExpand,add(argsOffset, argsSize)) 
+                switch lt(maxExpand, add(argsOffset, argsSize)) 
                 case 0 {
                     maxExpand := expandMemory(maxExpand)
                 }
@@ -3675,6 +3659,13 @@ object "EvmEmulator" {
                 retSize, sp := popStackItemWithoutCheck(sp)
             
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+            
+            
+                checkOverflow(argsOffset,argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
+            
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
             
                 // static_gas = 0
                 // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -3698,22 +3689,15 @@ object "EvmEmulator" {
                 }
             
                 {
-                    let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+                    let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
                     gasUsed := add(gasUsed, maxExpand)
                 }
             
                 evmGasLeft := chargeGas(evmGasLeft, gasUsed)
             
                 gasToPass := capGas(evmGasLeft, gasToPass)
-                
-                checkOverflow(argsOffset,argsSize, evmGasLeft)
-                checkOverflow(retOffset, retSize, evmGasLeft)
             
-                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-            
-                let success, frameGasLeft 
-                success, frameGasLeft, gasToPass := _performCall(
+                let success, frameGasLeft := _performCall(
                     addr,
                     gasToPass,
                     value,
@@ -3725,7 +3709,7 @@ object "EvmEmulator" {
             
                 let gasUsed := 0
             
-                // TODO should return nothing
+                // TODO precompile should be called, but return nothing if gasPassed is too low
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                 switch iszero(precompileCost)
                 case 1 {
@@ -3764,7 +3748,7 @@ object "EvmEmulator" {
                 }
             
                 {
-                    let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+                    let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
                     gasUsed := add(gasUsed, maxExpand)
                 }
             
@@ -3773,9 +3757,8 @@ object "EvmEmulator" {
                 gasToPass := capGas(evmGasLeft, gasToPass)
             
                 let success, frameGasLeft := _performStaticCall(
-                    _isEVM(addr),
-                    gasToPass,
                     addr,
+                    gasToPass,
                     add(MEM_OFFSET_INNER(), argsOffset),
                     argsSize,
                     add(MEM_OFFSET_INNER(), retOffset),
@@ -3826,7 +3809,7 @@ object "EvmEmulator" {
                 }
             
                 {
-                    let maxExpand := getMaxExpansionMemory(retOffset, retSize, argsOffset, argsSize)
+                    let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
                     gasUsed := add(gasUsed, maxExpand)
                 }
             
@@ -3846,67 +3829,52 @@ object "EvmEmulator" {
                 )
             
                 let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-            
                 let gasUsed := sub(gasToPass, frameGasLeft)
+            
                 newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
             
                 sp := pushStackItem(sp, success, newEvmGasLeft)
             }
             
-            function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft, gasToPassNew {
-                gasToPassNew := gasToPass
-            
+            function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
                 switch _isEVM(addr)
                 case 0 {
                     // zkEVM native
-                    gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-                    let zkevmGasBefore := gas()
-                    success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
+                    let zkEvmGasBefore := gas()
+                    success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
-                    let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+                    let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
             
-                    frameGasLeft := 0
-                    if gt(gasToPassNew, gasUsed) {
-                        frameGasLeft := sub(gasToPassNew, gasUsed) // TODO check
+                    if gt(gasToPass, gasUsed) {
+                        frameGasLeft := sub(gasToPass, gasUsed) // TODO check
                     }
                 }
                 default {
-                    _pushEVMFrame(gasToPassNew, false)
+                    _pushEVMFrame(gasToPass, false)
                     success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
                     frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 }
             }
             
-            function _performStaticCall(
-                _calleeIsEVM,
-                _calleeGas,
-                _callee,
-                _inputOffset,
-                _inputLen,
-                _outputOffset,
-                _outputLen
-            ) ->  success, _gasLeft {
-                switch _calleeIsEVM
+            function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
+                switch _isEVM(addr)
                 case 0 {
                     // zkEVM native
-                    _calleeGas := _getZkEVMGas(_calleeGas, _callee)
-                    let zkevmGasBefore := gas()
-                    success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
-            
+                    let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
+                    let zkEvmGasBefore := gas()
+                    success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
+                    let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
             
-                    let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-            
-                    _gasLeft := 0
-                    if gt(_calleeGas, gasUsed) {
-                        _gasLeft := sub(_calleeGas, gasUsed)
+                    if gt(gasToPass, gasUsed) {
+                        frameGasLeft := sub(gasToPass, gasUsed) // TODO check
                     }
                 }
                 default {
-                    _pushEVMFrame(_calleeGas, true)
-                    success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
-            
-                    _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+                    _pushEVMFrame(gasToPass, true)
+                    success := staticcall(EVM_GAS_STIPEND(), addr, argsOffset, argsSize, 0, 0)
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 }
             }
             
@@ -4080,7 +4048,7 @@ object "EvmEmulator" {
                 evmGasLeft := chargeGas(evmGas, 32000)
             
                 if isStatic {
-                    revertWithGas(evmGasLeft)
+                    revertWithGas(evmGasLeft) // TODO review
                 }
             
                 let value, offset, size
