@@ -7,11 +7,8 @@ import type { ContractDeployer } from "../typechain";
 import { ContractDeployerFactory, DeployableFactory } from "../typechain";
 import {
   ONE_BYTES32_HEX,
-  REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
-  TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
   TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   TEST_FORCE_DEPLOYER_ADDRESS,
-  TEST_IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT_ADDRESS,
 } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import {
@@ -71,7 +68,7 @@ describe("ContractDeployer tests", function () {
 
   describe("constructor", function () {
     it("successfully updated allowedBytecodeTypesToDeploy", async () => {
-      let newContractDeployer = await deployContract("ContractDeployer", [
+      const newContractDeployer = await deployContract("ContractDeployer", [
         "0x0000000000000000000000000000000000000000000000000000000000000001",
       ]);
 
