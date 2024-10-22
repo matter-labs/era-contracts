@@ -13,7 +13,7 @@ import {ZeroAddress, CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineNotGr
 /// timer and gives at least `INITIAL_DELAY` for the chains to upgrade. In case for any reason the timeline has to 
 /// extended, the owner of this contract can increase the timeline, but only the maximum of `MAX_ADDITIONAL_DELAY` 
 /// is allowed.
-contract TimedContract is Ownable2Step {
+contract GovernanceUpgradeTimer is Ownable2Step {
     /// @notice The initial delay to be used.
     uint256 public immutable INITIAL_DELAY;
     /// @notice The maximal delay for the upgrade.
