@@ -24,7 +24,13 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {
-        if (address(_initializeData.verifier) == address(0)) {
+        if (address(_initializeData.dualVerifier) == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.plonkVerifier == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.fflonkVerifier == address(0)) {
             revert ZeroAddress();
         }
         if (_initializeData.admin == address(0)) {
@@ -55,7 +61,10 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
 
-        s.verifier = _initializeData.verifier;
+        s.dualVerifier = _initializeData.dualVerifier;
+        s.plonkVerifier = _initializeData.plonkVerifier;
+        s.fflonkVerifier = _initializeData.fflonkVerifier;
+        s.fflonkProofLength = _initializeData.fflonkProofLength;
         s.admin = _initializeData.admin;
         s.validators[_initializeData.validatorTimelock] = true;
 

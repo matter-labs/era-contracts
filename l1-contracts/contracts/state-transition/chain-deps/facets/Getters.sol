@@ -36,8 +36,20 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IGetters
-    function getVerifier() external view returns (address) {
-        return address(s.verifier);
+    function getDualVerifier() external view returns (address) {
+        return address(s.dualVerifier);
+    }
+    /// @inheritdoc IGetters
+    function getPlonkVerifier() external view returns (address) {
+        return s.plonkVerifier;
+    }
+    /// @inheritdoc IGetters
+    function getFflonkVerifier() external view returns (address) {
+        return s.fflonkVerifier;
+    }
+    /// @inheritdoc IGetters
+    function getFflonkProofLength() external view returns (uint256) {
+        return s.fflonkProofLength;
     }
 
     /// @inheritdoc IGetters

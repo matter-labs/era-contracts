@@ -75,8 +75,8 @@ struct ZKChainStorage {
     address __DEPRECATED_pendingGovernor;
     /// @notice List of permitted validators
     mapping(address validatorAddress => bool isValidator) validators;
-    /// @dev Verifier contract. Used to verify aggregated proof for batches
-    IVerifier verifier;
+    /// @dev Dual Verifier contract. Wrapper contract that routes proof verification based on the proof type
+    IVerifier dualVerifier;
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
     /// (batch 0 is genesis)
     uint256 totalBatchesExecuted;
@@ -169,4 +169,10 @@ struct ZKChainStorage {
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
+    /// @dev The address of the PLONK Verifier contract
+    address plonkVerifier;
+    /// @dev The address of the FFLONK Verifier contract
+    address fflonkVerifier;
+    /// @dev The length of the FFLONK proof type
+    uint256 fflonkProofLength;
 }

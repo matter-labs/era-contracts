@@ -30,7 +30,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
+        _upgradeVerifiers(_proposedUpgrade.dualVerifier, _proposedUpgrade.plonkVerifier, _proposedUpgrade.fflonkVerifier, _proposedUpgrade.fflonkProofLength, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
 
         bytes32 txHash;
