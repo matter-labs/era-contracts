@@ -261,7 +261,7 @@ contract GatewayPreparation is Script {
         // Fund chain admin with tokens
         if (gatewayBaseTokenAssetId != ethTokenAssetId) {
             deployerAddress = msg.sender;
-            uint256 amountForDistribution = 1000000000000000000000;
+            uint256 amountForDistribution = 100000000000000000000;
             L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
             IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
             address baseTokenAddress = nativeTokenVault.tokenAddress(gatewayBaseTokenAssetId);

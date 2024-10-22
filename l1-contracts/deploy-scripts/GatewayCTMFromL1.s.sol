@@ -168,7 +168,7 @@ contract GatewayCTMFromL1 is Script {
 
     function distributeBaseToken() internal {
         deployerAddress = msg.sender;
-        uint256 amountForDistribution = 1000000000000000000000;
+        uint256 amountForDistribution = 100000000000000000000;
         L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
         bytes32 baseTokenAssetID = nativeTokenVault.assetId(config.baseToken);
