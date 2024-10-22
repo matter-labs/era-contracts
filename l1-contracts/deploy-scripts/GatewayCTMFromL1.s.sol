@@ -168,18 +168,18 @@ contract GatewayCTMFromL1 is Script {
 
     function distributeBaseToken() internal {
         deployerAddress = msg.sender;
+        uint256 amountForDistribution = 1000000000000000000000;
         L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
         bytes32 baseTokenAssetID = nativeTokenVault.assetId(config.baseToken);
         uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetID);
         TestnetERC20Token baseToken = TestnetERC20Token(config.baseToken);
-        uint256 deployerBalance = baseToken.balanceOf(deployerAddress);
 
         vm.startBroadcast();
         if (baseTokenOriginChainId == block.chainid) {
-            baseToken.mint(config.governanceAddr, deployerBalance / 3);
+            baseToken.mint(config.governanceAddr, amountForDistribution);
         } else {
-            baseToken.transfer(config.governanceAddr, deployerBalance / 3);
+            baseToken.transfer(config.governanceAddr, amountForDistribution);
         }
         vm.stopBroadcast();
     }
