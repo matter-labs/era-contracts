@@ -414,6 +414,15 @@ error InvalidAddress(address expected, address actual);
 error NotAllowed(address addr);
 // 0xccdd18d2
 error BytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x25d8333c
+error CallerNotTimerAdmin();
+// 0x907f8e51
+error DeadlineNotYetPassed();
+// 0x6eef58d1
+error NewDeadlineNotGreaterThanCurrent();
+// 0x8b7e144a
+error NewDeadlineExceedsMaxDeadline();
+
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
