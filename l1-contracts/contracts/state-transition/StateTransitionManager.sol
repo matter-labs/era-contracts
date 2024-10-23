@@ -404,13 +404,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _baseToken the base token address used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
-    /// @param inputData the input data for chain creation
+    /// @param _inputData the input data for chain creation
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata inputData
+        bytes calldata _inputData
     ) external onlyBridgehub {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
@@ -419,7 +419,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         // check not registered
         (bytes memory _diamondCut, AllowedBytecodeTypes allowedBytecodeTypesMode) = abi.decode(
-            inputData,
+            _inputData,
             (bytes, AllowedBytecodeTypes)
         );
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));

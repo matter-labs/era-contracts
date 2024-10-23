@@ -17,6 +17,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -129,15 +130,27 @@ contract StateTransitionManagerTest is Test {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
+        _createNewChain(_diamondCut, false);
+    }
+
+    function createNewChainWithEvmEmulator(Diamond.DiamondCutData memory _diamondCut) internal {
+        _createNewChain(_diamondCut, true);
+    }
+
+    function _createNewChain(Diamond.DiamondCutData memory _diamondCut, bool isEvmEmulatorAllowed) private {
         vm.stopPrank();
         vm.startPrank(address(bridgehub));
 
+        bytes memory diamondCutEncoded = abi.encode(_diamondCut);
+        uint256 allowedBytecodeTypesMode = isEvmEmulatorAllowed ? AllowedBytecodeTypes.EraVmAndEVM : AllowedBytecodeTypes.EraVm;
+        bytes memory inputData = abi.encode(diamondCutEncoded, allowedBytecodeTypesMode);
+        
         chainContractAddress.createNewChain({
             _chainId: chainId,
             _baseToken: baseToken,
             _sharedBridge: sharedBridge,
             _admin: newChainAdmin,
-            _diamondCut: abi.encode(_diamondCut)
+            _inputData: inputData
         });
     }
 
