@@ -7,6 +7,8 @@ error AccessToFallbackDenied(address target, address invoker);
 error AccessToFunctionDenied(address target, bytes4 selector, address invoker);
 //
 error AlreadyCurrentSettlementLayer();
+// 0x8164f842
+error ApprovalFailed();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x52e22c98
@@ -17,12 +19,6 @@ error RestrictionWasAlreadyPresent(address restriction);
 error BridgehubOnL1();
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
-// 0x59e1b0d2
-error ChainZeroAddress();
-// 0xff4bbdf1
-error NotAHyperchain(address chainAddress);
-// 0xa3decdf3
-error NotAnAdmin(address expected, address actual);
 // 0xf6fd7071
 error RemovingPermanentRestriction();
 // 0xfcb9b2e1
@@ -426,6 +422,8 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
+// 0x64846fe4
+error NotARestriction(address addr);
 // 0x10f30e75
 error NotBridgehub(address addr);
 // 0x2554babc

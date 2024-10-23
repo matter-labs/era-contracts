@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {ChainAdmin} from "./ChainAdmin.sol";
+import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,6 +15,8 @@ import {ChainAdmin} from "./ChainAdmin.sol";
 /// @dev The contract is immutable, in case the restrictions need to be changed,
 /// a new contract should be deployed.
 contract L2AdminFactory {
+    /// @notice Emitted when an admin is deployed on the L2.
+    /// @param admin The address of the newly deployed admin.
     event AdminDeployed(address admin);
 
     /// @dev We use storage instead of immutable variables due to the
@@ -21,12 +24,17 @@ contract L2AdminFactory {
     address[] public requiredRestrictions;
 
     constructor(address[] memory _requiredRestrictions) {
+        _validateRestrctions(_requiredRestrictions);
         requiredRestrictions = _requiredRestrictions;
     }
 
     /// @notice Deploys a new L2 admin contract.
     /// @return admin The address of the deployed admin contract.
-    function deployAdmin(address[] calldata _additionalRestrictions, bytes32 _salt) external returns (address admin) {
+    // solhint-disable-next-line gas-calldata-parameters
+    function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
+        // Even though the chain admin will likely perform similar checks,
+        // we keep those here just in case, since it is not expensive, while allowing to fail fast.
+        _validateRestrctions(_additionalRestrictions);
         address[] memory restrictions = new address[](requiredRestrictions.length + _additionalRestrictions.length);
         uint256 cachedRequired = requiredRestrictions.length;
         for (uint256 i = 0; i < cachedRequired; ++i) {
@@ -38,5 +46,17 @@ contract L2AdminFactory {
         }
 
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
+    }
+
+    /// @notice Checks that the provided list of restrictions is correct.
+    /// @param _restrictions List of the restrictions to check.
+    /// @dev In case either of the restrictions is not correct, the function reverts.
+    function _validateRestrctions(address[] memory _restrictions) internal view {
+        unchecked {
+            uint256 length = _restrictions.length;
+            for (uint256 i = 0; i < length; ++i) {
+                RestrictionValidator.validateRestriction(_restrictions[i]);
+            }
+        }
     }
 }
