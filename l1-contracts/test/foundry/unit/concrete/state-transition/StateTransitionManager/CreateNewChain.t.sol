@@ -27,7 +27,7 @@ contract createNewChainTest is StateTransitionManagerTest {
 
     function test_RevertWhen_CalledNotByBridgehub() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(diamondInit);
-        
+
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         chainContractAddress.createNewChain({
             _chainId: chainId,
