@@ -7,6 +7,10 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
+import {L2_CREATE2_FACTORY, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER} from "./Constants.sol";
+import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
+
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 library L2GenesisUpgradeHelper {
     function performForceDeployedContractsInit(
@@ -48,7 +52,7 @@ library L2GenesisUpgradeHelper {
     function _getForceDeploymentsData(
         bytes memory _fixedForceDeploymentsData,
         bytes memory _additionalForceDeploymentsData
-    ) internal view returns (ForceDeployment[] memory forceDeployments) {
+    ) internal returns (ForceDeployment[] memory forceDeployments) {
         FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
             _fixedForceDeploymentsData,
             (FixedForceDeploymentsData)
@@ -97,6 +101,14 @@ library L2GenesisUpgradeHelper {
             )
         });
 
+        address wrappedBaseTokenAddress = _ensureWethToken(
+            additionalForceDeploymentsData.predeployedL2WethAddress,
+            fixedForceDeploymentsData.aliasedL1Governance,
+            additionalForceDeploymentsData.baseTokenL1Address,
+            additionalForceDeploymentsData.baseTokenName,
+            additionalForceDeploymentsData.baseTokenSymbol
+        );
+
         address deployedTokenBeacon;
         // FIXME: the following does not work locally due to testing limitations.
         // please decide how to fix
@@ -117,10 +129,44 @@ library L2GenesisUpgradeHelper {
                 additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
                 false,
-                // FIXME: need to finalize the approach for weth token.
-                address(0),
+                wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId
             )
         });
+    }
+
+    function _ensureWethToken(
+        address _predeployedWethToken,
+        address _aliasedL1Governance,
+        address _baseTokenL1Address,
+        string memory _baseTokenName,
+        string memory _baseTokenSymbol
+    ) internal returns (address) {
+        if(_predeployedWethToken != address(0) && _predeployedWethToken.code.length > 0) {
+            return _predeployedWethToken;
+        }
+
+        string memory wrappedBaseTokenName = string.concat(
+            "Wrapped ",
+            _baseTokenName
+        );
+        string memory wrappedBaseTokenSymbol = string.concat(
+            "W",
+            _baseTokenSymbol
+        );
+
+        bytes memory initData = abi.encodeCall(
+            IL2WrappedBaseToken.initializeV2,
+            (wrappedBaseTokenName, wrappedBaseTokenSymbol, L2_ASSET_ROUTER, _baseTokenL1Address)
+        );  
+        bytes memory constructoParams = abi.encode(
+            WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
+            _aliasedL1Governance,
+            initData
+        );
+
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(WRAPPED_BASE_TOKEN_IMPL_ADDRESS, _aliasedL1Governance, initData);
+
+        return address(proxy);
     }
 }

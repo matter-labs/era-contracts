@@ -5,6 +5,12 @@ pragma solidity ^0.8.20;
 struct ZKChainSpecificForceDeploymentsData {
     bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;
+    address predeployedL2WethAddress;
+    address baseTokenL1Address;
+    /// @dev Some info about the base token, it is
+    /// needed to deploy weth token in case it is not present
+    string baseTokenName;
+    string baseTokenSymbol;
 }
 
 /// @notice THe structure that describes force deployments that are the same for each chain.

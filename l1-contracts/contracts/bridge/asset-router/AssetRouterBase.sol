@@ -12,10 +12,11 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
+import {IL1BaseTokenAssetHandler} from "../interfaces/IL1BaseTokenAssetHandler.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {Unauthorized, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, AssetHandlerDoesNotExist, AssetHandlerNotRegistered} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -67,6 +68,18 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         ERA_CHAIN_ID = _eraChainId;
         BRIDGE_HUB = _bridgehub;
     }
+
+    // /// @notice Returns the address of the token to its assetId
+    // function assetIdToAddress(bytes32 _assetId) external returns (address) {
+    //     address assetHandler = assetHandlerAddress[_assetId];
+        
+    //     // We throw an error in case the asset handler has not been registered for this token
+    //     if (assetHandler == address(0)) {
+    //         revert AssetHandlerNotRegistered(baseTokenAssetId);
+    //     }
+
+    //     return IL1BaseTokenAssetHandler(assetHandler).tokenAddress(_assetId);
+    // }
 
     /// @inheritdoc IAssetRouterBase
     function setAssetHandlerAddressThisChain(

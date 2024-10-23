@@ -21,6 +21,7 @@ struct GatewayUpgradeEncodedInput {
     address ctmDeployer;
     address oldValidatorTimelock;
     address newValidatorTimelock;
+    address wBaseTokenStore;
 }
 
 /// @author Matter Labs
@@ -55,7 +56,11 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         bytes memory gatewayUpgradeCalldata = abi.encode(
             encodedInput.ctmDeployer,
             encodedInput.fixedForceDeploymentsData,
-            GatewayHelper.getZKChainSpecificForceDeploymentsData(s)
+            GatewayHelper.getZKChainSpecificForceDeploymentsData(
+                s,
+                encodedInput.wBaseTokenStore,
+                s.__DEPRECATED_baseToken
+            )
         );
         encodedInput.forceDeployments[encodedInput.l2GatewayUpgradePosition].input = gatewayUpgradeCalldata;
 

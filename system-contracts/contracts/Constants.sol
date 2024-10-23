@@ -16,6 +16,7 @@ import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
+import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -73,6 +74,7 @@ address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 IBaseToken constant REAL_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
+ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
 address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
 address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
@@ -80,6 +82,8 @@ IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFS
 // Note, that on its own this contract does not provide much functionality, but having it on a constant address
 // serves as a convenient storage for its bytecode to be accssible via `extcodehash`.
 address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
+
+address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
