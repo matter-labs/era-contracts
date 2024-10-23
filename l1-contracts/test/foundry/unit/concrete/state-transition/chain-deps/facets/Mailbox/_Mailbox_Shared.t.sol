@@ -10,7 +10,9 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract MailboxTest is Test {
     IMailbox internal mailboxFacet;
@@ -18,7 +20,7 @@ contract MailboxTest is Test {
     IGetters internal gettersFacet;
     address sender;
     uint256 constant eraChainId = 9;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
 
     function setupDiamondProxy() public {

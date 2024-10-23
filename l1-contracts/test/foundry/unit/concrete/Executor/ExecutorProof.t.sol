@@ -9,7 +9,9 @@ import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     function createBatchCommitment(
@@ -42,7 +44,7 @@ contract TestExecutorFacet is ExecutorFacet {
 contract ExecutorProofTest is Test {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);
