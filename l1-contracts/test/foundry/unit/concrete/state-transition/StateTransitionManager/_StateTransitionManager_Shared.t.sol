@@ -142,9 +142,11 @@ contract StateTransitionManagerTest is Test {
         vm.startPrank(address(bridgehub));
 
         bytes memory diamondCutEncoded = abi.encode(_diamondCut);
-        uint256 allowedBytecodeTypesMode = isEvmEmulatorAllowed ? AllowedBytecodeTypes.EraVmAndEVM : AllowedBytecodeTypes.EraVm;
+        uint256 allowedBytecodeTypesMode = isEvmEmulatorAllowed
+            ? AllowedBytecodeTypes.EraVmAndEVM
+            : AllowedBytecodeTypes.EraVm;
         bytes memory inputData = abi.encode(diamondCutEncoded, allowedBytecodeTypesMode);
-        
+
         chainContractAddress.createNewChain({
             _chainId: chainId,
             _baseToken: baseToken,
