@@ -19,7 +19,7 @@ contract GovernanceUpgradeTimer is Ownable2Step {
     /// @notice The maximal delay for the upgrade.
     uint256 public immutable MAX_ADDITIONAL_DELAY;
     /// @notice The address that can start the timer.
-    address public immutable TIMER_ADMIN;
+    address public immutable TIMER_GOVERNANCE;
 
     /// @notice The deadline which we should wait.
     uint256 public deadline;
@@ -41,38 +41,41 @@ contract GovernanceUpgradeTimer is Ownable2Step {
     event DeadlineChanged(uint256 newDeadline);
 
     /**
-     * @dev Initializes the contract with immutable values for `INITIAL_DELAY`, `MAX_ADDITIONAL_DELAY`, and `TIMER_ADMIN`.
+     * @dev Initializes the contract with immutable values for `INITIAL_DELAY`, `MAX_ADDITIONAL_DELAY`, and `TIMER_GOVERNANCE`.
      * @param _initialDelay The initial delay in seconds to be added to the current block timestamp to set the deadline.
      * @param _maxAdditionalDelay The maximum number of seconds that can be added to the initial delay to set `maxDeadline`.
-     * @param _timerAdmin The address of the timer administrator, who is allowed to start the timer.
+     * @param _timerGovernance The address of the timer administrator, who is allowed to start the timer.
      */
     constructor(
         uint256 _initialDelay,
         uint256 _maxAdditionalDelay,
-        address _timerAdmin
+        address _timerGovernance,
+        address _initialOwner
     ) {
-        if(_timerAdmin == address(0)) {
+        if(_timerGovernance == address(0)) {
             revert ZeroAddress();
         }
 
         INITIAL_DELAY = _initialDelay;
         MAX_ADDITIONAL_DELAY = _maxAdditionalDelay;
-        TIMER_ADMIN = _timerAdmin;
+        TIMER_GOVERNANCE = _timerGovernance;
+
+        _transferOwnership(_initialOwner);
     }
 
     /**
-     * @dev Modifier that restricts function access to the `TIMER_ADMIN` address.
-     * Reverts with a custom error if the caller is not `TIMER_ADMIN`.
+     * @dev Modifier that restricts function access to the `TIMER_GOVERNANCE` address.
+     * Reverts with a custom error if the caller is not `TIMER_GOVERNANCE`.
      */
     modifier onlyTimerAdmin() {
-        if (msg.sender != TIMER_ADMIN) {
+        if (msg.sender != TIMER_GOVERNANCE) {
             revert CallerNotTimerAdmin();
         }
         _;
     }
 
     /**
-     * @dev Starts the timer by setting the `deadline` and `maxDeadline`. Only callable by the `TIMER_ADMIN`.
+     * @dev Starts the timer by setting the `deadline` and `maxDeadline`. Only callable by the `TIMER_GOVERNANCE`.
      *
      * Emits a {TimerStarted} event.
      */

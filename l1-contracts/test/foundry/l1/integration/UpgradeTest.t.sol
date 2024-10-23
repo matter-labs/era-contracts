@@ -30,11 +30,12 @@ contract UpgradeTest is Test {
         // Firstly, we deploy all the contracts.
         generateUpgradeData.prepareEcosystemContracts(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
 
+        // console.log("Ecosystem admin taking over ownership of temporary contracts");
+        // governanceMulticall(generateUpgradeData.getEcosystemAdmin(), generateUpgradeData.getEcosystemAdminCalls());
+
         // For chain, we have deployed the DA validator contracts
         // and also updated the chain admin.
-        // IMPORTANT: for erc20-based chains with token multiplier setter
-        // this should be coordinated with the server.
-        console.log("Preparing chain for the upgrade");
+        console.log("Preparing chain for the upgrade (just config load)");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
         console.log("Starting stage1 of the upgrade!");
@@ -59,8 +60,7 @@ contract UpgradeTest is Test {
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
-
-        vm.warp(generateUpgradeData.getOldProtocolDeadline());
+        // so it was tested in e2e local environment.
 
         console.log("Starting stage2 of the upgrade!");
         governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());

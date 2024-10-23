@@ -29,7 +29,6 @@ contract ChainUpgrade is Script {
         address chainDiamondProxyAddress;
         bool permanentRollup;
         // FIXME: From ecosystem, maybe move to a different struct
-        address permanentRollupRestriction;
         address bridgehubProxyAddress;
         address oldSharedBridgeProxyAddress;
     }
@@ -58,12 +57,14 @@ contract ChainUpgrade is Script {
         initializeConfig(configPath, ecosystemInputPath, ecosystemOutputPath);
 
         checkCorrectOwnerAddress();
-        // Preparation of chain consists of two parts:
-        // - Deploying l2 da validator
-        // - Deploying new chain admin
 
+        // Deploying of the new chain admin is not strictly needed
+        // but our existing tooling relies on the new impl of chain admin
         deployNewChainAdmin();
         governanceMoveToNewChainAdmin();
+
+        // This script does nothing, it only checks that the provided inputs are correct.
+        // It is just a wrapper to easily call `upgradeChain`
 
         saveOutput(outputPath);
     }
@@ -109,10 +110,6 @@ contract ChainUpgrade is Script {
         config.chainDiamondProxyAddress = toml.readAddress("$.chain.diamond_proxy_address");
         config.permanentRollup = toml.readBool("$.chain.permanent_rollup");
 
-        toml = vm.readFile(ecosystemOutputPath);
-
-        config.permanentRollupRestriction = toml.readAddress("$.deployed_addresses.permanent_rollup_restriction");
-
         toml = vm.readFile(ecosystemInputPath);
 
         config.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
@@ -131,14 +128,8 @@ contract ChainUpgrade is Script {
         AccessControlRestriction accessControlRestriction = new AccessControlRestriction(0, config.ownerAddress);
 
         address[] memory restrictions;
-        if (config.permanentRollup) {
-            restrictions = new address[](2);
-            restrictions[0] = address(accessControlRestriction);
-            restrictions[1] = config.permanentRollupRestriction;
-        } else {
-            restrictions = new address[](1);
-            restrictions[0] = address(accessControlRestriction);
-        }
+        restrictions = new address[](1);
+        restrictions[0] = address(accessControlRestriction);
 
         vm.broadcast(config.ownerAddress);
         ChainAdmin newChainAdmin = new ChainAdmin(restrictions);

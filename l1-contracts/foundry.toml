@@ -9,7 +9,7 @@ solc_version = "0.8.24"
 evm_version = "cancun"
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
-    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
+    { access = "read", path = "../system-contracts/artifacts-zk/" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/artifacts" },
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
