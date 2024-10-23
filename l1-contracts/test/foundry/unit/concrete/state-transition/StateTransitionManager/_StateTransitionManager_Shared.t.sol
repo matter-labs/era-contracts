@@ -129,7 +129,10 @@ contract StateTransitionManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
-    function getCreateInputData(Diamond.DiamondCutData memory _diamondCut, bool allowEvmEmulator) internal view returns (bytes memory) {
+    function getCreateInputData(
+        Diamond.DiamondCutData memory _diamondCut,
+        bool allowEvmEmulator
+    ) internal view returns (bytes memory) {
         bytes memory diamondCutEncoded = abi.encode(_diamondCut);
         AllowedBytecodeTypes allowedBytecodeTypesMode = allowEvmEmulator
             ? AllowedBytecodeTypes.EraVmAndEVM

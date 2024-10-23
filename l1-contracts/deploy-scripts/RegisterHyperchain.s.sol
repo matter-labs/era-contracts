@@ -10,6 +10,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -44,7 +45,7 @@ contract RegisterHyperchainScript is Script {
         address newDiamondProxy;
         address governance;
         address chainAdmin;
-        bool isEvmEmulatorSupported;
+        bool allowEvmEmulator;
     }
 
     Config internal config;
@@ -101,7 +102,7 @@ contract RegisterHyperchainScript is Script {
         );
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
-        config.isEvmEmulatorSupported = toml.readBool("$.chain.is_evm_emulator_supported");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function checkTokenAddress() internal view {
@@ -168,7 +169,9 @@ contract RegisterHyperchainScript is Script {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
 
-        uint256 allowedBytecodeTypesMode = config.isEvmEmulatorSupported ? 1 : 0;
+        AllowedBytecodeTypes allowedBytecodeTypesMode = config.allowEvmEmulator
+            ? AllowedBytecodeTypes.EraVmAndEVM
+            : AllowedBytecodeTypes.EraVm;
 
         bytes memory diamondCutEncoded = abi.encode(config.diamondCutData);
 

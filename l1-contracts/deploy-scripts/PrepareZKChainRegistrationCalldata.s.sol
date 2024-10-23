@@ -12,6 +12,7 @@ import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol"
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Utils} from "./Utils.sol";
 
@@ -75,7 +76,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         // Address of the L1 ERC20 bridge proxy (required for the L2 bridge deployment)
         address erc20BridgeProxy;
         // Should be EVM emulator supported or not
-        bool isEvmEmulatorSupported;
+        bool allowEvmEmulator;
     }
 
     // Addresses of the contracts in the L1 ecosystem that are fetched from the chain
@@ -153,7 +154,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.diamondCutData = toml.readBytes("$.chain.diamond_cut_data");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
-        config.isEvmEmulatorSupported = toml.readBool("$.chain.is_evm_emulator_supported");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
 
         bytecodes.l2SharedBridgeBytecode = Utils.readHardhatBytecode("/script-config/artifacts/L2SharedBridge.json");
         bytecodes.beaconProxy = Utils.readHardhatBytecode("/script-config/artifacts/BeaconProxy.json");
@@ -273,7 +274,9 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     function prepareRegisterHyperchainCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
-        uint256 allowedBytecodeTypesMode = config.isEvmEmulatorSupported ? 1 : 0;
+        AllowedBytecodeTypes allowedBytecodeTypesMode = config.allowEvmEmulator
+            ? AllowedBytecodeTypes.EraVmAndEVM
+            : AllowedBytecodeTypes.EraVm;
 
         bytes memory diamondCutEncoded = abi.encode(config.diamondCutData);
 
