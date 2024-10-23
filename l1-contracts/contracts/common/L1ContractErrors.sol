@@ -426,6 +426,8 @@ error NewDeadlineExceedsMaxDeadline();
 error AlreadyPermanentRollup();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
+// 0x6e3331f5
+error IncorrectPricingMode();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

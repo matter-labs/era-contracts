@@ -13,7 +13,7 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {InvalidDAForPermanentRollup, AlreadyPermanentRollup, Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {IncorrectPricingMode, InvalidDAForPermanentRollup, AlreadyPermanentRollup, Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -131,6 +131,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
+        if (s.isPermanentRollup && _pricingMode != PubdataPricingMode.Rollup) {
+            revert IncorrectPricingMode();
+        }
+
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
@@ -175,6 +179,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if(!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
             // The correct data availability pair should be set beforehand.
             revert InvalidDAForPermanentRollup();
+        }
+
+        if(s.feeParams.pubdataPricingMode != PubdataPricingMode.Rollup) {
+            // The correct pubdata pricing mode should be set beforehand.
+            revert IncorrectPricingMode();
         }
 
         s.isPermanentRollup = true;

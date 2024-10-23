@@ -399,15 +399,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-
-        // During migration to the new protocol version, there will be a period when
-        // the bridgehub does not yet provide the `messageRoot` functionality.
-        // To ease up the migration, we never append messages to message root on L1.
-        if (block.chainid != L1_CHAIN_ID) {
-            // Once the batch is executed, we include its message to the message root.
-            IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-            messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
-        }
+        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
     /// @notice Executes one batch
@@ -428,14 +420,22 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
+        _appendMessageRoot(_storedBatch.batchNumber, _storedBatch.l2LogsTreeRoot);
+    }
 
+    /// @notice Appends the batch message root to the global message.
+    /// @param _batchNumber The number of the batch
+    /// @param _messageRoot The root of the merkle tree of the messages to L1.
+    /// @dev The logic of this function depends on the settlement layer as we support
+    /// message root aggregation only on non-L1 settlement layers for ease for migration. 
+    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // During migration to the new protocol version, there will be a period when
         // the bridgehub does not yet provide the `messageRoot` functionality.
         // To ease up the migration, we never append messages to message root on L1.
         if (block.chainid != L1_CHAIN_ID) {
             // Once the batch is executed, we include its message to the message root.
             IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-            messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+            messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
         }
     }
 

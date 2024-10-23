@@ -405,14 +405,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
     /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
+    function finalizeDeposit(FinalizeL1DepositParams memory _finalizeWithdrawalParams) public {
         _finalizeDeposit(_finalizeWithdrawalParams);
     }
 
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     function _finalizeDeposit(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
+        FinalizeL1DepositParams memory _finalizeWithdrawalParams
     ) internal nonReentrant whenNotPaused {
         uint256 chainId = _finalizeWithdrawalParams.chainId;
         uint256 l2BatchNumber = _finalizeWithdrawalParams.l2BatchNumber;
@@ -509,7 +509,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return assetId The ID of the bridged asset.
     /// @return transferData The transfer data used to finalize withdawal.
     function _verifyWithdrawal(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
+        FinalizeL1DepositParams memory _finalizeWithdrawalParams
     ) internal returns (bytes32 assetId, bytes memory transferData) {
         (assetId, transferData) = _parseL2WithdrawalMessage(
             _finalizeWithdrawalParams.chainId,
@@ -764,14 +764,19 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external {
-        l1AssetRouter.finalizeWithdrawal({
-            _chainId: _chainId,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
+    ) external override {
+        /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
+        /// by the legacy bridge.
+        address legacyL2Bridge = __DEPRECATED_l2BridgeAddress[_chainId];
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
+            chainId: _chainId,
+            l2BatchNumber: _l2BatchNumber,
+            l2MessageIndex: _l2MessageIndex,
+            l2Sender: legacyL2Bridge == address(0) ? L2_ASSET_ROUTER_ADDR : legacyL2Bridge,
+            l2TxNumberInBatch: _l2TxNumberInBatch,
+            message: _message,
+            merkleProof: _merkleProof
         });
+        finalizeDeposit(finalizeWithdrawalParams);
     }
 }

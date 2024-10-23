@@ -572,19 +572,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
-        /// by the legacy bridge.
-        address legacyL2Bridge = L1_NULLIFIER.l2BridgeAddress(_chainId);
-        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
-            chainId: _chainId,
-            l2BatchNumber: _l2BatchNumber,
-            l2MessageIndex: _l2MessageIndex,
-            l2Sender: legacyL2Bridge == address(0) ? L2_ASSET_ROUTER_ADDR : legacyL2Bridge,
-            l2TxNumberInBatch: _l2TxNumberInBatch,
-            message: _message,
-            merkleProof: _merkleProof
+        L1_NULLIFIER.finalizeWithdrawal({
+            _chainId: _chainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
         });
-        L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
