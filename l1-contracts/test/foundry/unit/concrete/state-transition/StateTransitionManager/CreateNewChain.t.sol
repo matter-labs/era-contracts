@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
@@ -33,12 +34,22 @@ contract createNewChainTest is StateTransitionManagerTest {
             _baseToken: baseToken,
             _sharedBridge: sharedBridge,
             _admin: admin,
-            _diamondCut: abi.encode(initialDiamondCutData)
+            _inputData: getCreateInputData(initialDiamondCutData, false)
         });
     }
 
     function test_SuccessfulCreationOfNewChain() public {
         createNewChain(getDiamondCutData(diamondInit));
+
+        address admin = chainContractAddress.getChainAdmin(chainId);
+        address newChainAddress = chainContractAddress.getHyperchain(chainId);
+
+        assertEq(newChainAdmin, admin);
+        assertNotEq(newChainAddress, address(0));
+    }
+
+    function test_SuccessfulCreationOfNewChainWithEvmEmulator() public {
+        createNewChainWithEvmEmulator(getDiamondCutData(diamondInit));
 
         address admin = chainContractAddress.getChainAdmin(chainId);
         address newChainAddress = chainContractAddress.getHyperchain(chainId);

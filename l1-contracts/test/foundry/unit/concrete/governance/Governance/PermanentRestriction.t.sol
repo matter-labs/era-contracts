@@ -10,6 +10,7 @@ import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.
 import {ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
@@ -197,13 +198,14 @@ contract PermanentRestrictionTest is StateTransitionManagerTest {
         bridgehub.addStateTransitionManager(address(chainContractAddress));
         bridgehub.addToken(baseToken);
         bridgehub.setSharedBridge(sharedBridge);
+
         bridgehub.createNewChain({
             _chainId: chainId,
             _stateTransitionManager: address(chainContractAddress),
             _baseToken: baseToken,
             _salt: 0,
             _admin: newChainAdmin,
-            _initData: abi.encode(_diamondCut)
+            _initData: getCreateInputData(_diamondCut, false)
         });
     }
 }

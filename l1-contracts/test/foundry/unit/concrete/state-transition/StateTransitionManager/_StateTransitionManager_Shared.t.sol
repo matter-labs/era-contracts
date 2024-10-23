@@ -17,6 +17,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -128,7 +129,27 @@ contract StateTransitionManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
+    function getCreateInputData(
+        Diamond.DiamondCutData memory _diamondCut,
+        bool allowEvmEmulator
+    ) internal view returns (bytes memory) {
+        bytes memory diamondCutEncoded = abi.encode(_diamondCut);
+        AllowedBytecodeTypes allowedBytecodeTypesMode = allowEvmEmulator
+            ? AllowedBytecodeTypes.EraVmAndEVM
+            : AllowedBytecodeTypes.EraVm;
+
+        return abi.encode(diamondCutEncoded, allowedBytecodeTypesMode);
+    }
+
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
+        _createNewChain(_diamondCut, false);
+    }
+
+    function createNewChainWithEvmEmulator(Diamond.DiamondCutData memory _diamondCut) internal {
+        _createNewChain(_diamondCut, true);
+    }
+
+    function _createNewChain(Diamond.DiamondCutData memory _diamondCut, bool allowEvmEmulator) private {
         vm.stopPrank();
         vm.startPrank(address(bridgehub));
 
@@ -137,7 +158,7 @@ contract StateTransitionManagerTest is Test {
             _baseToken: baseToken,
             _sharedBridge: sharedBridge,
             _admin: newChainAdmin,
-            _diamondCut: abi.encode(_diamondCut)
+            _inputData: getCreateInputData(_diamondCut, allowEvmEmulator)
         });
     }
 

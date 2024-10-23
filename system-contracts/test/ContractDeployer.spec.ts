@@ -66,12 +66,21 @@ describe("ContractDeployer tests", function () {
     });
   });
 
-  describe("constructor", function () {
-    it("successfully updated allowedBytecodeTypesToDeploy", async () => {
-      const newContractDeployer = await deployContract("ContractDeployer", [
-        "0x0000000000000000000000000000000000000000000000000000000000000001",
-      ]);
+  describe("setAllowedBytecodeTypesToDeploy", function () {
+    it("can't change if not forceDeployer", async () => {
+      const newContractDeployer = await deployContract("ContractDeployer", []);
 
+      expect(newContractDeployer.setAllowedBytecodeTypesToDeploy(1)).to.be.revertedWithCustomError(
+        newContractDeployer,
+        "Unauthorized"
+      );
+    });
+
+    it("successfully updated allowedBytecodeTypesToDeploy", async () => {
+      const newContractDeployer = await deployContract("ContractDeployer", []);
+
+      expect(await newContractDeployer.allowedBytecodeTypesToDeploy()).to.be.eq(0);
+      await newContractDeployer.connect(forceDeployer).setAllowedBytecodeTypesToDeploy(1);
       expect(await newContractDeployer.allowedBytecodeTypesToDeploy()).to.be.eq(1);
     });
   });

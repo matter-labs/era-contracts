@@ -744,7 +744,8 @@ export class Deployer {
     compareDiamondCutHash: boolean = false,
     nonce?,
     predefinedChainId?: string,
-    useGovernance: boolean = false
+    useGovernance: boolean = false,
+    isEvmEmulatorSupported: boolean = false
   ) {
     const gasLimit = 10_000_000;
 
@@ -756,7 +757,13 @@ export class Deployer {
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
-    const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
+    const diamondCutDataEncoded = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
+
+    const allowedBytecodeTypesMode = isEvmEmulatorSupported ? 1 : 0;
+    const initData = new ethers.utils.AbiCoder().encode(
+      ["bytes", "uint256"],
+      [diamondCutDataEncoded, allowedBytecodeTypesMode]
+    );
 
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
@@ -768,7 +775,7 @@ export class Deployer {
         baseTokenAddress,
         Date.now(),
         admin,
-        initialDiamondCut,
+        initData,
       ],
       0,
       {
