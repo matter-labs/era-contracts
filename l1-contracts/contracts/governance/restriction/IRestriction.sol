@@ -18,5 +18,5 @@ interface IRestriction {
     /// @notice Ensures that the invoker has the required role to call the function.
     /// @param _call The call data.
     /// @param _invoker The address of the invoker.
-    function validateCall(Call calldata _call, address _invoker) external virtual view;
+    function validateCall(Call calldata _call, address _invoker) external view;
 }
