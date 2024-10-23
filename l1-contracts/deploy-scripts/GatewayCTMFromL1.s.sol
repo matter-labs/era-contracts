@@ -95,13 +95,25 @@ contract GatewayCTMFromL1 is Script {
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
     Output internal output;
 
-    function run() external {
+    function prepareAddresses() external {
+        initializeConfig();
+    
+        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
+            bytes32(0),
+            gatewayCTMDeployerConfig
+        ); 
+
+        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
+        saveOutput();
+    }
+
+    function deployCTM() external {
         initializeConfig();
 
         (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(0),
             gatewayCTMDeployerConfig
-        );
+        ); 
 
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 
@@ -131,6 +143,11 @@ contract GatewayCTMFromL1 is Script {
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
+        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
+        saveOutput();
+    }
+
+    function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {
         output = Output({
             gatewayStateTransition: StateTransitionDeployedAddresses({
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
@@ -153,10 +170,7 @@ contract GatewayCTMFromL1 is Script {
             relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
             validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator
         });
-
-        saveOutput();
     }
-
 
     function initializeConfig() internal {
         deployerAddress = msg.sender;
