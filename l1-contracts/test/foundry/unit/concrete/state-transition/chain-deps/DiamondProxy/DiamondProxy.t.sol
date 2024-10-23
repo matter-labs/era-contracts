@@ -11,8 +11,10 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {FacetIsFrozen, ValueMismatch, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract TestFacet is ZkSyncHyperchainBase {
     function func() public pure returns (bool) {
@@ -25,7 +27,7 @@ contract TestFacet is ZkSyncHyperchainBase {
 
 contract DiamondProxyTest is Test {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getTestFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](1);
