@@ -11,9 +11,6 @@ error NotAssetRouter(address msgSender, address sharedBridge);
 // 0x4b62f013
 error TokenNotSet();
 
-// 0xc5e44dc9
-error ChainAlreadyPresent();
-
 // 0xff514c10
 error ChainIdAlreadyPresent();
 
@@ -82,3 +79,6 @@ error OnlyChain(address msgSender, address zkChainAddress);
 
 // 0x693cd3dc
 error NotOwnerViaRouter(address msgSender, address originalCaller);
+
+// 0x5de72107
+error ChainNotLegacy();

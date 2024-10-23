@@ -21,7 +21,7 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {NotL1, NotRelayedSender, NotAssetRouter, TokenNotSet, ChainAlreadyPresent, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
+import {NotL1, NotRelayedSender, NotAssetRouter, TokenNotSet, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
 import {NoCTMForAssetId, MigrationPaused, AssetIdAlreadyRegistered, CTMNotRegistered, ChainIdNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress, AssetHandlerNotRegistered} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -230,7 +230,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function setLegacyChainAddress(uint256 _chainId) external override {
         address ctm = chainTypeManager[_chainId];
         if (ctm == address(0)) {
-            revert ChainAlreadyPresent();
+            revert ChainNotLegacy();
         }
         if (zkChainMap.contains(_chainId)) {
             revert ChainIdAlreadyPresent();
