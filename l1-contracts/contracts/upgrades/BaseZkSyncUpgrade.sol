@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-// solhint-disable reason-string, gas-custom-errors
-
 pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
@@ -13,7 +11,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, L2BytecodeHashMismatch, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "./ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, L2BytecodeHashMismatch, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetEvmEmulator} from "./ZkSyncUpgradeErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @notice The struct that represents the upgrade proposal.
@@ -21,6 +19,7 @@ import {SemVer} from "../common/libraries/SemVer.sol";
 /// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
 /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
 /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
+/// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
 /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
 /// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
 /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
@@ -134,14 +133,16 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return;
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set new EVM emulator");
+        if (_patchOnly) {
+            revert PatchUpgradeCantSetEvmEmulator();
+        }
 
         L2ContractHelper.validateBytecodeHash(_l2EvmEmulatorBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
         bytes32 previousL2EvmEmulatorBytecodeHash = s.l2EvmEmulatorBytecodeHash;
 
-        // Change the default account bytecode hash
+        // Change the EVM emulator bytecode hash
         s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
         emit NewL2EvmEmulatorBytecodeHash(previousL2EvmEmulatorBytecodeHash, _l2EvmEmulatorBytecodeHash);
     }
