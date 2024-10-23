@@ -13,12 +13,6 @@ error RestrictionWasNotPresent(address restriction);
 error RestrictionWasAlreadyPresent(address restriction);
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
-// 0x59e1b0d2
-error ChainZeroAddress();
-// 0xff4bbdf1
-error NotAHyperchain(address chainAddress);
-// 0xa3decdf3
-error NotAnAdmin(address expected, address actual);
 // 0xf6fd7071
 error RemovingPermanentRestriction();
 // 0xfcb9b2e1
@@ -242,8 +236,6 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x4ef79e5a
 error NonZeroAddress(address);
-// 0xdd629f86
-error NotEnoughGas();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xdf17e316
@@ -407,10 +399,6 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
-// 0x10f30e75
-error NotBridgehub(address addr);
-// 0x2554babc
-error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
 
