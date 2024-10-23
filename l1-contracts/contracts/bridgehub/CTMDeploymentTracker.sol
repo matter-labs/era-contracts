@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
@@ -14,6 +12,8 @@ import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
+import {OnlyBridgehub, CTMNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
+import {UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -30,15 +30,17 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(BRIDGE_HUB), "CTM DT: not BH");
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+        }
         _;
     }
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyOwnerViaRouter(address _originalCaller) {
-        // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(L1_ASSET_ROUTER) && _originalCaller == owner(), "CTM DT: not owner via router");
+        if (msg.sender != address(L1_ASSET_ROUTER) || _originalCaller != owner()) {
+            revert NotOwnerViaRouter(msg.sender, _originalCaller);
+        }
         _;
     }
 
@@ -59,9 +61,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @notice Used to register the ctm asset in L1 contracts, AssetRouter and Bridgehub.
     /// @param _ctmAddress the address of the ctm asset
     function registerCTMAssetOnL1(address _ctmAddress) external onlyOwner {
-        // solhint-disable-next-line gas-custom-errors
-
-        require(BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress), "CTMDT: ctm not registered");
+        if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
+            revert CTMNotRegistered();
+        }
         L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
         BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
     }
@@ -86,14 +88,17 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         uint256,
         bytes calldata _data
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
-        // solhint-disable-next-line gas-custom-errors
+        if (msg.value != 0) {
+            revert NoEthAllowed();
+        }
 
-        require(msg.value == 0, "CTMDT: no eth allowed");
-        // solhint-disable-next-line gas-custom-errors
-
-        require(_originalCaller == owner(), "CTMDT: not owner");
+        if (_originalCaller != owner()) {
+            revert NotOwner(_originalCaller, owner());
+        }
         bytes1 encodingVersion = _data[0];
-        require(encodingVersion == ENCODING_VERSION, "CTMDT: wrong encoding version");
+        if (encodingVersion != ENCODING_VERSION) {
+            revert UnsupportedEncodingVersion();
+        }
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
         request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
@@ -112,7 +117,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         address _originalCaller,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyOwnerViaRouter(_originalCaller) {
-        require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "CTMDT: wrong counter part");
+        if (_assetHandlerAddressOnCounterpart != L2_BRIDGEHUB_ADDR) {
+            revert WrongCounterPart(_assetHandlerAddressOnCounterpart, L2_BRIDGEHUB_ADDR);
+        }
     }
 
     function getAssetId(address _l1CTM) public view override returns (bytes32) {

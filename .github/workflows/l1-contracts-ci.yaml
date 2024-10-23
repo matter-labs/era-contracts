@@ -72,6 +72,9 @@ jobs:
       - name: Lint
         run: yarn lint:check
 
+      - name: Lint errors
+        run: yarn l1 errors-lint --check
+
   test-foundry:
     needs: [build, lint]
     runs-on: ubuntu-latest

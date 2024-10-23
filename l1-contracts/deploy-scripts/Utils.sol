@@ -141,8 +141,8 @@ library Utils {
             child := create(0, add(bytecode, 0x20), mload(bytecode))
         }
         vm.stopBroadcast();
-        require(child != address(0), "Failed to deploy Create2Factory");
-        require(child.code.length > 0, "Failed to deploy Create2Factory");
+        require(child != address(0), "Failed to deploy create2factory");
+        require(child.code.length > 0, "Failed to deploy create2factory");
         return child;
     }
 

@@ -2,15 +2,13 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
 
-import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "./DAContractsErrors.sol";
+import {InvalidPubdataSource, PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed, BlobCommitmentNotPublished} from "./DAContractsErrors.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
@@ -67,7 +65,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             (blobCommitments, ) = _processCalldataDA(blobsProvided, fullPubdataHash, _maxBlobsSupported, l1DaInput[1:]);
         } else {
-            revert("l1-da-validator/invalid-pubdata-source");
+            revert InvalidPubdataSource(pubdataSource);
         }
 
         // We verify that for each set of blobHash/blobCommitment are either both empty
@@ -145,8 +143,9 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
             if (prepublishedCommitment != bytes32(0)) {
                 // We double check that this commitment has indeed been published.
                 // If that is the case, we do not care about the actual underlying data.
-                require(publishedBlobCommitments[prepublishedCommitment], "not published");
-
+                if (!publishedBlobCommitments[prepublishedCommitment]) {
+                    revert BlobCommitmentNotPublished();
+                }
                 blobsCommitments[i] = prepublishedCommitment;
             } else {
                 blobsCommitments[i] = _getPublishedBlobCommitment(versionedHashIndex, commitmentData);

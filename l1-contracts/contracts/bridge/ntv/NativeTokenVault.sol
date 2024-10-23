@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -22,6 +20,7 @@ import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
 import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyToken} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -88,7 +87,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (_nativeToken == WETH_TOKEN) {
             revert TokenNotSupported(WETH_TOKEN);
         }
-        require(_nativeToken.code.length > 0, "NTV: empty token");
+        if (_nativeToken.code.length == 0) {
+            revert EmptyToken();
+        }
         _unsafeRegisterNativeToken(_nativeToken);
     }
 
