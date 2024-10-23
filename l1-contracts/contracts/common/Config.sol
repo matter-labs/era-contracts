@@ -155,4 +155,6 @@ struct ZKChainCommitment {
     bytes32[] batchHashes;
     /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
+    /// @notice Whether a chain is a permanent rollup.
+    bool isPermanentRollup;
 }

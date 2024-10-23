@@ -170,7 +170,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function makePermanentRollup() external onlyAdmin {
+    function makePermanentRollup() external onlyAdmin onlySettlementLayer {
         if (s.isPermanentRollup) {
             revert AlreadyPermanentRollup();
         }
@@ -319,6 +319,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.totalBatchesCommitted = batchesCommitted;
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
+        s.isPermanentRollup = _commitment.isPermanentRollup;
 
         // Some consistency checks just in case.
         require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
@@ -403,6 +404,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
+        commitment.isPermanentRollup = s.isPermanentRollup;
 
         // just in case
         require(
