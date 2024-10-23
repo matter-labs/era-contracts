@@ -236,8 +236,6 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x4ef79e5a
 error NonZeroAddress(address);
-// 0xdd629f86
-error NotEnoughGas();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xdf17e316

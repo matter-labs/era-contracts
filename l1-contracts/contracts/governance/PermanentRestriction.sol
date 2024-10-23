@@ -215,9 +215,6 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
 
-        // Note, that we do use assembly here to ensure that the function does not panic in case of
-        // either incorrect `_chain` address or in case the returndata is too large
-
         (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
 
         if (!chainIdQuerySuccess) {
@@ -238,13 +235,17 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         return admin == msg.sender;
     }
 
-    /// @notice Tries to call `IGetters.getChainId()` function on the `_potentialChainAddress`.
+    /// @notice Tries to call `IGetters.getChainId()` function on the `_chain`.
     /// It ensures that the returndata is of correct format and if not, it returns false.
     /// @param _chain The address of the potential chain
-    /// @return Returns a tuple of of the chainId and whether the call was successful.
+    /// @return chainId The chainId of the chain. 
+    /// @return success Whether the call was successful.
     /// If the second item is `false`, the caller should ignore the first value. 
     function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;
+        
+        // Note, that we do use assembly here to ensure that the function does not panic in case of
+        // either incorrect `_chain` address or in case the returndata is too large
         assembly {
             // We use scratch space here, so it is safe
             mstore(0, selector)
@@ -272,7 +273,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
     /// @notice Tries to get the new admin from the migration.
     /// @param _call The call data.
-    /// @return Returns a tuple of of the new admin and whether the transaction is indeed the migration.
+    /// @return Returns a tuple of the new admin and whether the transaction is indeed the migration.
     /// If the second item is `false`, the caller should ignore the first value. 
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected 
     /// error that should be bubbled up by the caller.
