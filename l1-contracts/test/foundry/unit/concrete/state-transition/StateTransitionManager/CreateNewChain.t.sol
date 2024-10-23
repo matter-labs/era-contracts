@@ -46,4 +46,14 @@ contract createNewChainTest is StateTransitionManagerTest {
         assertEq(newChainAdmin, admin);
         assertNotEq(newChainAddress, address(0));
     }
+
+    function test_SuccessfulCreationOfNewChainWithEvmEmulator() public {
+        createNewChainWithEvmEmulator(getDiamondCutData(diamondInit));
+
+        address admin = chainContractAddress.getChainAdmin(chainId);
+        address newChainAddress = chainContractAddress.getHyperchain(chainId);
+
+        assertEq(newChainAdmin, admin);
+        assertNotEq(newChainAddress, address(0));
+    }
 }
