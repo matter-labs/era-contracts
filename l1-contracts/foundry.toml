@@ -15,7 +15,12 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
-    { access = "read", path = "./out" }
+    { access = "read", path = "./out" },
+    { access = "read", path = "./deploy-script-config-template/config-deploy-erc20.toml" },
+    { access = "read", path = "./deploy-script-config-template/config-deploy-l1.toml" },
+    { access = "read", path = "./deploy-script-config-template/register-hyperchain.toml" },
+    { access = "read-write", path = "./script-out/output-deploy-l1.toml"},
+    { access = "read-write", path = "./script-out/output-deploy-erc20.toml"}
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
