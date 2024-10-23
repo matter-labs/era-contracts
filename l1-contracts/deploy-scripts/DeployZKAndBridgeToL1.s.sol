@@ -42,6 +42,7 @@ contract DeployZKScript is Script {
         address deployer;
         address owner;
         address anotherOwner;
+        address chainGovernor;
     }
 
     struct TokenDescription {
@@ -93,6 +94,7 @@ contract DeployZKScript is Script {
         config.l1SharedBridge = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
         config.chainId = toml.readUint("$.chain.chain_chain_id");
+        config.chainGovernor = toml.readAddress("$.owner_address");
     }
 
     function initializeAdditionalConfig() internal {
@@ -152,18 +154,6 @@ contract DeployZKScript is Script {
             config.bridgehub,
             config.l1SharedBridge
         );
-        // bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
-        //     Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
-        //     msg.sender,
-        //     "",
-        //     "",
-        //     Utils.MAX_PRIORITY_TX_GAS,
-        //     new bytes[](0),
-        //     addr,
-        //     config.chainId,
-        //     config.bridgehub,
-        //     config.l1SharedBridge
-        // );
     }
 
     function finalizeZkTokenWithdrawal(
@@ -215,6 +205,22 @@ contract DeployZKScript is Script {
         l1ZK.transfer(config.owner, balance / 2);
         string memory tokenInfo = vm.serializeAddress("ZK", "l1Address", l1ZKAddress);
         vm.writeToml(tokenInfo, path, ".ZK.l1Address");
+    }
+
+    function fundChainGovernor() public {
+        initializeConfig();
+
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, vm.envString("ZK_TOKEN_OUTPUT"));
+        string memory toml = vm.readFile(path);
+
+        address l1ZKAddress = toml.readAddress("$.ZK.l1Address.l1Address");
+        console.log("L1 ZK address: ", l1ZKAddress);
+        console.log("Address of governor: ", config.chainGovernor);
+        TestnetERC20Token l1ZK = TestnetERC20Token(l1ZKAddress);
+        uint256 balance = l1ZK.balanceOf(config.deployerAddress);
+        vm.broadcast();
+        l1ZK.transfer(config.chainGovernor, balance / 10);
     }
 
     function deployErc20(
