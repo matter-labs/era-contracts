@@ -129,6 +129,15 @@ contract StateTransitionManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
+    function getCreateInputData(bytes memory _diamondCut, bool allowEvmEmulator) internal view returns (bytes memory) {
+        bytes memory diamondCutEncoded = abi.encode(_diamondCut);
+        AllowedBytecodeTypes allowedBytecodeTypesMode = allowEvmEmulator
+            ? AllowedBytecodeTypes.EraVmAndEVM
+            : AllowedBytecodeTypes.EraVm;
+
+        return abi.encode(diamondCutEncoded, allowedBytecodeTypesMode);
+    }
+
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
         _createNewChain(_diamondCut, false);
     }
@@ -137,22 +146,16 @@ contract StateTransitionManagerTest is Test {
         _createNewChain(_diamondCut, true);
     }
 
-    function _createNewChain(Diamond.DiamondCutData memory _diamondCut, bool isEvmEmulatorAllowed) private {
+    function _createNewChain(Diamond.DiamondCutData memory _diamondCut, bool allowEvmEmulator) private {
         vm.stopPrank();
         vm.startPrank(address(bridgehub));
-
-        bytes memory diamondCutEncoded = abi.encode(_diamondCut);
-        uint256 allowedBytecodeTypesMode = isEvmEmulatorAllowed
-            ? AllowedBytecodeTypes.EraVmAndEVM
-            : AllowedBytecodeTypes.EraVm;
-        bytes memory inputData = abi.encode(diamondCutEncoded, allowedBytecodeTypesMode);
 
         chainContractAddress.createNewChain({
             _chainId: chainId,
             _baseToken: baseToken,
             _sharedBridge: sharedBridge,
             _admin: newChainAdmin,
-            _inputData: inputData
+            _inputData: getCreateInputData(_diamondCut, allowEvmEmulator)
         });
     }
 

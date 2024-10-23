@@ -8,6 +8,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
+import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
@@ -665,7 +666,8 @@ contract ExperimentalBridgeTest is Test {
             isFreezable,
             mockSelectors,
             mockInitAddress,
-            mockInitCalldata
+            mockInitCalldata,
+            false
         );
 
         // bridgeHub.createNewChain => stateTransitionManager.createNewChain => this function sets the stateTransition mapping
@@ -1435,7 +1437,8 @@ contract ExperimentalBridgeTest is Test {
         bool isFreezable,
         bytes4[] memory mockSelectors,
         address, //mockInitAddress,
-        bytes memory //mockInitCalldata
+        bytes memory, //mockInitCalldata
+        bool allowEvmEmulation
     ) internal returns (bytes memory) {
         bytes4[] memory singleSelector = new bytes4[](1);
         singleSelector[0] = bytes4(0xabcdef12);
@@ -1469,7 +1472,13 @@ contract ExperimentalBridgeTest is Test {
 
         mockSTM.setChainCreationParams(params);
 
-        return abi.encode(diamondCutData);
+        bytes memory diamondCutEncoded = abi.encode(diamondCutData);
+
+        AllowedBytecodeTypes allowedBytecodeTypesMode = allowEvmEmulation
+            ? AllowedBytecodeTypes.EraVmAndEVM
+            : AllowedBytecodeTypes.EraVm;
+
+        return abi.encode(diamondCutEncoded, allowedBytecodeTypesMode);
     }
 
     function _setUpHyperchainForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
