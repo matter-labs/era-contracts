@@ -110,11 +110,9 @@ library L2GenesisUpgradeHelper {
         );
 
         address deployedTokenBeacon;
-        // FIXME: the following does not work locally due to testing limitations.
-        // please decide how to fix
-        // if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
-        //     deployedTokenBeacon = address(IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon());
-        // }
+        if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
+            deployedTokenBeacon = address(IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon());
+        }
 
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
