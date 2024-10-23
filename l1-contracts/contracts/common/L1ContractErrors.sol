@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
 error AccessToFunctionDenied(address target, bytes4 selector, address invoker);
+//
+error AlreadyCurrentSettlementLayer();
 // 0x8164f842
 error ApprovalFailed();
 // 0x6c167909
@@ -13,6 +15,8 @@ error OnlySelfAllowed();
 error RestrictionWasNotPresent(address restriction);
 // 0xf126e113
 error RestrictionWasAlreadyPresent(address restriction);
+//
+error BridgehubOnL1();
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
 // 0xf6fd7071
@@ -179,6 +183,12 @@ error InvalidTxType(uint256 txType);
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xaa7feadc
 error InvalidValue();
+//
+error L2AssetRouter_LegacyDataNotImplemented();
+//
+error L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
+//
+error L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
 // 0x888b2f09
 error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
 // 0xa4f62e33
@@ -241,6 +251,8 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x4ef79e5a
 error NonZeroAddress(address);
+//
+error NotCurrentSettlementLayer();
 // 0xdd629f86
 error NotEnoughGas();
 // 0xdd7e3621
@@ -311,6 +323,8 @@ error RevertedBatchBeforeNewBatch();
 error RevertedBatchNotAfterNewLastBatch();
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
+//
+error SettlementLayerNotRegistered();
 // 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0xc1d9246c
