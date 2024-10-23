@@ -26,6 +26,7 @@ struct GatewayUpgradeEncodedInput {
     address l2GatewayUpgrade;
     address oldValidatorTimelock;
     address newValidatorTimelock;
+    address interopCenter;
 }
 
 /// @author Matter Labs
@@ -44,7 +45,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
-        GatewayUpgradeEncodedInput memory encodedInput = abi.decode(
+        GatewayUpgradeEncodedInput memory decodedInput = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
             (GatewayUpgradeEncodedInput)
         );
@@ -53,23 +54,24 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
 
         s.baseTokenAssetId = baseTokenAssetId;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        s.validators[encodedInput.oldValidatorTimelock] = false;
-        s.validators[encodedInput.newValidatorTimelock] = true;
+        s.validators[decodedInput.oldValidatorTimelock] = false;
+        s.validators[decodedInput.newValidatorTimelock] = true;
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
+        s.interopCenter = decodedInput.interopCenter;
 
         bytes memory gatewayUpgradeCalldata = abi.encodeCall(
             IL2GatewayUpgrade.upgrade,
             (
-                encodedInput.baseForceDeployments,
-                encodedInput.ctmDeployer,
-                encodedInput.fixedForceDeploymentsData,
+                decodedInput.baseForceDeployments,
+                decodedInput.ctmDeployer,
+                decodedInput.fixedForceDeploymentsData,
                 GatewayHelper.getZKChainSpecificForceDeploymentsData(s)
             )
         );
 
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
             IComplexUpgrader.upgrade,
-            (encodedInput.l2GatewayUpgrade, gatewayUpgradeCalldata)
+            (decodedInput.l2GatewayUpgrade, gatewayUpgradeCalldata)
         );
 
         // slither-disable-next-line controlled-delegatecall

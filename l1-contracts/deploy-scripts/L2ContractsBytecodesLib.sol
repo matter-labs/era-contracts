@@ -13,6 +13,15 @@ library L2ContractsBytecodesLib {
             Utils.readHardhatBytecode("/../l1-contracts/artifacts-zk/contracts/bridgehub/Bridgehub.sol/Bridgehub.json");
     }
 
+    /// @notice Reads the bytecode of the InteropCenter contract.
+    /// @return The bytecode of the InteropCenter contract.
+    function readInteropCenterBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/bridgehub/InteropCenter.sol/InteropCenter.json"
+            );
+    }
+
     /// @notice Reads the bytecode of the L2NativeTokenVault contract.
     /// @return The bytecode of the L2NativeTokenVault contract.
     function readL2NativeTokenVaultBytecode() internal view returns (bytes memory) {

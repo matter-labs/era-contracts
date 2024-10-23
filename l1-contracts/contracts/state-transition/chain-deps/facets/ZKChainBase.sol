@@ -48,6 +48,13 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    modifier onlyBridgehubOrInteropCenter() {
+        if ((msg.sender != s.interopCenter) && (msg.sender != s.interopCenter)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     modifier onlyAdminOrChainTypeManager() {
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);

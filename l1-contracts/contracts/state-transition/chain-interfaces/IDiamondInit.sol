@@ -24,6 +24,7 @@ import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 struct InitializeData {
     uint256 chainId;
     address bridgehub;
+    address interopCenter;
     address chainTypeManager;
     uint256 protocolVersion;
     address admin;

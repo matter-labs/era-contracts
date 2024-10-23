@@ -156,6 +156,8 @@ contract EcosystemUpgrade is Script {
         address ctmDeploymentTrackerProxy;
         address messageRootImplementation;
         address messageRootProxy;
+        address interopCenterImplementation;
+        address interopCenterProxy;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -429,7 +431,8 @@ contract EcosystemUpgrade is Script {
             fixedForceDeploymentsData: generatedData.forceDeploymentsData,
             l2GatewayUpgrade: addresses.expectedL2Addresses.expectedL2GatewayUpgrade,
             oldValidatorTimelock: config.contracts.oldValidatorTimelock,
-            newValidatorTimelock: addresses.validatorTimelock
+            newValidatorTimelock: addresses.validatorTimelock,
+            interopCenter: addresses.bridgehub.interopCenterProxy
         });
 
         bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput);
@@ -526,7 +529,8 @@ contract EcosystemUpgrade is Script {
                 (
                     addresses.bridges.sharedBridgeProxy,
                     CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-                    MessageRoot(addresses.bridgehub.messageRootProxy)
+                    MessageRoot(addresses.bridgehub.messageRootProxy),
+                    addresses.bridgehub.interopCenterProxy
                 )
             ),
             value: 0

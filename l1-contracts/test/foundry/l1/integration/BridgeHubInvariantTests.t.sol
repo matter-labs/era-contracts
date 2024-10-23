@@ -19,6 +19,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -270,7 +271,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = interopCenter.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -320,7 +321,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
+        bytes32 resultantHash = interopCenter.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -375,7 +376,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges(requestTx);
+        bytes32 resultantHash = interopCenter.requestL2TransactionTwoBridges(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -420,7 +421,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
+        bytes32 resultantHash = interopCenter.requestL2TransactionDirect{value: mintValue}(txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -464,7 +465,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionDirect(txRequest);
+        bytes32 resultantHash = interopCenter.requestL2TransactionDirect(txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -512,7 +513,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IInteropCenter.proveL2MessageInclusion.selector,
                 currentChainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -568,7 +569,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IInteropCenter.proveL2MessageInclusion.selector,
                 currentChainId,
                 l2BatchNumber,
                 l2MessageIndex,

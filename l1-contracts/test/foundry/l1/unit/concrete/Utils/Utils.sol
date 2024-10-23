@@ -309,7 +309,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](39);
+        bytes4[] memory selectors = new bytes4[](40);
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
@@ -349,6 +349,7 @@ library Utils {
         selectors[36] = UtilsFacet.util_setTotalBatchesExecuted.selector;
         selectors[37] = UtilsFacet.util_setL2LogsRootHash.selector;
         selectors[38] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
+        selectors[39] = UtilsFacet.util_setInteropCenter.selector;
 
         return selectors;
     }
@@ -382,6 +383,7 @@ library Utils {
                 chainId: 1,
                 bridgehub: address(dummyBridgehub),
                 chainTypeManager: address(0x1234567890876543567890),
+                interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),

@@ -19,6 +19,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -81,8 +82,8 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(interopCenter),
+            abi.encodeWithSelector(IInteropCenter.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         uint256 chainId = eraZKChainId;
@@ -172,7 +173,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-        bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
+        interopCenter.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,

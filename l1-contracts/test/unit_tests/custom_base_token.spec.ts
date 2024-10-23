@@ -10,6 +10,8 @@ import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
 import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
 import type { IL1NativeTokenVault } from "../../typechain/IL1NativeTokenVault";
 import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultFactory";
+import { IInteropCenter } from "../../typechain/IInteropCenter";
+import { IInteropCenterFactory } from "../../typechain/IInteropCenterFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -25,6 +27,7 @@ describe("Custom base token chain and bridge tests", () => {
   let deployer: Deployer;
   let l1SharedBridge: IL1AssetRouter;
   let bridgehub: IBridgehub;
+  let interopCenter: IInteropCenter;
   let nativeTokenVault: IL1NativeTokenVault;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
@@ -54,6 +57,7 @@ describe("Custom base token chain and bridge tests", () => {
     deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [], "BAT");
     chainId = deployer.chainId;
     bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    interopCenter = IInteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
 
     const tokens = getTokens();
     baseTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "BAT")!.address;
@@ -123,7 +127,7 @@ describe("Custom base token chain and bridge tests", () => {
 
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
     await (await baseToken.connect(randomSigner).approve(l1SharedBridge.address, baseTokenAmount)).wait();
-    await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
+    await interopCenter.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,
       l2Value: 1,

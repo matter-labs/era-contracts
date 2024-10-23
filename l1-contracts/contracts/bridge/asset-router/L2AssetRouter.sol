@@ -14,9 +14,10 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
@@ -77,7 +78,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) {
+    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), IInteropCenter(L2_INTEROP_CENTER_ADDR)) {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();

@@ -16,7 +16,7 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -26,6 +26,7 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -50,6 +51,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
     IBridgehub l2Bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
+    IInteropCenter l2InteropCenter = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;

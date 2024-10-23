@@ -25,6 +25,7 @@ import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -269,7 +270,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex""
         });
         if (!correctSecondBridge) {
-            call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+            call.data = abi.encodeCall(IInteropCenter.requestL2TransactionTwoBridges, (outer));
             // 0 is not correct second bridge
             return call;
         }
@@ -289,7 +290,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+        call.data = abi.encodeCall(IInteropCenter.requestL2TransactionTwoBridges, (outer));
     }
 
     function assertInvalidMigrationCall(Call memory call) public {
@@ -368,7 +369,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), new MessageRoot(bridgehub));
+        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), new MessageRoot(bridgehub), address(1));
         vm.stopPrank();
 
         // ctm deployer address is 0 in this test

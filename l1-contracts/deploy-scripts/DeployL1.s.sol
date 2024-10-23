@@ -20,6 +20,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -104,6 +105,7 @@ contract DeployL1Script is Script, DeployUtils {
         deployChainAdmin();
         deployTransparentProxyAdmin();
         deployBridgehubContract();
+        deployInteropCenterContract();
         deployMessageRootContract();
 
         deployL1NullifierContracts();
@@ -173,6 +175,26 @@ contract DeployL1Script is Script, DeployUtils {
         addresses.bridgehub.bridgehubProxy = bridgehubProxy;
     }
 
+    function deployInteropCenterContract() internal {
+        address interopCenterImplementation = deployViaCreate2(
+            type(InteropCenter).creationCode,
+            abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.ownerAddress)
+        );
+        console.log("InteropCenter Implementation deployed at:", interopCenterImplementation);
+        addresses.bridgehub.interopCenterImplementation = interopCenterImplementation;
+
+        address interopCenterProxy = deployViaCreate2(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(
+                interopCenterImplementation,
+                addresses.transparentProxyAdmin,
+                abi.encodeCall(InteropCenter.initialize, (config.deployerAddress))
+            )
+        );
+        console.log("Interop Center Proxy deployed at:", interopCenterProxy);
+        addresses.bridgehub.interopCenterProxy = interopCenterProxy;
+    }
+
     function deployMessageRootContract() internal {
         address messageRootImplementation = deployViaCreate2(
             type(MessageRoot).creationCode,
@@ -196,7 +218,11 @@ contract DeployL1Script is Script, DeployUtils {
     function deployCTMDeploymentTracker() internal {
         address ctmDTImplementation = deployViaCreate2(
             type(CTMDeploymentTracker).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.sharedBridgeProxy)
+            abi.encode(
+                addresses.bridgehub.bridgehubProxy,
+                addresses.bridgehub.interopCenterProxy,
+                addresses.bridges.sharedBridgeProxy
+            )
         );
         console.log("CTM Deployment Tracker Implementation deployed at:", ctmDTImplementation);
         addresses.bridgehub.ctmDeploymentTrackerImplementation = ctmDTImplementation;
@@ -291,7 +317,12 @@ contract DeployL1Script is Script, DeployUtils {
         address contractAddress = deployViaCreate2(
             type(L1NullifierDev).creationCode,
             // solhint-disable-next-line func-named-parameters
-            abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.stateTransition.diamondProxy)
+            abi.encode(
+                addresses.bridgehub.bridgehubProxy,
+                addresses.bridgehub.interopCenterProxy,
+                config.eraChainId,
+                addresses.stateTransition.diamondProxy
+            )
         );
         console.log("L1NullifierImplementation deployed at:", contractAddress);
         addresses.bridges.l1NullifierImplementation = contractAddress;
@@ -314,6 +345,7 @@ contract DeployL1Script is Script, DeployUtils {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridgehub.bridgehubProxy,
+                addresses.bridgehub.interopCenterProxy,
                 addresses.bridges.l1NullifierProxy,
                 config.eraChainId,
                 addresses.stateTransition.diamondProxy
@@ -335,14 +367,17 @@ contract DeployL1Script is Script, DeployUtils {
 
     function setBridgehubParams() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        InteropCenter interopCenter = InteropCenter(addresses.bridgehub.interopCenterProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
             addresses.bridges.sharedBridgeProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-            IMessageRoot(addresses.bridgehub.messageRootProxy)
+            IMessageRoot(addresses.bridgehub.messageRootProxy),
+            addresses.bridgehub.interopCenterProxy
         );
+        interopCenter.setAddresses(addresses.bridges.sharedBridgeProxy);
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
@@ -688,6 +723,9 @@ contract DeployL1Script is Script, DeployUtils {
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            interopCenterBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readInteropCenterBytecode()
+            ),
             // For newly created chains it it is expected that the following bridges are not present
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),

@@ -6,6 +6,7 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -24,6 +25,7 @@ contract L1ContractDeployer is Test {
     address bridgehubProxyAddress;
     address bridgehubOwnerAddress;
     Bridgehub bridgehub;
+    IInteropCenter interopCenter;
 
     CTMDeploymentTracker ctmDeploymentTracker;
 
@@ -56,6 +58,7 @@ contract L1ContractDeployer is Test {
         ecosystemConfig = l1Script.getConfig();
 
         bridgehub = Bridgehub(ecosystemAddresses.bridgehub.bridgehubProxy);
+        interopCenter = IInteropCenter(ecosystemAddresses.bridgehub.interopCenterProxy);
         chainTypeManager = IChainTypeManager(ecosystemAddresses.stateTransition.chainTypeManagerProxy);
         ctmDeploymentTracker = CTMDeploymentTracker(ecosystemAddresses.bridgehub.ctmDeploymentTrackerProxy);
 
