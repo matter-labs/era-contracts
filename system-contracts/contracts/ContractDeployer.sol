@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-// solhint-disable reason-string, gas-custom-errors, func-named-parameters
-
 pragma solidity 0.8.24;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
