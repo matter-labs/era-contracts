@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import { ZeroAddress, Unauthorized } from "../common/L1ContractErrors.sol";
 

@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {ZKChainStorage} from "../state-transition/chain-deps/ZKChainStorage.sol";
@@ -30,8 +30,15 @@ library GatewayHelper {
         }
 
         // It is required for a base to implement the following methods
-        string memory baseTokenName = IERC20Metadata(_baseTokenAddress).name();
-        string memory baseTokenSymbol = IERC20Metadata(_baseTokenAddress).symbol();
+        string memory baseTokenName;
+        string memory baseTokenSymbol;
+        if (_baseTokenAddress == ETH_TOKEN_ADDRESS) {
+            baseTokenName = string("Ether");
+            baseTokenSymbol = string("ETH");
+        } else {
+            baseTokenName = IERC20Metadata(_baseTokenAddress).name();
+            baseTokenSymbol = IERC20Metadata(_baseTokenAddress).symbol();
+        }
 
         ZKChainSpecificForceDeploymentsData
             memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
