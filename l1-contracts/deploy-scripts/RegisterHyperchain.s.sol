@@ -44,6 +44,7 @@ contract RegisterHyperchainScript is Script {
         address newDiamondProxy;
         address governance;
         address chainAdmin;
+        bool isEvmEmulatorSupported;
     }
 
     Config internal config;
@@ -100,6 +101,7 @@ contract RegisterHyperchainScript is Script {
         );
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+        config.isEvmEmulatorSupported = toml.readBool("$.chain.is_evm_emulator_supported");
     }
 
     function checkTokenAddress() internal view {
@@ -166,6 +168,10 @@ contract RegisterHyperchainScript is Script {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
 
+        uint256 allowedBytecodeTypesMode = config.isEvmEmulatorSupported ? 1 : 0;
+
+        bytes memory diamondCutEncoded = abi.encode(config.diamondCutData);
+
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
@@ -175,7 +181,7 @@ contract RegisterHyperchainScript is Script {
                 config.baseToken,
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
-                config.diamondCutData
+                abi.encode(diamondCutEncoded, allowedBytecodeTypesMode)
             )
         );
 

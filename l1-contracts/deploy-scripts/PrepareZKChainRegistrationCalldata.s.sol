@@ -74,6 +74,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         bytes diamondCutData;
         // Address of the L1 ERC20 bridge proxy (required for the L2 bridge deployment)
         address erc20BridgeProxy;
+        // Should be EVM emulator supported or not
+        bool isEvmEmulatorSupported;
     }
 
     // Addresses of the contracts in the L1 ecosystem that are fetched from the chain
@@ -151,6 +153,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.diamondCutData = toml.readBytes("$.chain.diamond_cut_data");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
+        config.isEvmEmulatorSupported = toml.readBool("$.chain.is_evm_emulator_supported");
 
         bytecodes.l2SharedBridgeBytecode = Utils.readHardhatBytecode("/script-config/artifacts/L2SharedBridge.json");
         bytecodes.beaconProxy = Utils.readHardhatBytecode("/script-config/artifacts/BeaconProxy.json");
@@ -270,6 +273,10 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     function prepareRegisterHyperchainCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
+        uint256 allowedBytecodeTypesMode = config.isEvmEmulatorSupported ? 1 : 0;
+
+        bytes memory diamondCutEncoded = abi.encode(config.diamondCutData);
+
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
             (
@@ -278,7 +285,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
                 config.baseToken,
                 config.bridgehubCreateNewChainSalt,
                 config.chainAdmin,
-                config.diamondCutData
+                abi.encode(diamondCutEncoded, allowedBytecodeTypesMode)
             )
         );
 

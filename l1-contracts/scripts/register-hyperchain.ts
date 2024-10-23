@@ -68,6 +68,7 @@ async function main() {
     .option("--base-token-address <base-token-address>")
     .option("--use-governance <use-governance>")
     .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
+    .option("--allow-evm-emulation")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -106,7 +107,21 @@ async function main() {
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
 
-      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
+      const isEvmEmulatorSupported = !!cmd.allowEvmEmulation;
+
+      console.log(`EVM emulator: ${isEvmEmulatorSupported ? "SUPPORTED" : " NOT SUPPORTED"}`);
+
+      await deployer.registerHyperchain(
+        baseTokenAddress,
+        cmd.validiumMode,
+        null,
+        gasPrice,
+        null,
+        null,
+        null,
+        useGovernance,
+        isEvmEmulatorSupported
+      );
       if (tokenMultiplierSetterAddress != "") {
         console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
         await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);

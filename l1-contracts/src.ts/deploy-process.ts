@@ -80,7 +80,8 @@ export async function registerHyperchain(
   gasPrice: BigNumberish,
   baseTokenName?: string,
   chainId?: string,
-  useGovernance: boolean = false
+  useGovernance: boolean = false,
+  isEvmEmulatorSupported: boolean = false
 ) {
   const testnetTokens = getTokens();
 
@@ -99,6 +100,7 @@ export async function registerHyperchain(
     false,
     null,
     chainId,
-    useGovernance
+    useGovernance,
+    isEvmEmulatorSupported
   );
 }

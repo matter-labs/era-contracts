@@ -13,6 +13,7 @@ import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
 import {ISystemContext} from "./l2-deps/ISystemContext.sol";
+import {AllowedBytecodeTypes} from "./l2-deps/AllowedBytecodeTypes.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -322,8 +323,15 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// registration
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
-    function _setChainIdUpgrade(uint256 _chainId, address _chainContract) internal {
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
+    function _setChainConfigurationUpgrade(
+        uint256 _chainId,
+        AllowedBytecodeTypes _allowedBytecodeTypesMode,
+        address _chainContract
+    ) internal {
+        bytes memory systemContextCalldata = abi.encodeCall(
+            ISystemContext.setChainConfiguration,
+            (_chainId, uint256(_allowedBytecodeTypesMode))
+        );
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
 
@@ -396,13 +404,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _baseToken the base token address used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
-    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
+    /// @param inputData the input data for chain creation
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut
+        bytes calldata inputData
     ) external onlyBridgehub {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
@@ -410,12 +418,18 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         }
 
         // check not registered
+        (bytes memory _diamondCut, AllowedBytecodeTypes allowedBytecodeTypesMode) = abi.decode(
+            inputData,
+            (bytes, AllowedBytecodeTypes)
+        );
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
-        // check input
-        bytes32 cutHashInput = keccak256(_diamondCut);
-        if (cutHashInput != initialCutHash) {
-            revert HashMismatch(initialCutHash, cutHashInput);
+        {
+            // check input
+            bytes32 cutHashInput = keccak256(_diamondCut);
+            if (cutHashInput != initialCutHash) {
+                revert HashMismatch(initialCutHash, cutHashInput);
+            }
         }
 
         // construct init data
@@ -445,8 +459,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         _registerNewHyperchain(_chainId, hyperchainAddress);
 
-        // set chainId in VM
-        _setChainIdUpgrade(_chainId, hyperchainAddress);
+        // set chain configuration: chainId in VM and allowed bytecode types
+        _setChainConfigurationUpgrade(_chainId, allowedBytecodeTypesMode, hyperchainAddress);
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.
