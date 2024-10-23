@@ -179,18 +179,18 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override returns (bytes32 canonicalTxHash) {
-        return _requestL2TransactionTwoBridges(msg.sender, _request);
+        return _requestL2TransactionTwoBridges(msg.sender, false, _request);
     }
 
     function requestL2TransactionTwoBridgesSender(
         address _sender,
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
-        return _requestL2TransactionTwoBridges(_sender, _request);
+        return _requestL2TransactionTwoBridges(_sender, true, _request);
     }
 
     function _requestL2TransactionTwoBridges(
-        address _sender,
+        address _sender, bool _routeViaBridgehub,
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) internal nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
@@ -221,7 +221,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             );
         }
         L2TransactionRequestTwoBridgesInner memory outputRequest;
-        if (_request.secondBridgeAddress == address(assetRouter)) {
+        if (_request.secondBridgeAddress == address(assetRouter) || !_routeViaBridgehub) {
             // slither-disable-next-line arbitrary-send-eth
             outputRequest = IL1AssetRouter(_request.secondBridgeAddress).bridgehubDeposit{
                 value: _request.secondBridgeValue

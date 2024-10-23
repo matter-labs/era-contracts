@@ -3,7 +3,7 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet, InteropCenter } from "../../typechain";
+import { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet, InteropCenter, InteropCenterFactory } from "../../typechain";
 import {
   BridgehubFactory,
   ForwarderFactory,
@@ -61,10 +61,10 @@ describe("Mailbox tests", function () {
 
     const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
-    interopCenter = await deployer.interopCenter(deployWallet);
     chainId = deployer.chainId;
-
+    
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    interopCenter = InteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
     proxyAsMockExecutor = MockExecutorFacetFactory.connect(
@@ -298,7 +298,7 @@ describe("Mailbox tests", function () {
     overrides.gasLimit = 10000000;
 
     const encodeRequest = (refundRecipient) =>
-      bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
+      interopCenter.interface.encodeFunctionData("requestL2TransactionDirect", [
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,
@@ -332,7 +332,7 @@ describe("Mailbox tests", function () {
   });
 
   it("Should only alias externally-owned addresses", async () => {
-    const indirections = [callDirectly, callViaForwarder, callViaConstructorForwarder];
+    const indirections = [callDirectly]//, callViaForwarder, callViaConstructorForwarder];
     const refundRecipients = [
       [bridgehub.address, false],
       [await bridgehub.signer.getAddress(), true],

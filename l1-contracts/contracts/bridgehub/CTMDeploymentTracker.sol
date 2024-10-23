@@ -35,7 +35,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyInteropCenter() {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(INTEROP_CENTER), "CTM DT: not BH");
+        require(msg.sender == address(INTEROP_CENTER), "CTM DT: not IC");
         _;
     }
 

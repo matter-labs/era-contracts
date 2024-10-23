@@ -4,7 +4,7 @@ import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
 import type { Bridgehub, InteropCenter } from "../../typechain";
-import { BridgehubFactory } from "../../typechain";
+import { BridgehubFactory, InteropCenterFactory } from "../../typechain";
 
 import {
   initialTestnetDeploymentProcess,
@@ -60,7 +60,7 @@ describe("Gateway", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    interopCenter = migratingDeployer.interopCenter(deployWallet);
+    interopCenter = InteropCenterFactory.connect(migratingDeployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
 
     gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     gatewayDeployer.chainId = 10;
@@ -104,7 +104,7 @@ describe("Gateway", function () {
     const assetId = await bridgehub.ctmAssetIdFromChainId(chainId);
 
     await migratingDeployer.executeUpgrade(
-      bridgehub.address,
+      interopCenter.address,
       value,
       bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
         {
@@ -123,7 +123,7 @@ describe("Gateway", function () {
       ])
     );
     await migratingDeployer.executeUpgrade(
-      bridgehub.address,
+      interopCenter.address,
       value,
       bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
         {
