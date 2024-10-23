@@ -2071,8 +2071,8 @@ object "Bootloader" {
                 ) {
                     // If not enough gas for pubdata was provided, we revert all the state diffs / messages
                     // that caused the pubdata to be published
-                    debugLog("Reverting due to pubdata", 0)
-                    nearCallPanic()
+                    // debugLog("Reverting due to pubdata", 0)
+                    // nearCallPanic()
                 }
             }
 
