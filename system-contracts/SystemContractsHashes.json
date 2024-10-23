@@ -45,7 +45,7 @@
     "contractName": "DefaultAccount",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/DefaultAccount.sol/DefaultAccount.json",
     "sourceCodePath": "contracts-preprocessed/DefaultAccount.sol",
-    "bytecodeHash": "0x0100055d9982342d047fb5709665acedb5a5fa432ec105c907d60c878f95cd3e",
+    "bytecodeHash": "0x0100055d974eab9e54ec46d3aba418a5fe4d1d41ae6036d0c473835e28106376",
     "sourceCodeHash": "0xebffe840ebbd9329edb1ebff8ca50f6935e7dabcc67194a896fcc2e968d46dfb"
   },
   {

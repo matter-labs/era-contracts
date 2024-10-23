@@ -6,6 +6,7 @@ import {MailboxFacet} from "./facets/Mailbox.sol";
 import {ExecutorFacet} from "./facets/Executor.sol";
 import {GettersFacet} from "./facets/Getters.sol";
 import {AdminFacet} from "./facets/Admin.sol";
+import {Multicall3} from "../../dev-contracts/Multicall3.sol";
 
 import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
@@ -87,6 +88,7 @@ struct DAContracts {
 }
 
 struct DeployedContracts {
+    address multicall3;
     StateTransitionContracts stateTransition;
     DAContracts daContracts;
     bytes diamondCutData;
@@ -118,6 +120,8 @@ contract GatewayCTMDeployer {
         // so it is actually relatively lightweight tx.
 
         DeployedContracts memory contracts;
+
+        contracts.multicall3 = address(new Multicall3{salt: salt}());
 
         _deployFacetsAndUpgrades(
             salt,

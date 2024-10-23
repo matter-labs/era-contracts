@@ -64,6 +64,8 @@ import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploym
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
+    address expectedRollupL2DAValidator;
+
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 
     function run() public {
@@ -97,6 +99,8 @@ contract DeployL1Script is Script, DeployUtils {
 
         deployBytecodesSupplier();
 
+        initializeExpectedL2Addresses();
+
         deployVerifier();
 
         deployDefaultUpgrade();
@@ -125,7 +129,7 @@ contract DeployL1Script is Script, DeployUtils {
         initializeGeneratedData();
 
         deployBlobVersionedHashRetriever();
-        deployChainTypeManagerContract();
+        deployChainTypeManagerContract(addresses.daAddresses.rollupDAManager);
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
 
@@ -149,14 +153,29 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function deployDAValidators() internal {
-        address contractAddress = deployViaCreate2(Utils.readRollupDAValidatorBytecode(), "");
-        console.log("L1RollupDAValidator deployed at:", contractAddress);
-        addresses.daAddresses.l1RollupDAValidator = contractAddress;
+    function initializeExpectedL2Addresses() internal {
+        expectedRollupL2DAValidator = Utils.getL2AddressViaCreate2Factory(
+            bytes32(0),
+            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
+            hex""
+        );
+    }
 
-        contractAddress = deployViaCreate2(type(ValidiumL1DAValidator).creationCode, "");
-        console.log("L1ValidiumDAValidator deployed at:", contractAddress);
-        addresses.daAddresses.l1ValidiumDAValidator = contractAddress;
+    function deployDAValidators() internal {
+        vm.broadcast();
+        address rollupDAManager = address(new RollupDAManager());
+        addresses.daAddresses.rollupDAManager = rollupDAManager;
+
+        address rollupDAValidator = deployViaCreate2(Utils.readRollupDAValidatorBytecode(), "");
+        console.log("L1RollupDAValidator deployed at:", rollupDAValidator);
+        addresses.daAddresses.l1RollupDAValidator = rollupDAValidator;
+
+        address validiumDAValidator = deployViaCreate2(type(ValidiumL1DAValidator).creationCode, "");
+        console.log("L1ValidiumDAValidator deployed at:", validiumDAValidator);
+        addresses.daAddresses.l1ValidiumDAValidator = validiumDAValidator;
+
+        vm.broadcast();
+        RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), expectedRollupL2DAValidator, true);
     }
     function deployBridgehubContract() internal {
         address bridgehubImplementation = deployViaCreate2(
@@ -476,6 +495,8 @@ contract DeployL1Script is Script, DeployUtils {
         CTMDeploymentTracker ctmDeploymentTracker = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
         ctmDeploymentTracker.transferOwnership(addresses.governance);
 
+        RollupDAManager(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
+
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -646,6 +667,11 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.serializeAddress(
             "deployed_addresses",
+            "l1_rollup_da_manager",
+            addresses.daAddresses.rollupDAManager
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
             "rollup_l1_da_validator_addr",
             addresses.daAddresses.l1RollupDAValidator
         );
@@ -669,6 +695,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", expectedRollupL2DAValidator);
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);

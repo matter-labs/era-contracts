@@ -13,7 +13,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_CREATE2_FACTORY_ADDRESS} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 
@@ -37,6 +37,10 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
+import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
+
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayCTMFromL1 is Script {
@@ -75,6 +79,7 @@ contract GatewayCTMFromL1 is Script {
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
+        address expectedRollupL2DAValidator;
         bytes forceDeploymentsData;
     }
 
@@ -87,16 +92,71 @@ contract GatewayCTMFromL1 is Script {
     }
 
     Config internal config;
+    GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
     Output internal output;
 
-    function run() public {
-        console.log("Setting up the Gateway script");
-
+    function run() external {
         initializeConfig();
-        deployGatewayContracts();
+
+        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
+            bytes32(0),
+            gatewayCTMDeployerConfig
+        );
+
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
+
+        for(uint i = 0 ; i <deps.length; i++) {
+            bytes[] memory localDeps = new bytes[](1);
+            localDeps[0] = deps[i];
+            Utils.runL1L2Transaction({
+                l2Calldata: hex"",
+                l2GasLimit: 72_000_000,
+                l2Value: 0,
+                factoryDeps: localDeps,
+                dstAddress: address(0),
+                chainId: config.chainChainId,
+                bridgehubAddress: config.bridgehub,
+                l1SharedBridgeProxy: config.sharedBridgeProxy
+            });
+        }
+
+        Utils.runL1L2Transaction({
+            l2Calldata: create2Calldata,
+            l2GasLimit: 72_000_000,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
+            chainId: config.chainChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy
+        });
+
+        output = Output({
+            gatewayStateTransition: StateTransitionDeployedAddresses({
+                chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
+                chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
+                verifier: expectedGatewayContracts.stateTransition.verifier,
+                adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
+                mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
+                executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
+                gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
+                diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
+                genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
+                // No need for default upgrade on gateway
+                defaultUpgrade: address(0),
+                validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
+                diamondProxy: address(0),
+                bytecodesSupplier: address(0)
+            }),
+            multicall3: expectedGatewayContracts.multicall3,
+            diamondCutData: expectedGatewayContracts.diamondCutData,
+            relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
+            validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator
+        });
 
         saveOutput();
     }
+
 
     function initializeConfig() internal {
         deployerAddress = msg.sender;
@@ -137,8 +197,54 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
+            expectedRollupL2DAValidator: toml.readAddress("$.expected_rollup_l2_da_validator"),
             forceDeploymentsData: toml.readBytes("$.force_deployments_data")
         });
+
+        address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+        gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
+            governanceAddress: aliasedGovernor,
+            salt: bytes32(0),
+            eraChainId: config.eraChainId,
+            l1ChainId: config.l1ChainId,
+            rollupL2DAValidatorAddress: config.expectedRollupL2DAValidator,
+            testnetVerifier: config.testnetVerifier,
+
+            adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
+            executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
+            mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
+            gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
+
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
+                recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
+                recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
+            }),
+
+            feeParams: FeeParams({
+                pubdataPricingMode: config.diamondInitPubdataPricingMode,
+                batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
+                maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
+                maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
+                priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
+                minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
+            }),
+
+            bootloaderHash: config.bootloaderHash,
+            defaultAccountHash: config.defaultAAHash,
+            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
+            
+            genesisRoot: config.genesisRoot,
+            genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
+            genesisBatchCommitment: config.genesisBatchCommitment,
+
+            forceDeploymentsData: config.forceDeploymentsData,
+
+            protocolVersion: config.latestProtocolVersion
+        });
+
+
+        
     }
 
     function saveOutput() internal {
@@ -198,41 +304,6 @@ contract GatewayCTMFromL1 is Script {
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-gateway-ctm.toml");
         vm.writeToml(toml, path);
-    }
-
-    /// @dev The sender may not have any privileges
-    function deployGatewayContracts() public {
-        output.multicall3 = _deployInternal(L2ContractsBytecodesLib.readMulticall3Bytecode(), hex"");
-
-        deployGatewayFacets();
-
-        output.gatewayStateTransition.verifier = deployGatewayVerifier();
-        output.gatewayStateTransition.validatorTimelock = deployValidatorTimelock();
-        output.gatewayStateTransition.genesisUpgrade = address(
-            _deployInternal(L2ContractsBytecodesLib.readL1GenesisUpgradeBytecode(), hex"")
-        );
-        console.log("Genesis upgrade deployed at", output.gatewayStateTransition.genesisUpgrade);
-        output.gatewayStateTransition.defaultUpgrade = address(
-            _deployInternal(L2ContractsBytecodesLib.readDefaultUpgradeBytecode(), hex"")
-        );
-        console.log("Default upgrade deployed at", output.gatewayStateTransition.defaultUpgrade);
-        output.gatewayStateTransition.diamondInit = address(
-            _deployInternal(L2ContractsBytecodesLib.readDiamondInitBytecode(), hex"")
-        );
-        console.log("Diamond init deployed at", output.gatewayStateTransition.diamondInit);
-
-        deployGatewayChainTypeManager();
-        setChainTypeManagerInValidatorTimelock();
-
-        output.relayedSLDAValidator = _deployInternal(
-            L2ContractsBytecodesLib.readRelayedSLDAValidatorBytecode(),
-            hex""
-        );
-
-        output.validiumDAValidator = _deployInternal(
-            L2ContractsBytecodesLib.readValidiumL1DAValidatorBytecode(),
-            hex""
-        );
     }
 
     function _deployInternal(bytes memory bytecode, bytes memory constructorargs) internal returns (address) {

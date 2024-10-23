@@ -6,6 +6,7 @@ import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROO
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
+import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 
 library L2GenesisUpgradeHelper {
     function performForceDeployedContractsInit(
@@ -96,6 +97,13 @@ library L2GenesisUpgradeHelper {
             )
         });
 
+        address deployedTokenBeacon;
+        // FIXME: the following does not work locally due to testing limitations.
+        // please decide how to fix
+        // if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
+        //     deployedTokenBeacon = address(IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon());
+        // }
+
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
             newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -107,9 +115,10 @@ library L2GenesisUpgradeHelper {
                 fixedForceDeploymentsData.aliasedL1Governance,
                 fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
                 additionalForceDeploymentsData.l2LegacySharedBridge,
-                address(0), // this is used if the contract were already deployed, so for the migration of Era.
+                deployedTokenBeacon,
                 false,
-                additionalForceDeploymentsData.l2Weth,
+                // FIXME: need to finalize the approach for weth token.
+                address(0),
                 additionalForceDeploymentsData.baseTokenAssetId
             )
         });

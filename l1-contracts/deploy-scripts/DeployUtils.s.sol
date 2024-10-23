@@ -94,6 +94,7 @@ struct L1NativeTokenVaultAddresses {
 }
 
 struct DataAvailabilityDeployedAddresses {
+    address rollupDAManager;
     address l1RollupDAValidator;
     address l1ValidiumDAValidator;
 }
@@ -343,19 +344,18 @@ contract DeployUtils is Script {
         addresses.transparentProxyAdmin = address(proxyAdmin);
     }
 
-    function deployChainTypeManagerContract() internal {
-        deployStateTransitionDiamondFacets();
+    function deployChainTypeManagerContract(address _rollupDAManager) internal {
+        deployStateTransitionDiamondFacets(_rollupDAManager);
         deployChainTypeManagerImplementation();
         deployChainTypeManagerProxy();
     }
 
-    function deployStateTransitionDiamondFacets() internal {
+    function deployStateTransitionDiamondFacets(address _rollupDAManager) internal {
         address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId));
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
-        // FIXME: deploy RollupDAManager and use it
-        address adminFacet = deployViaCreate2(type(AdminFacet).creationCode, abi.encode(config.l1ChainId));
+        address adminFacet = deployViaCreate2(type(AdminFacet).creationCode, abi.encode(config.l1ChainId, _rollupDAManager));
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 
@@ -374,6 +374,24 @@ contract DeployUtils is Script {
         console.log("DiamondInit deployed at:", diamondInit);
         addresses.stateTransition.diamondInit = diamondInit;
     }
+
+    // function deployRollupDAManager() internal {
+    //     rollupDAManager = new RollupDAManager{salt: _salt}();
+
+    //     ValidiumL1DAValidator validiumDAValidator = new ValidiumL1DAValidator{salt: _salt}();
+
+    //     RelayedSLDAValidator relayedSLDAValidator = new RelayedSLDAValidator{salt: _salt}();
+    //     rollupDAManager.updateDAPair(address(relayedSLDAValidator), _rollupL2DAValidatorAddress, true);
+
+    //     // Note, that the governance still has to accept it. 
+    //     // It will happen in a separate voting after the deployment is done.
+    //     rollupDAManager.transferOwnership(_governanceAddress);
+
+    //     _deployedContracts.daContracts.rollupDAManager = address(rollupDAManager);
+    //     _deployedContracts.daContracts.relayedSLDAValidator = address(relayedSLDAValidator);
+    //     _deployedContracts.daContracts.validiumDAValidator = address(validiumDAValidator);
+
+    // }
 
     function deployChainTypeManagerImplementation() internal {
         bytes memory bytecode = type(ChainTypeManager).creationCode;

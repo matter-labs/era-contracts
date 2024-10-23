@@ -23,7 +23,7 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 26;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 27;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 4;
 
@@ -190,6 +190,11 @@ library SystemContractsProcessing {
         systemContracts[25] = SystemContract({
             addr: 0x0000000000000000000000000000000000010001,
             codeName: "L2GenesisUpgrade",
+            lang: Language.Solidity
+        });
+        systemContracts[26] = SystemContract({
+            addr: 0x0000000000000000000000000000000000010006,
+            codeName: "SloadContract",
             lang: Language.Solidity
         });
         return systemContracts;

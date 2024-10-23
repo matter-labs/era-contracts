@@ -28,28 +28,6 @@ struct InnerDeployConfig {
 }
 
 library GatewayCTMDeployerHelper {
-    // bytes public create2Calldata;
-    // address public ctmDeployerAddress;
-
-    // DeployedContracts internal deployedContracts;
-    // GatewayCTMDeployerConfig internal config;
-
-    // constructor() {
-    //     config = _config;
-
-    //     (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(
-    //         _create2Salt, 
-    //         Utils.readZKFoundryBytecode("GatewayCTMDeployer.sol", "GatewayCTMDeployer"),
-    //         abi.encode(_config)
-    //     );
-
-    //     // Create2Factory has the same interface as the usual deployer.
-    //     create2Calldata = deployData;
-
-    //     ctmDeployerAddress = Utils.getL2AddressViaCreate2Factory(_create2Salt, bytecodeHash, abi.encode(_config));
-    // }
-
-
     function calculateAddresses(bytes32 _create2Salt, GatewayCTMDeployerConfig memory config) internal returns (
         DeployedContracts memory contracts,
         bytes memory create2Calldata,
@@ -75,6 +53,13 @@ library GatewayCTMDeployerHelper {
         bytes32 salt = config.salt;
         uint256 eraChainId = config.eraChainId;
         uint256 l1ChainId = config.l1ChainId;
+
+        contracts.multicall3 = _deployInternal(
+            "Multicall3",
+            "Multicall3.sol",
+            hex"",
+            innerConfig
+        );
 
         contracts = _deployFacetsAndUpgrades(
             salt,
@@ -326,5 +311,36 @@ library GatewayCTMDeployerHelper {
             L2ContractHelper.hashL2Bytecode(bytecode),
             keccak256(params)
         );
+    }
+
+    /// @notice List of factory dependencies needed for the correct execution of
+    /// CTMDeployer and healthy functionaling of the system overall
+    function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
+        uint256 totalDependencies = 18;
+        dependencies = new bytes[](totalDependencies);
+        uint256 index = 0;
+
+        dependencies[index++] = Utils.readZKFoundryBytecode("GatewayCTMDeployer.sol", "GatewayCTMDeployer");
+        dependencies[index++] = Utils.readZKFoundryBytecode("Multicall3.sol", "Multicall3");
+        dependencies[index++] = Utils.readZKFoundryBytecode("Mailbox.sol", "MailboxFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecode("Executor.sol", "ExecutorFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecode("Getters.sol", "GettersFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecode("RollupDAManager.sol", "RollupDAManager");
+        dependencies[index++] = Utils.readZKFoundryBytecode("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+        dependencies[index++] = Utils.readZKFoundryBytecode("RelayedSLDAValidator.sol", "RelayedSLDAValidator");
+        dependencies[index++] = Utils.readZKFoundryBytecode("Admin.sol", "AdminFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecode("DiamondInit.sol", "DiamondInit");
+        dependencies[index++] = Utils.readZKFoundryBytecode("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        // Include both verifiers since we cannot determine which one will be used
+        dependencies[index++] = Utils.readZKFoundryBytecode("TestnetVerifier.sol", "TestnetVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecode("Verifier.sol", "Verifier");
+        dependencies[index++] = Utils.readZKFoundryBytecode("ValidatorTimelock.sol", "ValidatorTimelock");
+        dependencies[index++] = Utils.readZKFoundryBytecode("ChainTypeManager.sol", "ChainTypeManager");
+        dependencies[index++] = Utils.readZKFoundryBytecode("ProxyAdmin.sol", "ProxyAdmin");
+        dependencies[index++] = Utils.readZKFoundryBytecode("TransparentUpgradeableProxy.sol", "TransparentUpgradeableProxy");
+        // Not used in scripts, but definitely needed for CTM to work
+        dependencies[index++] = Utils.readZKFoundryBytecode("DiamondProxy.sol", "DiamondProxy");
+
+        return dependencies;
     }
 }
