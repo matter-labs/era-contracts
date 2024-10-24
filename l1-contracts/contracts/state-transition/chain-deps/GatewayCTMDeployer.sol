@@ -193,7 +193,7 @@ contract GatewayCTMDeployer {
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// in the process of the exeuction of this function.
+    /// in the process of the execution of this function.
     function _deployFacetsAndUpgrades(
         bytes32 _salt,
         uint256 _eraChainId,
@@ -226,7 +226,7 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// in the process of the exeuction of this function.
+    /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
         bool _testnetVerifier,
@@ -245,7 +245,7 @@ contract GatewayCTMDeployer {
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// in the process of the exeuction of this function.
+    /// in the process of the execution of this function.
     function _deployRollupDAContracts(
         bytes32 _salt,
         address _rollupL2DAValidatorAddress,
@@ -272,7 +272,7 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _config The deployment config.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// in the process of the exeuction of this function.
+    /// in the process of the execution of this function.
     function _deployCTM(
         bytes32 _salt,
         GatewayCTMDeployerConfig memory _config,
@@ -359,7 +359,7 @@ contract GatewayCTMDeployer {
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _timelock The address of the validator timelock
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// in the process of the exeuction of this function.
+    /// in the process of the execution of this function.
     function _setChainTypeManagerInValidatorTimelock(
         address _aliasedGovernanceAddress,
         ValidatorTimelock _timelock,

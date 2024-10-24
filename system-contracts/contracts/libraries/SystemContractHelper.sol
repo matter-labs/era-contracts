@@ -424,7 +424,7 @@ library SystemContractHelper {
         );
     }
 
-    /// @notice Reads a cerain storage slot from a contract.
+    /// @notice Reads a certain storage slot from a contract.
     /// @param _addr The address to read the slot from.
     /// @param _key The key to read.
     /// @return result The value stored at slot `_key` under the address `_addr`.
