@@ -1409,16 +1409,22 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset,size, evmGasLeft)
+        checkOverflow(offset, size, evmGasLeft)
         checkMemOverflowByOffset(add(offset, size), evmGasLeft)
-        evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
-
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
 
         // Don't check overflow here since previous checks are enough to ensure this is safe
         offset := add(offset, MEM_OFFSET_INNER())
-        offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
 
-        revert(offset,size)
+        if eq(isCallerEVM, 1) {
+            offset := sub(offset, 32)
+            size := add(size, 32)
+    
+            // include gas
+            mstore(offset, evmGasLeft)
+        }
+
+        revert(offset, size)
     }
     case 0xFE { // OP_INVALID
         evmGasLeft := 0
