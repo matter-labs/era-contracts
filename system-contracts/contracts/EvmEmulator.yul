@@ -1032,11 +1032,10 @@ object "EvmEmulator" {
         
             offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
         
-            pushStackCheck(sp, 4)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
+            mstore(0x20, mload(sub(offset, 0x80))
+            mstore(0x40, mload(sub(offset, 0x60))
+            mstore(0x60, mload(sub(offset, 0x40))
+            mstore(0x80, mload(sub(offset, 0x20))
         
             _pushEVMFrame(gasForTheCall, false)
         
@@ -1081,17 +1080,11 @@ object "EvmEmulator" {
             let gasUsed := sub(gasForTheCall, gasLeft)
             evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
         
-            let back
-        
-            // skipping check since we pushed exactly 4 items earlier
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x20), back)
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x40), back)
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x60), back)
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x80), back)
+            // moving memory slots back
+            mstore(sub(offset, 0x80), mload(0x20))
+            mstore(sub(offset, 0x60), mload(0x40))
+            mstore(sub(offset, 0x40), mload(0x60))
+            mstore(sub(offset, 0x20), mload(0x80))
         }
         
         function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
@@ -3986,11 +3979,10 @@ object "EvmEmulator" {
             
                 offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
             
-                pushStackCheck(sp, 4)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
+                mstore(0x20, mload(sub(offset, 0x80))
+                mstore(0x40, mload(sub(offset, 0x60))
+                mstore(0x60, mload(sub(offset, 0x40))
+                mstore(0x80, mload(sub(offset, 0x20))
             
                 _pushEVMFrame(gasForTheCall, false)
             
@@ -4035,17 +4027,11 @@ object "EvmEmulator" {
                 let gasUsed := sub(gasForTheCall, gasLeft)
                 evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
             
-                let back
-            
-                // skipping check since we pushed exactly 4 items earlier
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x20), back)
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x40), back)
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x60), back)
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x80), back)
+                // moving memory slots back
+                mstore(sub(offset, 0x80), mload(0x20))
+                mstore(sub(offset, 0x60), mload(0x40))
+                mstore(sub(offset, 0x40), mload(0x60))
+                mstore(sub(offset, 0x20), mload(0x80))
             }
             
             function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
