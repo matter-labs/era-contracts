@@ -18,7 +18,7 @@ import {Utils} from "./Utils.sol";
 
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
-import {GatewayCTMDeployerConfig, DeployedContracts, ADDRESS_ONE} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerConfig, DeployedContracts, BLOB_HASH_RETRIEVER_ADDR} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 
 // solhint-disable gas-custom-errors
 
@@ -57,7 +57,7 @@ library GatewayCTMDeployerHelper {
             eraChainId,
             l1ChainId,
             config.rollupL2DAValidatorAddress,
-            config.governanceAddress,
+            config.aliasedGovernanceAddress,
             contracts,
             innerConfig
         );
@@ -236,7 +236,7 @@ library GatewayCTMDeployerHelper {
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
             feeParams: _config.feeParams,
-            blobVersionedHashRetriever: ADDRESS_ONE
+            blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -257,7 +257,7 @@ library GatewayCTMDeployerHelper {
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: _config.governanceAddress,
+            owner: _config.aliasedGovernanceAddress,
             validatorTimelock: _deployedContracts.stateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: _config.protocolVersion

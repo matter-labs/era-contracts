@@ -32,6 +32,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
@@ -175,6 +176,14 @@ contract ChainTypeManagerTest is Test {
             abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
             abi.encode(l1Nullifier)
         );
+
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encode(baseToken)
+        );
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
         return
             chainContractAddress.createNewChain({

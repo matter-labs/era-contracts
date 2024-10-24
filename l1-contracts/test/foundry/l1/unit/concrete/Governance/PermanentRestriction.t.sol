@@ -27,6 +27,7 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract TestPermanentRestriction is PermanentRestriction {
     constructor(IBridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
@@ -390,6 +391,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector),
             abi.encode(bridgehub)
         );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encode(baseToken)
+        );
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
+
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,

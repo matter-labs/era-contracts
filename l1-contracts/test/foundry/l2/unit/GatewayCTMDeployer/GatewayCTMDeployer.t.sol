@@ -82,7 +82,7 @@ contract GatewayCTMDeployerTest is Test {
     function setUp() external {
         // Initialize the configuration with sample data
         GatewayCTMDeployerConfig memory config = GatewayCTMDeployerConfig({
-            governanceAddress: address(0x123),
+            aliasedGovernanceAddress: address(0x123),
             salt: keccak256("test-salt"),
             eraChainId: 1001,
             l1ChainId: 1,

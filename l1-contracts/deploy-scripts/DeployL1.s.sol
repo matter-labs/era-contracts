@@ -162,7 +162,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployDAValidators() internal {
-        vm.broadcast();
+        vm.broadcast(msg.sender);
         address rollupDAManager = address(new RollupDAManager());
         addresses.daAddresses.rollupDAManager = rollupDAManager;
 
@@ -174,7 +174,7 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("L1ValidiumDAValidator deployed at:", validiumDAValidator);
         addresses.daAddresses.l1ValidiumDAValidator = validiumDAValidator;
 
-        vm.broadcast();
+        vm.broadcast(msg.sender);
         RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), expectedRollupL2DAValidator, true);
     }
     function deployBridgehubContract() internal {
@@ -463,16 +463,6 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.broadcast(msg.sender);
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
-
-        // bytes memory data = abi.encodeCall(sharedBridge.setNativeTokenVault, (IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy)));
-        // Utils.executeUpgrade({
-        //     _governor: ownable.owner(),
-        //     _salt: bytes32(0),
-        //     _target: addresses.bridges.sharedBridgeProxy,
-        //     _data: data,
-        //     _value: 0,
-        //     _delay: 0
-        // });
     }
 
     function updateOwners() internal {

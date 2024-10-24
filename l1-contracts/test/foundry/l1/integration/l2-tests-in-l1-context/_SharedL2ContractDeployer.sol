@@ -136,6 +136,12 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
             abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
             abi.encode(address(0))
         );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
+            abi.encode(address(uint160(1)))
+        );
+        
         vm.prank(L2_BRIDGEHUB_ADDR);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
@@ -193,7 +199,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         L2WrappedBaseToken wethImpl = new L2WrappedBaseToken();
         TransparentUpgradeableProxy wethProxy = new TransparentUpgradeableProxy(address(wethImpl), ownerWallet, "");
         weth = L2WrappedBaseToken(payable(wethProxy));
-        weth.initializeV2("Wrapped Ether", "WETH", L2_ASSET_ROUTER_ADDR, l1WethAddress);
+        weth.initializeV3("Wrapped Ether", "WETH", L2_ASSET_ROUTER_ADDR, l1WethAddress, baseTokenAssetId);
         return weth;
     }
 
