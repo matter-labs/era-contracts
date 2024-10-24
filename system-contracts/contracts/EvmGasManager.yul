@@ -46,6 +46,10 @@ object "EvmGasManager" {
                 mask :=  sub(shl(160, 1), 1)
             }
 
+            function MAX_88_BIT_VALUE() -> value {
+                value := sub(shl(88, 1), 1)
+            }
+
             function $llvm_AlwaysInline_llvm$__getRawSenderCodeHash() -> hash {
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, caller())
@@ -125,10 +129,17 @@ object "EvmGasManager" {
             }
             case 1 { // function isSlotWarm(uint256 _slot)
                 // If specified slot in the caller storage is warm, will return 32 bytes of unspecified data.
-                mstore(0, calldataload(1)) // load _slot
-                mstore(32, or(IS_SLOT_WARM_PREFIX(), caller())) // prefixed caller address
-
-                let transientSlot := keccak256(0, 64)
+                let _slot := calldataload(1) // load _slot
+                let transientSlot
+                switch gt(_slot, MAX_88_BIT_VALUE()) 
+                case 1 {
+                    mstore(0, _slot) 
+                    mstore(32, or(IS_SLOT_WARM_PREFIX(), caller())) // prefixed caller address
+                    transientSlot := keccak256(0, 64)
+                }
+                case 0 {
+                    transientSlot := or(shl(160, _slot), caller())
+                }
     
                 if tload(transientSlot) {
                     return(0x0, 0x20)
@@ -139,10 +150,18 @@ object "EvmGasManager" {
                 // Warm slot in caller storage, if needed. Will return original value of the slot if it is already warm.
                 $llvm_AlwaysInline_llvm$_onlyEvmSystemCall()
 
-                mstore(0, calldataload(1)) // load _slot
-                mstore(32, or(IS_SLOT_WARM_PREFIX(), caller())) // prefixed caller address
+                let _slot := calldataload(1) // load _slot
+                let transientSlot
+                switch gt(_slot, MAX_88_BIT_VALUE()) 
+                case 1 {
+                    mstore(0, _slot) 
+                    mstore(32, or(IS_SLOT_WARM_PREFIX(), caller())) // prefixed caller address
+                    transientSlot := keccak256(0, 64)
+                }
+                case 0 {
+                    transientSlot := or(shl(160, _slot), caller())
+                }
 
-                let transientSlot := keccak256(0, 64)
                 let isWarm := tload(transientSlot)
 
                 if isWarm {
