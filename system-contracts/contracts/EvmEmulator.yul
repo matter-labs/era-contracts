@@ -227,12 +227,13 @@ object "EvmEmulator" {
             mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
-            let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+            let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 0)
         
             if iszero(result) {
                 revert(0, 0)
             }
         
+            returndatacopy(0, 0, 32)
             nonce := mload(0)
         }
         
@@ -240,13 +241,14 @@ object "EvmEmulator" {
             mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
             mstore(4, account)
         
-            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
         
+            returndatacopy(0, 0, 32)
             hash := mload(0)
         }
         
@@ -380,13 +382,14 @@ object "EvmEmulator" {
             mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
             mstore(4, _addr)
         
-            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
         
+            returndatacopy(0, 0, 32)
             isEVM := mload(0)
         }
         
@@ -756,7 +759,8 @@ object "EvmEmulator" {
                 // zkEVM native
                 let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                 let zkEvmGasBefore := gas()
-                success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, 0, 0)
+                returndatacopy(0, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
                 let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
         
@@ -777,7 +781,8 @@ object "EvmEmulator" {
                 // zkEVM native
                 let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                 let zkEvmGasBefore := gas()
-                success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, 0, 0)
+                returndatacopy(0, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
                 let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
         
@@ -1005,13 +1010,14 @@ object "EvmEmulator" {
         function _fetchConstructorReturnGas() -> gasLeft {
             mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
         
-            let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
+            let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
         
+            returndatacopy(0, 0, 32)
             gasLeft := mload(0)
         }
         
@@ -3236,12 +3242,13 @@ object "EvmEmulator" {
                 mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
-                let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+                let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 0)
             
                 if iszero(result) {
                     revert(0, 0)
                 }
             
+                returndatacopy(0, 0, 32)
                 nonce := mload(0)
             }
             
@@ -3249,13 +3256,14 @@ object "EvmEmulator" {
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, account)
             
-                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
             
+                returndatacopy(0, 0, 32)
                 hash := mload(0)
             }
             
@@ -3389,13 +3397,14 @@ object "EvmEmulator" {
                 mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
                 mstore(4, _addr)
             
-                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
             
+                returndatacopy(0, 0, 32)
                 isEVM := mload(0)
             }
             
@@ -3765,7 +3774,8 @@ object "EvmEmulator" {
                     // zkEVM native
                     let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                     let zkEvmGasBefore := gas()
-                    success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, 0, 0)
+                    returndatacopy(0, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
                     let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
             
@@ -3786,7 +3796,8 @@ object "EvmEmulator" {
                     // zkEVM native
                     let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                     let zkEvmGasBefore := gas()
-                    success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                    success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, 0, 0)
+                    returndatacopy(0, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
                     let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
             
@@ -4014,13 +4025,14 @@ object "EvmEmulator" {
             function _fetchConstructorReturnGas() -> gasLeft {
                 mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
             
-                let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
+                let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
             
+                returndatacopy(0, 0, 32)
                 gasLeft := mload(0)
             }
             
