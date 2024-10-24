@@ -192,22 +192,22 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         // If the method is called by an EVM contract, then we need to increase deployment
         // nonce for a contract even if contract creation actually failed
-        /*if (SystemContractHelper.isSystemCall() && ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender)) {
+        if (SystemContractHelper.isSystemCall() && ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender)) {
             // EVM emulator provides infinite gas
-            try this.evmDeployOnAddress{value: msg.value}(newAddress, _initCode) {} catch {
+            try this.evmDeployOnAddress{value: msg.value}(msg.sender, newAddress, _initCode) {} catch {
                 newAddress = address(0);
             }
         } else {
-            this.evmDeployOnAddress{value: msg.value}(newAddress, _initCode);
-        }*/
+            this.evmDeployOnAddress{value: msg.value}(msg.sender, newAddress, _initCode);
+        }
 
-        _evmDeployOnAddress(newAddress, _initCode);
+        //_evmDeployOnAddress(newAddress, _initCode);
 
         return newAddress;
     }
 
-    function evmDeployOnAddress(address _newAddress, bytes calldata _initCode) external payable onlySelf {
-        _evmDeployOnAddress(_newAddress, _initCode);
+    function evmDeployOnAddress(address _sender, address _newAddress, bytes calldata _initCode) external payable onlySelf {
+        _evmDeployOnAddress(_sender, _newAddress, _initCode);
     }
 
     /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE2` opcode
@@ -221,7 +221,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         bytes32 bytecodeHash = EfficientCall.keccak(_initCode);
         address newAddress = Utils.getNewAddressCreate2EVM(msg.sender, _salt, bytecodeHash);
 
-        _evmDeployOnAddress(newAddress, _initCode);
+        _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
         return newAddress;
     }
@@ -383,7 +383,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         _performDeployOnAddress(_bytecodeHash, _newAddress, _aaVersion, _input, true);
     }
 
-    function _evmDeployOnAddress(address _newAddress, bytes calldata _initCode) internal {
+    function _evmDeployOnAddress(address _sender, address _newAddress, bytes calldata _initCode) internal {
         if (_getAllowedBytecodeTypesMode() != AllowedBytecodeTypes.EraVmAndEVM) {
             revert EVMEmulationNotSupported();
         }
@@ -391,7 +391,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
-        _performDeployOnAddressEVM(_newAddress, AccountAbstractionVersion.None, _initCode);
+        _performDeployOnAddressEVM(_sender, _newAddress, AccountAbstractionVersion.None, _initCode);
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -425,10 +425,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Deploy a certain bytecode on the address.
+    /// @param _sender TODO
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _aaVersion The version of the account abstraction protocol to use.
     /// @param _input The constructor calldata.
     function _performDeployOnAddressEVM(
+        address _sender,
         address _newAddress,
         AccountAbstractionVersion _aaVersion,
         bytes calldata _input
@@ -443,7 +445,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
 
         // When constructing they just get the intrepeter bytecode hash in consutrcting mode
-        _constructEVMContract(msg.sender, _newAddress, _input);
+        _constructEVMContract(_sender, _newAddress, _input);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -540,7 +542,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             _gas: uint32(gasleft()),
             _address: _newAddress,
             _data: _input,
-            _whoToMimic: msg.sender,
+            _whoToMimic: _sender,
             _isConstructor: true,
             _isSystem: false
         });
