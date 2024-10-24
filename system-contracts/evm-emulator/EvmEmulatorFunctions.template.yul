@@ -732,7 +732,7 @@ function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, re
         // zkEVM native
         let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
         let zkEvmGasBefore := gas()
-        success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, 0, 0)
+        success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
         _saveReturndataAfterZkEVMCall()
         let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
 
