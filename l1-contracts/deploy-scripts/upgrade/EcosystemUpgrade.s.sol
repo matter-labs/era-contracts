@@ -517,7 +517,7 @@ contract EcosystemUpgrade is Script {
             fixedForceDeploymentsData: generatedData.forceDeploymentsData,
             oldValidatorTimelock: config.contracts.oldValidatorTimelock,
             newValidatorTimelock: addresses.validatorTimelock,
-            wBaseTokenStore: addresses.l2WrappedBaseTokenStore
+            wrappedBaseTokenStore: addresses.l2WrappedBaseTokenStore
         });
 
         bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput);

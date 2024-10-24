@@ -11,7 +11,7 @@ import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {GatewayHelper} from "./GatewayHelper.sol";
+import {L1GatewayHelper} from "./L1GatewayHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct GatewayUpgradeEncodedInput {
@@ -21,7 +21,7 @@ struct GatewayUpgradeEncodedInput {
     address ctmDeployer;
     address oldValidatorTimelock;
     address newValidatorTimelock;
-    address wBaseTokenStore;
+    address wrappedBaseTokenStore;
 }
 
 /// @author Matter Labs
@@ -56,9 +56,9 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         bytes memory gatewayUpgradeCalldata = abi.encode(
             encodedInput.ctmDeployer,
             encodedInput.fixedForceDeploymentsData,
-            GatewayHelper.getZKChainSpecificForceDeploymentsData(
+            L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
                 s,
-                encodedInput.wBaseTokenStore,
+                encodedInput.wrappedBaseTokenStore,
                 s.__DEPRECATED_baseToken
             )
         );

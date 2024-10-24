@@ -7,52 +7,82 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {L2_CREATE2_FACTORY, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER} from "./Constants.sol";
+import {L2_CREATE2_FACTORY, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_ASSET_ROUTER} from "./Constants.sol";
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-library L2GenesisUpgradeHelper {
+/// @title L2GatewayUpgradeHelper
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice A helper library for initializing and managing force-deployed contracts during either the L2 gateway upgrade or
+/// the genesis after the gateway protocol upgrade.
+library L2GatewayUpgradeHelper {
+    /// @dev Storage slot with the admin of the contract used for EIP1967 proxies (e.g., TransparentUpgradeableProxy, BeaconProxy, etc.).
+    bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    /// @notice Initializes force-deployed contracts required for the L2 genesis upgrade.
+    /// @param _ctmDeployer Address of the CTM Deployer contract.
+    /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
+    /// is the same for all the chains.
+    /// @param _additionalForceDeploymentsData Encoded data for force deployments that
+    /// is specific for each ZK Chain.
     function performForceDeployedContractsInit(
         address _ctmDeployer,
         bytes memory _fixedForceDeploymentsData,
         bytes memory _additionalForceDeploymentsData
     ) internal {
+        // Decode and retrieve the force deployments data.
         ForceDeployment[] memory forceDeployments = _getForceDeploymentsData(
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData
         );
+
+        // Force deploy the contracts on specified addresses.
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(forceDeployments);
 
-        // It is expected that either via to the force deployments above
-        // or upon init both the L2 deployment of Bridgehub, AssetRouter and MessageRoot are deployed.
-        // (The comment does not mention the exact order in case it changes)
-        // However, there is still some follow up finalization that needs to be done.
+        // It is expected that either through the force deployments above
+        // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
+        // However, there is still some follow-up finalization that needs to be done.
 
+        // Retrieve the owner of the BridgeHub contract.
         address bridgehubOwner = L2_BRIDGE_HUB.owner();
 
+        // Prepare calldata to set addresses in BridgeHub.
         bytes memory data = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
             (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT))
         );
 
+        // Execute the call to set addresses in BridgeHub.
         (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
             address(L2_BRIDGE_HUB),
             bridgehubOwner,
             data
         );
+
+        // Revert with the original revert reason if the call failed.
         if (!success) {
-            // Progapatate revert reason
+            /// @dev Propagate the revert reason from the failed call.
             assembly {
                 revert(add(returnData, 0x20), returndatasize())
             }
         }
     }
 
+    /// @notice Retrieves and constructs the force deployments array.
+    /// @dev Decodes the provided force deployments data and organizes them into an array of `ForceDeployment` to 
+    /// to execute.
+    /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
+    /// is the same for all the chains.
+    /// @param _additionalForceDeploymentsData Encoded data for force deployments that
+    /// is specific for each ZK Chain.
+    /// @return forceDeployments An array of `ForceDeployment` structs containing deployment details.
     function _getForceDeploymentsData(
         bytes memory _fixedForceDeploymentsData,
         bytes memory _additionalForceDeploymentsData
     ) internal returns (ForceDeployment[] memory forceDeployments) {
+        // Decode the fixed and additional force deployments data.
         FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
             _fixedForceDeploymentsData,
             (FixedForceDeploymentsData)
@@ -64,6 +94,7 @@ library L2GenesisUpgradeHelper {
 
         forceDeployments = new ForceDeployment[](4);
 
+        // Configure the MessageRoot deployment.
         forceDeployments[0] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.messageRootBytecodeHash,
             newAddress: address(L2_MESSAGE_ROOT),
@@ -73,6 +104,7 @@ library L2GenesisUpgradeHelper {
             input: abi.encode(address(L2_BRIDGE_HUB))
         });
 
+        // Configure the BridgeHub deployment.
         forceDeployments[1] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.bridgehubBytecodeHash,
             newAddress: address(L2_BRIDGE_HUB),
@@ -85,6 +117,7 @@ library L2GenesisUpgradeHelper {
             )
         });
 
+        // Configure the AssetRouter deployment.
         forceDeployments[2] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2AssetRouterBytecodeHash,
             newAddress: address(L2_ASSET_ROUTER),
@@ -101,6 +134,7 @@ library L2GenesisUpgradeHelper {
             )
         });
 
+        // Ensure the WETH token is deployed and retrieve its address.
         address wrappedBaseTokenAddress = _ensureWethToken(
             additionalForceDeploymentsData.predeployedL2WethAddress,
             fixedForceDeploymentsData.aliasedL1Governance,
@@ -117,6 +151,7 @@ library L2GenesisUpgradeHelper {
 
         bool shouldDeployBeacon = deployedTokenBeacon == address(0);
 
+        // Configure the Native Token Vault deployment.
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
             newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -136,6 +171,12 @@ library L2GenesisUpgradeHelper {
         });
     }
 
+    /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.
+    /// @param _wrappedBaseTokenName The name of the wrapped base token.
+    /// @param _wrappedBaseTokenSymbol The symbol of the wrapped base token.
+    /// @param _baseTokenL1Address The L1 address of the base token.
+    /// @param _baseTokenAssetId The asset ID of the base token.
+    /// @return initData The encoded initialization calldata.
     function getWethInitData(
         string memory _wrappedBaseTokenName,
         string memory _wrappedBaseTokenSymbol,
@@ -148,6 +189,14 @@ library L2GenesisUpgradeHelper {
         );  
     }
 
+    /// @notice Ensures that the WETH token is deployed. If not predeployed, deploys it.
+    /// @param _predeployedWethToken The potential address of the predeployed WETH token.
+    /// @param _aliasedL1Governance Address of the aliased L1 governance.
+    /// @param _baseTokenL1Address L1 address of the base token.
+    /// @param _baseTokenAssetId Asset ID of the base token.
+    /// @param _baseTokenName Name of the base token.
+    /// @param _baseTokenSymbol Symbol of the base token.
+    /// @return The address of the ensured WETH token.
     function _ensureWethToken(
         address _predeployedWethToken,
         address _aliasedL1Governance,
@@ -156,7 +205,7 @@ library L2GenesisUpgradeHelper {
         string memory _baseTokenName,
         string memory _baseTokenSymbol
     ) private returns (address) {
-        if(_predeployedWethToken != address(0) && _predeployedWethToken.code.length > 0) {
+        if (_predeployedWethToken != address(0)) {
             return _predeployedWethToken;
         }
 
@@ -175,13 +224,18 @@ library L2GenesisUpgradeHelper {
             _baseTokenL1Address,
             _baseTokenAssetId
         );
-        bytes memory constructoParams = abi.encode(
+
+        bytes memory constructorParams = abi.encode(
             WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
             _aliasedL1Governance,
             initData
         );
 
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(WRAPPED_BASE_TOKEN_IMPL_ADDRESS, _aliasedL1Governance, initData);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(
+            WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
+            _aliasedL1Governance,
+            initData
+        );
 
         return address(proxy);
     }

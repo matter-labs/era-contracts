@@ -22,7 +22,7 @@ import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/I
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {GatewayHelper} from "./GatewayHelper.sol";
+import {L1GatewayHelper} from "./L1GatewayHelper.sol";
 import {BridgeHelper} from "../bridge/BridgeHelper.sol";
 
 /// @author Matter Labs
@@ -44,7 +44,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         {
             bytes memory complexUpgraderCalldata;
             {
-                bytes memory additionalForceDeploymentsData = GatewayHelper.getZKChainSpecificForceDeploymentsData(
+                bytes memory additionalForceDeploymentsData = L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
                     s, 
                     address(0),
                     baseTokenAddress        

@@ -375,24 +375,6 @@ contract DeployUtils is Script {
         addresses.stateTransition.diamondInit = diamondInit;
     }
 
-    // function deployRollupDAManager() internal {
-    //     rollupDAManager = new RollupDAManager{salt: _salt}();
-
-    //     ValidiumL1DAValidator validiumDAValidator = new ValidiumL1DAValidator{salt: _salt}();
-
-    //     RelayedSLDAValidator relayedSLDAValidator = new RelayedSLDAValidator{salt: _salt}();
-    //     rollupDAManager.updateDAPair(address(relayedSLDAValidator), _rollupL2DAValidatorAddress, true);
-
-    //     // Note, that the governance still has to accept it. 
-    //     // It will happen in a separate voting after the deployment is done.
-    //     rollupDAManager.transferOwnership(_governanceAddress);
-
-    //     _deployedContracts.daContracts.rollupDAManager = address(rollupDAManager);
-    //     _deployedContracts.daContracts.relayedSLDAValidator = address(relayedSLDAValidator);
-    //     _deployedContracts.daContracts.validiumDAValidator = address(validiumDAValidator);
-
-    // }
-
     function deployChainTypeManagerImplementation() internal {
         bytes memory bytecode = type(ChainTypeManager).creationCode;
         bytes memory constructorArgs = abi.encode(addresses.bridgehub.bridgehubProxy);

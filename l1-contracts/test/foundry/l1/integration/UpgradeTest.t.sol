@@ -30,12 +30,9 @@ contract UpgradeTest is Test {
         // Firstly, we deploy all the contracts.
         generateUpgradeData.prepareEcosystemContracts(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
 
-        // console.log("Ecosystem admin taking over ownership of temporary contracts");
-        // governanceMulticall(generateUpgradeData.getEcosystemAdmin(), generateUpgradeData.getEcosystemAdminCalls());
-
         // For chain, we have deployed the DA validator contracts
         // and also updated the chain admin.
-        console.log("Preparing chain for the upgrade (just config load)");
+        console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
         console.log("Starting stage1 of the upgrade!");

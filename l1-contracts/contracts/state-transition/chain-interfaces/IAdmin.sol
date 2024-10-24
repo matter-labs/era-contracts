@@ -87,7 +87,6 @@ interface IAdmin is IZKChainBase {
     /// @dev DANGEROUS: once activated, there is no way back!
     function makePermanentRollup() external;
 
-
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 

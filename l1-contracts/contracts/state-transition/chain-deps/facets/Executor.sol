@@ -43,8 +43,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _;
     }
 
-    constructor(uint256 l1ChainId) {
-        L1_CHAIN_ID = l1ChainId;
+    constructor(uint256 _l1ChainId) {
+        L1_CHAIN_ID = _l1ChainId;
     }
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
