@@ -399,7 +399,7 @@ for { } true { } {
         checkOverflow(sourceOffset, len)
         // Check bytecode overflow
         if gt(add(sourceOffset, len), sub(MEM_OFFSET(), 1)) {
-            revertWithGas(0)
+            panic()
         }
 
         $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, len)
@@ -488,7 +488,7 @@ for { } true { } {
 
         // Check returndata out-of-bounds error
         if gt(add(sourceOffset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
-            revertWithGas(0)
+            panic()
         }
 
         copyActivePtrData(add(MEM_OFFSET_INNER(), dstOffset), sourceOffset, len)
@@ -634,7 +634,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         if isStatic {
-            revertWithGas(0)
+            panic()
         }
 
         let key, value, gasSpent
@@ -684,7 +684,7 @@ for { } true { } {
         // Check next opcode is JUMPDEST
         let nextOpcode := readIP(ip,maxAcceptablePos)
         if iszero(eq(nextOpcode, 0x5B)) {
-            revertWithGas(evmGasLeft)
+            panic()
         }
 
         // execute JUMPDEST immediately
@@ -710,7 +710,7 @@ for { } true { } {
         // Check next opcode is JUMPDEST
         let nextOpcode := readIP(ip, maxAcceptablePos)
         if iszero(eq(nextOpcode, 0x5B)) {
-            revertWithGas(evmGasLeft)
+            panic()
         }
 
         // execute JUMPDEST immediately
@@ -754,7 +754,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         if isStatic {
-            revertWithGas(0)
+            panic()
         }
 
         let key, value
@@ -1212,7 +1212,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 375)
 
         if isStatic {
-            revertWithGas(0)
+            panic()
         }
 
         let offset, size
@@ -1233,7 +1233,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 375)
 
         if isStatic {
-            revertWithGas(0)
+            panic()
         }
 
         let offset, size
@@ -1259,7 +1259,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 375)
 
         if isStatic {
-            revertWithGas(0)
+            panic()
         }
 
         let offset, size
@@ -1286,7 +1286,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 375)
 
         if isStatic {
-            revertWithGas(0)
+            panic()
         }
 
         let offset, size
@@ -1314,7 +1314,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 375)
 
         if isStatic {
-            revertWithGas(0)
+            panic()
         }
 
         let offset, size

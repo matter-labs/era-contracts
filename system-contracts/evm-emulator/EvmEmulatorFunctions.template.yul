@@ -85,9 +85,13 @@ function revertWithGas(evmGasLeft) {
     revert(0, 32)
 }
 
+function panic() {
+    revert(0, 0)
+}
+
 function chargeGas(prevGas, toCharge) -> gasRemaining {
     if lt(prevGas, toCharge) {
-        revertWithGas(0)
+        panic()
     }
 
     gasRemaining := sub(prevGas, toCharge)
@@ -97,19 +101,19 @@ function checkMemIsAccessible(index, offset) {
     checkOverflow(index, offset)
 
     if gt(add(index, offset), MAX_MEMORY_FRAME()) {
-        revertWithGas(0)
+        panic()
     }
 }
 
 function checkMemOverflow(location) {
     if gt(location, MAX_MEMORY_FRAME()) {
-        revertWithGas(0)
+        panic()
     }
 }
 
 function checkOverflow(data1, data2) {
     if lt(add(data1, data2), data2) {
-        revertWithGas(0)
+        panic()
     }
 }
 
@@ -369,7 +373,7 @@ function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, 
     let tempSp := sub(sp, mul(0x20, sub(position, 1)))
 
     if lt(tempSp, STACK_OFFSET())  {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 
     mstore(sp, oldStackHead)
@@ -382,7 +386,7 @@ function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stack
     let tempSp := sub(sp, mul(0x20, position))
 
     if lt(tempSp, STACK_OFFSET())  {
-        revertWithGas(0)
+        panic()
     }
 
     stackHead := mload(tempSp)                    
@@ -392,7 +396,7 @@ function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stack
 function popStackItem(sp, oldStackHead) -> a, newSp, stackHead {
     // We can not return any error here, because it would break compatibility
     if lt(sp, STACK_OFFSET()) {
-        revertWithGas(0)
+        panic()
     }
 
     a := oldStackHead
@@ -402,7 +406,7 @@ function popStackItem(sp, oldStackHead) -> a, newSp, stackHead {
 
 function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
     if iszero(lt(sp, BYTECODE_OFFSET())) {
-        revertWithGas(0)
+        panic()
     }
 
     mstore(sp, oldStackHead)
@@ -424,19 +428,19 @@ function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
 
 function popStackCheck(sp, numInputs) {
     if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-        revertWithGas(0)
+        panic()
     }
 }
 
 function pushStackCheck(sp, numInputs) {
     if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
-        revertWithGas(0)
+        panic()
     }
 }
 
 function accessStackHead(sp, stackHead) -> value {
     if lt(sp, STACK_OFFSET()) {
-        revertWithGas(0)
+        panic()
     }
 
     value := stackHead
@@ -1044,7 +1048,7 @@ function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, s
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
-        revertWithGas(0)
+        panic()
     }
 
     let value, offset, size
@@ -1085,7 +1089,7 @@ function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
-        revertWithGas(0)
+        panic()
     }
 
     let value, offset, size, salt

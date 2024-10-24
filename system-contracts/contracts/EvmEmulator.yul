@@ -135,9 +135,13 @@ object "EvmEmulator" {
             revert(0, 32)
         }
         
+        function panic() {
+            revert(0, 0)
+        }
+        
         function chargeGas(prevGas, toCharge) -> gasRemaining {
             if lt(prevGas, toCharge) {
-                revertWithGas(0)
+                panic()
             }
         
             gasRemaining := sub(prevGas, toCharge)
@@ -147,19 +151,19 @@ object "EvmEmulator" {
             checkOverflow(index, offset)
         
             if gt(add(index, offset), MAX_MEMORY_FRAME()) {
-                revertWithGas(0)
+                panic()
             }
         }
         
         function checkMemOverflow(location) {
             if gt(location, MAX_MEMORY_FRAME()) {
-                revertWithGas(0)
+                panic()
             }
         }
         
         function checkOverflow(data1, data2) {
             if lt(add(data1, data2), data2) {
-                revertWithGas(0)
+                panic()
             }
         }
         
@@ -419,7 +423,7 @@ object "EvmEmulator" {
             let tempSp := sub(sp, mul(0x20, sub(position, 1)))
         
             if lt(tempSp, STACK_OFFSET())  {
-                revertWithGas(evmGasLeft)
+                panic()
             }
         
             mstore(sp, oldStackHead)
@@ -432,7 +436,7 @@ object "EvmEmulator" {
             let tempSp := sub(sp, mul(0x20, position))
         
             if lt(tempSp, STACK_OFFSET())  {
-                revertWithGas(0)
+                panic()
             }
         
             stackHead := mload(tempSp)                    
@@ -442,7 +446,7 @@ object "EvmEmulator" {
         function popStackItem(sp, oldStackHead) -> a, newSp, stackHead {
             // We can not return any error here, because it would break compatibility
             if lt(sp, STACK_OFFSET()) {
-                revertWithGas(0)
+                panic()
             }
         
             a := oldStackHead
@@ -452,7 +456,7 @@ object "EvmEmulator" {
         
         function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
             if iszero(lt(sp, BYTECODE_OFFSET())) {
-                revertWithGas(0)
+                panic()
             }
         
             mstore(sp, oldStackHead)
@@ -474,19 +478,19 @@ object "EvmEmulator" {
         
         function popStackCheck(sp, numInputs) {
             if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-                revertWithGas(0)
+                panic()
             }
         }
         
         function pushStackCheck(sp, numInputs) {
             if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
-                revertWithGas(0)
+                panic()
             }
         }
         
         function accessStackHead(sp, stackHead) -> value {
             if lt(sp, STACK_OFFSET()) {
-                revertWithGas(0)
+                panic()
             }
         
             value := stackHead
@@ -1094,7 +1098,7 @@ object "EvmEmulator" {
             evmGasLeft := chargeGas(evmGas, 32000)
         
             if isStatic {
-                revertWithGas(0)
+                panic()
             }
         
             let value, offset, size
@@ -1135,7 +1139,7 @@ object "EvmEmulator" {
             evmGasLeft := chargeGas(evmGas, 32000)
         
             if isStatic {
-                revertWithGas(0)
+                panic()
             }
         
             let value, offset, size, salt
@@ -1622,7 +1626,7 @@ object "EvmEmulator" {
                     checkOverflow(sourceOffset, len)
                     // Check bytecode overflow
                     if gt(add(sourceOffset, len), sub(MEM_OFFSET(), 1)) {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, len)
@@ -1711,7 +1715,7 @@ object "EvmEmulator" {
             
                     // Check returndata out-of-bounds error
                     if gt(add(sourceOffset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     copyActivePtrData(add(MEM_OFFSET_INNER(), dstOffset), sourceOffset, len)
@@ -1857,7 +1861,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     if isStatic {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     let key, value, gasSpent
@@ -1907,7 +1911,7 @@ object "EvmEmulator" {
                     // Check next opcode is JUMPDEST
                     let nextOpcode := readIP(ip,maxAcceptablePos)
                     if iszero(eq(nextOpcode, 0x5B)) {
-                        revertWithGas(evmGasLeft)
+                        panic()
                     }
             
                     // execute JUMPDEST immediately
@@ -1933,7 +1937,7 @@ object "EvmEmulator" {
                     // Check next opcode is JUMPDEST
                     let nextOpcode := readIP(ip, maxAcceptablePos)
                     if iszero(eq(nextOpcode, 0x5B)) {
-                        revertWithGas(evmGasLeft)
+                        panic()
                     }
             
                     // execute JUMPDEST immediately
@@ -1977,7 +1981,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     if isStatic {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     let key, value
@@ -2435,7 +2439,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 375)
             
                     if isStatic {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     let offset, size
@@ -2456,7 +2460,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 375)
             
                     if isStatic {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     let offset, size
@@ -2482,7 +2486,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 375)
             
                     if isStatic {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     let offset, size
@@ -2509,7 +2513,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 375)
             
                     if isStatic {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     let offset, size
@@ -2537,7 +2541,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 375)
             
                     if isStatic {
-                        revertWithGas(0)
+                        panic()
                     }
             
                     let offset, size
@@ -3097,9 +3101,13 @@ object "EvmEmulator" {
                 revert(0, 32)
             }
             
+            function panic() {
+                revert(0, 0)
+            }
+            
             function chargeGas(prevGas, toCharge) -> gasRemaining {
                 if lt(prevGas, toCharge) {
-                    revertWithGas(0)
+                    panic()
                 }
             
                 gasRemaining := sub(prevGas, toCharge)
@@ -3109,19 +3117,19 @@ object "EvmEmulator" {
                 checkOverflow(index, offset)
             
                 if gt(add(index, offset), MAX_MEMORY_FRAME()) {
-                    revertWithGas(0)
+                    panic()
                 }
             }
             
             function checkMemOverflow(location) {
                 if gt(location, MAX_MEMORY_FRAME()) {
-                    revertWithGas(0)
+                    panic()
                 }
             }
             
             function checkOverflow(data1, data2) {
                 if lt(add(data1, data2), data2) {
-                    revertWithGas(0)
+                    panic()
                 }
             }
             
@@ -3381,7 +3389,7 @@ object "EvmEmulator" {
                 let tempSp := sub(sp, mul(0x20, sub(position, 1)))
             
                 if lt(tempSp, STACK_OFFSET())  {
-                    revertWithGas(evmGasLeft)
+                    panic()
                 }
             
                 mstore(sp, oldStackHead)
@@ -3394,7 +3402,7 @@ object "EvmEmulator" {
                 let tempSp := sub(sp, mul(0x20, position))
             
                 if lt(tempSp, STACK_OFFSET())  {
-                    revertWithGas(0)
+                    panic()
                 }
             
                 stackHead := mload(tempSp)                    
@@ -3404,7 +3412,7 @@ object "EvmEmulator" {
             function popStackItem(sp, oldStackHead) -> a, newSp, stackHead {
                 // We can not return any error here, because it would break compatibility
                 if lt(sp, STACK_OFFSET()) {
-                    revertWithGas(0)
+                    panic()
                 }
             
                 a := oldStackHead
@@ -3414,7 +3422,7 @@ object "EvmEmulator" {
             
             function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
                 if iszero(lt(sp, BYTECODE_OFFSET())) {
-                    revertWithGas(0)
+                    panic()
                 }
             
                 mstore(sp, oldStackHead)
@@ -3436,19 +3444,19 @@ object "EvmEmulator" {
             
             function popStackCheck(sp, numInputs) {
                 if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-                    revertWithGas(0)
+                    panic()
                 }
             }
             
             function pushStackCheck(sp, numInputs) {
                 if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
-                    revertWithGas(0)
+                    panic()
                 }
             }
             
             function accessStackHead(sp, stackHead) -> value {
                 if lt(sp, STACK_OFFSET()) {
-                    revertWithGas(0)
+                    panic()
                 }
             
                 value := stackHead
@@ -4056,7 +4064,7 @@ object "EvmEmulator" {
                 evmGasLeft := chargeGas(evmGas, 32000)
             
                 if isStatic {
-                    revertWithGas(0)
+                    panic()
                 }
             
                 let value, offset, size
@@ -4097,7 +4105,7 @@ object "EvmEmulator" {
                 evmGasLeft := chargeGas(evmGas, 32000)
             
                 if isStatic {
-                    revertWithGas(0)
+                    panic()
                 }
             
                 let value, offset, size, salt
@@ -4584,7 +4592,7 @@ object "EvmEmulator" {
                         checkOverflow(sourceOffset, len)
                         // Check bytecode overflow
                         if gt(add(sourceOffset, len), sub(MEM_OFFSET(), 1)) {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, len)
@@ -4673,7 +4681,7 @@ object "EvmEmulator" {
                 
                         // Check returndata out-of-bounds error
                         if gt(add(sourceOffset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         copyActivePtrData(add(MEM_OFFSET_INNER(), dstOffset), sourceOffset, len)
@@ -4819,7 +4827,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         if isStatic {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         let key, value, gasSpent
@@ -4869,7 +4877,7 @@ object "EvmEmulator" {
                         // Check next opcode is JUMPDEST
                         let nextOpcode := readIP(ip,maxAcceptablePos)
                         if iszero(eq(nextOpcode, 0x5B)) {
-                            revertWithGas(evmGasLeft)
+                            panic()
                         }
                 
                         // execute JUMPDEST immediately
@@ -4895,7 +4903,7 @@ object "EvmEmulator" {
                         // Check next opcode is JUMPDEST
                         let nextOpcode := readIP(ip, maxAcceptablePos)
                         if iszero(eq(nextOpcode, 0x5B)) {
-                            revertWithGas(evmGasLeft)
+                            panic()
                         }
                 
                         // execute JUMPDEST immediately
@@ -4939,7 +4947,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         if isStatic {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         let key, value
@@ -5397,7 +5405,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 375)
                 
                         if isStatic {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         let offset, size
@@ -5418,7 +5426,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 375)
                 
                         if isStatic {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         let offset, size
@@ -5444,7 +5452,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 375)
                 
                         if isStatic {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         let offset, size
@@ -5471,7 +5479,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 375)
                 
                         if isStatic {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         let offset, size
@@ -5499,7 +5507,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 375)
                 
                         if isStatic {
-                            revertWithGas(0)
+                            panic()
                         }
                 
                         let offset, size
