@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-/// @title StorageReader
-/// @author 
+/// @title SloadContract
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice This contract provides a method to read values from arbitrary storage slots
 /// @dev It is used by the `SystemContractHelper` library to help system contracts read
 /// arbitrary slots of contracts.

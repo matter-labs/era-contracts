@@ -404,7 +404,10 @@ library SystemContractHelper {
         }
     }
 
-    /// @notice Force deploys an address
+    /// @notice Force deploys some bytecode hash to an address
+    /// without invoking the constructor.
+    /// @param _addr The address to force-deploy the bytecodehash to.
+    /// @param _bytecodeHash The bytecode hash to force-deploy.
     function forceDeployNoConstructor(
         address _addr,
         bytes32 _bytecodeHash
@@ -427,7 +430,18 @@ library SystemContractHelper {
         );
     }
 
-    /// @notice Reads a certain number of slots from a contract
+    /// @notice Reads a cerain storage slot from a contract.
+    /// @param _addr The address to read the slot from.
+    /// @param _key The key to read.
+    /// @return result The value stored at slot `_key` under the address `_addr`.
+    /// @dev zkEVM similarly to EVM only has an opcode to read
+    /// from the current contract's storage. However, sometimes system contracts
+    /// may require to read private storage slots of a contract. In order to provide 
+    /// generic functionality to read arbitrary storage slots from other contracts, the following 
+    /// scheme is used:
+    /// 1. Force-deploy `SloadContract` to the address.
+    /// 2. Read the required slot.
+    /// 3. Force-deploy the previous bytecode back.
     function forcedSload(
         address _addr,
         bytes32 _key
