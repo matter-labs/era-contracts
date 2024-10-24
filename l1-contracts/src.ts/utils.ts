@@ -47,7 +47,7 @@ export const FORCE_DEPLOYMENT_ABI_STRING =
   "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
 export const BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes ctmData, bytes chainData)";
 export const FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING =
-  "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address l2BridgeProxyOwnerAddress, address l2BridgedStandardERC20ProxyOwnerAddress)";
+  "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl)";
 export const ADDITIONAL_FORCE_DEPLOYMENTS_DATA_ABI_STRING = "tuple(bytes32 baseTokenAssetId, address l2Weth)";
 
 export function applyL1ToL2Alias(address: string): string {

@@ -566,7 +566,7 @@ export class Deployer {
   public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const contractAddress = await this.deployViaCreate2(
       "AdminFacet",
-      [await this.getL1ChainId()],
+      [await this.getL1ChainId(), ethers.constants.AddressZero],
       create2Salt,
       ethTxOptions
     );
