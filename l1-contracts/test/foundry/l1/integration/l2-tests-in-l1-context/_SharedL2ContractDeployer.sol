@@ -141,7 +141,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
             abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
             abi.encode(address(uint160(1)))
         );
-        
+
         vm.prank(L2_BRIDGEHUB_ADDR);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
