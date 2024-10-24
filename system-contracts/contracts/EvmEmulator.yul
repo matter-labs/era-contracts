@@ -484,6 +484,14 @@ object "EvmEmulator" {
             }
         }
         
+        function accessStackHead(sp, stackHead) -> value {
+            if lt(sp, STACK_OFFSET()) {
+                revertWithGas(0)
+            }
+        
+            value := stackHead
+        }
+        
         ////////////////////////////////////////////////////////////////
         //               EVM GAS MANAGER FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
@@ -1438,10 +1446,7 @@ object "EvmEmulator" {
                 case 0x15 { // OP_ISZERO
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-                    stackHead := iszero(stackHead)
+                    stackHead := iszero(accessStackHead(sp, stackHead))
             
                     ip := add(ip, 1)
                 }
@@ -1478,11 +1483,7 @@ object "EvmEmulator" {
                 case 0x19 { // OP_NOT
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-            
-                    stackHead := not(stackHead)
+                    stackHead := not(accessStackHead(sp, stackHead))
             
                     ip := add(ip, 1)
                 }
@@ -1557,11 +1558,7 @@ object "EvmEmulator" {
                 case 0x31 { // OP_BALANCE
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-            
-                    let addr := stackHead
+                    let addr := accessStackHead(sp, stackHead)
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1592,12 +1589,8 @@ object "EvmEmulator" {
                 }
                 case 0x35 { // OP_CALLDATALOAD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
-                    
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
             
-                    stackHead := calldataload(stackHead)
+                    stackHead := calldataload(accessStackHead(sp, stackHead))
             
                     ip := add(ip, 1)
                 }
@@ -1674,10 +1667,7 @@ object "EvmEmulator" {
                 case 0x3B { // OP_EXTCODESIZE
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-                    let addr := stackHead
+                    let addr := accessStackHead(sp, stackHead)
             
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1727,11 +1717,7 @@ object "EvmEmulator" {
                 case 0x3F { // OP_EXTCODEHASH
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-            
-                    let addr := stackHead
+                    let addr := accessStackHead(sp, stackHead)
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1748,11 +1734,7 @@ object "EvmEmulator" {
                 case 0x40 { // OP_BLOCKHASH
                     evmGasLeft := chargeGas(evmGasLeft, 20)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-            
-                    stackHead := blockhash(stackHead)
+                    stackHead := blockhash(accessStackHead(sp, stackHead))
             
                     ip := add(ip, 1)
                 }
@@ -1807,11 +1789,7 @@ object "EvmEmulator" {
                 case 0x51 { // OP_MLOAD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-            
-                    let offset := stackHead
+                    let offset := accessStackHead(sp, stackHead)
             
                     checkMemOverflowByIndex(offset, 32)
                     let expansionGas := expandMemory(add(offset, 32))
@@ -1858,10 +1836,7 @@ object "EvmEmulator" {
             
                     let key, value, isWarm
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-                    key := stackHead
+                    key := accessStackHead(sp, stackHead)
             
                     let wasWarm := isSlotWarm(key)
             
@@ -1995,11 +1970,7 @@ object "EvmEmulator" {
                 case 0x5C { // OP_TLOAD
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    if lt(sp, STACK_OFFSET()) {
-                        revertWithGas(0)
-                    }
-            
-                    stackHead := tload(stackHead)
+                    stackHead := tload(accessStackHead(sp, stackHead))
                     ip := add(ip, 1)
                 }
                 case 0x5D { // OP_TSTORE
@@ -3475,6 +3446,14 @@ object "EvmEmulator" {
                 }
             }
             
+            function accessStackHead(sp, stackHead) -> value {
+                if lt(sp, STACK_OFFSET()) {
+                    revertWithGas(0)
+                }
+            
+                value := stackHead
+            }
+            
             ////////////////////////////////////////////////////////////////
             //               EVM GAS MANAGER FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
@@ -4429,10 +4408,7 @@ object "EvmEmulator" {
                     case 0x15 { // OP_ISZERO
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                        stackHead := iszero(stackHead)
+                        stackHead := iszero(accessStackHead(sp, stackHead))
                 
                         ip := add(ip, 1)
                     }
@@ -4469,11 +4445,7 @@ object "EvmEmulator" {
                     case 0x19 { // OP_NOT
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                
-                        stackHead := not(stackHead)
+                        stackHead := not(accessStackHead(sp, stackHead))
                 
                         ip := add(ip, 1)
                     }
@@ -4548,11 +4520,7 @@ object "EvmEmulator" {
                     case 0x31 { // OP_BALANCE
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                
-                        let addr := stackHead
+                        let addr := accessStackHead(sp, stackHead)
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -4583,12 +4551,8 @@ object "EvmEmulator" {
                     }
                     case 0x35 { // OP_CALLDATALOAD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
-                        
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
                 
-                        stackHead := calldataload(stackHead)
+                        stackHead := calldataload(accessStackHead(sp, stackHead))
                 
                         ip := add(ip, 1)
                     }
@@ -4665,10 +4629,7 @@ object "EvmEmulator" {
                     case 0x3B { // OP_EXTCODESIZE
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                        let addr := stackHead
+                        let addr := accessStackHead(sp, stackHead)
                 
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -4718,11 +4679,7 @@ object "EvmEmulator" {
                     case 0x3F { // OP_EXTCODEHASH
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                
-                        let addr := stackHead
+                        let addr := accessStackHead(sp, stackHead)
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -4739,11 +4696,7 @@ object "EvmEmulator" {
                     case 0x40 { // OP_BLOCKHASH
                         evmGasLeft := chargeGas(evmGasLeft, 20)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                
-                        stackHead := blockhash(stackHead)
+                        stackHead := blockhash(accessStackHead(sp, stackHead))
                 
                         ip := add(ip, 1)
                     }
@@ -4798,11 +4751,7 @@ object "EvmEmulator" {
                     case 0x51 { // OP_MLOAD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                
-                        let offset := stackHead
+                        let offset := accessStackHead(sp, stackHead)
                 
                         checkMemOverflowByIndex(offset, 32)
                         let expansionGas := expandMemory(add(offset, 32))
@@ -4849,10 +4798,7 @@ object "EvmEmulator" {
                 
                         let key, value, isWarm
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                        key := stackHead
+                        key := accessStackHead(sp, stackHead)
                 
                         let wasWarm := isSlotWarm(key)
                 
@@ -4986,11 +4932,7 @@ object "EvmEmulator" {
                     case 0x5C { // OP_TLOAD
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        if lt(sp, STACK_OFFSET()) {
-                            revertWithGas(0)
-                        }
-                
-                        stackHead := tload(stackHead)
+                        stackHead := tload(accessStackHead(sp, stackHead))
                         ip := add(ip, 1)
                     }
                     case 0x5D { // OP_TSTORE

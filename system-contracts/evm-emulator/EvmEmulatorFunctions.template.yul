@@ -434,6 +434,14 @@ function pushStackCheck(sp, numInputs) {
     }
 }
 
+function accessStackHead(sp, stackHead) -> value {
+    if lt(sp, STACK_OFFSET()) {
+        revertWithGas(0)
+    }
+
+    value := stackHead
+}
+
 ////////////////////////////////////////////////////////////////
 //               EVM GAS MANAGER FUNCTIONALITY
 ////////////////////////////////////////////////////////////////

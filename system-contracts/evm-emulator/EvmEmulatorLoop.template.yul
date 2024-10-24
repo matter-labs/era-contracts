@@ -193,10 +193,7 @@ for { } true { } {
     case 0x15 { // OP_ISZERO
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-        stackHead := iszero(stackHead)
+        stackHead := iszero(accessStackHead(sp, stackHead))
 
         ip := add(ip, 1)
     }
@@ -233,11 +230,7 @@ for { } true { } {
     case 0x19 { // OP_NOT
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-
-        stackHead := not(stackHead)
+        stackHead := not(accessStackHead(sp, stackHead))
 
         ip := add(ip, 1)
     }
@@ -312,11 +305,7 @@ for { } true { } {
     case 0x31 { // OP_BALANCE
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-
-        let addr := stackHead
+        let addr := accessStackHead(sp, stackHead)
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -347,12 +336,8 @@ for { } true { } {
     }
     case 0x35 { // OP_CALLDATALOAD
         evmGasLeft := chargeGas(evmGasLeft, 3)
-        
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
 
-        stackHead := calldataload(stackHead)
+        stackHead := calldataload(accessStackHead(sp, stackHead))
 
         ip := add(ip, 1)
     }
@@ -429,10 +414,7 @@ for { } true { } {
     case 0x3B { // OP_EXTCODESIZE
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-        let addr := stackHead
+        let addr := accessStackHead(sp, stackHead)
 
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -482,11 +464,7 @@ for { } true { } {
     case 0x3F { // OP_EXTCODEHASH
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-
-        let addr := stackHead
+        let addr := accessStackHead(sp, stackHead)
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -503,11 +481,7 @@ for { } true { } {
     case 0x40 { // OP_BLOCKHASH
         evmGasLeft := chargeGas(evmGasLeft, 20)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-
-        stackHead := blockhash(stackHead)
+        stackHead := blockhash(accessStackHead(sp, stackHead))
 
         ip := add(ip, 1)
     }
@@ -562,11 +536,7 @@ for { } true { } {
     case 0x51 { // OP_MLOAD
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-
-        let offset := stackHead
+        let offset := accessStackHead(sp, stackHead)
 
         checkMemOverflowByIndex(offset, 32)
         let expansionGas := expandMemory(add(offset, 32))
@@ -611,20 +581,14 @@ for { } true { } {
     case 0x54 { // OP_SLOAD
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
-        let key, value, isWarm
-
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-        key := stackHead
-
+        let key := accessStackHead(sp, stackHead)
         let wasWarm := isSlotWarm(key)
 
         if iszero(wasWarm) {
             evmGasLeft := chargeGas(evmGasLeft, 2000)
         }
 
-        value := sload(key)
+        let value := sload(key)
 
         if iszero(wasWarm) {
             let _wasW, _orgV := warmSlot(key, value)
@@ -650,7 +614,7 @@ for { } true { } {
         {
             // Here it is okay to read before we charge since we known anyway that
             // the context has enough funds to compensate at least for the read.
-            // Im not sure if we need this before: require(gasLeft > GAS_CALL_STIPEND);
+            // Im not sure if we need this before: require(gasLeft > GAS_CALL_STIPEND); // TODO
             let currentValue := sload(key)
             let wasWarm, originalValue := warmSlot(key, currentValue)
 
@@ -750,11 +714,7 @@ for { } true { } {
     case 0x5C { // OP_TLOAD
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
-        if lt(sp, STACK_OFFSET()) {
-            revertWithGas(0)
-        }
-
-        stackHead := tload(stackHead)
+        stackHead := tload(accessStackHead(sp, stackHead))
         ip := add(ip, 1)
     }
     case 0x5D { // OP_TSTORE
