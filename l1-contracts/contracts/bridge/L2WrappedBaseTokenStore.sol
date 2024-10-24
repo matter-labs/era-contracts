@@ -8,11 +8,23 @@ import { ZeroAddress, Unauthorized } from "../common/L1ContractErrors.sol";
 /// @title L2WrappedBaseTokenStore
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice This contract is used as a store for L2 deployments of L2WrappedBaseToken for chains that have it.
+/// These values will be stored in the corresponding chain's L2NativeTokenVault upon migration to the new version,
+/// so these values being correct is crucial. The following upgrade process is expected for this contract:
+/// - It will be populated for the existing chains before the governance reviews the values.
+/// - Each new chain (before the new protocol version is available) will have to double check that the admin
+/// has set the correct value in this contract. If the admin did not set a correct value, the chain should be discarded.
+/// - Once the ugprade is done, this contract will no longer be needed. Even though it is unlikely for a chain to be corrupted,
+/// the governornance can fix any corrupted chains in the next ugprade.
+/// @dev This contract is not expected to be deployed as a proxy, but rather a standalone contract.
+/// @dev The `admin` of this contract is expected to be some cold wallet, trusted to provide correct values. However, 
+/// due to process above, even its malicious behavior should impact security of the ecosystem.
+/// @dev The `owner` of this contract is trusted decentralized governance. 
 contract L2WrappedBaseTokenStore is Ownable2Step {
     /// @notice Mapping from chain ID to L2 wrapped base token address.
     mapping(uint256 chainId => address l2WBaseTokenAddress) public l2WBaseTokenAddress;
 
-    /// @notice Admin address with specific permissions.
+    /// @notice Admin address who has the right to register weth token deployment for a chain.
     address public admin;
 
     /// @notice used to accept the admin role
@@ -72,6 +84,9 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
         _setWBaseTokenAddress(_chainId, _l2WBaseToken);
     }
 
+    /// @notice Sets the address of the L2 wrapped base token deployment for a chain.
+    /// @param _chainId The ID of the blockchain network.
+    /// @param _l2WBaseToken The new address of the L2 WBaseToken token.
     function _setWBaseTokenAddress(uint256 _chainId, address _l2WBaseToken) internal {
         l2WBaseTokenAddress[_chainId] = _l2WBaseToken;
         emit NewWBaseTokenAddress(_chainId, _l2WBaseToken);

@@ -32,76 +32,131 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-interfaces/IDiamondInit.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} from "../IChainTypeManager.sol";
 
-// solhint-disable gas-custom-errors
-
-/// Needed to deterministically deploy everything related to CTM
-/// We can not just use Create2Factory mainly because some of the contracts deployed are Ownable and so 
-/// we need the contract to actually transfer the ownership to the governance.
-/// To ensure deterministic addresses, this contract does have to be deployed via Create2Factory
+/// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 struct GatewayCTMDeployerConfig {
-    address governanceAddress;
+    /// @notice Address of the aliased governance contract.
+    address aliasedGovernanceAddress;
+    /// @notice Salt used for deterministic deployments via CREATE2.
     bytes32 salt;
+    /// @notice Chain ID of the Era chain.
     uint256 eraChainId;
+    /// @notice Chain ID of the L1 chain.
     uint256 l1ChainId;
+    /// @notice Address of the Rollup L2 Data Availability Validator.
     address rollupL2DAValidatorAddress;
+    /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
 
+    /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
+    /// @notice Array of function selectors for the Executor facet.
     bytes4[] executorSelectors;
+    /// @notice Array of function selectors for the Mailbox facet.
     bytes4[] mailboxSelectors;
+    /// @notice Array of function selectors for the Getters facet.
     bytes4[] gettersSelectors;
 
+    /// @notice Parameters for the verifier contract.
     VerifierParams verifierParams;
+    /// @notice Parameters related to fees.
+    /// @dev They are mainly related to the L1->L2 transactions, fees for 
+    /// which are not processed on Gateway. However, we still need these
+    /// values to deploy new chain's instances on Gateway. 
     FeeParams feeParams;
 
+    /// @notice Hash of the bootloader bytecode.
     bytes32 bootloaderHash;
+    /// @notice Hash of the default account bytecode.
     bytes32 defaultAccountHash;
+    /// @notice Maximum gas limit for priority transactions.
     uint256 priorityTxMaxGasLimit;
 
+    /// @notice Root hash of the genesis state.
     bytes32 genesisRoot;
+    /// @notice Leaf index in the genesis rollup.
     uint256 genesisRollupLeafIndex;
+    /// @notice Commitment of the genesis batch.
     bytes32 genesisBatchCommitment;
 
+    /// @notice Data for force deployments.
     bytes forceDeploymentsData;
 
+    /// @notice The latest protocol version.
     uint256 protocolVersion;
 }
 
+/// @notice Addresses of state transition related contracts.
 struct StateTransitionContracts {
+    /// @notice Address of the ChainTypeManager proxy contract.
     address chainTypeManagerProxy;
+    /// @notice Address of the ChainTypeManager implementation contract.
     address chainTypeManagerImplementation;
+    /// @notice Address of the Verifier contract.
     address verifier;
+    /// @notice Address of the Admin facet contract.
     address adminFacet;
+    /// @notice Address of the Mailbox facet contract.
     address mailboxFacet;
+    /// @notice Address of the Executor facet contract.
     address executorFacet;
+    /// @notice Address of the Getters facet contract.
     address gettersFacet;
+    /// @notice Address of the DiamondInit contract.
     address diamondInit;
+    /// @notice Address of the GenesisUpgrade contract.
     address genesisUpgrade;
+    /// @notice Address of the ValidatorTimelock contract.
     address validatorTimelock;
+    /// @notice Address of the ProxyAdmin for ChainTypeManager.
     address chainTypeManagerProxyAdmin;
 }
 
+/// @notice Addresses of Data Availability (DA) related contracts.
 struct DAContracts {
+    /// @notice Address of the RollupDAManager contract.
     address rollupDAManager;
+    /// @notice Address of the RelayedSLDAValidator contract.
     address relayedSLDAValidator;
+    /// @notice Address of the ValidiumL1DAValidator contract.
     address validiumDAValidator;
 }
 
+/// @notice Collection of all deployed contracts by the GatewayCTMDeployer.
 struct DeployedContracts {
+    /// @notice Address of the Multicall3 contract.
     address multicall3;
+    /// @notice Struct containing state transition related contracts.
     StateTransitionContracts stateTransition;
+    /// @notice Struct containing Data Availability related contracts.
     DAContracts daContracts;
+    /// @notice Encoded data for the diamond cut operation.
     bytes diamondCutData;
 }
 
-address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+/// @dev The constant address to be used for the blobHashRetriever inside the contracts.
+/// At the time of this writing the blob hash retriever is not used at all, but the zero-address 
+/// check is still yet present, so we use address one as the substitution.
+address constant BLOB_HASH_RETRIEVER_ADDR = address(uint160(1));
 
+/// @title GatewayCTMDeployer
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Contract responsible for deploying all the CTM-related contracts on top
+/// of the Gateway contract.
+/// @dev The expectation is that this contract will be deployed via the built-in L2 `Create2Factory`.
+/// This will achieve the fact that the address of this contract (and thus, the addresses of the
+/// contract it deploys are deterministic). An important role that this contract plays is in 
+/// being the first owner of some of the contracts (e.g. ValidatorTimelock), which helps it to initialize it properly
+/// and transfer the ownership to the correct governance.
+/// @dev Note, that it is expected to be used in zkEVM environment only. Since all of the deployments
+/// are done by hash in zkEVM, this contract is actually quite small and cheap to execute in zkEVM environment.
 contract GatewayCTMDeployer {
-    // Public getters for deployed contracts.
-    // Can be used in tests for generating the final addresses or
-    // generally for easier accessibility.
     DeployedContracts internal deployedContracts;
 
+    /// @notice Returns deployed contracts.
+    /// @dev Just using `public` mode for the `deployedContracts` field did not work
+    /// due to internal issues during testing.
+    /// @return contracts The struct with information about the deployed contracts. 
     function getDeployedContracts() external view returns (DeployedContracts memory contracts) {
         contracts = deployedContracts;
     }
@@ -113,11 +168,6 @@ contract GatewayCTMDeployer {
         bytes32 salt = _config.salt;
         uint256 eraChainId = _config.eraChainId;
         uint256 l1ChainId = _config.l1ChainId;
-        
-        // All the action is done inside constructor.
-        // It may seem like a lot is going for as for a single tx, but 
-        // note that on Era all deployments are done by hash and not by bytecode,
-        // so it is actually relatively lightweight tx.
 
         DeployedContracts memory contracts;
 
@@ -128,7 +178,7 @@ contract GatewayCTMDeployer {
             eraChainId,
             l1ChainId,
             _config.rollupL2DAValidatorAddress,
-            _config.governanceAddress,
+            _config.aliasedGovernanceAddress,
             contracts
         );
         _deployVerifier(salt, _config.testnetVerifier, contracts);
@@ -137,27 +187,36 @@ contract GatewayCTMDeployer {
         contracts.stateTransition.validatorTimelock = address(timelock);
 
         _deployCTM(salt, _config, contracts);
-        _setChainTypeManagerInValidatorTimelock(_config.governanceAddress, timelock, contracts);
+        _setChainTypeManagerInValidatorTimelock(_config.aliasedGovernanceAddress, timelock, contracts);
 
         deployedContracts = contracts;
     }
 
+    /// @notice Deploys facets and upgrade contracts.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _eraChainId Era Chain ID.
+    /// @param _l1ChainId L1 Chain ID.
+    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
+    /// used by permanent rollups.
+    /// @param _aliasedGovernanceAddress The aliased address of the governnace.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the exeuction of this function.
     function _deployFacetsAndUpgrades(
         bytes32 _salt,
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _rollupL2DAValidatorAddress,
-        address _governanceAddress,
+        address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId));
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
 
-        RollupDAManager rollupDAManager = _deployRollupDAManager(
+        RollupDAManager rollupDAManager = _deployRollupDAContracts(
             _salt,
             _rollupL2DAValidatorAddress,
-            _governanceAddress,
+            _aliasedGovernanceAddress,
             _deployedContracts
         );
         _deployedContracts.stateTransition.adminFacet = address(new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager));
@@ -167,6 +226,11 @@ contract GatewayCTMDeployer {
 
     }
 
+    /// @notice Deploys verifier.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _testnetVerifier Whether testnet verifier should be used.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the exeuction of this function.
     function _deployVerifier(
         bytes32 _salt,
         bool _testnetVerifier,
@@ -179,10 +243,17 @@ contract GatewayCTMDeployer {
         }
     }
 
-    function _deployRollupDAManager(
+    /// @notice Deploys DA-related contracts.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
+    /// used by permanent rollups.
+    /// @param _aliasedGovernanceAddress The aliased address of the governnace.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the exeuction of this function.
+    function _deployRollupDAContracts(
         bytes32 _salt, 
         address _rollupL2DAValidatorAddress,
-        address _governanceAddress,
+        address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal returns (RollupDAManager rollupDAManager) {
         rollupDAManager = new RollupDAManager{salt: _salt}();
@@ -194,13 +265,18 @@ contract GatewayCTMDeployer {
 
         // Note, that the governance still has to accept it. 
         // It will happen in a separate voting after the deployment is done.
-        rollupDAManager.transferOwnership(_governanceAddress);
+        rollupDAManager.transferOwnership(_aliasedGovernanceAddress);
 
         _deployedContracts.daContracts.rollupDAManager = address(rollupDAManager);
         _deployedContracts.daContracts.relayedSLDAValidator = address(relayedSLDAValidator);
         _deployedContracts.daContracts.validiumDAValidator = address(validiumDAValidator);
     }
 
+    /// @notice Deploys DA-related contracts.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _config The deployment config.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the exeuction of this function.
     function _deployCTM(
         bytes32 _salt,
         GatewayCTMDeployerConfig memory _config,
@@ -210,7 +286,7 @@ contract GatewayCTMDeployer {
             L2_BRIDGEHUB_ADDR
         ));
         ProxyAdmin proxyAdmin = new ProxyAdmin{salt: _salt}();
-        proxyAdmin.transferOwnership(_config.governanceAddress);
+        proxyAdmin.transferOwnership(_config.aliasedGovernanceAddress);
         _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = address(proxyAdmin);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
@@ -246,8 +322,7 @@ contract GatewayCTMDeployer {
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
             feeParams: _config.feeParams,
-            // We can not provide zero value there. At the same time, there is no such contract on gateway
-            blobVersionedHashRetriever: ADDRESS_ONE
+            blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -269,7 +344,7 @@ contract GatewayCTMDeployer {
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: _config.governanceAddress,
+            owner: _config.aliasedGovernanceAddress,
             validatorTimelock: _deployedContracts.stateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: _config.protocolVersion
@@ -282,18 +357,23 @@ contract GatewayCTMDeployer {
         ));
     }
 
+    /// @notice Sets the previously deployed CTM inside the ValidatorTimelock
+    /// @param _aliasedGovernanceAddress The aliased address of the governnace.
+    /// @param _timelock The address of the validator timelock
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the exeuction of this function.
     function _setChainTypeManagerInValidatorTimelock(
-        address _governanceAddress,
-        ValidatorTimelock timelock,
+        address _aliasedGovernanceAddress,
+        ValidatorTimelock _timelock,
         DeployedContracts memory _deployedContracts
     ) internal {
-        timelock.setChainTypeManager(
+        _timelock.setChainTypeManager(
             IChainTypeManager(_deployedContracts.stateTransition.chainTypeManagerProxy)
         );
 
         // Note, that the governance still has to accept it. 
         // It will happen in a separate voting after the deployment is done.
-        timelock.transferOwnership(_governanceAddress);
+        _timelock.transferOwnership(_aliasedGovernanceAddress);
     }
 
 }

@@ -15,7 +15,10 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
  */
 library BridgeHelper {
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function getERC20GettersRaw(address _token) internal view returns (bytes memory name, bytes memory symbol, bytes memory decimals) {
+    function getERC20Getters(address _token, uint256 _originChainId) internal view returns (bytes memory) {
+        bytes memory name;
+        bytes memory symbol;
+        bytes memory decimals;
         if (_token == ETH_TOKEN_ADDRESS) {
             // when depositing eth to a non-eth based chain it is an ERC20
             name = abi.encode("Ether");
@@ -27,12 +30,6 @@ library BridgeHelper {
             (, symbol) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
             (, decimals) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
         }
-    }
-
-    /// @dev Receives and parses (name, symbol, decimals) from the token contract. 
-    /// It then returns the encoded values of those.
-    function getERC20Getters(address _token, uint256 _originChainId) internal view returns (bytes memory) {
-        (bytes memory name, bytes memory symbol, bytes memory decimals) = getERC20GettersRaw(_token);
         return
             DataEncoding.encodeTokenData({_chainId: _originChainId, _name: name, _symbol: symbol, _decimals: decimals});
     }
