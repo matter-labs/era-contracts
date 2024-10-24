@@ -98,13 +98,13 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
 
         if (getMarker(vesionedBytecodeHash) == 0) {
             // ToDO: use efficient call
-            L1_MESSENGER_CONTRACT.sendToL1(paddedBytecode);
+            L1_MESSENGER_CONTRACT.requestBytecodeL1Publication(vesionedBytecodeHash);
 
             assembly {
                 sstore(vesionedBytecodeHash, 1)
             }
 
-            emit MarkedAsKnown(vesionedBytecodeHash, false);
+            emit MarkedAsKnown(vesionedBytecodeHash, true);
         }
 
         assembly {

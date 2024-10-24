@@ -257,16 +257,30 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         calldataPtr += 4;
         bytes32 reconstructedChainedL1BytecodesRevealDataHash = bytes32(0);
         for (uint256 i = 0; i < numberOfBytecodes; ++i) {
+            uint8 bytecodeVersion = uint8(
+                bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 1])
+            );
+            calldataPtr += 1;
             uint32 currentBytecodeLength = uint32(
                 bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
             );
             calldataPtr += 4;
+
+            bytes32 versionedBytecodeHash;
+            if (bytecodeVersion == 0) {
+                versionedBytecodeHash = Utils.hashL2Bytecode(
+                    _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
+                );
+            } else {
+                versionedBytecodeHash = Utils.hashEVMBytecode(
+                    _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
+                );                
+            }
+
             reconstructedChainedL1BytecodesRevealDataHash = keccak256(
                 abi.encode(
                     reconstructedChainedL1BytecodesRevealDataHash,
-                    Utils.hashL2Bytecode(
-                        _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
-                    )
+                    versionedBytecodeHash
                 )
             );
             calldataPtr += currentBytecodeLength;
