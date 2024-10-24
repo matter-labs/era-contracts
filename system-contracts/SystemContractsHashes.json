@@ -129,8 +129,8 @@
     "contractName": "EvmGasManager",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmGasManager.yul/EvmGasManager.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmGasManager.yul",
-    "bytecodeHash": "0x0100005577ee81de6b5334d9f91ea8d9a91f02e3afa057bb0455f2e2d8aac636",
-    "sourceCodeHash": "0xd27ca9819fad1f1dc3fbc7f2c90f5ba2a9907413036fc78efbcee33649c975cb"
+    "bytecodeHash": "0x01000059d5a1736d5865f592c5dcf2e301697b83d4abfdc4a8fa2b5cfe88de8d",
+    "sourceCodeHash": "0xad51904bf2b8cd81cb66962c3211c9514e6ccd0c5bd30288d1f5697b29639fcb"
   },
   {
     "contractName": "CodeOracle",
