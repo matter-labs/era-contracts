@@ -759,8 +759,7 @@ object "EvmEmulator" {
                 // zkEVM native
                 let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                 let zkEvmGasBefore := gas()
-                success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, 0, 0)
-                returndatacopy(0, retOffset, retSize)
+                success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
                 let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
         
@@ -782,7 +781,6 @@ object "EvmEmulator" {
                 let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                 let zkEvmGasBefore := gas()
                 success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, 0, 0)
-                returndatacopy(0, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
                 let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
         
@@ -3774,8 +3772,7 @@ object "EvmEmulator" {
                     // zkEVM native
                     let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                     let zkEvmGasBefore := gas()
-                    success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, 0, 0)
-                    returndatacopy(0, retOffset, retSize)
+                    success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
                     let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
             
@@ -3797,7 +3794,6 @@ object "EvmEmulator" {
                     let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
                     let zkEvmGasBefore := gas()
                     success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, 0, 0)
-                    returndatacopy(0, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
                     let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
             
