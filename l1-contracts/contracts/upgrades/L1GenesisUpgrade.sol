@@ -15,13 +15,11 @@ import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADD
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
-import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-
-import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {L1GatewayHelper} from "./L1GatewayHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -35,12 +33,18 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         bytes calldata _fixedForceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
+        address baseTokenAddress = IBridgehub(s.bridgehub).baseToken(_chainId);
+
         L2CanonicalTransaction memory l2ProtocolUpgradeTx;
 
         {
             bytes memory complexUpgraderCalldata;
             {
-                bytes memory additionalForceDeploymentsData = _getZKChainSpecificForceDeploymentsData();
+                bytes memory additionalForceDeploymentsData = L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
+                    s,
+                    address(0),
+                    baseTokenAddress
+                );
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
                     (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
@@ -75,7 +79,6 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         }
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            factoryDeps: _factoryDeps,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             verifier: address(0),
@@ -106,17 +109,5 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
-
-    function _getZKChainSpecificForceDeploymentsData() internal view returns (bytes memory) {
-        address sharedBridge = IBridgehub(s.bridgehub).sharedBridge();
-        address legacySharedBridge = IL1SharedBridgeLegacy(sharedBridge).l2BridgeAddress(s.chainId);
-        ZKChainSpecificForceDeploymentsData
-            memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
-                baseTokenAssetId: s.baseTokenAssetId,
-                l2LegacySharedBridge: legacySharedBridge,
-                l2Weth: address(0) // kl todo
-            });
-        return abi.encode(additionalForceDeploymentsData);
     }
 }

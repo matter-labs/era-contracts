@@ -30,6 +30,7 @@ import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -162,7 +163,7 @@ contract ExecutorTest is Test {
 
         rollupL1DAValidator = new RollupL1DAValidator();
 
-        admin = new AdminFacet(block.chainid);
+        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
         mailbox = new MailboxFacet(eraChainId, block.chainid);

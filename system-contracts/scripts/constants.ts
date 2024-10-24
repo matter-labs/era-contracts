@@ -211,7 +211,15 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // We do not use the same address as create2 factories on EVM, since
     // this is a zkEVM create2 factory.
     address: "0x0000000000000000000000000000000000010005",
-    codeName: "L2MessageRouter",
+    codeName: "MessageRoot",
+    lang: Language.Solidity,
+  },
+  SloadContract: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010006",
+    codeName: "SloadContract",
     lang: Language.Solidity,
   },
 } as const;

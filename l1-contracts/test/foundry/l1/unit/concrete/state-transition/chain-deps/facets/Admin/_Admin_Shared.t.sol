@@ -10,6 +10,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 contract AdminTest is Test {
     IAdmin internal adminFacet;
@@ -36,7 +37,7 @@ contract AdminTest is Test {
     function setUp() public virtual {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new AdminFacet(block.chainid)),
+            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getAdminSelectors()

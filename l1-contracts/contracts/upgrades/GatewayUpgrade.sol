@@ -9,23 +9,19 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
-
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
-import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
-import {IL2GatewayUpgrade} from "../state-transition/l2-deps/IL2GatewayUpgrade.sol";
-
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-
-import {GatewayHelper} from "./GatewayHelper.sol";
+import {L1GatewayHelper} from "./L1GatewayHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct GatewayUpgradeEncodedInput {
-    IL2ContractDeployer.ForceDeployment[] baseForceDeployments;
+    IL2ContractDeployer.ForceDeployment[] forceDeployments;
+    uint256 l2GatewayUpgradePosition;
     bytes fixedForceDeploymentsData;
     address ctmDeployer;
-    address l2GatewayUpgrade;
     address oldValidatorTimelock;
     address newValidatorTimelock;
+    address wrappedBaseTokenStore;
 }
 
 /// @author Matter Labs
@@ -57,19 +53,20 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         s.validators[encodedInput.newValidatorTimelock] = true;
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
 
-        bytes memory gatewayUpgradeCalldata = abi.encodeCall(
-            IL2GatewayUpgrade.upgrade,
-            (
-                encodedInput.baseForceDeployments,
-                encodedInput.ctmDeployer,
-                encodedInput.fixedForceDeploymentsData,
-                GatewayHelper.getZKChainSpecificForceDeploymentsData(s)
+        bytes memory gatewayUpgradeCalldata = abi.encode(
+            encodedInput.ctmDeployer,
+            encodedInput.fixedForceDeploymentsData,
+            L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
+                s,
+                encodedInput.wrappedBaseTokenStore,
+                s.__DEPRECATED_baseToken
             )
         );
+        encodedInput.forceDeployments[encodedInput.l2GatewayUpgradePosition].input = gatewayUpgradeCalldata;
 
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-            IComplexUpgrader.upgrade,
-            (encodedInput.l2GatewayUpgrade, gatewayUpgradeCalldata)
+            IL2ContractDeployer.forceDeployOnAddresses,
+            (encodedInput.forceDeployments)
         );
 
         // slither-disable-next-line controlled-delegatecall

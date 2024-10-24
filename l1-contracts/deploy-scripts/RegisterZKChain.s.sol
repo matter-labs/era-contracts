@@ -86,7 +86,7 @@ contract RegisterZKChainScript is Script {
 
         initializeConfig();
         // TODO: some chains may not want to have a legacy shared bridge
-        runInner("/script-out/output-register-zk-chain.toml", true);
+        runInner("/script-out/output-register-zk-chain.toml", false);
     }
 
     function runForTest() public {

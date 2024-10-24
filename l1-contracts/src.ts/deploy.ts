@@ -211,8 +211,6 @@ export class Deployer {
       messageRootBytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
       l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
       l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
-      l2BridgeProxyOwnerAddress: ethers.constants.AddressZero,
-      l2BridgedStandardERC20ProxyOwnerAddress: ethers.constants.AddressZero,
     };
 
     return ethers.utils.defaultAbiCoder.encode([FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING], [fixedForceDeploymentsData]);
@@ -568,7 +566,7 @@ export class Deployer {
   public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const contractAddress = await this.deployViaCreate2(
       "AdminFacet",
-      [await this.getL1ChainId()],
+      [await this.getL1ChainId(), ethers.constants.AddressZero],
       create2Salt,
       ethTxOptions
     );
@@ -598,7 +596,12 @@ export class Deployer {
   }
 
   public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const contractAddress = await this.deployViaCreate2("ExecutorFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "ExecutorFacet",
+      [await this.getL1ChainId()],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
       console.log(`CONTRACTS_EXECUTOR_FACET_ADDR=${contractAddress}`);

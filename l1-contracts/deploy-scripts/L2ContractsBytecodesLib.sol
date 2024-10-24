@@ -76,6 +76,15 @@ library L2ContractsBytecodesLib {
             );
     }
 
+    /// @notice Reads the bytecode of the TransparentUpgradeableProxy contract.
+    /// @return The bytecode of the TransparentUpgradeableProxy contract.
+    function readTransparentUpgradeableProxyBytecodeFromSystemContracts() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../system-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+            );
+    }
+
     /// @notice Reads the bytecode of the ForceDeployUpgrader contract.
     /// @return The bytecode of the ForceDeployUpgrader contract.
     function readForceDeployUpgraderBytecode() internal view returns (bytes memory) {
@@ -300,6 +309,15 @@ library L2ContractsBytecodesLib {
         return
             Utils.readHardhatBytecode(
                 "/../l1-contracts/artifacts-zk/contracts/governance/L2ProxyAdminDeployer.sol/L2ProxyAdminDeployer.json"
+            );
+    }
+
+    /// @notice Reads the bytecode of the L2WrappedBaseToken contract.
+    /// @return The bytecode of the L2WrappedBaseToken contract.
+    function readL2WrappedBaseToken() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l1-contracts/artifacts-zk/contracts/bridge/L2WrappedBaseToken.sol/L2WrappedBaseToken.json"
             );
     }
 }

@@ -73,7 +73,7 @@ uint256 constant L1_TX_DELTA_FACTORY_DEPS_L2_GAS = 2473;
 uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = 64;
 
 /// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
-uint256 constant MAX_NEW_FACTORY_DEPS = 32;
+uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
@@ -155,4 +155,6 @@ struct ZKChainCommitment {
     bytes32[] batchHashes;
     /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
+    /// @notice Whether a chain is a permanent rollup.
+    bool isPermanentRollup;
 }

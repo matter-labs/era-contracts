@@ -15,10 +15,16 @@ struct ForceDeployment {
     bytes input;
 }
 
+// solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
     bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;
-    address l2Weth;
+    address predeployedL2WethAddress;
+    address baseTokenL1Address;
+    /// @dev Some info about the base token, it is
+    /// needed to deploy weth token in case it is not present
+    string baseTokenName;
+    string baseTokenSymbol;
 }
 
 /// @author Matter Labs

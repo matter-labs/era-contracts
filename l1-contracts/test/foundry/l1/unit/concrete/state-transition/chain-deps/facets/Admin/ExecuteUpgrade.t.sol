@@ -42,7 +42,6 @@ contract ExecuteUpgradeTest is AdminTest {
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
-            factoryDeps: new bytes[](0),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             verifier: address(0),

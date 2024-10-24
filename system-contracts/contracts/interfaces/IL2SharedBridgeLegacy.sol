@@ -14,7 +14,7 @@ interface IL2SharedBridgeLegacy {
         uint256 amount
     );
 
-    function l2TokenBeacon() external returns (UpgradeableBeacon);
+    function l2TokenBeacon() external view returns (UpgradeableBeacon);
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
 

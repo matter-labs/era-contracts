@@ -123,7 +123,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
-        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
         validatorTimelock = _initializeData.validatorTimelock;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
@@ -211,7 +211,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
     /// @param _validatorTimelock the new validatorTimelock address
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
@@ -231,8 +231,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
-        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
+        _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
@@ -245,11 +245,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
-    /// @dev set the protocol version timestamp
+    /// @notice Set the protocol version deadline
     /// @param _protocolVersion the protocol version
     /// @param _timestamp the timestamp is the deadline
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        _setProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -507,12 +507,31 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // state updates that occur.
     }
 
+    /// @notice Set the protocol version deadline
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
+    function _setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) internal {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Legacy functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice return the chain contract address for a chainId
     function getHyperchain(uint256 _chainId) public view returns (address) {
+        // During upgrade, there will be a period when the zkChains mapping on
+        // bridgehub will not be filled yet, while the ValidatorTimelock
+        // will still query the address to obtain the chain id.
+        //
+        // To cover this case, we firstly use the existing storage and only then
+        // we use the bridgehub if the former was not present.
+        // This logic should be deleted in one of the future upgrades.
+        address legacyAddress = getZKChainLegacy(_chainId);
+        if (legacyAddress != address(0)) {
+            return legacyAddress;
+        }
         return getZKChain(_chainId);
     }
 }

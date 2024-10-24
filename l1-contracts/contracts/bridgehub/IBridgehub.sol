@@ -118,6 +118,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function admin() external view returns (address);
 
+    function assetRouter() external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(

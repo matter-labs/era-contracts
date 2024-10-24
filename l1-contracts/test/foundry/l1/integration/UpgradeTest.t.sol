@@ -32,21 +32,13 @@ contract UpgradeTest is Test {
 
         // For chain, we have deployed the DA validator contracts
         // and also updated the chain admin.
-        // IMPORTANT: for erc20-based chains with token multiplier setter
-        // this should be coordinated with the server.
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
         console.log("Starting stage1 of the upgrade!");
         // Now, some time has passed and we are ready to start the upgrade of the
         // ecosystem.
-        // Stage 1 of the upgrade:
-        // - accept all the ownerships of the contracts
-        // - set the new upgrade data for chains + update validator timelock.
-        Call[] memory stage1Calls = mergeCalls(
-            generateUpgradeData.provideAcceptOwnershipCalls(),
-            generateUpgradeData.provideSetNewVersionUpgradeCall()
-        );
+        Call[] memory stage1Calls = generateUpgradeData.getStage1UpgradeCalls();
 
         governanceMulticall(generateUpgradeData.getOwnerAddress(), stage1Calls);
 
@@ -65,8 +57,7 @@ contract UpgradeTest is Test {
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
-
-        vm.warp(generateUpgradeData.getOldProtocolDeadline());
+        // so it was tested in e2e local environment.
 
         console.log("Starting stage2 of the upgrade!");
         governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());
@@ -91,15 +82,5 @@ contract UpgradeTest is Test {
         }
 
         vm.stopBroadcast();
-    }
-
-    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
-        result = new Call[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
-        }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
-        }
     }
 }
