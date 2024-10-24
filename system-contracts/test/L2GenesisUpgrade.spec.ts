@@ -35,15 +35,17 @@ describe("L2GenesisUpgrade tests", function () {
   let fixedForceDeploymentsData: string;
 
   const additionalForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
-    ["tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, string baseTokenName, string baseTokenSymbol)"],
+    [
+      "tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, string baseTokenName, string baseTokenSymbol)",
+    ],
     [
       {
         baseTokenAssetId: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
         l2LegacySharedBridge: ethers.constants.AddressZero,
         predeployedL2WethAddress: ADDRESS_ONE,
         baseTokenL1Address: ADDRESS_ONE,
-        baseTokenName: 'Ether',
-        baseTokenSymbol: 'ETH'
+        baseTokenName: "Ether",
+        baseTokenSymbol: "ETH",
       },
     ]
   );
