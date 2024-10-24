@@ -85,31 +85,35 @@ function revertWithGas(evmGasLeft) {
     revert(0, 32)
 }
 
+function panic() {
+    revert(0, 0)
+}
+
 function chargeGas(prevGas, toCharge) -> gasRemaining {
     if lt(prevGas, toCharge) {
-        revertWithGas(0)
+        panic()
     }
 
     gasRemaining := sub(prevGas, toCharge)
 }
 
-function checkMemOverflowByOffset(offset, evmGasLeft) {
-    if gt(offset, MAX_POSSIBLE_MEM()) {
-        mstore(0, evmGasLeft)
-        revert(0, 32)
+function checkMemIsAccessible(index, offset) {
+    checkOverflow(index, offset)
+
+    if gt(add(index, offset), MAX_MEMORY_FRAME()) {
+        panic()
     }
 }
 
-function checkMemOverflow(location, evmGasLeft) {
+function checkMemOverflow(location) {
     if gt(location, MAX_MEMORY_FRAME()) {
-        mstore(0, evmGasLeft)
-        revert(0, 32)
+        panic()
     }
 }
 
-function checkOverflow(data1, data2, evmGasLeft) {
+function checkOverflow(data1, data2) {
     if lt(add(data1, data2), data2) {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 }
 
@@ -369,7 +373,7 @@ function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, 
     let tempSp := sub(sp, mul(0x20, sub(position, 1)))
 
     if lt(tempSp, STACK_OFFSET())  {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 
     mstore(sp, oldStackHead)
@@ -382,17 +386,17 @@ function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stack
     let tempSp := sub(sp, mul(0x20, position))
 
     if lt(tempSp, STACK_OFFSET())  {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 
     stackHead := mload(tempSp)                    
     mstore(tempSp, oldStackHead)
 }
 
-function popStackItem(sp, evmGasLeft, oldStackHead) -> a, newSp, stackHead {
+function popStackItem(sp, oldStackHead) -> a, newSp, stackHead {
     // We can not return any error here, because it would break compatibility
     if lt(sp, STACK_OFFSET()) {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 
     a := oldStackHead
@@ -400,9 +404,9 @@ function popStackItem(sp, evmGasLeft, oldStackHead) -> a, newSp, stackHead {
     stackHead := mload(newSp)
 }
 
-function pushStackItem(sp, item, evmGasLeft, oldStackHead) -> newSp, stackHead {
+function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
     if iszero(lt(sp, BYTECODE_OFFSET())) {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 
     mstore(sp, oldStackHead)
@@ -422,16 +426,24 @@ function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
     newSp := add(sp, 0x20)
 }
 
-function popStackCheck(sp, evmGasLeft, numInputs) {
+function popStackCheck(sp, numInputs) {
     if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 }
 
-function pushStackCheck(sp, evmGasLeft, numInputs) {
+function pushStackCheck(sp, numInputs) {
     if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
-        revertWithGas(evmGasLeft)
+        panic()
     }
+}
+
+function accessStackHead(sp, stackHead) -> value {
+    if lt(sp, STACK_OFFSET()) {
+        panic()
+    }
+
+    value := stackHead
 }
 
 ////////////////////////////////////////////////////////////////
@@ -517,7 +529,7 @@ function consumeEvmFrame() -> passGas, isStatic, callerEVM {
 function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
     let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
 
-    popStackCheck(oldSp, evmGasLeft, 7)
+    popStackCheck(oldSp, 7)
     gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
     addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
@@ -527,12 +539,8 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-
-    checkOverflow(argsOffset,argsSize, evmGasLeft)
-    checkOverflow(retOffset, retSize, evmGasLeft)
-
-    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+    checkMemIsAccessible(argsOffset, argsSize)
+    checkMemIsAccessible(retOffset, retSize)
 
     // static_gas = 0
     // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -556,7 +564,7 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
     }
 
     {
-        let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+        let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
         gasUsed := add(gasUsed, maxExpand)
     }
 
@@ -593,7 +601,7 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
 function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
     let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
 
-    popStackCheck(oldSp, evmGasLeft, 6)
+    popStackCheck(oldSp, 6)
     gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
     addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
     argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
@@ -602,11 +610,8 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-    checkOverflow(argsOffset,argsSize, evmGasLeft)
-    checkOverflow(retOffset, retSize, evmGasLeft)
-
-    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+    checkMemIsAccessible(argsOffset, argsSize)
+    checkMemIsAccessible(retOffset, retSize)
 
     let gasUsed := 100
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -614,7 +619,7 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
     }
 
     {
-        let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+        let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
         gasUsed := add(gasUsed, maxExpand)
     }
 
@@ -651,7 +656,7 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
 function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEvmGasLeft, sp, stackHead {
     let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
 
-    popStackCheck(oldSp, evmGasLeft, 6)
+    popStackCheck(oldSp, 6)
     gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
     addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
@@ -660,15 +665,8 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEv
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-    checkOverflow(argsOffset, argsSize, evmGasLeft)
-    checkOverflow(retOffset, retSize, evmGasLeft)
-
-    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-
-    if iszero(_isEVM(addr)) {
-        revertWithGas(evmGasLeft)
-    }
+    checkMemIsAccessible(argsOffset, argsSize)
+    checkMemIsAccessible(retOffset, retSize)
 
     let gasUsed := 100
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -676,11 +674,15 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEv
     }
 
     {
-        let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+        let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
         gasUsed := add(gasUsed, maxExpand)
     }
 
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+    if iszero(_isEVM(addr)) {
+        revertWithGas(evmGasLeft)
+    }
 
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
 
@@ -768,7 +770,7 @@ function capGasForCall(evmGasLeft,oldGasToPass) -> gasToPass {
     }
 }
 
-function getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
+function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
     maxExpand := add(retOffset, retSize)
     switch lt(maxExpand, add(argsOffset, argsSize)) 
     case 0 {
@@ -972,15 +974,15 @@ function _fetchConstructorReturnGas() -> gasLeft {
 function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt, oldStackHead) -> result, evmGasLeft, addr, stackHead  {
     _eraseReturndataPointer()
 
-    let gasForTheCall := capGasForCall(evmGasLeftOld,INF_PASS_GAS())
+    let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
 
-    if lt(selfbalance(),value) {
+    if lt(selfbalance(), value) { // TODO optimize
         revertWithGas(evmGasLeftOld)
     }
 
-    offset := add(MEM_OFFSET_INNER(), offset)
+    offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
 
-    pushStackCheck(sp, evmGasLeftOld, 4)
+    pushStackCheck(sp, 4)
     sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
     sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
     sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
@@ -1046,20 +1048,19 @@ function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, s
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
-        revertWithGas(evmGasLeft) // TODO review
+        panic()
     }
 
     let value, offset, size
 
-    popStackCheck(oldSp, evmGasLeft, 3)
+    popStackCheck(oldSp, 3)
     value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
     offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
 
-    checkOverflow(offset, size, evmGasLeft)
-    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+    checkMemIsAccessible(offset, size)
 
     if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-        revertWithGas(evmGasLeft)
+        revertWithGas(evmGasLeft) // TODO check
     }
 
     if gt(value, balance(address())) {
@@ -1088,19 +1089,18 @@ function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
-        revertWithGas(evmGasLeft)
+        panic()
     }
 
     let value, offset, size, salt
 
-    popStackCheck(oldSp, evmGasLeft, 4)
+    popStackCheck(oldSp, 4)
     value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-    checkOverflow(offset, size, evmGasLeft)
-    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+    checkMemIsAccessible(offset, size)
 
     if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
         revertWithGas(evmGasLeft)
@@ -1163,35 +1163,5 @@ function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
     let rest_len := and(len, 31)
     if rest_len {
         $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
-    }
-}
-
-function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
-    evmGasLeft := chargeGas(evmGas, 100)
-
-    let addr, dest, offset, len
-    popStackCheck(oldSp, evmGasLeft, 4)
-    addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-    dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-
-    // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
-    // minimum_word_size = (size + 31) / 32
-
-    let dynamicGas := add(
-        mul(3, shr(5, add(len, 31))),
-        expandMemory(add(dest, len))
-    )
-    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        dynamicGas := add(dynamicGas, 2500)
-    }
-    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-
-    $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
-
-    // Gets the code from the addr
-    if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
-        pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))  
     }
 }
