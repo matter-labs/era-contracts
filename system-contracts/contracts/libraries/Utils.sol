@@ -133,7 +133,9 @@ library Utils {
         // solhint-disable gas-custom-errors
         require(_bytecode.length <= MAX_EVM_BYTECODE_LENGTH, "po");
 
-        hashedEVMBytecode = EfficientCall.sha(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        hashedEVMBytecode =
+            EfficientCall.sha(_bytecode) &
+            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
         // Setting the version of the hash
         hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(2 << 248)));
