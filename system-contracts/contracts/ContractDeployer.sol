@@ -554,7 +554,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             tstore(CONSTRUCTOR_RETURN_GAS_TSLOT, constructorReturnGas)
         }
 
-        emit ContractDeployed(_sender, evmBytecodeHash, _newAddress);
+        emit ContractDeployed(_sender, versionedCodeHash, _newAddress);
     }
 
     function _setEvmCodeHash(address _address, bytes32 _hash) internal {
