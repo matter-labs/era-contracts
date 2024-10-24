@@ -68,7 +68,7 @@ abstract contract StateDiffL2DAValidator {
             reconstructedChainedL1BytecodesRevealDataHash = keccak256(
                 abi.encode(
                     reconstructedChainedL1BytecodesRevealDataHash,
-                    L2ContractHelper.hashL2Bytecode(
+                    L2ContractHelper.hashL2BytecodeCalldata(
                         _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
                     )
                 )
