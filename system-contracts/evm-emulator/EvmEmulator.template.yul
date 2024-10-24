@@ -10,8 +10,12 @@ object "EvmEmulator" {
             loadCalldataIntoActivePtr()
 
             let size := getActivePtrDataSize()
-            mstore(bytecodeLengthOffset, size)
 
+            if gt(size, MAX_POSSIBLE_BYTECODE()) {
+                panic()
+            }
+
+            mstore(bytecodeLengthOffset, size)
             copyActivePtrData(bytecodeOffset, 0, size)
         }
 
@@ -128,7 +132,7 @@ object "EvmEmulator" {
                 isStatic := getIsStaticFromCallFlags()
             }
 
-            // First, copy the contract's bytecode to be executed into tEdhe `BYTECODE_OFFSET`
+            // First, copy the contract's bytecode to be executed into the `BYTECODE_OFFSET`
             // segment of memory.
             getDeployedBytecode()
 

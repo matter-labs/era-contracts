@@ -10,8 +10,12 @@ object "EvmEmulator" {
             loadCalldataIntoActivePtr()
 
             let size := getActivePtrDataSize()
-            mstore(bytecodeLengthOffset, size)
 
+            if gt(size, MAX_POSSIBLE_BYTECODE()) {
+                panic()
+            }
+
+            mstore(bytecodeLengthOffset, size)
             copyActivePtrData(bytecodeOffset, 0, size)
         }
 
@@ -282,7 +286,7 @@ object "EvmEmulator" {
                 _len := codeLen
             }
         
-            returndatacopy(dest, add(32,_offset), _len)
+            returndatacopy(dest, add(32, _offset), _len)
         }
         
         // Returns the length of the bytecode.
@@ -812,7 +816,7 @@ object "EvmEmulator" {
             }
         }
         
-        function capGasForCall(evmGasLeft,oldGasToPass) -> gasToPass {
+        function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
             let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
             gasToPass := oldGasToPass
             if gt(oldGasToPass, maxGasToPass) { 
@@ -1026,10 +1030,6 @@ object "EvmEmulator" {
         
             let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
         
-            if lt(selfbalance(), value) { // TODO optimize
-                revertWithGas(evmGasLeftOld)
-            }
-        
             offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
         
             pushStackCheck(sp, 4)
@@ -1109,12 +1109,8 @@ object "EvmEmulator" {
         
             checkMemIsAccessible(offset, size)
         
-            if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-                revertWithGas(evmGasLeft) // TODO check
-            }
-        
-            if gt(value, balance(address())) {
-                revertWithGas(evmGasLeft)
+            if gt(size, MAX_POSSIBLE_BYTECODE()) {
+                panic()
             }
         
             // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
@@ -1152,12 +1148,8 @@ object "EvmEmulator" {
         
             checkMemIsAccessible(offset, size)
         
-            if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-                revertWithGas(evmGasLeft)
-            }
-        
-            if gt(value, balance(address())) {
-                revertWithGas(evmGasLeft)
+            if gt(size, MAX_POSSIBLE_BYTECODE()) {
+                panic()
             }
         
             // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
@@ -1170,7 +1162,7 @@ object "EvmEmulator" {
                 shr(2, add(size, 31))
             ))
         
-            result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt, stackHead)
+            result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, true, salt, stackHead)
         }
         
         ////////////////////////////////////////////////////////////////
@@ -3248,7 +3240,7 @@ object "EvmEmulator" {
                     _len := codeLen
                 }
             
-                returndatacopy(dest, add(32,_offset), _len)
+                returndatacopy(dest, add(32, _offset), _len)
             }
             
             // Returns the length of the bytecode.
@@ -3778,7 +3770,7 @@ object "EvmEmulator" {
                 }
             }
             
-            function capGasForCall(evmGasLeft,oldGasToPass) -> gasToPass {
+            function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
                 let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
                 gasToPass := oldGasToPass
                 if gt(oldGasToPass, maxGasToPass) { 
@@ -3992,10 +3984,6 @@ object "EvmEmulator" {
             
                 let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
             
-                if lt(selfbalance(), value) { // TODO optimize
-                    revertWithGas(evmGasLeftOld)
-                }
-            
                 offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
             
                 pushStackCheck(sp, 4)
@@ -4075,12 +4063,8 @@ object "EvmEmulator" {
             
                 checkMemIsAccessible(offset, size)
             
-                if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-                    revertWithGas(evmGasLeft) // TODO check
-                }
-            
-                if gt(value, balance(address())) {
-                    revertWithGas(evmGasLeft)
+                if gt(size, MAX_POSSIBLE_BYTECODE()) {
+                    panic()
                 }
             
                 // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
@@ -4118,12 +4102,8 @@ object "EvmEmulator" {
             
                 checkMemIsAccessible(offset, size)
             
-                if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-                    revertWithGas(evmGasLeft)
-                }
-            
-                if gt(value, balance(address())) {
-                    revertWithGas(evmGasLeft)
+                if gt(size, MAX_POSSIBLE_BYTECODE()) {
+                    panic()
                 }
             
                 // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
@@ -4136,7 +4116,7 @@ object "EvmEmulator" {
                     shr(2, add(size, 31))
                 ))
             
-                result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt, stackHead)
+                result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, true, salt, stackHead)
             }
             
             ////////////////////////////////////////////////////////////////
@@ -5968,7 +5948,7 @@ object "EvmEmulator" {
                 isStatic := getIsStaticFromCallFlags()
             }
 
-            // First, copy the contract's bytecode to be executed into tEdhe `BYTECODE_OFFSET`
+            // First, copy the contract's bytecode to be executed into the `BYTECODE_OFFSET`
             // segment of memory.
             getDeployedBytecode()
 
