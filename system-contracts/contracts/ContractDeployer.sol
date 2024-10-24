@@ -179,18 +179,27 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function createEVM(bytes calldata _initCode) external payable override returns (address) {
         // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
         // Subtract 1 for EOA since the nonce has already been incremented for this transaction
-
-        uint256 deploymentNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(msg.sender);
-        if ((msg.sender != tx.origin) && deploymentNonce == 0) {
-            NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
-        }
-
         uint256 senderNonce = msg.sender == tx.origin
             ? NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1
             : NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
-        _evmDeployOnAddress(newAddress, _initCode);
+
+        // If the method is called by an EVM contract, then we need to increase deployment
+        // nonce for a contract even if contract creation actually failed
+        if (SystemContractHelper.isSystemCall() && ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender)) {
+            // EVM emulator provides infinite gas
+            try this.evmDeployOnAddress{value: msg.value}(newAddress, _initCode) {} catch {
+                newAddress = address(0);
+            }
+        } else {
+            this.evmDeployOnAddress{value: msg.value}(newAddress, _initCode);
+        }
+
         return newAddress;
+    }
+
+    function evmDeployOnAddress(address _newAddress, bytes calldata _initCode) external payable onlySelf {
+        _evmDeployOnAddress(_newAddress, _initCode);
     }
 
     /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE2` opcode
@@ -499,10 +508,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     function _constructEVMContract(address _sender, address _newAddress, bytes calldata _input) internal {
-        // FIXME: this is a temporary limitation.
-        // To be removed in the future
-        require(_input.length > 0);
-
         uint256 value = msg.value;
         // 1. Transfer the balance to the new address on the constructor call.
         if (value > 0) {

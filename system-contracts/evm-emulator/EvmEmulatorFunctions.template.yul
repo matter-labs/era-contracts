@@ -997,6 +997,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
 
 
         result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 32)
+        addr := mload(0)
     }
 
 
@@ -1010,6 +1011,14 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
 
 
         result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+
+        if iszero(result) {
+            // This error should never happen
+            revert(0, 0)
+        }
+
+        addr := mload(0)
+        result := iszero(iszero(addr))
     }
 
     addr := mload(0)
