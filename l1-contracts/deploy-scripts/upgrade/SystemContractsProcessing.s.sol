@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
+import {Utils, L2_WETH_IMPL_ADDRESS, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -25,7 +25,7 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 27;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 4;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -279,6 +279,7 @@ library SystemContractsProcessing {
         result[1] = L2ContractsBytecodesLib.readL2AssetRouterBytecode();
         result[2] = L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode();
         result[3] = L2ContractsBytecodesLib.readMessageRootBytecode();
+        result[4] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -315,6 +316,13 @@ library SystemContractsProcessing {
         forceDeployments[3] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[3]),
             newAddress: L2_MESSAGE_ROOT_ADDRESS,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
+            newAddress: L2_WETH_IMPL_ADDRESS,
             callConstructor: false,
             value: 0,
             input: ""
@@ -357,7 +365,7 @@ library SystemContractsProcessing {
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
     {
-        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getSystemContractsForceDeployments();
+        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments();
         IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
 
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);

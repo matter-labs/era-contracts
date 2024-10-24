@@ -105,6 +105,7 @@ library L2GenesisUpgradeHelper {
             additionalForceDeploymentsData.predeployedL2WethAddress,
             fixedForceDeploymentsData.aliasedL1Governance,
             additionalForceDeploymentsData.baseTokenL1Address,
+            additionalForceDeploymentsData.baseTokenAssetId,
             additionalForceDeploymentsData.baseTokenName,
             additionalForceDeploymentsData.baseTokenSymbol
         );
@@ -113,6 +114,8 @@ library L2GenesisUpgradeHelper {
         if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
             deployedTokenBeacon = address(IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon());
         }
+
+        bool shouldDeployBeacon = deployedTokenBeacon == address(0);
 
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
@@ -126,20 +129,33 @@ library L2GenesisUpgradeHelper {
                 fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
                 additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
-                false,
+                shouldDeployBeacon,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId
             )
         });
     }
 
+    function getWethInitData(
+        string memory _wrappedBaseTokenName,
+        string memory _wrappedBaseTokenSymbol,
+        address _baseTokenL1Address,
+        bytes32 _baseTokenAssetId
+    ) internal pure returns (bytes memory initData) {
+        initData = abi.encodeCall(
+            IL2WrappedBaseToken.initializeV3,
+            (_wrappedBaseTokenName, _wrappedBaseTokenSymbol, L2_ASSET_ROUTER, _baseTokenL1Address, _baseTokenAssetId)
+        );  
+    }
+
     function _ensureWethToken(
         address _predeployedWethToken,
         address _aliasedL1Governance,
         address _baseTokenL1Address,
+        bytes32 _baseTokenAssetId,
         string memory _baseTokenName,
         string memory _baseTokenSymbol
-    ) internal returns (address) {
+    ) private returns (address) {
         if(_predeployedWethToken != address(0) && _predeployedWethToken.code.length > 0) {
             return _predeployedWethToken;
         }
@@ -153,10 +169,12 @@ library L2GenesisUpgradeHelper {
             _baseTokenSymbol
         );
 
-        bytes memory initData = abi.encodeCall(
-            IL2WrappedBaseToken.initializeV2,
-            (wrappedBaseTokenName, wrappedBaseTokenSymbol, L2_ASSET_ROUTER, _baseTokenL1Address)
-        );  
+        bytes memory initData = getWethInitData(
+            wrappedBaseTokenName,
+            wrappedBaseTokenSymbol,
+            _baseTokenL1Address,
+            _baseTokenAssetId
+        );
         bytes memory constructoParams = abi.encode(
             WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
             _aliasedL1Governance,
