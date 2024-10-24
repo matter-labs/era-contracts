@@ -32,10 +32,6 @@ contract L2GatewayUpgrade {
     /// @param _ctmDeployer Address of the CTM Deployer contract.
     /// @param _fixedForceDeploymentsData Encoded data for fixed force deployments.
     /// @param _additionalForceDeploymentsData Encoded data for ZK-Chain specific force deployments.
-    ///
-    /// Requirements:
-    ///
-    /// - `_ctmDeployer` cannot be the zero address.
     constructor(
         address _ctmDeployer,
         bytes memory _fixedForceDeploymentsData,
@@ -102,11 +98,6 @@ contract L2GatewayUpgrade {
     /// @param _proxyAddr Address of the TransparentUpgradeableProxy to upgrade.
     /// @param _newImpl Address of the new implementation contract.
     /// @param _additionalData Additional calldata to pass to the `upgradeToAndCall` function, if any.
-    ///
-    /// Requirements:
-    ///
-    /// - `_proxyAddr` must be a valid TransparentUpgradeableProxy.
-    /// - `_newImpl` must be a valid contract address.
     function forceUpgradeTransparentProxy(address _proxyAddr, address _newImpl, bytes memory _additionalData) internal {
         bytes memory upgradeData;
         if (_additionalData.length > 0) {
@@ -126,11 +117,6 @@ contract L2GatewayUpgrade {
     /// by mimicCall-ing the admin of the proxy.
     /// @param _proxyAddr Address of the UpgradeableBeacon proxy to upgrade.
     /// @param _newImpl Address of the new implementation contract.
-    ///
-    /// Requirements:
-    ///
-    /// - `_proxyAddr` must be a valid UpgradeableBeacon.
-    /// - `_newImpl` must be a valid contract address.
     function forceUpgradeBeaconProxy(address _proxyAddr, address _newImpl) internal {
         bytes memory upgradeData = abi.encodeCall(UpgradeableBeacon.upgradeTo, (_newImpl));
 
