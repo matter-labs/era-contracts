@@ -86,7 +86,8 @@ function revertWithGas(evmGasLeft) {
 }
 
 function panic() {
-    revert(0, 0)
+    mstore(0, 0)
+    revert(0, 32)
 }
 
 function chargeGas(prevGas, toCharge) -> gasRemaining {
