@@ -48,6 +48,10 @@ object "EvmEmulator" {
             returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
+        ////////////////////////////////////////////////////////////////
+        //                      CONSTANTS
+        ////////////////////////////////////////////////////////////////
+        
         function ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT() -> addr {
             addr := 0x0000000000000000000000000000000000008002
         }
@@ -68,12 +72,8 @@ object "EvmEmulator" {
             addr :=  0x0000000000000000000000000000000000008013
         }
         
-        function DEBUG_SLOT_OFFSET() -> offset {
-            offset := mul(32, 32) // TODO cleanup
-        }
-        
         function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
-            offset := add(DEBUG_SLOT_OFFSET(), mul(5, 32))
+            offset := mul(32, 32)
         }
         
         function STACK_OFFSET() -> offset {
@@ -82,10 +82,6 @@ object "EvmEmulator" {
         
         function BYTECODE_OFFSET() -> offset {
             offset := add(STACK_OFFSET(), mul(1024, 32))
-        }
-        
-        function INF_PASS_GAS() -> inf {
-            inf := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
         }
         
         function MAX_POSSIBLE_BYTECODE() -> max {
@@ -112,8 +108,59 @@ object "EvmEmulator" {
             max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
         }
         
+        function INF_PASS_GAS() -> inf {
+            inf := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+        }
+        
+        // Each evm gas is 5 zkEVM one
+        function GAS_DIVISOR() -> gas_div { gas_div := 5 }
+        function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
+        function OVERHEAD() -> overhead { overhead := 2000 }
+        
+        // From precompiles/CodeOracle
+        function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
+        
+        function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+        
+        ////////////////////////////////////////////////////////////////
+        //                  GENERAL FUNCTIONS
+        ////////////////////////////////////////////////////////////////
+        
         function $llvm_NoInline_llvm$_revert() {
             revert(0, 0)
+        }
+        
+        function revertWithGas(evmGasLeft) {
+            mstore(0, evmGasLeft)
+            revert(0, 32)
+        }
+        
+        function chargeGas(prevGas, toCharge) -> gasRemaining {
+            if lt(prevGas, toCharge) {
+                revertWithGas(0)
+            }
+        
+            gasRemaining := sub(prevGas, toCharge)
+        }
+        
+        function checkMemOverflowByOffset(offset, evmGasLeft) {
+            if gt(offset, MAX_POSSIBLE_MEM()) {
+                mstore(0, evmGasLeft)
+                revert(0, 32)
+            }
+        }
+        
+        function checkMemOverflow(location, evmGasLeft) {
+            if gt(location, MAX_MEMORY_FRAME()) {
+                mstore(0, evmGasLeft)
+                revert(0, 32)
+            }
+        }
+        
+        function checkOverflow(data1, data2, evmGasLeft) {
+            if lt(add(data1, data2), data2) {
+                revertWithGas(evmGasLeft)
+            }
         }
         
         // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
@@ -131,6 +178,238 @@ object "EvmEmulator" {
             }
             value := shr(mul(8,sub(32,length)),mload(start))
         }
+        
+        function getCodeAddress() -> addr {
+            addr := verbatim_0i_1o("code_source")
+        }
+        
+        function loadReturndataIntoActivePtr() {
+            verbatim_0i_0o("return_data_ptr_to_active")
+        }
+        
+        function loadCalldataIntoActivePtr() {
+            verbatim_0i_0o("calldata_ptr_to_active")
+        }
+        
+        function getActivePtrDataSize() -> size {
+            size := verbatim_0i_1o("active_ptr_data_size")
+        }
+        
+        function copyActivePtrData(_dest, _source, _size) {
+            verbatim_3i_0o("active_ptr_data_copy", _dest, _source, _size)
+        }
+        
+        function ptrAddIntoActive(_dest) {
+            verbatim_1i_0o("active_ptr_add_assign", _dest)
+        }
+        
+        function ptrShrinkIntoActive(_dest) {
+            verbatim_1i_0o("active_ptr_shrink_assign", _dest)
+        }
+        
+        function getIsStaticFromCallFlags() -> isStatic {
+            isStatic := verbatim_0i_1o("get_global::call_flags")
+            isStatic := iszero(iszero(and(isStatic, 0x04)))
+        }
+        
+        function isAddrEmpty(addr) -> isEmpty {
+            isEmpty := 0
+            if iszero(extcodesize(addr)) { // YUL doesn't have short-circuit evaluation
+                if iszero(balance(addr)) {
+                    if iszero(getRawNonce(addr)) {
+                        isEmpty := 1
+                    }
+                }
+            }
+        }
+        
+        function getRawNonce(addr) -> nonce {
+            mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
+            mstore(4, addr)
+        
+            let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+        
+            if iszero(result) {
+                revert(0, 0)
+            }
+        
+            nonce := mload(0)
+        }
+        
+        function _getRawCodeHash(account) -> hash {
+            mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
+            mstore(4, account)
+        
+            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        
+            hash := mload(0)
+        }
+        
+        // Basically performs an extcodecopy, while returning the length of the bytecode.
+        function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
+            codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
+        }
+        
+        // Basically performs an extcodecopy, while returning the length of the bytecode.
+        function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
+            let codeHash := _getRawCodeHash(addr)
+        
+            mstore(0, codeHash)
+        
+            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        
+            // The first word is the true length of the bytecode
+            returndatacopy(0, 0, 32)
+            codeLen := mload(0)
+        
+            if gt(_len, codeLen) {
+                _len := codeLen
+            }
+        
+            returndatacopy(dest, add(32,_offset), _len)
+        }
+        
+        // Returns the length of the bytecode.
+        function _fetchDeployedCodeLen(addr) -> codeLen {
+            let codeHash := _getRawCodeHash(addr)
+        
+            mstore(0, codeHash)
+        
+            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+        
+            switch iszero(success)
+            case 1 {
+                // The code oracle call can only fail in the case where the contract
+                // we are querying is the current one executing and it has not yet been
+                // deployed, i.e., if someone calls codesize (or extcodesize(address()))
+                // inside the constructor. In that case, code length is zero.
+                codeLen := 0
+            }
+            default {
+                // The first word is the true length of the bytecode
+                returndatacopy(0, 0, 32)
+                codeLen := mload(0)
+            }
+        }
+        
+        function getDeployedBytecode() {
+            let codeLen := _fetchDeployedCode(
+                getCodeAddress(),
+                add(BYTECODE_OFFSET(), 32),
+                MAX_POSSIBLE_BYTECODE()
+            )
+        
+            mstore(BYTECODE_OFFSET(), codeLen)
+        }
+        
+        function getMax(a, b) -> max {
+            max := b
+            if gt(a, b) {
+                max := a
+            }
+        }
+        
+        function bitLength(n) -> bitLen {
+            for { } gt(n, 0) { } { // while(n > 0)
+                if iszero(n) {
+                    bitLen := 1
+                    break
+                }
+                n := shr(1, n)
+                bitLen := add(bitLen, 1)
+            }
+        }
+        
+        function bitMaskFromBytes(nBytes) -> bitMask {
+            bitMask := sub(exp(2, mul(nBytes, 8)), 1) // 2**(nBytes*8) - 1
+        }
+        
+        // This function can overflow, it is the job of the caller to ensure that it does not.
+        // The argument to this function is the offset into the memory region IN BYTES.
+        function expandMemory(newSize) -> gasCost {
+            let oldSizeInWords := mload(MEM_OFFSET())
+        
+            // The add 31 here before dividing is there to account for misaligned
+            // memory expansions, where someone calls this with a newSize that is not
+            // a multiple of 32. For instance, if someone calls it with an offset of 33,
+            // the new size in words should be 2, not 1, but dividing by 32 will give 1.
+            // Adding 31 solves it.
+            let newSizeInWords := div(add(newSize, 31), 32)
+        
+            if gt(newSizeInWords, oldSizeInWords) {
+                let new_minus_old := sub(newSizeInWords, oldSizeInWords)
+                gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
+        
+                mstore(MEM_OFFSET(), newSizeInWords)
+            }
+        }
+        
+        function performSystemCall(
+            to,
+            dataLength,
+        ) -> ret {
+            let farCallAbi := shl(248, 1) // system call
+            // dataOffset is 0
+            // dataStart is 0
+            farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+            farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+            // shardId is 0
+            // forwardingMode is 0
+            // not constructor call
+        
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        }
+        
+        function _isEVM(_addr) -> isEVM {
+            // function isAccountEVM(address _addr) external view returns (bool);
+            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
+            mstore(4, _addr)
+        
+            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        
+            isEVM := mload(0)
+        }
+        
+        function zkVmGasToEvmGas(_zkevmGas) -> calczkevmGas {
+            calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
+        }
+        
+        function getEvmGasFromContext() -> evmGas {
+            let _gas := gas()
+            let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD()) // TODO CHECK GAS MECHANICS
+        
+            switch lt(_gas, requiredGas)
+            case 1 {
+                evmGas := 0
+            }
+            default {
+                evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+            }
+        }
+        
+        ////////////////////////////////////////////////////////////////
+        //                     STACK OPERATIONS
+        ////////////////////////////////////////////////////////////////
         
         function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
             evmGasLeft := chargeGas(evmGas, 3)
@@ -202,113 +481,62 @@ object "EvmEmulator" {
             }
         }
         
-        function getCodeAddress() -> addr {
-            addr := verbatim_0i_1o("code_source")
+        ////////////////////////////////////////////////////////////////
+        //               EVM GAS MANAGER FUNCTIONALITY
+        ////////////////////////////////////////////////////////////////
+        
+        function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
+            // function warmAccount(address account)
+            // non-standard selector 0x00
+            // addr is packed in the same word with selector
+            mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+        
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
+        
+            if returndatasize() {
+                isWarm := true
+            }
         }
         
-        function loadReturndataIntoActivePtr() {
-            verbatim_0i_0o("return_data_ptr_to_active")
-        }
+        function isSlotWarm(key) -> isWarm {
+            // non-standard selector 0x01
+            mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
+            mstore(1, key)
         
-        function loadCalldataIntoActivePtr() {
-            verbatim_0i_0o("calldata_ptr_to_active")
-        }
-        
-        function getActivePtrDataSize() -> size {
-            size := verbatim_0i_1o("active_ptr_data_size")
-        }
-        
-        function copyActivePtrData(_dest, _source, _size) {
-            verbatim_3i_0o("active_ptr_data_copy", _dest, _source, _size)
-        }
-        
-        function ptrAddIntoActive(_dest) {
-            verbatim_1i_0o("active_ptr_add_assign", _dest)
-        }
-        
-        function ptrShrinkIntoActive(_dest) {
-            verbatim_1i_0o("active_ptr_shrink_assign", _dest)
-        }
-        
-        function _getRawCodeHash(account) -> hash {
-            mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
-            mstore(4, account)
-        
-            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
         
-            hash := mload(0)
-        }
-        
-        function getIsStaticFromCallFlags() -> isStatic {
-            isStatic := verbatim_0i_1o("get_global::call_flags")
-            isStatic := iszero(iszero(and(isStatic, 0x04)))
-        }
-        
-        // Basically performs an extcodecopy, while returning the length of the bytecode.
-        function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
-            codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
-        }
-        
-        // Basically performs an extcodecopy, while returning the length of the bytecode.
-        function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
-            let codeHash := _getRawCodeHash(addr)
-        
-            mstore(0, codeHash)
-        
-            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
+            if returndatasize() {
+                isWarm := true
             }
-        
-            // The first word is the true length of the bytecode
-            returndatacopy(0, 0, 32)
-            codeLen := mload(0)
-        
-            if gt(_len, codeLen) {
-                _len := codeLen
-            }
-        
-            returndatacopy(dest, add(32,_offset), _len)
         }
         
-        // Returns the length of the bytecode.
-        function _fetchDeployedCodeLen(addr) -> codeLen {
-            let codeHash := _getRawCodeHash(addr)
+        function warmSlot(key,currentValue) -> isWarm, originalValue {
+            // non-standard selector 0x02
+            mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
+            mstore(1, key)
+            mstore(33,currentValue)
         
-            mstore(0, codeHash)
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
         
-            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-        
-            switch iszero(success)
-            case 1 {
-                // The code oracle call can only fail in the case where the contract
-                // we are querying is the current one executing and it has not yet been
-                // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                // inside the constructor. In that case, code length is zero.
-                codeLen := 0
-            }
-            default {
-                // The first word is the true length of the bytecode
+            if returndatasize() {
+                isWarm := true
                 returndatacopy(0, 0, 32)
-                codeLen := mload(0)
+                originalValue := mload(0)
             }
         }
         
-        function getDeployedBytecode() {
-            let codeLen := _fetchDeployedCode(
-                getCodeAddress(),
-                add(BYTECODE_OFFSET(), 32),
-                MAX_POSSIBLE_BYTECODE()
-            )
+        function _pushEVMFrame(_passGas, _isStatic) {
+            // function pushEVMFrame
+            // non-standard selector 0x03
+            mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
+            mstore(32, _passGas)
         
-            mstore(BYTECODE_OFFSET(), codeLen)
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
         }
         
         function consumeEvmFrame() -> passGas, isStatic, callerEVM {
@@ -329,35 +557,275 @@ object "EvmEmulator" {
             }
         }
         
-        function chargeGas(prevGas, toCharge) -> gasRemaining {
-            if lt(prevGas, toCharge) {
-                revertWithGas(0)
+        ////////////////////////////////////////////////////////////////
+        //               CALLS FUNCTIONALITY
+        ////////////////////////////////////////////////////////////////
+        
+        function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
+            let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
+        
+            popStackCheck(oldSp, evmGasLeft, 7)
+            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+        
+            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+        
+        
+            checkOverflow(argsOffset,argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
+        
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+        
+            // static_gas = 0
+            // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
+            // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
+            // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
+            // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
+            // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
+        
+            let gasUsed := 100 // warm address access cost
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                gasUsed := 2600 // cold address access cost
             }
         
-            gasRemaining := sub(prevGas, toCharge)
-        }
+            if gt(value, 0) {
+                gasUsed := add(gasUsed, 6700) // positive_value_cost - stipend
+                gasToPass := add(gasToPass, 2300) // stipend TODO
         
-        function getMax(a, b) -> max {
-            max := b
-            if gt(a, b) {
-                max := a
-            }
-        }
-        
-        function bitLength(n) -> bitLen {
-            for { } gt(n, 0) { } { // while(n > 0)
-                if iszero(n) {
-                    bitLen := 1
-                    break
+                if isAddrEmpty(addr) {
+                    gasUsed := add(gasUsed, 25000) // value_to_empty_account_cost
                 }
-                n := shr(1, n)
-                bitLen := add(bitLen, 1)
+            }
+        
+            {
+                let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+                gasUsed := add(gasUsed, maxExpand)
+            }
+        
+            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        
+            gasToPass := capGasForCall(evmGasLeft, gasToPass)
+        
+            let success, frameGasLeft := _performCall(
+                addr,
+                gasToPass,
+                value,
+                add(argsOffset, MEM_OFFSET_INNER()),
+                argsSize,
+                add(retOffset, MEM_OFFSET_INNER()),
+                retSize
+            )
+        
+            let gasUsed := 0
+        
+            // TODO precompile should be called, but return nothing if gasPassed is too low
+            let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+            switch iszero(precompileCost)
+            case 1 {
+                gasUsed := sub(gasToPass, frameGasLeft)
+            }
+            default {
+                gasUsed := precompileCost
+            }
+        
+            newGasLeft := chargeGas(evmGasLeft, gasUsed)
+            stackHead := success
+        }
+        
+        function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
+            let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+        
+            popStackCheck(oldSp, evmGasLeft, 6)
+            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+        
+            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+        
+            checkOverflow(argsOffset,argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
+        
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+        
+            let gasUsed := 100
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                gasUsed := 2600
+            }
+        
+            {
+                let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+                gasUsed := add(gasUsed, maxExpand)
+            }
+        
+            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        
+            gasToPass := capGasForCall(evmGasLeft, gasToPass)
+        
+            let success, frameGasLeft := _performStaticCall(
+                addr,
+                gasToPass,
+                add(MEM_OFFSET_INNER(), argsOffset),
+                argsSize,
+                add(MEM_OFFSET_INNER(), retOffset),
+                retSize
+            )
+        
+            let gasUsed := 0
+        
+            let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+            switch iszero(precompileCost)
+            case 1 {
+                gasUsed := sub(gasToPass, frameGasLeft)
+            }
+            default {
+                gasUsed := precompileCost
+            }
+        
+            newGasLeft := chargeGas(evmGasLeft, gasUsed)
+        
+            stackHead := success
+        }
+        
+        
+        function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEvmGasLeft, sp, stackHead {
+            let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
+        
+            popStackCheck(oldSp, evmGasLeft, 6)
+            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+        
+            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+        
+            checkOverflow(argsOffset, argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
+        
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+        
+            if iszero(_isEVM(addr)) {
+                revertWithGas(evmGasLeft)
+            }
+        
+            let gasUsed := 100
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                gasUsed := 2600
+            }
+        
+            {
+                let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+                gasUsed := add(gasUsed, maxExpand)
+            }
+        
+            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        
+            gasToPass := capGasForCall(evmGasLeft, gasToPass)
+        
+            _pushEVMFrame(gasToPass, isStatic)
+            let success := delegatecall(
+                // We can not just pass all gas here to prevent overflow of zkEVM gas counter
+                EVM_GAS_STIPEND(),
+                addr,
+                add(MEM_OFFSET_INNER(), argsOffset),
+                argsSize,
+                0,
+                0
+            )
+        
+            let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+            let gasUsed := sub(gasToPass, frameGasLeft)
+        
+            newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        
+            stackHead := success
+        }
+        
+        function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
+            switch _isEVM(addr)
+            case 0 {
+                // zkEVM native
+                let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                let zkEvmGasBefore := gas()
+                success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                _saveReturndataAfterZkEVMCall()
+                let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+        
+                if gt(gasToPass, gasUsed) {
+                    frameGasLeft := sub(gasToPass, gasUsed) // TODO check
+                }
+            }
+            default {
+                _pushEVMFrame(gasToPass, false)
+                success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
             }
         }
         
-        function bitMaskFromBytes(nBytes) -> bitMask {
-            bitMask := sub(exp(2, mul(nBytes, 8)), 1) // 2**(nBytes*8) - 1
+        function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
+            switch _isEVM(addr)
+            case 0 {
+                // zkEVM native
+                let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                let zkEvmGasBefore := gas()
+                success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                _saveReturndataAfterZkEVMCall()
+                let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+        
+                if gt(gasToPass, gasUsed) {
+                    frameGasLeft := sub(gasToPass, gasUsed) // TODO check
+                }
+            }
+            default {
+                _pushEVMFrame(gasToPass, true)
+                success := staticcall(EVM_GAS_STIPEND(), addr, argsOffset, argsSize, 0, 0)
+                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+            }
         }
+        
+        function _getZkEVMGasForCall(_evmGas, addr) -> zkevmGas {
+            // TODO CHECK COSTS CALCULATION
+            zkevmGas := mul(_evmGas, GAS_DIVISOR())
+            let byteSize := extcodesize(addr)
+            let should_ceil := mod(byteSize, 32)
+            if gt(should_ceil, 0) {
+                byteSize := add(byteSize, sub(32, should_ceil))
+            }
+            let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
+            zkevmGas := sub(zkevmGas, decommitGasCost)
+            if gt(zkevmGas, UINT32_MAX()) {
+                zkevmGas := UINT32_MAX()
+            }
+        }
+        
+        function capGasForCall(evmGasLeft,oldGasToPass) -> gasToPass {
+            let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
+            gasToPass := oldGasToPass
+            if gt(oldGasToPass, maxGasToPass) { 
+                gasToPass := maxGasToPass
+            }
+        }
+        
+        function getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
+            maxExpand := add(retOffset, retSize)
+            switch lt(maxExpand, add(argsOffset, argsSize)) 
+            case 0 {
+                maxExpand := expandMemory(maxExpand)
+            }
+            default {
+                maxExpand := expandMemory(add(argsOffset, argsSize))
+            }
+        }
+        
         // The gas cost mentioned here is purely the cost of the contract, 
         // and does not consider the cost of the call itself nor the instructions 
         // to put the parameters in memory. 
@@ -485,216 +953,14 @@ object "EvmEmulator" {
                 }
         }
         
-        function checkMemOverflowByOffset(offset, evmGasLeft) {
-            if gt(offset, MAX_POSSIBLE_MEM()) {
-                mstore(0, evmGasLeft)
-                revert(0, 32)
-            }
+        function _saveReturndataAfterZkEVMCall() {
+            loadReturndataIntoActivePtr()
+            let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
+        
+            mstore(lastRtSzOffset, returndatasize())
         }
         
-        function checkMemOverflow(location, evmGasLeft) {
-            if gt(location, MAX_MEMORY_FRAME()) {
-                mstore(0, evmGasLeft)
-                revert(0, 32)
-            }
-        }
-        
-        function checkOverflow(data1, data2, evmGasLeft) {
-            if lt(add(data1, data2), data2) {
-                revertWithGas(evmGasLeft)
-            }
-        }
-        
-        function revertWithGas(evmGasLeft) {
-            mstore(0, evmGasLeft)
-            revert(0, 32)
-        }
-        
-        // This function can overflow, it is the job of the caller to ensure that it does not.
-        // The argument to this function is the offset into the memory region IN BYTES.
-        function expandMemory(newSize) -> gasCost {
-            let oldSizeInWords := mload(MEM_OFFSET())
-        
-            // The add 31 here before dividing is there to account for misaligned
-            // memory expansions, where someone calls this with a newSize that is not
-            // a multiple of 32. For instance, if someone calls it with an offset of 33,
-            // the new size in words should be 2, not 1, but dividing by 32 will give 1.
-            // Adding 31 solves it.
-            let newSizeInWords := div(add(newSize, 31), 32)
-        
-            if gt(newSizeInWords, oldSizeInWords) {
-                let new_minus_old := sub(newSizeInWords, oldSizeInWords)
-                gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
-        
-                mstore(MEM_OFFSET(), newSizeInWords)
-            }
-        }
-        
-        function isSlotWarm(key) -> isWarm {
-            // non-standard selector 0x01
-            mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
-            mstore(1, key)
-        
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        
-            if returndatasize() {
-                isWarm := true
-            }
-        }
-        
-        function warmSlot(key,currentValue) -> isWarm, originalValue {
-            // non-standard selector 0x02
-            mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
-            mstore(1, key)
-            mstore(33,currentValue)
-        
-            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
-        
-            if returndatasize() {
-                isWarm := true
-                returndatacopy(0, 0, 32)
-                originalValue := mload(0)
-            }
-        }
-        
-        function performSystemCall(
-            to,
-            dataLength,
-        ) -> ret {
-            let farCallAbi := shl(248, 1) // system call
-            // dataOffset is 0
-            // dataStart is 0
-            farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-            farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
-            // shardId is 0
-            // forwardingMode is 0
-            // not constructor call
-        
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        }
-        
-        
-        function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
-            newOffset := offset
-            newSize := size
-            if eq(isCallerEVM,1) {
-                // include gas
-                let previousValue := mload(sub(offset,32))
-                mstore(sub(offset,32),evmGasLeft)
-                //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
-                // but it appears to rewrite were we want to store the gas
-        
-                newOffset := sub(offset, 32)
-                newSize := add(size, 32)
-            }
-        }
-        
-        function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-            // function warmAccount(address account)
-            // non-standard selector 0x00
-            // addr is packed in the same word with selector
-            mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
-        
-            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
-        
-            if returndatasize() {
-                isWarm := true
-            }
-        }
-        
-        function getRawNonce(addr) -> nonce {
-            mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
-            mstore(4, addr)
-        
-            let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-        
-            if iszero(result) {
-                revert(0, 0)
-            }
-        
-            nonce := mload(0)
-        }
-        
-        function _isEVM(_addr) -> isEVM {
-            // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector; (0x8c040477)
-            // function isAccountEVM(address _addr) external view returns (bool);
-            // IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
-            //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
-            // );
-        
-            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-            mstore(4, _addr)
-        
-            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        
-            isEVM := mload(0)
-        }
-        
-        function _pushEVMFrame(_passGas, _isStatic) {
-            // function pushEVMFrame
-            // non-standard selector 0x03
-            mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
-            mstore(32, _passGas)
-        
-            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
-        }
-        
-        // Each evm gas is 5 zkEVM one
-        function GAS_DIVISOR() -> gas_div { gas_div := 5 }
-        function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
-        function OVERHEAD() -> overhead { overhead := 2000 }
-        
-        // From precompiles/CodeOracle
-        function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
-        function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
-        
-        function _calcEVMGas(_zkevmGas) -> calczkevmGas {
-            calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
-        }
-        
-        function getEVMGas() -> evmGas {
-            let _gas := gas()
-            let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
-        
-            switch lt(_gas, requiredGas)
-            case 1 {
-                evmGas := 0
-            }
-            default {
-                evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
-            }
-        }
-        
-        function _getZkEVMGas(_evmGas, addr) -> zkevmGas {
-            zkevmGas := mul(_evmGas, GAS_DIVISOR())
-            let byteSize := extcodesize(addr)
-            let should_ceil := mod(byteSize, 32)
-            if gt(should_ceil, 0) {
-                byteSize := add(byteSize, sub(32, should_ceil))
-            }
-            let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
-            zkevmGas := sub(zkevmGas, decommitGasCost)
-            if gt(zkevmGas, UINT32_MAX()) {
-                zkevmGas := UINT32_MAX()
-            }
-        }
-        
-        function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
+        function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
             let rtsz := returndatasize()
         
@@ -732,273 +998,9 @@ object "EvmEmulator" {
             mstore(lastRtSzOffset, 0)
         }
         
-        function _saveReturndataAfterZkEVMCall() {
-            loadReturndataIntoActivePtr()
-            let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-        
-            mstore(lastRtSzOffset, returndatasize())
-        }
-        
-        function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
-            let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
-            gasToPass := oldGasToPass
-            if gt(oldGasToPass, maxGasToPass) { 
-                gasToPass := maxGasToPass
-            }
-        }
-        
-        function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-            maxExpand := add(retOffset, retSize)
-            switch lt(maxExpand, add(argsOffset, argsSize)) 
-            case 0 {
-                maxExpand := expandMemory(maxExpand)
-            }
-            default {
-                maxExpand := expandMemory(add(argsOffset, argsSize))
-            }
-        }
-        
-        function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-            let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
-        
-            popStackCheck(oldSp, evmGasLeft, 7)
-            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-        
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
-        
-            checkOverflow(argsOffset,argsSize, evmGasLeft)
-            checkOverflow(retOffset, retSize, evmGasLeft)
-        
-            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-        
-            // static_gas = 0
-            // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
-            // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
-            // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
-            // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
-            // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
-        
-            let gasUsed := 100 // warm address access cost
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600 // cold address access cost
-            }
-        
-            if gt(value, 0) {
-                gasUsed := add(gasUsed, 6700) // positive_value_cost - stipend
-                gasToPass := add(gasToPass, 2300) // stipend TODO
-        
-                if isAddrEmpty(addr) {
-                    gasUsed := add(gasUsed, 25000) // value_to_empty_account_cost
-                }
-            }
-        
-            {
-                let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-                gasUsed := add(gasUsed, maxExpand)
-            }
-        
-            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-        
-            gasToPass := capGas(evmGasLeft, gasToPass)
-        
-            let success, frameGasLeft := _performCall(
-                addr,
-                gasToPass,
-                value,
-                add(argsOffset, MEM_OFFSET_INNER()),
-                argsSize,
-                add(retOffset, MEM_OFFSET_INNER()),
-                retSize
-            )
-        
-            let gasUsed := 0
-        
-            // TODO precompile should be called, but return nothing if gasPassed is too low
-            let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-            switch iszero(precompileCost)
-            case 1 {
-                gasUsed := sub(gasToPass, frameGasLeft)
-            }
-            default {
-                gasUsed := precompileCost
-            }
-        
-            newGasLeft := chargeGas(evmGasLeft, gasUsed)
-            stackHead := success
-        }
-        
-        function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-            let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
-        
-            popStackCheck(oldSp, evmGasLeft, 6)
-            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
-            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-        
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
-            checkOverflow(argsOffset,argsSize, evmGasLeft)
-            checkOverflow(retOffset, retSize, evmGasLeft)
-        
-            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-        
-            let gasUsed := 100
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600
-            }
-        
-            {
-                let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-                gasUsed := add(gasUsed, maxExpand)
-            }
-        
-            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-        
-            gasToPass := capGas(evmGasLeft, gasToPass)
-        
-            let success, frameGasLeft := _performStaticCall(
-                addr,
-                gasToPass,
-                add(MEM_OFFSET_INNER(), argsOffset),
-                argsSize,
-                add(MEM_OFFSET_INNER(), retOffset),
-                retSize
-            )
-        
-            let gasUsed := 0
-        
-            let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-            switch iszero(precompileCost)
-            case 1 {
-                gasUsed := sub(gasToPass, frameGasLeft)
-            }
-            default {
-                gasUsed := precompileCost
-            }
-        
-            newGasLeft := chargeGas(evmGasLeft, gasUsed)
-        
-            stackHead := success
-        }
-        
-        
-        function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEvmGasLeft, sp, stackHead {
-            let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
-        
-            popStackCheck(oldSp, evmGasLeft, 6)
-            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-        
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
-            checkOverflow(argsOffset, argsSize, evmGasLeft)
-            checkOverflow(retOffset, retSize, evmGasLeft)
-        
-            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-        
-            if iszero(_isEVM(addr)) {
-                revertWithGas(evmGasLeft)
-            }
-        
-            let gasUsed := 100
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600
-            }
-        
-            {
-                let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-                gasUsed := add(gasUsed, maxExpand)
-            }
-        
-            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-        
-            gasToPass := capGas(evmGasLeft, gasToPass)
-        
-            _pushEVMFrame(gasToPass, isStatic)
-            let success := delegatecall(
-                // We can not just pass all gas here to prevent overflow of zkEVM gas counter
-                EVM_GAS_STIPEND(),
-                addr,
-                add(MEM_OFFSET_INNER(), argsOffset),
-                argsSize,
-                0,
-                0
-            )
-        
-            let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-            let gasUsed := sub(gasToPass, frameGasLeft)
-        
-            newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
-        
-            stackHead := success
-        }
-        
-        function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-            switch _isEVM(addr)
-            case 0 {
-                // zkEVM native
-                let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
-                let zkEvmGasBefore := gas()
-                success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
-                _saveReturndataAfterZkEVMCall()
-                let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
-        
-                if gt(gasToPass, gasUsed) {
-                    frameGasLeft := sub(gasToPass, gasUsed) // TODO check
-                }
-            }
-            default {
-                _pushEVMFrame(gasToPass, false)
-                success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-            }
-        }
-        
-        function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-            switch _isEVM(addr)
-            case 0 {
-                // zkEVM native
-                let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
-                let zkEvmGasBefore := gas()
-                success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
-                _saveReturndataAfterZkEVMCall()
-                let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
-        
-                if gt(gasToPass, gasUsed) {
-                    frameGasLeft := sub(gasToPass, gasUsed) // TODO check
-                }
-            }
-            default {
-                _pushEVMFrame(gasToPass, true)
-                success := staticcall(EVM_GAS_STIPEND(), addr, argsOffset, argsSize, 0, 0)
-                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-            }
-        }
-        
-        function isAddrEmpty(addr) -> isEmpty {
-            isEmpty := 0
-            if iszero(extcodesize(addr)) { // YUL doesn't have short-circuit evaluation
-                if iszero(balance(addr)) {
-                    if iszero(getRawNonce(addr)) {
-                        isEmpty := 1
-                    }
-                }
-            }
-        }
+        ////////////////////////////////////////////////////////////////
+        //                 CREATE FUNCTIONALITY
+        ////////////////////////////////////////////////////////////////
         
         function _fetchConstructorReturnGas() -> gasLeft {
             mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
@@ -1016,7 +1018,7 @@ object "EvmEmulator" {
         function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt, oldStackHead) -> result, evmGasLeft, addr, stackHead  {
             _eraseReturndataPointer()
         
-            let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
+            let gasForTheCall := capGasForCall(evmGasLeftOld,INF_PASS_GAS())
         
             if lt(selfbalance(),value) {
                 revertWithGas(evmGasLeftOld)
@@ -1084,75 +1086,6 @@ object "EvmEmulator" {
             mstore(sub(offset, 0x60), back)
             back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             mstore(sub(offset, 0x80), back)
-        }
-        
-        function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
-            let rest_bits := shl(3, len)
-            let upper_bits := sub(256, rest_bits)
-            let val_mask := shl(upper_bits, MAX_UINT())
-            let val_masked := and(val, val_mask)
-            let dst_val := mload(dest)
-            let dst_mask := shr(rest_bits, MAX_UINT())
-            let dst_masked := and(dst_val, dst_mask)
-            mstore(dest, or(val_masked, dst_masked))
-        }
-        
-        function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
-            let dest_addr := dest
-            let src_addr := src
-            let dest_end := add(dest, and(len, sub(0, 32)))
-            for { } lt(dest_addr, dest_end) {} {
-                mstore(dest_addr, mload(src_addr))
-                dest_addr := add(dest_addr, 32)
-                src_addr := add(src_addr, 32)
-            }
-        
-            let rest_len := and(len, 31)
-            if rest_len {
-                $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
-            }
-        }
-        
-        function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
-            let dest_end := add(dest, and(len, sub(0, 32)))
-            for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
-                mstore(i, 0)
-            }
-        
-            let rest_len := and(len, 31)
-            if rest_len {
-                $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
-            }
-        }
-        
-        function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
-            evmGasLeft := chargeGas(evmGas, 100)
-        
-            let addr, dest, offset, len
-            popStackCheck(oldSp, evmGasLeft, 4)
-            addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        
-            // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
-            // minimum_word_size = (size + 31) / 32
-        
-            let dynamicGas := add(
-                mul(3, shr(5, add(len, 31))),
-                expandMemory(add(dest, len))
-            )
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                dynamicGas := add(dynamicGas, 2500)
-            }
-            evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-        
-            $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
-        
-            // Gets the code from the addr
-            if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
-                pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))  
-            }
         }
         
         function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
@@ -1236,6 +1169,78 @@ object "EvmEmulator" {
             result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt, stackHead)
         }
         
+        ////////////////////////////////////////////////////////////////
+        //               EXTCODECOPY FUNCTIONALITY
+        ////////////////////////////////////////////////////////////////
+        
+        function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
+            let rest_bits := shl(3, len)
+            let upper_bits := sub(256, rest_bits)
+            let val_mask := shl(upper_bits, MAX_UINT())
+            let val_masked := and(val, val_mask)
+            let dst_val := mload(dest)
+            let dst_mask := shr(rest_bits, MAX_UINT())
+            let dst_masked := and(dst_val, dst_mask)
+            mstore(dest, or(val_masked, dst_masked))
+        }
+        
+        function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
+            let dest_addr := dest
+            let src_addr := src
+            let dest_end := add(dest, and(len, sub(0, 32)))
+            for { } lt(dest_addr, dest_end) {} {
+                mstore(dest_addr, mload(src_addr))
+                dest_addr := add(dest_addr, 32)
+                src_addr := add(src_addr, 32)
+            }
+        
+            let rest_len := and(len, 31)
+            if rest_len {
+                $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+            }
+        }
+        
+        function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
+            let dest_end := add(dest, and(len, sub(0, 32)))
+            for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+                mstore(i, 0)
+            }
+        
+            let rest_len := and(len, 31)
+            if rest_len {
+                $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+            }
+        }
+        
+        function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
+            evmGasLeft := chargeGas(evmGas, 100)
+        
+            let addr, dest, offset, len
+            popStackCheck(oldSp, evmGasLeft, 4)
+            addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        
+            // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+            // minimum_word_size = (size + 31) / 32
+        
+            let dynamicGas := add(
+                mul(3, shr(5, add(len, 31))),
+                expandMemory(add(dest, len))
+            )
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                dynamicGas := add(dynamicGas, 2500)
+            }
+            evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+        
+            $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
+        
+            // Gets the code from the addr
+            if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
+                pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))  
+            }
+        }
 
         function simulate(
             isCallerEVM,
@@ -2657,16 +2662,22 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset,size, evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
                     checkMemOverflowByOffset(add(offset, size), evmGasLeft)
-                    evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
-            
+                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
             
                     // Don't check overflow here since previous checks are enough to ensure this is safe
                     offset := add(offset, MEM_OFFSET_INNER())
-                    offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
             
-                    revert(offset,size)
+                    if eq(isCallerEVM, 1) {
+                        offset := sub(offset, 32)
+                        size := add(size, 32)
+                
+                        // include gas
+                        mstore(offset, evmGasLeft)
+                    }
+            
+                    revert(offset, size)
                 }
                 case 0xFE { // OP_INVALID
                     evmGasLeft := 0
@@ -3031,7 +3042,7 @@ object "EvmEmulator" {
         getConstructorBytecode()
 
         if iszero(isCallerEVM) {
-            evmGasLeft := getEVMGas()
+            evmGasLeft := getEvmGasFromContext()
         }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
@@ -3046,6 +3057,10 @@ object "EvmEmulator" {
     }
     object "EvmEmulator_deployed" {
         code {
+            ////////////////////////////////////////////////////////////////
+            //                      CONSTANTS
+            ////////////////////////////////////////////////////////////////
+            
             function ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT() -> addr {
                 addr := 0x0000000000000000000000000000000000008002
             }
@@ -3066,12 +3081,8 @@ object "EvmEmulator" {
                 addr :=  0x0000000000000000000000000000000000008013
             }
             
-            function DEBUG_SLOT_OFFSET() -> offset {
-                offset := mul(32, 32) // TODO cleanup
-            }
-            
             function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
-                offset := add(DEBUG_SLOT_OFFSET(), mul(5, 32))
+                offset := mul(32, 32)
             }
             
             function STACK_OFFSET() -> offset {
@@ -3080,10 +3091,6 @@ object "EvmEmulator" {
             
             function BYTECODE_OFFSET() -> offset {
                 offset := add(STACK_OFFSET(), mul(1024, 32))
-            }
-            
-            function INF_PASS_GAS() -> inf {
-                inf := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
             }
             
             function MAX_POSSIBLE_BYTECODE() -> max {
@@ -3110,8 +3117,59 @@ object "EvmEmulator" {
                 max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
             }
             
+            function INF_PASS_GAS() -> inf {
+                inf := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+            }
+            
+            // Each evm gas is 5 zkEVM one
+            function GAS_DIVISOR() -> gas_div { gas_div := 5 }
+            function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
+            function OVERHEAD() -> overhead { overhead := 2000 }
+            
+            // From precompiles/CodeOracle
+            function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
+            
+            function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+            
+            ////////////////////////////////////////////////////////////////
+            //                  GENERAL FUNCTIONS
+            ////////////////////////////////////////////////////////////////
+            
             function $llvm_NoInline_llvm$_revert() {
                 revert(0, 0)
+            }
+            
+            function revertWithGas(evmGasLeft) {
+                mstore(0, evmGasLeft)
+                revert(0, 32)
+            }
+            
+            function chargeGas(prevGas, toCharge) -> gasRemaining {
+                if lt(prevGas, toCharge) {
+                    revertWithGas(0)
+                }
+            
+                gasRemaining := sub(prevGas, toCharge)
+            }
+            
+            function checkMemOverflowByOffset(offset, evmGasLeft) {
+                if gt(offset, MAX_POSSIBLE_MEM()) {
+                    mstore(0, evmGasLeft)
+                    revert(0, 32)
+                }
+            }
+            
+            function checkMemOverflow(location, evmGasLeft) {
+                if gt(location, MAX_MEMORY_FRAME()) {
+                    mstore(0, evmGasLeft)
+                    revert(0, 32)
+                }
+            }
+            
+            function checkOverflow(data1, data2, evmGasLeft) {
+                if lt(add(data1, data2), data2) {
+                    revertWithGas(evmGasLeft)
+                }
             }
             
             // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
@@ -3129,6 +3187,238 @@ object "EvmEmulator" {
                 }
                 value := shr(mul(8,sub(32,length)),mload(start))
             }
+            
+            function getCodeAddress() -> addr {
+                addr := verbatim_0i_1o("code_source")
+            }
+            
+            function loadReturndataIntoActivePtr() {
+                verbatim_0i_0o("return_data_ptr_to_active")
+            }
+            
+            function loadCalldataIntoActivePtr() {
+                verbatim_0i_0o("calldata_ptr_to_active")
+            }
+            
+            function getActivePtrDataSize() -> size {
+                size := verbatim_0i_1o("active_ptr_data_size")
+            }
+            
+            function copyActivePtrData(_dest, _source, _size) {
+                verbatim_3i_0o("active_ptr_data_copy", _dest, _source, _size)
+            }
+            
+            function ptrAddIntoActive(_dest) {
+                verbatim_1i_0o("active_ptr_add_assign", _dest)
+            }
+            
+            function ptrShrinkIntoActive(_dest) {
+                verbatim_1i_0o("active_ptr_shrink_assign", _dest)
+            }
+            
+            function getIsStaticFromCallFlags() -> isStatic {
+                isStatic := verbatim_0i_1o("get_global::call_flags")
+                isStatic := iszero(iszero(and(isStatic, 0x04)))
+            }
+            
+            function isAddrEmpty(addr) -> isEmpty {
+                isEmpty := 0
+                if iszero(extcodesize(addr)) { // YUL doesn't have short-circuit evaluation
+                    if iszero(balance(addr)) {
+                        if iszero(getRawNonce(addr)) {
+                            isEmpty := 1
+                        }
+                    }
+                }
+            }
+            
+            function getRawNonce(addr) -> nonce {
+                mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
+                mstore(4, addr)
+            
+                let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+            
+                if iszero(result) {
+                    revert(0, 0)
+                }
+            
+                nonce := mload(0)
+            }
+            
+            function _getRawCodeHash(account) -> hash {
+                mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
+                mstore(4, account)
+            
+                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            
+                hash := mload(0)
+            }
+            
+            // Basically performs an extcodecopy, while returning the length of the bytecode.
+            function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
+                codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
+            }
+            
+            // Basically performs an extcodecopy, while returning the length of the bytecode.
+            function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
+                let codeHash := _getRawCodeHash(addr)
+            
+                mstore(0, codeHash)
+            
+                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            
+                // The first word is the true length of the bytecode
+                returndatacopy(0, 0, 32)
+                codeLen := mload(0)
+            
+                if gt(_len, codeLen) {
+                    _len := codeLen
+                }
+            
+                returndatacopy(dest, add(32,_offset), _len)
+            }
+            
+            // Returns the length of the bytecode.
+            function _fetchDeployedCodeLen(addr) -> codeLen {
+                let codeHash := _getRawCodeHash(addr)
+            
+                mstore(0, codeHash)
+            
+                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+            
+                switch iszero(success)
+                case 1 {
+                    // The code oracle call can only fail in the case where the contract
+                    // we are querying is the current one executing and it has not yet been
+                    // deployed, i.e., if someone calls codesize (or extcodesize(address()))
+                    // inside the constructor. In that case, code length is zero.
+                    codeLen := 0
+                }
+                default {
+                    // The first word is the true length of the bytecode
+                    returndatacopy(0, 0, 32)
+                    codeLen := mload(0)
+                }
+            }
+            
+            function getDeployedBytecode() {
+                let codeLen := _fetchDeployedCode(
+                    getCodeAddress(),
+                    add(BYTECODE_OFFSET(), 32),
+                    MAX_POSSIBLE_BYTECODE()
+                )
+            
+                mstore(BYTECODE_OFFSET(), codeLen)
+            }
+            
+            function getMax(a, b) -> max {
+                max := b
+                if gt(a, b) {
+                    max := a
+                }
+            }
+            
+            function bitLength(n) -> bitLen {
+                for { } gt(n, 0) { } { // while(n > 0)
+                    if iszero(n) {
+                        bitLen := 1
+                        break
+                    }
+                    n := shr(1, n)
+                    bitLen := add(bitLen, 1)
+                }
+            }
+            
+            function bitMaskFromBytes(nBytes) -> bitMask {
+                bitMask := sub(exp(2, mul(nBytes, 8)), 1) // 2**(nBytes*8) - 1
+            }
+            
+            // This function can overflow, it is the job of the caller to ensure that it does not.
+            // The argument to this function is the offset into the memory region IN BYTES.
+            function expandMemory(newSize) -> gasCost {
+                let oldSizeInWords := mload(MEM_OFFSET())
+            
+                // The add 31 here before dividing is there to account for misaligned
+                // memory expansions, where someone calls this with a newSize that is not
+                // a multiple of 32. For instance, if someone calls it with an offset of 33,
+                // the new size in words should be 2, not 1, but dividing by 32 will give 1.
+                // Adding 31 solves it.
+                let newSizeInWords := div(add(newSize, 31), 32)
+            
+                if gt(newSizeInWords, oldSizeInWords) {
+                    let new_minus_old := sub(newSizeInWords, oldSizeInWords)
+                    gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
+            
+                    mstore(MEM_OFFSET(), newSizeInWords)
+                }
+            }
+            
+            function performSystemCall(
+                to,
+                dataLength,
+            ) -> ret {
+                let farCallAbi := shl(248, 1) // system call
+                // dataOffset is 0
+                // dataStart is 0
+                farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+                farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+                // shardId is 0
+                // forwardingMode is 0
+                // not constructor call
+            
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            }
+            
+            function _isEVM(_addr) -> isEVM {
+                // function isAccountEVM(address _addr) external view returns (bool);
+                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
+                mstore(4, _addr)
+            
+                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            
+                isEVM := mload(0)
+            }
+            
+            function zkVmGasToEvmGas(_zkevmGas) -> calczkevmGas {
+                calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
+            }
+            
+            function getEvmGasFromContext() -> evmGas {
+                let _gas := gas()
+                let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD()) // TODO CHECK GAS MECHANICS
+            
+                switch lt(_gas, requiredGas)
+                case 1 {
+                    evmGas := 0
+                }
+                default {
+                    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+                }
+            }
+            
+            ////////////////////////////////////////////////////////////////
+            //                     STACK OPERATIONS
+            ////////////////////////////////////////////////////////////////
             
             function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
                 evmGasLeft := chargeGas(evmGas, 3)
@@ -3200,113 +3490,62 @@ object "EvmEmulator" {
                 }
             }
             
-            function getCodeAddress() -> addr {
-                addr := verbatim_0i_1o("code_source")
+            ////////////////////////////////////////////////////////////////
+            //               EVM GAS MANAGER FUNCTIONALITY
+            ////////////////////////////////////////////////////////////////
+            
+            function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
+                // function warmAccount(address account)
+                // non-standard selector 0x00
+                // addr is packed in the same word with selector
+                mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+            
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
+            
+                if returndatasize() {
+                    isWarm := true
+                }
             }
             
-            function loadReturndataIntoActivePtr() {
-                verbatim_0i_0o("return_data_ptr_to_active")
-            }
+            function isSlotWarm(key) -> isWarm {
+                // non-standard selector 0x01
+                mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
+                mstore(1, key)
             
-            function loadCalldataIntoActivePtr() {
-                verbatim_0i_0o("calldata_ptr_to_active")
-            }
-            
-            function getActivePtrDataSize() -> size {
-                size := verbatim_0i_1o("active_ptr_data_size")
-            }
-            
-            function copyActivePtrData(_dest, _source, _size) {
-                verbatim_3i_0o("active_ptr_data_copy", _dest, _source, _size)
-            }
-            
-            function ptrAddIntoActive(_dest) {
-                verbatim_1i_0o("active_ptr_add_assign", _dest)
-            }
-            
-            function ptrShrinkIntoActive(_dest) {
-                verbatim_1i_0o("active_ptr_shrink_assign", _dest)
-            }
-            
-            function _getRawCodeHash(account) -> hash {
-                mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
-                mstore(4, account)
-            
-                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
             
-                hash := mload(0)
-            }
-            
-            function getIsStaticFromCallFlags() -> isStatic {
-                isStatic := verbatim_0i_1o("get_global::call_flags")
-                isStatic := iszero(iszero(and(isStatic, 0x04)))
-            }
-            
-            // Basically performs an extcodecopy, while returning the length of the bytecode.
-            function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
-                codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
-            }
-            
-            // Basically performs an extcodecopy, while returning the length of the bytecode.
-            function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
-                let codeHash := _getRawCodeHash(addr)
-            
-                mstore(0, codeHash)
-            
-                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
+                if returndatasize() {
+                    isWarm := true
                 }
-            
-                // The first word is the true length of the bytecode
-                returndatacopy(0, 0, 32)
-                codeLen := mload(0)
-            
-                if gt(_len, codeLen) {
-                    _len := codeLen
-                }
-            
-                returndatacopy(dest, add(32,_offset), _len)
             }
             
-            // Returns the length of the bytecode.
-            function _fetchDeployedCodeLen(addr) -> codeLen {
-                let codeHash := _getRawCodeHash(addr)
+            function warmSlot(key,currentValue) -> isWarm, originalValue {
+                // non-standard selector 0x02
+                mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
+                mstore(1, key)
+                mstore(33,currentValue)
             
-                mstore(0, codeHash)
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
             
-                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-            
-                switch iszero(success)
-                case 1 {
-                    // The code oracle call can only fail in the case where the contract
-                    // we are querying is the current one executing and it has not yet been
-                    // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                    // inside the constructor. In that case, code length is zero.
-                    codeLen := 0
-                }
-                default {
-                    // The first word is the true length of the bytecode
+                if returndatasize() {
+                    isWarm := true
                     returndatacopy(0, 0, 32)
-                    codeLen := mload(0)
+                    originalValue := mload(0)
                 }
             }
             
-            function getDeployedBytecode() {
-                let codeLen := _fetchDeployedCode(
-                    getCodeAddress(),
-                    add(BYTECODE_OFFSET(), 32),
-                    MAX_POSSIBLE_BYTECODE()
-                )
+            function _pushEVMFrame(_passGas, _isStatic) {
+                // function pushEVMFrame
+                // non-standard selector 0x03
+                mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
+                mstore(32, _passGas)
             
-                mstore(BYTECODE_OFFSET(), codeLen)
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
             }
             
             function consumeEvmFrame() -> passGas, isStatic, callerEVM {
@@ -3327,35 +3566,275 @@ object "EvmEmulator" {
                 }
             }
             
-            function chargeGas(prevGas, toCharge) -> gasRemaining {
-                if lt(prevGas, toCharge) {
-                    revertWithGas(0)
+            ////////////////////////////////////////////////////////////////
+            //               CALLS FUNCTIONALITY
+            ////////////////////////////////////////////////////////////////
+            
+            function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
+                let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
+            
+                popStackCheck(oldSp, evmGasLeft, 7)
+                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+            
+                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+            
+            
+                checkOverflow(argsOffset,argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
+            
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+            
+                // static_gas = 0
+                // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
+                // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
+                // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
+                // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
+                // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
+            
+                let gasUsed := 100 // warm address access cost
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                    gasUsed := 2600 // cold address access cost
                 }
             
-                gasRemaining := sub(prevGas, toCharge)
-            }
+                if gt(value, 0) {
+                    gasUsed := add(gasUsed, 6700) // positive_value_cost - stipend
+                    gasToPass := add(gasToPass, 2300) // stipend TODO
             
-            function getMax(a, b) -> max {
-                max := b
-                if gt(a, b) {
-                    max := a
-                }
-            }
-            
-            function bitLength(n) -> bitLen {
-                for { } gt(n, 0) { } { // while(n > 0)
-                    if iszero(n) {
-                        bitLen := 1
-                        break
+                    if isAddrEmpty(addr) {
+                        gasUsed := add(gasUsed, 25000) // value_to_empty_account_cost
                     }
-                    n := shr(1, n)
-                    bitLen := add(bitLen, 1)
+                }
+            
+                {
+                    let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+                    gasUsed := add(gasUsed, maxExpand)
+                }
+            
+                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+            
+                gasToPass := capGasForCall(evmGasLeft, gasToPass)
+            
+                let success, frameGasLeft := _performCall(
+                    addr,
+                    gasToPass,
+                    value,
+                    add(argsOffset, MEM_OFFSET_INNER()),
+                    argsSize,
+                    add(retOffset, MEM_OFFSET_INNER()),
+                    retSize
+                )
+            
+                let gasUsed := 0
+            
+                // TODO precompile should be called, but return nothing if gasPassed is too low
+                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                switch iszero(precompileCost)
+                case 1 {
+                    gasUsed := sub(gasToPass, frameGasLeft)
+                }
+                default {
+                    gasUsed := precompileCost
+                }
+            
+                newGasLeft := chargeGas(evmGasLeft, gasUsed)
+                stackHead := success
+            }
+            
+            function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
+                let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+            
+                popStackCheck(oldSp, evmGasLeft, 6)
+                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+            
+                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+            
+                checkOverflow(argsOffset,argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
+            
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+            
+                let gasUsed := 100
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                    gasUsed := 2600
+                }
+            
+                {
+                    let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+                    gasUsed := add(gasUsed, maxExpand)
+                }
+            
+                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+            
+                gasToPass := capGasForCall(evmGasLeft, gasToPass)
+            
+                let success, frameGasLeft := _performStaticCall(
+                    addr,
+                    gasToPass,
+                    add(MEM_OFFSET_INNER(), argsOffset),
+                    argsSize,
+                    add(MEM_OFFSET_INNER(), retOffset),
+                    retSize
+                )
+            
+                let gasUsed := 0
+            
+                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                switch iszero(precompileCost)
+                case 1 {
+                    gasUsed := sub(gasToPass, frameGasLeft)
+                }
+                default {
+                    gasUsed := precompileCost
+                }
+            
+                newGasLeft := chargeGas(evmGasLeft, gasUsed)
+            
+                stackHead := success
+            }
+            
+            
+            function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEvmGasLeft, sp, stackHead {
+                let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
+            
+                popStackCheck(oldSp, evmGasLeft, 6)
+                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+            
+                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+            
+                checkOverflow(argsOffset, argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
+            
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+            
+                if iszero(_isEVM(addr)) {
+                    revertWithGas(evmGasLeft)
+                }
+            
+                let gasUsed := 100
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                    gasUsed := 2600
+                }
+            
+                {
+                    let maxExpand := getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize)
+                    gasUsed := add(gasUsed, maxExpand)
+                }
+            
+                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+            
+                gasToPass := capGasForCall(evmGasLeft, gasToPass)
+            
+                _pushEVMFrame(gasToPass, isStatic)
+                let success := delegatecall(
+                    // We can not just pass all gas here to prevent overflow of zkEVM gas counter
+                    EVM_GAS_STIPEND(),
+                    addr,
+                    add(MEM_OFFSET_INNER(), argsOffset),
+                    argsSize,
+                    0,
+                    0
+                )
+            
+                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+                let gasUsed := sub(gasToPass, frameGasLeft)
+            
+                newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
+            
+                stackHead := success
+            }
+            
+            function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
+                switch _isEVM(addr)
+                case 0 {
+                    // zkEVM native
+                    let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                    let zkEvmGasBefore := gas()
+                    success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    _saveReturndataAfterZkEVMCall()
+                    let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+            
+                    if gt(gasToPass, gasUsed) {
+                        frameGasLeft := sub(gasToPass, gasUsed) // TODO check
+                    }
+                }
+                default {
+                    _pushEVMFrame(gasToPass, false)
+                    success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 }
             }
             
-            function bitMaskFromBytes(nBytes) -> bitMask {
-                bitMask := sub(exp(2, mul(nBytes, 8)), 1) // 2**(nBytes*8) - 1
+            function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
+                switch _isEVM(addr)
+                case 0 {
+                    // zkEVM native
+                    let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                    let zkEvmGasBefore := gas()
+                    success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                    _saveReturndataAfterZkEVMCall()
+                    let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+            
+                    if gt(gasToPass, gasUsed) {
+                        frameGasLeft := sub(gasToPass, gasUsed) // TODO check
+                    }
+                }
+                default {
+                    _pushEVMFrame(gasToPass, true)
+                    success := staticcall(EVM_GAS_STIPEND(), addr, argsOffset, argsSize, 0, 0)
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                }
             }
+            
+            function _getZkEVMGasForCall(_evmGas, addr) -> zkevmGas {
+                // TODO CHECK COSTS CALCULATION
+                zkevmGas := mul(_evmGas, GAS_DIVISOR())
+                let byteSize := extcodesize(addr)
+                let should_ceil := mod(byteSize, 32)
+                if gt(should_ceil, 0) {
+                    byteSize := add(byteSize, sub(32, should_ceil))
+                }
+                let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
+                zkevmGas := sub(zkevmGas, decommitGasCost)
+                if gt(zkevmGas, UINT32_MAX()) {
+                    zkevmGas := UINT32_MAX()
+                }
+            }
+            
+            function capGasForCall(evmGasLeft,oldGasToPass) -> gasToPass {
+                let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
+                gasToPass := oldGasToPass
+                if gt(oldGasToPass, maxGasToPass) { 
+                    gasToPass := maxGasToPass
+                }
+            }
+            
+            function getMemoryExpansionCostForCall(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
+                maxExpand := add(retOffset, retSize)
+                switch lt(maxExpand, add(argsOffset, argsSize)) 
+                case 0 {
+                    maxExpand := expandMemory(maxExpand)
+                }
+                default {
+                    maxExpand := expandMemory(add(argsOffset, argsSize))
+                }
+            }
+            
             // The gas cost mentioned here is purely the cost of the contract, 
             // and does not consider the cost of the call itself nor the instructions 
             // to put the parameters in memory. 
@@ -3483,216 +3962,14 @@ object "EvmEmulator" {
                     }
             }
             
-            function checkMemOverflowByOffset(offset, evmGasLeft) {
-                if gt(offset, MAX_POSSIBLE_MEM()) {
-                    mstore(0, evmGasLeft)
-                    revert(0, 32)
-                }
+            function _saveReturndataAfterZkEVMCall() {
+                loadReturndataIntoActivePtr()
+                let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
+            
+                mstore(lastRtSzOffset, returndatasize())
             }
             
-            function checkMemOverflow(location, evmGasLeft) {
-                if gt(location, MAX_MEMORY_FRAME()) {
-                    mstore(0, evmGasLeft)
-                    revert(0, 32)
-                }
-            }
-            
-            function checkOverflow(data1, data2, evmGasLeft) {
-                if lt(add(data1, data2), data2) {
-                    revertWithGas(evmGasLeft)
-                }
-            }
-            
-            function revertWithGas(evmGasLeft) {
-                mstore(0, evmGasLeft)
-                revert(0, 32)
-            }
-            
-            // This function can overflow, it is the job of the caller to ensure that it does not.
-            // The argument to this function is the offset into the memory region IN BYTES.
-            function expandMemory(newSize) -> gasCost {
-                let oldSizeInWords := mload(MEM_OFFSET())
-            
-                // The add 31 here before dividing is there to account for misaligned
-                // memory expansions, where someone calls this with a newSize that is not
-                // a multiple of 32. For instance, if someone calls it with an offset of 33,
-                // the new size in words should be 2, not 1, but dividing by 32 will give 1.
-                // Adding 31 solves it.
-                let newSizeInWords := div(add(newSize, 31), 32)
-            
-                if gt(newSizeInWords, oldSizeInWords) {
-                    let new_minus_old := sub(newSizeInWords, oldSizeInWords)
-                    gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
-            
-                    mstore(MEM_OFFSET(), newSizeInWords)
-                }
-            }
-            
-            function isSlotWarm(key) -> isWarm {
-                // non-standard selector 0x01
-                mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
-                mstore(1, key)
-            
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            
-                if returndatasize() {
-                    isWarm := true
-                }
-            }
-            
-            function warmSlot(key,currentValue) -> isWarm, originalValue {
-                // non-standard selector 0x02
-                mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
-                mstore(1, key)
-                mstore(33,currentValue)
-            
-                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
-            
-                if returndatasize() {
-                    isWarm := true
-                    returndatacopy(0, 0, 32)
-                    originalValue := mload(0)
-                }
-            }
-            
-            function performSystemCall(
-                to,
-                dataLength,
-            ) -> ret {
-                let farCallAbi := shl(248, 1) // system call
-                // dataOffset is 0
-                // dataStart is 0
-                farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-                farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
-                // shardId is 0
-                // forwardingMode is 0
-                // not constructor call
-            
-                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            }
-            
-            
-            function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
-                newOffset := offset
-                newSize := size
-                if eq(isCallerEVM,1) {
-                    // include gas
-                    let previousValue := mload(sub(offset,32))
-                    mstore(sub(offset,32),evmGasLeft)
-                    //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
-                    // but it appears to rewrite were we want to store the gas
-            
-                    newOffset := sub(offset, 32)
-                    newSize := add(size, 32)
-                }
-            }
-            
-            function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-                // function warmAccount(address account)
-                // non-standard selector 0x00
-                // addr is packed in the same word with selector
-                mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
-            
-                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
-            
-                if returndatasize() {
-                    isWarm := true
-                }
-            }
-            
-            function getRawNonce(addr) -> nonce {
-                mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
-                mstore(4, addr)
-            
-                let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-            
-                if iszero(result) {
-                    revert(0, 0)
-                }
-            
-                nonce := mload(0)
-            }
-            
-            function _isEVM(_addr) -> isEVM {
-                // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector; (0x8c040477)
-                // function isAccountEVM(address _addr) external view returns (bool);
-                // IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
-                //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
-                // );
-            
-                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-                mstore(4, _addr)
-            
-                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            
-                isEVM := mload(0)
-            }
-            
-            function _pushEVMFrame(_passGas, _isStatic) {
-                // function pushEVMFrame
-                // non-standard selector 0x03
-                mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
-                mstore(32, _passGas)
-            
-                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
-            }
-            
-            // Each evm gas is 5 zkEVM one
-            function GAS_DIVISOR() -> gas_div { gas_div := 5 }
-            function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
-            function OVERHEAD() -> overhead { overhead := 2000 }
-            
-            // From precompiles/CodeOracle
-            function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
-            function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
-            
-            function _calcEVMGas(_zkevmGas) -> calczkevmGas {
-                calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
-            }
-            
-            function getEVMGas() -> evmGas {
-                let _gas := gas()
-                let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
-            
-                switch lt(_gas, requiredGas)
-                case 1 {
-                    evmGas := 0
-                }
-                default {
-                    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
-                }
-            }
-            
-            function _getZkEVMGas(_evmGas, addr) -> zkevmGas {
-                zkevmGas := mul(_evmGas, GAS_DIVISOR())
-                let byteSize := extcodesize(addr)
-                let should_ceil := mod(byteSize, 32)
-                if gt(should_ceil, 0) {
-                    byteSize := add(byteSize, sub(32, should_ceil))
-                }
-                let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
-                zkevmGas := sub(zkevmGas, decommitGasCost)
-                if gt(zkevmGas, UINT32_MAX()) {
-                    zkevmGas := UINT32_MAX()
-                }
-            }
-            
-            function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
+            function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
                 let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
                 let rtsz := returndatasize()
             
@@ -3730,273 +4007,9 @@ object "EvmEmulator" {
                 mstore(lastRtSzOffset, 0)
             }
             
-            function _saveReturndataAfterZkEVMCall() {
-                loadReturndataIntoActivePtr()
-                let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-            
-                mstore(lastRtSzOffset, returndatasize())
-            }
-            
-            function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
-                let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
-                gasToPass := oldGasToPass
-                if gt(oldGasToPass, maxGasToPass) { 
-                    gasToPass := maxGasToPass
-                }
-            }
-            
-            function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-                maxExpand := add(retOffset, retSize)
-                switch lt(maxExpand, add(argsOffset, argsSize)) 
-                case 0 {
-                    maxExpand := expandMemory(maxExpand)
-                }
-                default {
-                    maxExpand := expandMemory(add(argsOffset, argsSize))
-                }
-            }
-            
-            function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-                let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
-            
-                popStackCheck(oldSp, evmGasLeft, 7)
-                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-            
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
-            
-                checkOverflow(argsOffset,argsSize, evmGasLeft)
-                checkOverflow(retOffset, retSize, evmGasLeft)
-            
-                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-            
-                // static_gas = 0
-                // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
-                // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
-                // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
-                // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
-                // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
-            
-                let gasUsed := 100 // warm address access cost
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600 // cold address access cost
-                }
-            
-                if gt(value, 0) {
-                    gasUsed := add(gasUsed, 6700) // positive_value_cost - stipend
-                    gasToPass := add(gasToPass, 2300) // stipend TODO
-            
-                    if isAddrEmpty(addr) {
-                        gasUsed := add(gasUsed, 25000) // value_to_empty_account_cost
-                    }
-                }
-            
-                {
-                    let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-                    gasUsed := add(gasUsed, maxExpand)
-                }
-            
-                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-            
-                gasToPass := capGas(evmGasLeft, gasToPass)
-            
-                let success, frameGasLeft := _performCall(
-                    addr,
-                    gasToPass,
-                    value,
-                    add(argsOffset, MEM_OFFSET_INNER()),
-                    argsSize,
-                    add(retOffset, MEM_OFFSET_INNER()),
-                    retSize
-                )
-            
-                let gasUsed := 0
-            
-                // TODO precompile should be called, but return nothing if gasPassed is too low
-                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-                switch iszero(precompileCost)
-                case 1 {
-                    gasUsed := sub(gasToPass, frameGasLeft)
-                }
-                default {
-                    gasUsed := precompileCost
-                }
-            
-                newGasLeft := chargeGas(evmGasLeft, gasUsed)
-                stackHead := success
-            }
-            
-            function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-                let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
-            
-                popStackCheck(oldSp, evmGasLeft, 6)
-                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
-                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-            
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
-                checkOverflow(argsOffset,argsSize, evmGasLeft)
-                checkOverflow(retOffset, retSize, evmGasLeft)
-            
-                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-            
-                let gasUsed := 100
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600
-                }
-            
-                {
-                    let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-                    gasUsed := add(gasUsed, maxExpand)
-                }
-            
-                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-            
-                gasToPass := capGas(evmGasLeft, gasToPass)
-            
-                let success, frameGasLeft := _performStaticCall(
-                    addr,
-                    gasToPass,
-                    add(MEM_OFFSET_INNER(), argsOffset),
-                    argsSize,
-                    add(MEM_OFFSET_INNER(), retOffset),
-                    retSize
-                )
-            
-                let gasUsed := 0
-            
-                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-                switch iszero(precompileCost)
-                case 1 {
-                    gasUsed := sub(gasToPass, frameGasLeft)
-                }
-                default {
-                    gasUsed := precompileCost
-                }
-            
-                newGasLeft := chargeGas(evmGasLeft, gasUsed)
-            
-                stackHead := success
-            }
-            
-            
-            function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEvmGasLeft, sp, stackHead {
-                let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
-            
-                popStackCheck(oldSp, evmGasLeft, 6)
-                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-            
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
-                checkOverflow(argsOffset, argsSize, evmGasLeft)
-                checkOverflow(retOffset, retSize, evmGasLeft)
-            
-                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
-            
-                if iszero(_isEVM(addr)) {
-                    revertWithGas(evmGasLeft)
-                }
-            
-                let gasUsed := 100
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600
-                }
-            
-                {
-                    let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-                    gasUsed := add(gasUsed, maxExpand)
-                }
-            
-                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-            
-                gasToPass := capGas(evmGasLeft, gasToPass)
-            
-                _pushEVMFrame(gasToPass, isStatic)
-                let success := delegatecall(
-                    // We can not just pass all gas here to prevent overflow of zkEVM gas counter
-                    EVM_GAS_STIPEND(),
-                    addr,
-                    add(MEM_OFFSET_INNER(), argsOffset),
-                    argsSize,
-                    0,
-                    0
-                )
-            
-                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-                let gasUsed := sub(gasToPass, frameGasLeft)
-            
-                newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
-            
-                stackHead := success
-            }
-            
-            function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-                switch _isEVM(addr)
-                case 0 {
-                    // zkEVM native
-                    let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
-                    let zkEvmGasBefore := gas()
-                    success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
-                    _saveReturndataAfterZkEVMCall()
-                    let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
-            
-                    if gt(gasToPass, gasUsed) {
-                        frameGasLeft := sub(gasToPass, gasUsed) // TODO check
-                    }
-                }
-                default {
-                    _pushEVMFrame(gasToPass, false)
-                    success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                }
-            }
-            
-            function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-                switch _isEVM(addr)
-                case 0 {
-                    // zkEVM native
-                    let zkEvmGasToPass := _getZkEVMGas(gasToPass, addr)
-                    let zkEvmGasBefore := gas()
-                    success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
-                    _saveReturndataAfterZkEVMCall()
-                    let gasUsed := _calcEVMGas(sub(zkEvmGasBefore, gas()))
-            
-                    if gt(gasToPass, gasUsed) {
-                        frameGasLeft := sub(gasToPass, gasUsed) // TODO check
-                    }
-                }
-                default {
-                    _pushEVMFrame(gasToPass, true)
-                    success := staticcall(EVM_GAS_STIPEND(), addr, argsOffset, argsSize, 0, 0)
-                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                }
-            }
-            
-            function isAddrEmpty(addr) -> isEmpty {
-                isEmpty := 0
-                if iszero(extcodesize(addr)) { // YUL doesn't have short-circuit evaluation
-                    if iszero(balance(addr)) {
-                        if iszero(getRawNonce(addr)) {
-                            isEmpty := 1
-                        }
-                    }
-                }
-            }
+            ////////////////////////////////////////////////////////////////
+            //                 CREATE FUNCTIONALITY
+            ////////////////////////////////////////////////////////////////
             
             function _fetchConstructorReturnGas() -> gasLeft {
                 mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
@@ -4014,7 +4027,7 @@ object "EvmEmulator" {
             function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt, oldStackHead) -> result, evmGasLeft, addr, stackHead  {
                 _eraseReturndataPointer()
             
-                let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
+                let gasForTheCall := capGasForCall(evmGasLeftOld,INF_PASS_GAS())
             
                 if lt(selfbalance(),value) {
                     revertWithGas(evmGasLeftOld)
@@ -4082,75 +4095,6 @@ object "EvmEmulator" {
                 mstore(sub(offset, 0x60), back)
                 back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 mstore(sub(offset, 0x80), back)
-            }
-            
-            function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
-                let rest_bits := shl(3, len)
-                let upper_bits := sub(256, rest_bits)
-                let val_mask := shl(upper_bits, MAX_UINT())
-                let val_masked := and(val, val_mask)
-                let dst_val := mload(dest)
-                let dst_mask := shr(rest_bits, MAX_UINT())
-                let dst_masked := and(dst_val, dst_mask)
-                mstore(dest, or(val_masked, dst_masked))
-            }
-            
-            function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
-                let dest_addr := dest
-                let src_addr := src
-                let dest_end := add(dest, and(len, sub(0, 32)))
-                for { } lt(dest_addr, dest_end) {} {
-                    mstore(dest_addr, mload(src_addr))
-                    dest_addr := add(dest_addr, 32)
-                    src_addr := add(src_addr, 32)
-                }
-            
-                let rest_len := and(len, 31)
-                if rest_len {
-                    $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
-                }
-            }
-            
-            function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
-                let dest_end := add(dest, and(len, sub(0, 32)))
-                for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
-                    mstore(i, 0)
-                }
-            
-                let rest_len := and(len, 31)
-                if rest_len {
-                    $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
-                }
-            }
-            
-            function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
-                evmGasLeft := chargeGas(evmGas, 100)
-            
-                let addr, dest, offset, len
-                popStackCheck(oldSp, evmGasLeft, 4)
-                addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
-                // minimum_word_size = (size + 31) / 32
-            
-                let dynamicGas := add(
-                    mul(3, shr(5, add(len, 31))),
-                    expandMemory(add(dest, len))
-                )
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    dynamicGas := add(dynamicGas, 2500)
-                }
-                evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-            
-                $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
-            
-                // Gets the code from the addr
-                if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
-                    pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))  
-                }
             }
             
             function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
@@ -4234,6 +4178,78 @@ object "EvmEmulator" {
                 result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt, stackHead)
             }
             
+            ////////////////////////////////////////////////////////////////
+            //               EXTCODECOPY FUNCTIONALITY
+            ////////////////////////////////////////////////////////////////
+            
+            function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
+                let rest_bits := shl(3, len)
+                let upper_bits := sub(256, rest_bits)
+                let val_mask := shl(upper_bits, MAX_UINT())
+                let val_masked := and(val, val_mask)
+                let dst_val := mload(dest)
+                let dst_mask := shr(rest_bits, MAX_UINT())
+                let dst_masked := and(dst_val, dst_mask)
+                mstore(dest, or(val_masked, dst_masked))
+            }
+            
+            function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
+                let dest_addr := dest
+                let src_addr := src
+                let dest_end := add(dest, and(len, sub(0, 32)))
+                for { } lt(dest_addr, dest_end) {} {
+                    mstore(dest_addr, mload(src_addr))
+                    dest_addr := add(dest_addr, 32)
+                    src_addr := add(src_addr, 32)
+                }
+            
+                let rest_len := and(len, 31)
+                if rest_len {
+                    $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+                }
+            }
+            
+            function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
+                let dest_end := add(dest, and(len, sub(0, 32)))
+                for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+                    mstore(i, 0)
+                }
+            
+                let rest_len := and(len, 31)
+                if rest_len {
+                    $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+                }
+            }
+            
+            function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
+                evmGasLeft := chargeGas(evmGas, 100)
+            
+                let addr, dest, offset, len
+                popStackCheck(oldSp, evmGasLeft, 4)
+                addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            
+                // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+                // minimum_word_size = (size + 31) / 32
+            
+                let dynamicGas := add(
+                    mul(3, shr(5, add(len, 31))),
+                    expandMemory(add(dest, len))
+                )
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                    dynamicGas := add(dynamicGas, 2500)
+                }
+                evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+            
+                $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
+            
+                // Gets the code from the addr
+                if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
+                    pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))  
+                }
+            }
 
             function $llvm_NoInline_llvm$_simulate(
                 isCallerEVM,
@@ -5655,16 +5671,22 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset,size, evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
                         checkMemOverflowByOffset(add(offset, size), evmGasLeft)
-                        evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
-                
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
                 
                         // Don't check overflow here since previous checks are enough to ensure this is safe
                         offset := add(offset, MEM_OFFSET_INNER())
-                        offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
                 
-                        revert(offset,size)
+                        if eq(isCallerEVM, 1) {
+                            offset := sub(offset, 32)
+                            size := add(size, 32)
+                    
+                            // include gas
+                            mstore(offset, evmGasLeft)
+                        }
+                
+                        revert(offset, size)
                     }
                     case 0xFE { // OP_INVALID
                         evmGasLeft := 0
@@ -6028,7 +6050,7 @@ object "EvmEmulator" {
             let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
             if iszero(isCallerEVM) {
-                evmGasLeft := getEVMGas()
+                evmGasLeft := getEvmGasFromContext()
                 isStatic := getIsStaticFromCallFlags()
             }
 

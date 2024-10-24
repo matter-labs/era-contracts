@@ -79,7 +79,7 @@ object "EvmEmulator" {
         getConstructorBytecode()
 
         if iszero(isCallerEVM) {
-            evmGasLeft := getEVMGas()
+            evmGasLeft := getEvmGasFromContext()
         }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
@@ -124,7 +124,7 @@ object "EvmEmulator" {
             let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
             if iszero(isCallerEVM) {
-                evmGasLeft := getEVMGas()
+                evmGasLeft := getEvmGasFromContext()
                 isStatic := getIsStaticFromCallFlags()
             }
 
