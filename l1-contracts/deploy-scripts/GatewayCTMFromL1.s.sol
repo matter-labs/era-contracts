@@ -41,7 +41,6 @@ import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} 
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 
-
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayCTMFromL1 is Script {
     using stdToml for string;
@@ -97,11 +96,9 @@ contract GatewayCTMFromL1 is Script {
 
     function prepareAddresses() external {
         initializeConfig();
-    
-        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
-            bytes32(0),
-            gatewayCTMDeployerConfig
-        ); 
+
+        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
+            .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
         saveOutput();
@@ -110,14 +107,12 @@ contract GatewayCTMFromL1 is Script {
     function deployCTM() external {
         initializeConfig();
 
-        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
-            bytes32(0),
-            gatewayCTMDeployerConfig
-        ); 
+        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
+            .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 
-        for(uint i = 0 ; i <deps.length; i++) {
+        for (uint i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];
             Utils.runL1L2Transaction({
@@ -223,18 +218,15 @@ contract GatewayCTMFromL1 is Script {
             l1ChainId: config.l1ChainId,
             rollupL2DAValidatorAddress: config.expectedRollupL2DAValidator,
             testnetVerifier: config.testnetVerifier,
-
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
                 recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
                 recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
             }),
-
             feeParams: FeeParams({
                 pubdataPricingMode: config.diamondInitPubdataPricingMode,
                 batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
@@ -243,22 +235,15 @@ contract GatewayCTMFromL1 is Script {
                 priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
                 minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
             }),
-
             bootloaderHash: config.bootloaderHash,
             defaultAccountHash: config.defaultAAHash,
             priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
-            
             genesisRoot: config.genesisRoot,
             genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
             genesisBatchCommitment: config.genesisBatchCommitment,
-
             forceDeploymentsData: config.forceDeploymentsData,
-
             protocolVersion: config.latestProtocolVersion
         });
-
-
-        
     }
 
     function saveOutput() internal {

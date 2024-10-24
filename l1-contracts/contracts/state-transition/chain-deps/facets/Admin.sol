@@ -13,7 +13,7 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {IncorrectPricingMode, InvalidDAForPermanentRollup, AlreadyPermanentRollup, Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {IncorrectPricingMode, InvalidDAForPermanentRollup, AlreadyPermanentRollup, Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -165,7 +165,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DAValidator)) {
             revert InvalidDAForPermanentRollup();
         }
-    
+
         _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
     }
 
@@ -175,13 +175,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert AlreadyPermanentRollup();
         }
 
-        
-        if(!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
+        if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
             // The correct data availability pair should be set beforehand.
             revert InvalidDAForPermanentRollup();
         }
 
-        if(s.feeParams.pubdataPricingMode != PubdataPricingMode.Rollup) {
+        if (s.feeParams.pubdataPricingMode != PubdataPricingMode.Rollup) {
             // The correct pubdata pricing mode should be set beforehand.
             revert IncorrectPricingMode();
         }

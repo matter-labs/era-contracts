@@ -15,15 +15,11 @@ import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADD
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
-import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-
-import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {L1GatewayHelper} from "./L1GatewayHelper.sol";
-import {BridgeHelper} from "../bridge/BridgeHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -45,9 +41,9 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
             bytes memory complexUpgraderCalldata;
             {
                 bytes memory additionalForceDeploymentsData = L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
-                    s, 
+                    s,
                     address(0),
-                    baseTokenAddress        
+                    baseTokenAddress
                 );
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,

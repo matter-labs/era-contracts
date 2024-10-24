@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
-import { ZeroAddress, Unauthorized } from "../common/L1ContractErrors.sol";
+import {ZeroAddress, Unauthorized} from "../common/L1ContractErrors.sol";
 
 /// @title L2WrappedBaseTokenStore
 /// @author Matter Labs
@@ -17,9 +17,9 @@ import { ZeroAddress, Unauthorized } from "../common/L1ContractErrors.sol";
 /// - Once the ugprade is done, this contract will no longer be needed. Even though it is unlikely for a chain to be corrupted,
 /// the governornance can fix any corrupted chains in the next ugprade.
 /// @dev This contract is not expected to be deployed as a proxy, but rather a standalone contract.
-/// @dev The `admin` of this contract is expected to be some cold wallet, trusted to provide correct values. However, 
+/// @dev The `admin` of this contract is expected to be some cold wallet, trusted to provide correct values. However,
 /// due to process above, even its malicious behavior should impact security of the ecosystem.
-/// @dev The `owner` of this contract is trusted decentralized governance. 
+/// @dev The `owner` of this contract is trusted decentralized governance.
 contract L2WrappedBaseTokenStore is Ownable2Step {
     /// @notice Mapping from chain ID to L2 wrapped base token address.
     mapping(uint256 chainId => address l2WBaseTokenAddress) public l2WBaseTokenAddress;
@@ -73,7 +73,7 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
     }
 
     /// @notice Reinitializes the L2 WBaseToken address for a specific chain ID.
-    /// @dev Can only be called by the owner. It can not be called by the admin second time 
+    /// @dev Can only be called by the owner. It can not be called by the admin second time
     /// to prevent retroactively damaging existing chains.
     /// @param _chainId The ID of the blockchain network.
     /// @param _l2WBaseToken The new address of the L2 WBaseToken token.

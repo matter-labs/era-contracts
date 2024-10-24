@@ -7,7 +7,7 @@ import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 /// @title The RollupManager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Responsible for determining which DA pairs are allowed to be used 
+/// @notice Responsible for determining which DA pairs are allowed to be used
 /// for permanent rollups.
 contract RollupDAManager is Ownable2Step {
     /// @dev Mapping to track the status (enabled/disabled) of each DAPair.
@@ -30,7 +30,7 @@ contract RollupDAManager is Ownable2Step {
     }
 
     /// @dev Adds or updates a DAPair in the `allowedDAPairs` mapping. Only callable by the contract owner.
-    /// 
+    ///
     /// Emits a {DAPairUpdated} event.
     ///
     /// @param _l1DAValidator Address of the L1 data availability validator.
@@ -56,10 +56,7 @@ contract RollupDAManager is Ownable2Step {
     /// @param _l1DAValidator Address of the L1 data availability validator.
     /// @param _l2DAValidator Address of the L2 data availability validator.
     /// @return bool indicating if the DA pair is allowed.
-    function isPairAllowed(
-        address _l1DAValidator,
-        address _l2DAValidator
-    ) external view returns (bool) {
+    function isPairAllowed(address _l1DAValidator, address _l2DAValidator) external view returns (bool) {
         return allowedDAPairs[_l1DAValidator][_l2DAValidator];
     }
 }

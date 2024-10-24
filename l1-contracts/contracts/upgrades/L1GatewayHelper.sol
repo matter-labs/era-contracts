@@ -10,7 +10,6 @@ import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/I
 import {ZKChainStorage} from "../state-transition/chain-deps/ZKChainStorage.sol";
 
 import {L2WrappedBaseTokenStore} from "../bridge/L2WrappedBaseTokenStore.sol";
-import {BridgeHelper} from "../bridge/BridgeHelper.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title L1GatewayHelper
@@ -21,9 +20,9 @@ library L1GatewayHelper {
     /// @param s The pointer to the storage of the chain.
     /// @param _wrappedBaseTokenStore The address of the `L2WrappedBaseTokenStore` contract.
     /// It is expected to be zero during creation of new chains and non-zero during upgrades.
-    /// @param _baseTokenAddress The L1 address of the base token of the chain. Note, that for 
-    /// chains whose token originates from an L2, this address will be the address of its bridged 
-    /// representation on L1. 
+    /// @param _baseTokenAddress The L1 address of the base token of the chain. Note, that for
+    /// chains whose token originates from an L2, this address will be the address of its bridged
+    /// representation on L1.
     function getZKChainSpecificForceDeploymentsData(
         ZKChainStorage storage s,
         address _wrappedBaseTokenStore,

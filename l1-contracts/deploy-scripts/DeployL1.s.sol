@@ -665,11 +665,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
 
-        vm.serializeAddress(
-            "deployed_addresses",
-            "l1_rollup_da_manager",
-            addresses.daAddresses.rollupDAManager
-        );
+        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
         vm.serializeAddress(
             "deployed_addresses",
             "rollup_l1_da_validator_addr",

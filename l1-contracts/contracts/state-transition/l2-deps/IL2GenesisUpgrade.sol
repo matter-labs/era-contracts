@@ -15,6 +15,7 @@ struct ForceDeployment {
     bytes input;
 }
 
+// solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
     bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;

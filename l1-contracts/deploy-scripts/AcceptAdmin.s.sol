@@ -175,18 +175,11 @@ contract AcceptAdmin is Script {
         vm.stopBroadcast();
     }
 
-    function makePermanentRollup(
-        ChainAdmin chainAdmin,
-        address target
-    ) public {
+    function makePermanentRollup(ChainAdmin chainAdmin, address target) public {
         IZKChain adminContract = IZKChain(target);
 
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: target,
-            value: 0,
-            data: abi.encodeCall(adminContract.makePermanentRollup, ())
-        });
+        calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.makePermanentRollup, ())});
 
         vm.startBroadcast();
         chainAdmin.multicall(calls, true);

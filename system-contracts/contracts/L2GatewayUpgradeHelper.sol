@@ -7,7 +7,7 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {L2_CREATE2_FACTORY, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_ASSET_ROUTER} from "./Constants.sol";
+import {WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_ASSET_ROUTER} from "./Constants.sol";
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -18,9 +18,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 /// @notice A helper library for initializing and managing force-deployed contracts during either the L2 gateway upgrade or
 /// the genesis after the gateway protocol upgrade.
 library L2GatewayUpgradeHelper {
-    /// @dev Storage slot with the admin of the contract used for EIP1967 proxies (e.g., TransparentUpgradeableProxy, BeaconProxy, etc.).
-    bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
     /// @notice Initializes force-deployed contracts required for the L2 genesis upgrade.
     /// @param _ctmDeployer Address of the CTM Deployer contract.
     /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
@@ -71,7 +68,7 @@ library L2GatewayUpgradeHelper {
     }
 
     /// @notice Retrieves and constructs the force deployments array.
-    /// @dev Decodes the provided force deployments data and organizes them into an array of `ForceDeployment` to 
+    /// @dev Decodes the provided force deployments data and organizes them into an array of `ForceDeployment` to
     /// to execute.
     /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
     /// is the same for all the chains.
@@ -135,18 +132,20 @@ library L2GatewayUpgradeHelper {
         });
 
         // Ensure the WETH token is deployed and retrieve its address.
-        address wrappedBaseTokenAddress = _ensureWethToken(
-            additionalForceDeploymentsData.predeployedL2WethAddress,
-            fixedForceDeploymentsData.aliasedL1Governance,
-            additionalForceDeploymentsData.baseTokenL1Address,
-            additionalForceDeploymentsData.baseTokenAssetId,
-            additionalForceDeploymentsData.baseTokenName,
-            additionalForceDeploymentsData.baseTokenSymbol
-        );
+        address wrappedBaseTokenAddress = _ensureWethToken({
+            _predeployedWethToken: additionalForceDeploymentsData.predeployedL2WethAddress,
+            _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
+            _baseTokenL1Address: additionalForceDeploymentsData.baseTokenL1Address,
+            _baseTokenAssetId: additionalForceDeploymentsData.baseTokenAssetId,
+            _baseTokenName: additionalForceDeploymentsData.baseTokenName,
+            _baseTokenSymbol: additionalForceDeploymentsData.baseTokenSymbol
+        });
 
         address deployedTokenBeacon;
         if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
-            deployedTokenBeacon = address(IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon());
+            deployedTokenBeacon = address(
+                IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon()
+            );
         }
 
         bool shouldDeployBeacon = deployedTokenBeacon == address(0);
@@ -186,7 +185,7 @@ library L2GatewayUpgradeHelper {
         initData = abi.encodeCall(
             IL2WrappedBaseToken.initializeV3,
             (_wrappedBaseTokenName, _wrappedBaseTokenSymbol, L2_ASSET_ROUTER, _baseTokenL1Address, _baseTokenAssetId)
-        );  
+        );
     }
 
     /// @notice Ensures that the WETH token is deployed. If not predeployed, deploys it.
@@ -209,14 +208,8 @@ library L2GatewayUpgradeHelper {
             return _predeployedWethToken;
         }
 
-        string memory wrappedBaseTokenName = string.concat(
-            "Wrapped ",
-            _baseTokenName
-        );
-        string memory wrappedBaseTokenSymbol = string.concat(
-            "W",
-            _baseTokenSymbol
-        );
+        string memory wrappedBaseTokenName = string.concat("Wrapped ", _baseTokenName);
+        string memory wrappedBaseTokenSymbol = string.concat("W", _baseTokenSymbol);
 
         bytes memory initData = getWethInitData(
             wrappedBaseTokenName,
@@ -225,16 +218,12 @@ library L2GatewayUpgradeHelper {
             _baseTokenAssetId
         );
 
-        bytes memory constructorParams = abi.encode(
-            WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
-            _aliasedL1Governance,
-            initData
-        );
+        bytes memory constructorParams = abi.encode(WRAPPED_BASE_TOKEN_IMPL_ADDRESS, _aliasedL1Governance, initData);
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(
             WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
             _aliasedL1Governance,
-            initData
+            constructorParams
         );
 
         return address(proxy);

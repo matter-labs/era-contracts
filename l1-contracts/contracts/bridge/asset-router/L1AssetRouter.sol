@@ -15,7 +15,7 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-import {IL1Nullifier, FinalizeL1DepositParams} from "../interfaces/IL1Nullifier.sol";
+import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 

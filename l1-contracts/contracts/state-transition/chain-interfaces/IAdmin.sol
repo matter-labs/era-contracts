@@ -80,9 +80,9 @@ interface IAdmin is IZKChainBase {
     /// @param _l2DAValidator The address of the L2 DA validator
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
 
-    /// @notice Makes the chain as permanent rollup. 
-    /// @dev This is a security feature needed for chains that should be 
-    /// trusted to keep their data available even if the chain admin becomes malicious 
+    /// @notice Makes the chain as permanent rollup.
+    /// @dev This is a security feature needed for chains that should be
+    /// trusted to keep their data available even if the chain admin becomes malicious
     /// and tries to set the DA validator pair to something which does not publish DA to Ethereum.
     /// @dev DANGEROUS: once activated, there is no way back!
     function makePermanentRollup() external;

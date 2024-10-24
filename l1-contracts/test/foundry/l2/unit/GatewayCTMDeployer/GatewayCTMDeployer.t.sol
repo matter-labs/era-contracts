@@ -8,7 +8,6 @@ import {GatewayCTMDeployer, GatewayCTMDeployerConfig, DeployedContracts, StateTr
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
-
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -21,7 +20,6 @@ import {ValidiumL1DAValidator} from "contracts/state-transition/data-availabilit
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -42,13 +40,15 @@ import {L2_CREATE2_FACTORY_ADDRESS} from "deploy-scripts/Utils.sol";
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
 contract GatewayCTMDeployerTester {
-    function deployCTMDeployer(bytes memory data) external returns (DeployedContracts memory deployedContracts, address addr) {
+    function deployCTMDeployer(
+        bytes memory data
+    ) external returns (DeployedContracts memory deployedContracts, address addr) {
         (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDRESS.call(data);
         require(success, "failed to deploy");
 
         addr = abi.decode(result, (address));
 
-        deployedContracts = GatewayCTMDeployer(addr).getDeployedContracts();   
+        deployedContracts = GatewayCTMDeployer(addr).getDeployedContracts();
     }
 }
 
@@ -57,10 +57,10 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1,1);
+        new MailboxFacet(1, 1);
         new ExecutorFacet(1);
         new GettersFacet();
-        new AdminFacet(1,RollupDAManager(address(0)));
+        new AdminFacet(1, RollupDAManager(address(0)));
 
         new DiamondInit();
         new L1GenesisUpgrade();
@@ -76,11 +76,7 @@ contract GatewayCTMDeployerTest is Test {
         new ValidatorTimelock(address(0), 0, 0);
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
-        try new TransparentUpgradeableProxy(address(0), address(0), hex"") {
-
-        } catch {
-
-        }
+        try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}
     }
 
     function setUp() external {
@@ -140,13 +136,18 @@ contract GatewayCTMDeployerTest is Test {
         // Just to publish bytecode
         new GatewayCTMDeployer(deployerConfig);
 
-        (DeployedContracts memory calculatedDeployedContracts, bytes memory create2Calldata, address ctmDeployerAddress) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0),deployerConfig);
+        (
+            DeployedContracts memory calculatedDeployedContracts,
+            bytes memory create2Calldata,
+            address ctmDeployerAddress
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
         GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
-        (DeployedContracts memory deployedContracts, address correctCTMDeployerAddress) = tester.deployCTMDeployer(create2Calldata);
+        (DeployedContracts memory deployedContracts, address correctCTMDeployerAddress) = tester.deployCTMDeployer(
+            create2Calldata
+        );
 
         require(ctmDeployerAddress == correctCTMDeployerAddress, "Incorrect address");
-
 
         DeployedContractsComparator.compareDeployedContracts(calculatedDeployedContracts, deployedContracts);
 
@@ -157,17 +158,11 @@ contract GatewayCTMDeployerTest is Test {
         // );
 
         // DeployedContracts memory deployedContracts = deployer.getDeployedContracts();
-
-
-
     }
 }
 
 library DeployedContractsComparator {
-    function compareDeployedContracts(
-        DeployedContracts memory a,
-        DeployedContracts memory b
-    ) internal pure {
+    function compareDeployedContracts(DeployedContracts memory a, DeployedContracts memory b) internal pure {
         compareStateTransitionContracts(a.stateTransition, b.stateTransition);
         compareDAContracts(a.daContracts, b.daContracts);
         compareBytes(a.diamondCutData, b.diamondCutData, "diamondCutData");
@@ -177,78 +172,29 @@ library DeployedContractsComparator {
         StateTransitionContracts memory a,
         StateTransitionContracts memory b
     ) internal pure {
-        require(
-            a.chainTypeManagerProxy == b.chainTypeManagerProxy,
-            "chainTypeManagerProxy differs"
-        );
+        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
         require(
             a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
             "chainTypeManagerImplementation differs"
         );
-        require(
-            a.verifier == b.verifier,
-            "verifier differs"
-        );
-        require(
-            a.adminFacet == b.adminFacet,
-            "adminFacet differs"
-        );
-        require(
-            a.mailboxFacet == b.mailboxFacet,
-            "mailboxFacet differs"
-        );
-        require(
-            a.executorFacet == b.executorFacet,
-            "executorFacet differs"
-        );
-        require(
-            a.gettersFacet == b.gettersFacet,
-            "gettersFacet differs"
-        );
-        require(
-            a.diamondInit == b.diamondInit,
-            "diamondInit differs"
-        );
-        require(
-            a.genesisUpgrade == b.genesisUpgrade,
-            "genesisUpgrade differs"
-        );
-        require(
-            a.validatorTimelock == b.validatorTimelock,
-            "validatorTimelock differs"
-        );
-        require(
-            a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin,
-            "chainTypeManagerProxyAdmin differs"
-        );
+        require(a.verifier == b.verifier, "verifier differs");
+        require(a.adminFacet == b.adminFacet, "adminFacet differs");
+        require(a.mailboxFacet == b.mailboxFacet, "mailboxFacet differs");
+        require(a.executorFacet == b.executorFacet, "executorFacet differs");
+        require(a.gettersFacet == b.gettersFacet, "gettersFacet differs");
+        require(a.diamondInit == b.diamondInit, "diamondInit differs");
+        require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
+        require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
+        require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
     }
 
-    function compareDAContracts(
-        DAContracts memory a,
-        DAContracts memory b
-    ) internal pure {
-        require(
-            a.rollupDAManager == b.rollupDAManager,
-            "rollupDAManager differs"
-        );
-        require(
-            a.relayedSLDAValidator == b.relayedSLDAValidator,
-            "relayedSLDAValidator differs"
-        );
-        require(
-            a.validiumDAValidator == b.validiumDAValidator,
-            "validiumDAValidator differs"
-        );
+    function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {
+        require(a.rollupDAManager == b.rollupDAManager, "rollupDAManager differs");
+        require(a.relayedSLDAValidator == b.relayedSLDAValidator, "relayedSLDAValidator differs");
+        require(a.validiumDAValidator == b.validiumDAValidator, "validiumDAValidator differs");
     }
 
-    function compareBytes(
-        bytes memory a,
-        bytes memory b,
-        string memory fieldName
-    ) internal pure {
-        require(
-            keccak256(a) == keccak256(b),
-            string(abi.encodePacked(fieldName, " differs"))
-        );
+    function compareBytes(bytes memory a, bytes memory b, string memory fieldName) internal pure {
+        require(keccak256(a) == keccak256(b), string(abi.encodePacked(fieldName, " differs")));
     }
 }

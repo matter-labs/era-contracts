@@ -2,6 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+// solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
     bytes32 baseTokenAssetId;
     address l2LegacySharedBridge;
@@ -14,8 +15,8 @@ struct ZKChainSpecificForceDeploymentsData {
 }
 
 /// @notice THe structure that describes force deployments that are the same for each chain.
-/// @dev Note, that for simplicity, the same struct is used both for upgrading to the 
-/// Gateway version and for the Genesis. Some fields may not be used in either of those. 
+/// @dev Note, that for simplicity, the same struct is used both for upgrading to the
+/// Gateway version and for the Genesis. Some fields may not be used in either of those.
 // solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;

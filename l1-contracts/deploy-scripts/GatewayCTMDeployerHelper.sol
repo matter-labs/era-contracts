@@ -28,13 +28,12 @@ struct InnerDeployConfig {
 }
 
 library GatewayCTMDeployerHelper {
-    function calculateAddresses(bytes32 _create2Salt, GatewayCTMDeployerConfig memory config) internal returns (
-        DeployedContracts memory contracts,
-        bytes memory create2Calldata,
-        address ctmDeployerAddress
-    ) {
+    function calculateAddresses(
+        bytes32 _create2Salt,
+        GatewayCTMDeployerConfig memory config
+    ) internal returns (DeployedContracts memory contracts, bytes memory create2Calldata, address ctmDeployerAddress) {
         (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(
-            _create2Salt, 
+            _create2Salt,
             Utils.readZKFoundryBytecode("GatewayCTMDeployer.sol", "GatewayCTMDeployer"),
             abi.encode(config)
         );
@@ -44,22 +43,14 @@ library GatewayCTMDeployerHelper {
 
         ctmDeployerAddress = Utils.getL2AddressViaCreate2Factory(_create2Salt, bytecodeHash, abi.encode(config));
 
-        InnerDeployConfig memory innerConfig = InnerDeployConfig({
-            deployerAddr: ctmDeployerAddress,
-            salt: config.salt
-        });
+        InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: ctmDeployerAddress, salt: config.salt});
 
         // Caching some values
         bytes32 salt = config.salt;
         uint256 eraChainId = config.eraChainId;
         uint256 l1ChainId = config.l1ChainId;
 
-        contracts.multicall3 = _deployInternal(
-            "Multicall3",
-            "Multicall3.sol",
-            hex"",
-            innerConfig
-        );
+        contracts.multicall3 = _deployInternal("Multicall3", "Multicall3.sol", hex"", innerConfig);
 
         contracts = _deployFacetsAndUpgrades(
             salt,
@@ -147,7 +138,6 @@ library GatewayCTMDeployerHelper {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
-
     ) internal returns (DeployedContracts memory) {
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
@@ -174,12 +164,7 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory, address) {
-        address daManager = _deployInternal(
-            "RollupDAManager",
-            "RollupDAManager.sol",
-            hex"",
-            innerConfig
-        );
+        address daManager = _deployInternal("RollupDAManager", "RollupDAManager.sol", hex"", innerConfig);
 
         address validiumDAValidator = _deployInternal(
             "ValidiumL1DAValidator",
@@ -215,12 +200,7 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
-        address proxyAdmin = _deployInternal(
-            "ProxyAdmin",
-            "ProxyAdmin.sol",
-            hex"",
-            innerConfig
-        );
+        address proxyAdmin = _deployInternal("ProxyAdmin", "ProxyAdmin.sol", hex"", innerConfig);
         _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = proxyAdmin;
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
@@ -298,19 +278,20 @@ library GatewayCTMDeployerHelper {
     }
 
     function _deployInternal(
-        string memory contractName, 
-        string memory fileName, 
+        string memory contractName,
+        string memory fileName,
         bytes memory params,
         InnerDeployConfig memory config
     ) private returns (address) {
         bytes memory bytecode = Utils.readZKFoundryBytecode(fileName, contractName);
-        
-        return L2ContractHelper.computeCreate2Address(
-            config.deployerAddr,
-            config.salt,
-            L2ContractHelper.hashL2Bytecode(bytecode),
-            keccak256(params)
-        );
+
+        return
+            L2ContractHelper.computeCreate2Address(
+                config.deployerAddr,
+                config.salt,
+                L2ContractHelper.hashL2Bytecode(bytecode),
+                keccak256(params)
+            );
     }
 
     /// @notice List of factory dependencies needed for the correct execution of
@@ -337,7 +318,10 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecode("ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[index++] = Utils.readZKFoundryBytecode("ChainTypeManager.sol", "ChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecode("ProxyAdmin.sol", "ProxyAdmin");
-        dependencies[index++] = Utils.readZKFoundryBytecode("TransparentUpgradeableProxy.sol", "TransparentUpgradeableProxy");
+        dependencies[index++] = Utils.readZKFoundryBytecode(
+            "TransparentUpgradeableProxy.sol",
+            "TransparentUpgradeableProxy"
+        );
         // Not used in scripts, but definitely needed for CTM to work
         dependencies[index++] = Utils.readZKFoundryBytecode("DiamondProxy.sol", "DiamondProxy");
 

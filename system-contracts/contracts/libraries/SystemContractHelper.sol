@@ -7,7 +7,7 @@ import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeploye
 import {SloadContract} from "../SloadContract.sol";
 
 import {CalldataForwardingMode, SystemContractsCaller, MIMIC_CALL_CALL_ADDRESS, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
-import {IndexOutOfBounds, FailedToChargeGas} from "../SystemContractErrors.sol";
+import {IndexOutOfBounds, FailedToChargeGas, SloadContractBytecodeUnknown, PreviousBytecodeUnknown} from "../SystemContractErrors.sol";
 
 uint256 constant UINT32_MASK = type(uint32).max;
 uint256 constant UINT64_MASK = type(uint64).max;
@@ -408,10 +408,7 @@ library SystemContractHelper {
     /// without invoking the constructor.
     /// @param _addr The address to force-deploy the bytecodehash to.
     /// @param _bytecodeHash The bytecode hash to force-deploy.
-    function forceDeployNoConstructor(
-        address _addr,
-        bytes32 _bytecodeHash
-    ) internal {
+    function forceDeployNoConstructor(address _addr, bytes32 _bytecodeHash) internal {
         ForceDeployment[] memory deployments = new ForceDeployment[](1);
         deployments[0] = ForceDeployment({
             bytecodeHash: _bytecodeHash,
@@ -423,10 +420,7 @@ library SystemContractHelper {
         mimicCallWithPropagatedRevert(
             address(DEPLOYER_SYSTEM_CONTRACT),
             FORCE_DEPLOYER,
-            abi.encodeCall(
-                IContractDeployer.forceDeployOnAddresses,
-                deployments
-            )
+            abi.encodeCall(IContractDeployer.forceDeployOnAddresses, deployments)
         );
     }
 
@@ -436,17 +430,14 @@ library SystemContractHelper {
     /// @return result The value stored at slot `_key` under the address `_addr`.
     /// @dev zkEVM similarly to EVM only has an opcode to read
     /// from the current contract's storage. However, sometimes system contracts
-    /// may require to read private storage slots of a contract. In order to provide 
-    /// generic functionality to read arbitrary storage slots from other contracts, the following 
+    /// may require to read private storage slots of a contract. In order to provide
+    /// generic functionality to read arbitrary storage slots from other contracts, the following
     /// scheme is used:
     /// 1. Force-deploy `SloadContract` to the address.
     /// 2. Read the required slot.
     /// 3. Force-deploy the previous bytecode back.
-    function forcedSload(
-        address _addr,
-        bytes32 _key
-    ) internal returns (bytes32 result) {
-        bytes32 sloadContractBytecodeHash; 
+    function forcedSload(address _addr, bytes32 _key) internal returns (bytes32 result) {
+        bytes32 sloadContractBytecodeHash;
         address sloadContractAddress = SLOAD_CONTRACT_ADDRESS;
         assembly {
             sloadContractBytecodeHash := extcodehash(sloadContractAddress)
@@ -454,8 +445,7 @@ library SystemContractHelper {
 
         // Just in case, that the `sloadContractBytecodeHash` is known
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(sloadContractBytecodeHash) == 0) {
-            // todo use custom error
-            revert("sload contract not supported");
+            revert SloadContractBytecodeUnknown();
         }
 
         bytes32 previoushHash;
@@ -467,19 +457,12 @@ library SystemContractHelper {
         // It may be needed since `previoushHash` could be non-zero and unknown if it is
         // equal to keccak(""). It is the case for used default accounts.
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(previoushHash) == 0) {
-            // todo use custom error
-            revert("bad prev code");
+            revert PreviousBytecodeUnknown();
         }
 
-        forceDeployNoConstructor(
-            _addr,
-            sloadContractBytecodeHash
-        );
+        forceDeployNoConstructor(_addr, sloadContractBytecodeHash);
         result = SloadContract(_addr).sload(_key);
-        forceDeployNoConstructor(
-            _addr,
-            previoushHash
-        );
+        forceDeployNoConstructor(_addr, previoushHash);
     }
 
     /// @notice Performs a `mimicCall` to an address, while ensuring that the call

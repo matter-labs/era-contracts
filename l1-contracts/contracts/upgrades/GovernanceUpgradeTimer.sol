@@ -9,9 +9,9 @@ import {ZeroAddress, CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineNotGr
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract will be used by the governance to ensure that the chains have enough time
 /// to upgrade their implementation before finalizing the upgrade on L1.
-/// @notice The `startTimer` function should be called once the new version is published. It starts the 
-/// timer and gives at least `INITIAL_DELAY` for the chains to upgrade. In case for any reason the timeline has to 
-/// be extended, the owner of this contract can increase the timeline, but only the maximum of `MAX_ADDITIONAL_DELAY` 
+/// @notice The `startTimer` function should be called once the new version is published. It starts the
+/// timer and gives at least `INITIAL_DELAY` for the chains to upgrade. In case for any reason the timeline has to
+/// be extended, the owner of this contract can increase the timeline, but only the maximum of `MAX_ADDITIONAL_DELAY`
 /// is allowed.
 contract GovernanceUpgradeTimer is Ownable2Step {
     /// @notice The initial delay to be used.
@@ -41,13 +41,8 @@ contract GovernanceUpgradeTimer is Ownable2Step {
     /// @param _maxAdditionalDelay The maximum number of seconds that can be added to the initial delay to set `maxDeadline`.
     /// @param _timerGovernance The address of the timer administrator, who is allowed to start the timer.
     /// @param _initialOwner The initial owner of the contract.
-    constructor(
-        uint256 _initialDelay,
-        uint256 _maxAdditionalDelay,
-        address _timerGovernance,
-        address _initialOwner
-    ) {
-        if(_timerGovernance == address(0)) {
+    constructor(uint256 _initialDelay, uint256 _maxAdditionalDelay, address _timerGovernance, address _initialOwner) {
+        if (_timerGovernance == address(0)) {
             revert ZeroAddress();
         }
 

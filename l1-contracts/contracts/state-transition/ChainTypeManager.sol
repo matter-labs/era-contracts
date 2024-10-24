@@ -510,10 +510,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Set the protocol version deadline
     /// @param _protocolVersion the protocol version
     /// @param _timestamp the timestamp is the deadline
-    function _setProtocolVersionDeadline(
-        uint256 _protocolVersion,
-        uint256 _timestamp
-    ) internal {
+    function _setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) internal {
         protocolVersionDeadline[_protocolVersion] = _timestamp;
         emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
     }

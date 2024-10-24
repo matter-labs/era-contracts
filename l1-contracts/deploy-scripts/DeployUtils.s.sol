@@ -355,7 +355,10 @@ contract DeployUtils is Script {
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
-        address adminFacet = deployViaCreate2(type(AdminFacet).creationCode, abi.encode(config.l1ChainId, _rollupDAManager));
+        address adminFacet = deployViaCreate2(
+            type(AdminFacet).creationCode,
+            abi.encode(config.l1ChainId, _rollupDAManager)
+        );
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 

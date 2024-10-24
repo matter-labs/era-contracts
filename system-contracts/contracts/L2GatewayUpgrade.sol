@@ -22,7 +22,7 @@ bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8
 /// @dev This contract is neither predeployed nor a system contract. It resides in this folder due to overlapping functionality with `L2GenesisUpgrade` and to facilitate code reuse.
 /// @dev During the upgrade process, this contract will be force-deployed onto the address of the `ComplexUpgrader` system contract, so
 /// `this` will take the address of the `ComplexUpgrader`. This approach is used instead of delegate-calling `ComplexUpgrader`
-/// to alleviate the need to predeploy the implementation. In the future this limitation will be removed with the new `ComplexUpgrader` 
+/// to alleviate the need to predeploy the implementation. In the future this limitation will be removed with the new `ComplexUpgrader`
 /// functionality.
 /// @dev All the logic happens inside the constructor, since once the constructor execution is done, the normal `ComplexUpgrader`
 /// bytecode will be deployed back in its place.
@@ -107,35 +107,18 @@ contract L2GatewayUpgrade {
     ///
     /// - `_proxyAddr` must be a valid TransparentUpgradeableProxy.
     /// - `_newImpl` must be a valid contract address.
-    function forceUpgradeTransparentProxy(
-        address _proxyAddr,
-        address _newImpl,
-        bytes memory _additionalData
-    ) internal {
+    function forceUpgradeTransparentProxy(address _proxyAddr, address _newImpl, bytes memory _additionalData) internal {
         bytes memory upgradeData;
         if (_additionalData.length > 0) {
-            upgradeData = abi.encodeCall(
-                ITransparentUpgradeableProxy.upgradeToAndCall,
-                (_newImpl, _additionalData)
-            );
+            upgradeData = abi.encodeCall(ITransparentUpgradeableProxy.upgradeToAndCall, (_newImpl, _additionalData));
         } else {
-            upgradeData = abi.encodeCall(
-                ITransparentUpgradeableProxy.upgradeTo,
-                (_newImpl)
-            );
+            upgradeData = abi.encodeCall(ITransparentUpgradeableProxy.upgradeTo, (_newImpl));
         }
 
         // Retrieve the proxy admin address from the proxy's storage slot.
-        address proxyAdmin = address(uint160(uint256(SystemContractHelper.forcedSload(
-            _proxyAddr,
-            PROXY_ADMIN_SLOT
-        ))));
+        address proxyAdmin = address(uint160(uint256(SystemContractHelper.forcedSload(_proxyAddr, PROXY_ADMIN_SLOT))));
 
-        SystemContractHelper.mimicCallWithPropagatedRevert(
-            _proxyAddr,
-            proxyAdmin,
-            upgradeData
-        );
+        SystemContractHelper.mimicCallWithPropagatedRevert(_proxyAddr, proxyAdmin, upgradeData);
     }
 
     /// @notice Forces an upgrade of an UpgradeableBeacon proxy contract.
@@ -148,23 +131,13 @@ contract L2GatewayUpgrade {
     ///
     /// - `_proxyAddr` must be a valid UpgradeableBeacon.
     /// - `_newImpl` must be a valid contract address.
-    function forceUpgradeBeaconProxy(
-        address _proxyAddr,
-        address _newImpl
-    ) internal {
-        bytes memory upgradeData = abi.encodeCall(
-            UpgradeableBeacon.upgradeTo,
-            (_newImpl)
-        );
+    function forceUpgradeBeaconProxy(address _proxyAddr, address _newImpl) internal {
+        bytes memory upgradeData = abi.encodeCall(UpgradeableBeacon.upgradeTo, (_newImpl));
 
         // Retrieve the owner of the beacon.
         address owner = UpgradeableBeacon(_proxyAddr).owner();
 
         // Execute the upgrade via a low-level call, propagating any revert.
-        SystemContractHelper.mimicCallWithPropagatedRevert(
-            _proxyAddr,
-            owner,
-            upgradeData
-        );
+        SystemContractHelper.mimicCallWithPropagatedRevert(_proxyAddr, owner, upgradeData);
     }
 }

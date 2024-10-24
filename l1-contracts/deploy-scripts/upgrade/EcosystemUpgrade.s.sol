@@ -132,7 +132,7 @@ contract EcosystemUpgrade is Script {
         address expectedRollupL2DAValidator;
         address expectedValidiumL2DAValidator;
         address l2SharedBridgeLegacyImpl;
-        address l2BridgedStandardERC20Impl;   
+        address l2BridgedStandardERC20Impl;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -173,7 +173,7 @@ contract EcosystemUpgrade is Script {
         uint256 eraChainId;
         address ownerAddress;
         // This is the address of the ecosystem admin.
-        // Note, that it is not the owner, but rather the address that is responsible 
+        // Note, that it is not the owner, but rather the address that is responsible
         // for facilitating partially trusted, but not critical tasks.
         address ecosystemAdminAddress;
         bool testnetVerifier;
@@ -372,7 +372,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function getOldProtocolDeadline() public returns (uint256) {
-        // Note, that it is this way by design, on stage2 it 
+        // Note, that it is this way by design, on stage2 it
         // will be set to 0
         return type(uint256).max;
     }
@@ -398,10 +398,7 @@ contract EcosystemUpgrade is Script {
         // The call that will start the timer till the end of the upgrade.
         Call memory timerCall = Call({
             target: addresses.upgradeTimer,
-            data: abi.encodeCall(
-                GovernanceUpgradeTimer.startTimer,
-                ()
-            ),
+            data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
             value: 0
         });
 
@@ -807,7 +804,8 @@ contract EcosystemUpgrade is Script {
         upgradeSpecificDependencies[5] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
         upgradeSpecificDependencies[6] = L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode();
 
-        upgradeSpecificDependencies[7] = L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecodeFromSystemContracts();
+        upgradeSpecificDependencies[7] = L2ContractsBytecodesLib
+            .readTransparentUpgradeableProxyBytecodeFromSystemContracts();
 
         cachedBytecodeHashes = CachedBytecodeHashes({
             sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
@@ -877,7 +875,6 @@ contract EcosystemUpgrade is Script {
         address rollupDAManager = address(new RollupDAManager());
         addresses.daAddresses.rollupDAManager = rollupDAManager;
 
-
         address rollupDAValidator = deployViaCreate2(Utils.readRollupDAValidatorBytecode());
         console.log("L1RollupDAValidator deployed at:", rollupDAValidator);
         addresses.daAddresses.l1RollupDAValidator = rollupDAValidator;
@@ -887,7 +884,11 @@ contract EcosystemUpgrade is Script {
         addresses.daAddresses.l1ValidiumDAValidator = validiumDAValidator;
 
         vm.broadcast(msg.sender);
-        RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), addresses.expectedL2Addresses.expectedRollupL2DAValidator, true);
+        RollupDAManager(rollupDAManager).updateDAPair(
+            address(rollupDAValidator),
+            addresses.expectedL2Addresses.expectedRollupL2DAValidator,
+            true
+        );
     }
 
     function deployValidatorTimelock() internal {
@@ -986,7 +987,10 @@ contract EcosystemUpgrade is Script {
         addresses.stateTransition.executorFacet = executorFacet;
 
         address adminFacet = deployViaCreate2(
-            abi.encodePacked(type(AdminFacet).creationCode, abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager))
+            abi.encodePacked(
+                type(AdminFacet).creationCode,
+                abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager)
+            )
         );
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
@@ -1188,17 +1192,17 @@ contract EcosystemUpgrade is Script {
 
         uint256 MAX_ADDITIONAL_DELAY = 2 weeks;
 
-        // It may make sense to have a separate admin there, but 
+        // It may make sense to have a separate admin there, but
         // using the same as bridgehub is just as fine.
-        address bridgehubAdmin = Bridgehub(config.contracts.bridgehubProxyAddress).admin();     
+        address bridgehubAdmin = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
 
         bytes memory bytecode = abi.encodePacked(
             type(GovernanceUpgradeTimer).creationCode,
-            abi.encode(INITIAL_DELAY, MAX_ADDITIONAL_DELAY, config.ownerAddress, config.ecosystemAdminAddress)   
+            abi.encode(INITIAL_DELAY, MAX_ADDITIONAL_DELAY, config.ownerAddress, config.ecosystemAdminAddress)
         );
 
         addresses.upgradeTimer = deployViaCreate2(bytecode);
-    }   
+    }
 
     function deployL2WrappedBaseTokenStore() internal {
         bytes memory bytecode = abi.encodePacked(
