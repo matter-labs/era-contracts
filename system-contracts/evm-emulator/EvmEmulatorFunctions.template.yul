@@ -232,7 +232,7 @@ function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
         _len := codeLen
     }
 
-    returndatacopy(dest, add(32,_offset), _len)
+    returndatacopy(dest, add(32, _offset), _len)
 }
 
 // Returns the length of the bytecode.
@@ -762,7 +762,7 @@ function _getZkEVMGasForCall(_evmGas, addr) -> zkevmGas {
     }
 }
 
-function capGasForCall(evmGasLeft,oldGasToPass) -> gasToPass {
+function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
     let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
     gasToPass := oldGasToPass
     if gt(oldGasToPass, maxGasToPass) { 
@@ -976,10 +976,6 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
 
     let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
 
-    if lt(selfbalance(), value) { // TODO optimize
-        revertWithGas(evmGasLeftOld)
-    }
-
     offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
 
     pushStackCheck(sp, 4)
@@ -1059,12 +1055,8 @@ function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, s
 
     checkMemIsAccessible(offset, size)
 
-    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-        revertWithGas(evmGasLeft) // TODO check
-    }
-
-    if gt(value, balance(address())) {
-        revertWithGas(evmGasLeft)
+    if gt(size, MAX_POSSIBLE_BYTECODE()) {
+        panic()
     }
 
     // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
@@ -1102,12 +1094,8 @@ function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp
 
     checkMemIsAccessible(offset, size)
 
-    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-        revertWithGas(evmGasLeft)
-    }
-
-    if gt(value, balance(address())) {
-        revertWithGas(evmGasLeft)
+    if gt(size, MAX_POSSIBLE_BYTECODE()) {
+        panic()
     }
 
     // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
@@ -1120,7 +1108,7 @@ function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp
         shr(2, add(size, 31))
     ))
 
-    result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt, stackHead)
+    result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, true, salt, stackHead)
 }
 
 ////////////////////////////////////////////////////////////////
