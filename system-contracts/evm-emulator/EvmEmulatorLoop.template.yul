@@ -399,7 +399,7 @@ for { } true { } {
         checkOverflow(sourceOffset, len)
         // Check bytecode overflow
         if gt(add(sourceOffset, len), sub(MEM_OFFSET(), 1)) {
-            revertWithGas(evmGasLeft) // TODO
+            revertWithGas(0)
         }
 
         $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, len)
@@ -428,7 +428,37 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0x3C { // OP_EXTCODECOPY
-        evmGasLeft, sp, stackHead := performExtCodeCopy(evmGasLeft, sp, stackHead)
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
+        let addr, dest, offset, len
+        popStackCheck(sp, 4)
+        addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    
+        checkMemIsAccessible(dest, len)
+    
+        // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+        // minimum_word_size = (size + 31) / 32
+        let dynamicGas := add(
+            mul(3, shr(5, add(len, 31))),
+            expandMemory(add(dest, len))
+        )
+        
+        if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+            dynamicGas := add(dynamicGas, 2500)
+        }
+
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+    
+        $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
+    
+        // Gets the code from the addr
+        if and(iszero(iszero(_getRawCodeHash(addr))), gt(len, 0)) {
+            pop(_fetchDeployedCodeWithDest(addr, offset, len, add(dest, MEM_OFFSET_INNER())))  
+        }
+
         ip := add(ip, 1)
     }
     case 0x3D { // OP_RETURNDATASIZE
@@ -441,7 +471,7 @@ for { } true { } {
     case 0x3E { // OP_RETURNDATACOPY
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
-        let dstOffset, offset, len
+        let dstOffset, sourceOffset, len
         popStackCheck(sp, 3)
         dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
