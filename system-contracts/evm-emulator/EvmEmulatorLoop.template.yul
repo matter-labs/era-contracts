@@ -289,8 +289,8 @@ for { } true { } {
         popStackCheck(sp, evmGasLeft, 2)
         offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkMemOverflowByOffset(add(offset, size))
         let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
 
         // When an offset is first accessed (either read or write), memory may trigger 
@@ -372,8 +372,8 @@ for { } true { } {
         offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(destOffset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(destOffset,size), evmGasLeft)
+        checkOverflow(destOffset, size)
+        checkMemOverflowByOffset(add(destOffset, size))
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
@@ -410,9 +410,9 @@ for { } true { } {
         dst := add(dst, MEM_OFFSET_INNER())
         offset := add(add(offset, BYTECODE_OFFSET()), 32)
 
-        checkOverflow(dst,len, evmGasLeft)
-        checkOverflow(offset,len, evmGasLeft)
-        checkMemOverflow(add(dst, len), evmGasLeft)
+        checkOverflow(dst, len)
+        checkOverflow(offset, len)
+        checkMemOverflow(add(dst, len))
         // Check bytecode overflow
         if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
             revertWithGas(evmGasLeft)
@@ -466,14 +466,14 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset,len, evmGasLeft)
+        checkOverflow(offset, len)
         if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
             revertWithGas(evmGasLeft)
         }
 
         // minimum_word_size = (size + 31) / 32
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-        checkMemOverflowByOffset(offset, evmGasLeft)
+        checkMemOverflowByOffset(offset)
         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dest, len)))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
@@ -569,7 +569,7 @@ for { } true { } {
 
         let offset := stackHead
 
-        checkMemOverflowByOffset(offset, evmGasLeft)
+        checkMemOverflowByOffset(offset)
         let expansionGas := expandMemory(add(offset, 32))
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
@@ -586,7 +586,7 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemOverflowByOffset(offset, evmGasLeft)
+        checkMemOverflowByOffset(offset)
         let expansionGas := expandMemory(add(offset, 32))
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
@@ -602,7 +602,7 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemOverflowByOffset(offset, evmGasLeft)
+        checkMemOverflowByOffset(offset)
         let expansionGas := expandMemory(add(offset, 1))
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
@@ -782,10 +782,10 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkOverflow(destOffset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
-        checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkOverflow(destOffset, size)
+        checkMemOverflowByOffset(add(offset, size))
+        checkMemOverflowByOffset(add(destOffset, size))
 
         expandMemory(add(destOffset, size))
         expandMemory(add(offset, size))
@@ -1230,8 +1230,8 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkMemOverflowByOffset(add(offset, size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -1252,8 +1252,8 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkMemOverflowByOffset(add(offset, size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -1278,8 +1278,8 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkMemOverflowByOffset(add(offset, size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -1306,8 +1306,8 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkMemOverflowByOffset(add(offset, size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -1335,8 +1335,8 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkMemOverflowByOffset(add(offset, size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -1375,10 +1375,10 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
+        checkOverflow(offset, size)
         evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
 
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkMemOverflowByOffset(add(offset, size))
 
         returnLen := size
         
@@ -1409,8 +1409,8 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkOverflow(offset, size, evmGasLeft)
-        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+        checkOverflow(offset, size)
+        checkMemOverflowByOffset(add(offset, size))
         evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
 
         // Don't check overflow here since previous checks are enough to ensure this is safe

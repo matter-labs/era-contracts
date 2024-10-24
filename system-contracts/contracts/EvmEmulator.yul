@@ -143,23 +143,21 @@ object "EvmEmulator" {
             gasRemaining := sub(prevGas, toCharge)
         }
         
-        function checkMemOverflowByOffset(offset, evmGasLeft) {
+        function checkMemOverflowByOffset(offset) {
             if gt(offset, MAX_POSSIBLE_MEM()) {
-                mstore(0, evmGasLeft)
-                revert(0, 32)
+                revertWithGas(0)
             }
         }
         
-        function checkMemOverflow(location, evmGasLeft) {
+        function checkMemOverflow(location) {
             if gt(location, MAX_MEMORY_FRAME()) {
-                mstore(0, evmGasLeft)
-                revert(0, 32)
+                revertWithGas(0)
             }
         }
         
-        function checkOverflow(data1, data2, evmGasLeft) {
+        function checkOverflow(data1, data2) {
             if lt(add(data1, data2), data2) {
-                revertWithGas(evmGasLeft)
+                revertWithGas(0)
             }
         }
         
@@ -578,11 +576,11 @@ object "EvmEmulator" {
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
         
-            checkOverflow(argsOffset,argsSize, evmGasLeft)
-            checkOverflow(retOffset, retSize, evmGasLeft)
+            checkOverflow(argsOffset,argsSize)
+            checkOverflow(retOffset, retSize)
         
-            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+            checkMemOverflowByOffset(add(argsOffset, argsSize))
+            checkMemOverflowByOffset(add(retOffset, retSize))
         
             // static_gas = 0
             // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -652,11 +650,11 @@ object "EvmEmulator" {
         
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
-            checkOverflow(argsOffset,argsSize, evmGasLeft)
-            checkOverflow(retOffset, retSize, evmGasLeft)
+            checkOverflow(argsOffset,argsSize)
+            checkOverflow(retOffset, retSize)
         
-            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+            checkMemOverflowByOffset(add(argsOffset, argsSize))
+            checkMemOverflowByOffset(add(retOffset, retSize))
         
             let gasUsed := 100
             if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -710,11 +708,11 @@ object "EvmEmulator" {
         
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
-            checkOverflow(argsOffset, argsSize, evmGasLeft)
-            checkOverflow(retOffset, retSize, evmGasLeft)
+            checkOverflow(argsOffset, argsSize)
+            checkOverflow(retOffset, retSize)
         
-            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+            checkMemOverflowByOffset(add(argsOffset, argsSize))
+            checkMemOverflowByOffset(add(retOffset, retSize))
         
             if iszero(_isEVM(addr)) {
                 revertWithGas(evmGasLeft)
@@ -1105,8 +1103,8 @@ object "EvmEmulator" {
             value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
             offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
         
-            checkOverflow(offset, size, evmGasLeft)
-            checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+            checkOverflow(offset, size)
+            checkMemOverflowByOffset(add(offset, size))
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                 revertWithGas(evmGasLeft)
@@ -1149,8 +1147,8 @@ object "EvmEmulator" {
             size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         
-            checkOverflow(offset, size, evmGasLeft)
-            checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+            checkOverflow(offset, size)
+            checkMemOverflowByOffset(add(offset, size))
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                 revertWithGas(evmGasLeft)
@@ -1546,8 +1544,8 @@ object "EvmEmulator" {
                     popStackCheck(sp, evmGasLeft, 2)
                     offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkMemOverflowByOffset(add(offset, size))
                     let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
             
                     // When an offset is first accessed (either read or write), memory may trigger 
@@ -1629,8 +1627,8 @@ object "EvmEmulator" {
                     offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(destOffset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(destOffset,size), evmGasLeft)
+                    checkOverflow(destOffset, size)
+                    checkMemOverflowByOffset(add(destOffset, size))
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
@@ -1667,9 +1665,9 @@ object "EvmEmulator" {
                     dst := add(dst, MEM_OFFSET_INNER())
                     offset := add(add(offset, BYTECODE_OFFSET()), 32)
             
-                    checkOverflow(dst,len, evmGasLeft)
-                    checkOverflow(offset,len, evmGasLeft)
-                    checkMemOverflow(add(dst, len), evmGasLeft)
+                    checkOverflow(dst, len)
+                    checkOverflow(offset, len)
+                    checkMemOverflow(add(dst, len))
                     // Check bytecode overflow
                     if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
                         revertWithGas(evmGasLeft)
@@ -1723,14 +1721,14 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset,len, evmGasLeft)
+                    checkOverflow(offset, len)
                     if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
                         revertWithGas(evmGasLeft)
                     }
             
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                    checkMemOverflowByOffset(offset, evmGasLeft)
+                    checkMemOverflowByOffset(offset)
                     let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dest, len)))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
@@ -1826,7 +1824,7 @@ object "EvmEmulator" {
             
                     let offset := stackHead
             
-                    checkMemOverflowByOffset(offset, evmGasLeft)
+                    checkMemOverflowByOffset(offset)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -1843,7 +1841,7 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemOverflowByOffset(offset, evmGasLeft)
+                    checkMemOverflowByOffset(offset)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -1859,7 +1857,7 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemOverflowByOffset(offset, evmGasLeft)
+                    checkMemOverflowByOffset(offset)
                     let expansionGas := expandMemory(add(offset, 1))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -2039,10 +2037,10 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkOverflow(destOffset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
-                    checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkOverflow(destOffset, size)
+                    checkMemOverflowByOffset(add(offset, size))
+                    checkMemOverflowByOffset(add(destOffset, size))
             
                     expandMemory(add(destOffset, size))
                     expandMemory(add(offset, size))
@@ -2487,8 +2485,8 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkMemOverflowByOffset(add(offset, size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2509,8 +2507,8 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkMemOverflowByOffset(add(offset, size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2535,8 +2533,8 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkMemOverflowByOffset(add(offset, size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2563,8 +2561,8 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkMemOverflowByOffset(add(offset, size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2592,8 +2590,8 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkMemOverflowByOffset(add(offset, size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2632,10 +2630,10 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
+                    checkOverflow(offset, size)
                     evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
             
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size))
             
                     returnLen := size
                     
@@ -2666,8 +2664,8 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, size, evmGasLeft)
-                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkOverflow(offset, size)
+                    checkMemOverflowByOffset(add(offset, size))
                     evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
             
                     // Don't check overflow here since previous checks are enough to ensure this is safe
@@ -3156,23 +3154,21 @@ object "EvmEmulator" {
                 gasRemaining := sub(prevGas, toCharge)
             }
             
-            function checkMemOverflowByOffset(offset, evmGasLeft) {
+            function checkMemOverflowByOffset(offset) {
                 if gt(offset, MAX_POSSIBLE_MEM()) {
-                    mstore(0, evmGasLeft)
-                    revert(0, 32)
+                    revertWithGas(0)
                 }
             }
             
-            function checkMemOverflow(location, evmGasLeft) {
+            function checkMemOverflow(location) {
                 if gt(location, MAX_MEMORY_FRAME()) {
-                    mstore(0, evmGasLeft)
-                    revert(0, 32)
+                    revertWithGas(0)
                 }
             }
             
-            function checkOverflow(data1, data2, evmGasLeft) {
+            function checkOverflow(data1, data2) {
                 if lt(add(data1, data2), data2) {
-                    revertWithGas(evmGasLeft)
+                    revertWithGas(0)
                 }
             }
             
@@ -3591,11 +3587,11 @@ object "EvmEmulator" {
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
             
-                checkOverflow(argsOffset,argsSize, evmGasLeft)
-                checkOverflow(retOffset, retSize, evmGasLeft)
+                checkOverflow(argsOffset,argsSize)
+                checkOverflow(retOffset, retSize)
             
-                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+                checkMemOverflowByOffset(add(argsOffset, argsSize))
+                checkMemOverflowByOffset(add(retOffset, retSize))
             
                 // static_gas = 0
                 // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -3665,11 +3661,11 @@ object "EvmEmulator" {
             
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                checkOverflow(argsOffset,argsSize, evmGasLeft)
-                checkOverflow(retOffset, retSize, evmGasLeft)
+                checkOverflow(argsOffset,argsSize)
+                checkOverflow(retOffset, retSize)
             
-                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+                checkMemOverflowByOffset(add(argsOffset, argsSize))
+                checkMemOverflowByOffset(add(retOffset, retSize))
             
                 let gasUsed := 100
                 if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -3723,11 +3719,11 @@ object "EvmEmulator" {
             
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                checkOverflow(argsOffset, argsSize, evmGasLeft)
-                checkOverflow(retOffset, retSize, evmGasLeft)
+                checkOverflow(argsOffset, argsSize)
+                checkOverflow(retOffset, retSize)
             
-                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
-                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
+                checkMemOverflowByOffset(add(argsOffset, argsSize))
+                checkMemOverflowByOffset(add(retOffset, retSize))
             
                 if iszero(_isEVM(addr)) {
                     revertWithGas(evmGasLeft)
@@ -4118,8 +4114,8 @@ object "EvmEmulator" {
                 value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
                 offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                checkOverflow(offset, size, evmGasLeft)
-                checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                checkOverflow(offset, size)
+                checkMemOverflowByOffset(add(offset, size))
             
                 if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                     revertWithGas(evmGasLeft)
@@ -4162,8 +4158,8 @@ object "EvmEmulator" {
                 size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                checkOverflow(offset, size, evmGasLeft)
-                checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                checkOverflow(offset, size)
+                checkMemOverflowByOffset(add(offset, size))
             
                 if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                     revertWithGas(evmGasLeft)
@@ -4559,8 +4555,8 @@ object "EvmEmulator" {
                         popStackCheck(sp, evmGasLeft, 2)
                         offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkMemOverflowByOffset(add(offset, size))
                         let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
                 
                         // When an offset is first accessed (either read or write), memory may trigger 
@@ -4642,8 +4638,8 @@ object "EvmEmulator" {
                         offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(destOffset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(destOffset,size), evmGasLeft)
+                        checkOverflow(destOffset, size)
+                        checkMemOverflowByOffset(add(destOffset, size))
                 
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
@@ -4680,9 +4676,9 @@ object "EvmEmulator" {
                         dst := add(dst, MEM_OFFSET_INNER())
                         offset := add(add(offset, BYTECODE_OFFSET()), 32)
                 
-                        checkOverflow(dst,len, evmGasLeft)
-                        checkOverflow(offset,len, evmGasLeft)
-                        checkMemOverflow(add(dst, len), evmGasLeft)
+                        checkOverflow(dst, len)
+                        checkOverflow(offset, len)
+                        checkMemOverflow(add(dst, len))
                         // Check bytecode overflow
                         if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
                             revertWithGas(evmGasLeft)
@@ -4736,14 +4732,14 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset,len, evmGasLeft)
+                        checkOverflow(offset, len)
                         if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
                             revertWithGas(evmGasLeft)
                         }
                 
                         // minimum_word_size = (size + 31) / 32
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                        checkMemOverflowByOffset(offset, evmGasLeft)
+                        checkMemOverflowByOffset(offset)
                         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dest, len)))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
@@ -4839,7 +4835,7 @@ object "EvmEmulator" {
                 
                         let offset := stackHead
                 
-                        checkMemOverflowByOffset(offset, evmGasLeft)
+                        checkMemOverflowByOffset(offset)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -4856,7 +4852,7 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemOverflowByOffset(offset, evmGasLeft)
+                        checkMemOverflowByOffset(offset)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -4872,7 +4868,7 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemOverflowByOffset(offset, evmGasLeft)
+                        checkMemOverflowByOffset(offset)
                         let expansionGas := expandMemory(add(offset, 1))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -5052,10 +5048,10 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkOverflow(destOffset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
-                        checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkOverflow(destOffset, size)
+                        checkMemOverflowByOffset(add(offset, size))
+                        checkMemOverflowByOffset(add(destOffset, size))
                 
                         expandMemory(add(destOffset, size))
                         expandMemory(add(offset, size))
@@ -5500,8 +5496,8 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkMemOverflowByOffset(add(offset, size))
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5522,8 +5518,8 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkMemOverflowByOffset(add(offset, size))
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5548,8 +5544,8 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkMemOverflowByOffset(add(offset, size))
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5576,8 +5572,8 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkMemOverflowByOffset(add(offset, size))
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5605,8 +5601,8 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkMemOverflowByOffset(add(offset, size))
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5645,10 +5641,10 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
+                        checkOverflow(offset, size)
                         evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
                 
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size))
                 
                         returnLen := size
                         
@@ -5679,8 +5675,8 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, size, evmGasLeft)
-                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkOverflow(offset, size)
+                        checkMemOverflowByOffset(add(offset, size))
                         evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
                 
                         // Don't check overflow here since previous checks are enough to ensure this is safe
@@ -6044,7 +6040,7 @@ object "EvmEmulator" {
                 if eq(isCallerEVM, 1) {
                     // Includes gas
                     returnOffset := sub(returnOffset, 32)
-                    checkOverflow(returnLen, 32, evmGasLeft)
+                    checkOverflow(returnLen, 32)
                     returnLen := add(returnLen, 32)
 
                     mstore(returnOffset, evmGasLeft)
