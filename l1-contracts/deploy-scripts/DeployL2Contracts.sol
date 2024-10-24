@@ -35,12 +35,10 @@ contract DeployL2Script is Script {
         uint256 chainId;
         uint256 eraChainId;
         bool legacyBridge;
-
         bool deploySharedBridge;
         bool deployConsensusRegistry;
         bool deployMulticall3;
         bool deployForceDeployUpgrader;
-
         ContractSpec l2SharedBridgeImplementation;
         ContractSpec l2SharedBridgeProxy;
         ContractSpec l2ConsensusRegistryImplementation;
@@ -78,7 +76,12 @@ contract DeployL2Script is Script {
         }
 
         if (config.deployForceDeployUpgrader) {
-            config.l2ForceDeployUpgrader = deployThroughL1("ForceDeployUpgrader", bytecodes.forceDeployUpgrader, "", new bytes[](0));
+            config.l2ForceDeployUpgrader = deployThroughL1(
+                "ForceDeployUpgrader",
+                bytecodes.forceDeployUpgrader,
+                "",
+                new bytes[](0)
+            );
         }
 
         saveOutput();
@@ -105,9 +108,7 @@ contract DeployL2Script is Script {
         bytecodes.consensusRegistry = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/ConsensusRegistry.sol/ConsensusRegistry.json"
         );
-        bytecodes.multicall3 = Utils.readFoundryBytecode(
-            "/../l2-contracts/zkout/Multicall3.sol/Multicall3.json"
-        );
+        bytecodes.multicall3 = Utils.readFoundryBytecode("/../l2-contracts/zkout/Multicall3.sol/Multicall3.json");
         bytecodes.forceDeployUpgrader = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
@@ -140,29 +141,50 @@ contract DeployL2Script is Script {
     function saveOutput() internal {
         string memory toml = "{}";
         if (config.l2SharedBridgeImplementation.addr != address(0)) {
-            toml = vm.serializeString("root", "l2_shared_bridge_implementation", serializeContract(config.l2SharedBridgeImplementation));
+            toml = vm.serializeString(
+                "root",
+                "l2_shared_bridge_implementation",
+                serializeContract(config.l2SharedBridgeImplementation)
+            );
         }
         if (config.l2SharedBridgeProxy.addr != address(0)) {
             toml = vm.serializeString("root", "l2_shared_bridge_proxy", serializeContract(config.l2SharedBridgeProxy));
         }
         if (config.l2ConsensusRegistryImplementation.addr != address(0)) {
-            toml = vm.serializeString("root", "l2_consensus_registry_implementation", serializeContract(config.l2ConsensusRegistryImplementation));
+            toml = vm.serializeString(
+                "root",
+                "l2_consensus_registry_implementation",
+                serializeContract(config.l2ConsensusRegistryImplementation)
+            );
         }
         if (config.l2ConsensusRegistryProxy.addr != address(0)) {
-            toml = vm.serializeString("root", "l2_consensus_registry_proxy", serializeContract(config.l2ConsensusRegistryProxy));
+            toml = vm.serializeString(
+                "root",
+                "l2_consensus_registry_proxy",
+                serializeContract(config.l2ConsensusRegistryProxy)
+            );
         }
         if (config.l2Multicall3.addr != address(0)) {
             toml = vm.serializeString("root", "l2_multicall3", serializeContract(config.l2Multicall3));
         }
         if (config.l2ForceDeployUpgrader.addr != address(0)) {
-            toml = vm.serializeString("root", "l2_force_deploy_upgrader", serializeContract(config.l2ForceDeployUpgrader));
+            toml = vm.serializeString(
+                "root",
+                "l2_force_deploy_upgrader",
+                serializeContract(config.l2ForceDeployUpgrader)
+            );
         }
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
         vm.writeToml(toml, path);
     }
 
-    function deployThroughL1(string memory name, bytes memory bytecode, bytes memory constructorArgs, bytes[] memory factoryDeps) internal returns (ContractSpec memory) {
+    function deployThroughL1(
+        string memory name,
+        bytes memory bytecode,
+        bytes memory constructorArgs,
+        bytes[] memory factoryDeps
+    ) internal returns (ContractSpec memory) {
         address addr = Utils.deployThroughL1({
             bytecode: bytecode,
             constructorargs: constructorArgs,
@@ -173,18 +195,24 @@ contract DeployL2Script is Script {
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
-        return ContractSpec({
-            addr: addr,
-            name: name,
-            constructorArgs: constructorArgs
-        });
+        return ContractSpec({addr: addr, name: name, constructorArgs: constructorArgs});
     }
 
-    function deployTransparentUpgradeableProxy(ContractSpec memory target, address admin, bytes memory data) internal returns (ContractSpec memory) {
+    function deployTransparentUpgradeableProxy(
+        ContractSpec memory target,
+        address admin,
+        bytes memory data
+    ) internal returns (ContractSpec memory) {
         assert(target.addr != address(0));
         assert(admin != address(0));
         bytes memory constructorArgs = abi.encode(target.addr, admin, data);
-        return deployThroughL1("TransparentUpgradeableProxy", bytecodes.transparentUpgradeableProxy, constructorArgs, new bytes[](0));
+        return
+            deployThroughL1(
+                "TransparentUpgradeableProxy",
+                bytecodes.transparentUpgradeableProxy,
+                constructorArgs,
+                new bytes[](0)
+            );
     }
 
     function deploySharedBridge() internal {
@@ -201,10 +229,20 @@ contract DeployL2Script is Script {
         bytes memory constructorArgs = abi.encode(config.eraChainId);
         string memory functionSignature;
         if (config.legacyBridge) {
-            config.l2SharedBridgeImplementation = deployThroughL1("DevL2SharedBridge", bytecodes.devL2SharedBridge, constructorArgs, factoryDeps);
+            config.l2SharedBridgeImplementation = deployThroughL1(
+                "DevL2SharedBridge",
+                bytecodes.devL2SharedBridge,
+                constructorArgs,
+                factoryDeps
+            );
             functionSignature = "initializeDevBridge(address,address,bytes32,address)";
         } else {
-            config.l2SharedBridgeImplementation = deployThroughL1("L2SharedBridge", bytecodes.l2SharedBridge, constructorArgs, factoryDeps);
+            config.l2SharedBridgeImplementation = deployThroughL1(
+                "L2SharedBridge",
+                bytecodes.l2SharedBridge,
+                constructorArgs,
+                factoryDeps
+            );
             functionSignature = "initialize(address,address,bytes32,address)";
         }
 
@@ -228,7 +266,10 @@ contract DeployL2Script is Script {
             Utils.chainAdminMulticall({
                 _chainAdmin: bridge.admin(),
                 _target: config.l1SharedBridgeProxy,
-                _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy.addr)),
+                _data: abi.encodeCall(
+                    bridge.initializeChainGovernance,
+                    (config.chainId, config.l2SharedBridgeProxy.addr)
+                ),
                 _value: 0
             });
         }
@@ -237,14 +278,16 @@ contract DeployL2Script is Script {
     // Deploy a transparent upgradable proxy for the already deployed consensus registry
     // implementation and save its address into the config.
     function deployConsensusRegistry() internal {
-        config.l2ConsensusRegistryImplementation = deployThroughL1("ConsensusRegistry", bytecodes.consensusRegistry, "", new bytes[](0));
+        config.l2ConsensusRegistryImplementation = deployThroughL1(
+            "ConsensusRegistry",
+            bytecodes.consensusRegistry,
+            "",
+            new bytes[](0)
+        );
         config.l2ConsensusRegistryProxy = deployTransparentUpgradeableProxy(
             config.l2ConsensusRegistryImplementation,
             AddressAliasHelper.applyL1ToL2Alias(config.governance),
-            abi.encodeWithSignature(
-                "initialize(address)",
-                config.consensusRegistryOwner
-            )
+            abi.encodeWithSignature("initialize(address)", config.consensusRegistryOwner)
         );
     }
 }
