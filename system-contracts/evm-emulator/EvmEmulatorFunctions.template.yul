@@ -68,7 +68,14 @@ function INF_PASS_GAS() -> inf {
 
 // Each evm gas is 5 zkEVM one
 function GAS_DIVISOR() -> gas_div { gas_div := 5 }
+
 function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
+
+// We need to pass some gas for MsgValueSimulator internal logic
+function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
+        gas_stipend := 30000 // 27000 + a little bit more
+}
+
 function OVERHEAD() -> overhead { overhead := 2000 }
 
 // From precompiles/CodeOracle
@@ -711,8 +718,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEv
 
     _pushEVMFrame(gasToPass, isStatic)
     let success := delegatecall(
-        // We can not just pass all gas here to prevent overflow of zkEVM gas counter
-        EVM_GAS_STIPEND(),
+        0, // 0 gas since VM will add EVM_GAS_STIPEND() to gas
         addr,
         add(MEM_OFFSET_INNER(), argsOffset),
         argsSize,
@@ -744,7 +750,10 @@ function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, r
     }
     default {
         _pushEVMFrame(gasToPass, false)
-        success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+        // VM will add EVM_GAS_STIPEND() to gas for this call
+        // but if value != 0 we will firstly call MsgValueSimulator contract, which is zkVM system contract
+        // so we need to pass some gas for MsgValueSimulator
+        success := call(MSG_VALUE_SIMULATOR_STIPEND_GAS(), addr, value, argsOffset, argsSize, 0, 0)
         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
     }
 }
@@ -765,7 +774,7 @@ function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, re
     }
     default {
         _pushEVMFrame(gasToPass, true)
-        success := staticcall(EVM_GAS_STIPEND(), addr, argsOffset, argsSize, 0, 0)
+        success := staticcall(0, addr, argsOffset, argsSize, 0, 0) // 0 gas since VM will add EVM_GAS_STIPEND() to gas
         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
     }
 }
