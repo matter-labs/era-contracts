@@ -1,6 +1,9 @@
 pragma solidity 0.8.24;
 
+import {Script, console2 as console} from "forge-std/Script.sol";
+
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
@@ -23,6 +26,8 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -374,6 +379,18 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
             abi.encode(l1Nullifier)
         );
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector),
+            abi.encode(sharedBridge)
+        );
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(INativeTokenVault.tokenAddress.selector),
+            abi.encode(baseToken)
+        );
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,
