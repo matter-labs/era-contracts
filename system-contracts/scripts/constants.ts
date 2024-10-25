@@ -206,7 +206,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "L2NativeTokenVault",
     lang: Language.Solidity,
   },
-  L2MessageRouter: {
+  L2MessageRoot: {
     // This is explicitly a non-system-contract address.
     // We do not use the same address as create2 factories on EVM, since
     // this is a zkEVM create2 factory.
@@ -222,6 +222,14 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "SloadContract",
     lang: Language.Solidity,
   },
+  L2WrappedBaseTokenImplementation: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010007",
+    codeName: "L2WrappedBaseToken",
+    lang: Language.Solidity,
+  }
 } as const;
 
 export const EIP712_TX_ID = 113;
