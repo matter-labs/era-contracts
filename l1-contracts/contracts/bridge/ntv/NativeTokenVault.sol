@@ -60,7 +60,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
@@ -264,7 +264,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             }
             _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (_depositAmount != amount) {
-                revert ValueMismatch(amount, msg.value);
+                revert ValueMismatch(_depositAmount, amount);
             }
         } else {
             // The Bridgehub also checks this, but we want to be sure
@@ -329,13 +329,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token, uint256 _originChainId) public view override returns (bytes memory) {
         return BridgeHelper.getERC20Getters(_token, _originChainId);
-    }
-
-    /// @notice Returns the parsed assetId.
-    /// @param _nativeToken The address of the token to be parsed.
-    /// @dev Shows the assetId for a given chain and token address
-    function getAssetId(uint256 _chainId, address _nativeToken) external pure override returns (bytes32) {
-        return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
     }
 
     /// @notice Registers a native token address for the vault.
@@ -426,6 +419,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
 
         tokenAddress[_assetId] = _expectedToken;
+        assetId[_expectedToken] = _assetId;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
@@ -454,7 +448,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
-        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
+        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_assetId, _originToken, _erc20Data);
 
         originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);

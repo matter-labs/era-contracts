@@ -73,7 +73,7 @@ uint256 constant L1_TX_DELTA_FACTORY_DEPS_L2_GAS = 2473;
 uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = 64;
 
 /// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
-uint256 constant MAX_NEW_FACTORY_DEPS = 32;
+uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
@@ -120,6 +120,11 @@ address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111
 /// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
 uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
 
+/// @dev The virtual address of the L1 settlement layer.
+address constant L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS = address(
+    uint160(uint256(keccak256("L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS")) - 1)
+);
+
 struct PriorityTreeCommitment {
     uint256 nextLeafIndex;
     uint256 startIndex;
@@ -150,4 +155,6 @@ struct ZKChainCommitment {
     bytes32[] batchHashes;
     /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
+    /// @notice Whether a chain is a permanent rollup.
+    bool isPermanentRollup;
 }

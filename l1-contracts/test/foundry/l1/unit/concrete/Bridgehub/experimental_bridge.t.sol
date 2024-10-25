@@ -31,7 +31,7 @@ import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehu
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {AssetIdNotSupported, ZeroChainId, ChainAlreadyLive, AssetIdAlreadyRegistered, AddressTooLow, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, TokenNotRegistered, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {AssetIdNotSupported, ZeroChainId, AssetIdAlreadyRegistered, AddressTooLow, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, TokenNotRegistered, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ExperimentalBridgeTest is Test {
@@ -439,9 +439,10 @@ contract ExperimentalBridgeTest is Test {
         );
 
         if (randomAddress != address(testTokenAddress)) {
+            assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(randomAddress));
+            vm.assume(!bridgeHub.assetIdIsRegistered(assetId));
             // Testing to see if a random address can also be added or not
             vm.prank(bridgeOwner);
-            assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(randomAddress));
             bridgeHub.addTokenAssetId(assetId);
             assertTrue(bridgeHub.assetIdIsRegistered(assetId));
         }
@@ -787,7 +788,6 @@ contract ExperimentalBridgeTest is Test {
                 mockCTM.createNewChain.selector,
                 chainId,
                 tokenAssetId,
-                sharedBridgeAddress,
                 admin,
                 mockInitCalldata,
                 factoryDeps

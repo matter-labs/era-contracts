@@ -12,7 +12,7 @@ name: Codespell
 on: pull_request
 
 jobs:
-  # TODO: fix codespell
+  # TODO: fix codespell CI
   # codespell:
   #   runs-on: ubuntu-latest
 

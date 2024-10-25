@@ -91,6 +91,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
         bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
         tokenAddress[newAssetId] = _l2TokenAddress;
+        assetId[_l2TokenAddress] = newAssetId;
         originChainId[newAssetId] = L1_CHAIN_ID;
     }
 
@@ -144,6 +145,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
 
         tokenAddress[_assetId] = _expectedToken;
+        assetId[_expectedToken] = _assetId;
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

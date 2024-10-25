@@ -54,7 +54,7 @@
   },
   "scripts": {
     "build": "hardhat compile ",
-    "build-l1": "harhdat compile",
+    "build:foundry": "forge build",
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
     "verify": "hardhat run --network env scripts/verify.ts"

@@ -608,7 +608,8 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
+        address sharedBridge = IBridgehub(s.bridgehub).sharedBridge();
+        IL1AssetRouter(sharedBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -644,7 +645,8 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 refundRecipient: _refundRecipient
             })
         );
-        IL1AssetRouter(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
+        address sharedBridge = IBridgehub(s.bridgehub).sharedBridge();
+        IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,
             msg.sender,

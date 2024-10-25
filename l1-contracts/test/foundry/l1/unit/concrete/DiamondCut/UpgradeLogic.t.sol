@@ -17,6 +17,7 @@ import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainType
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -52,7 +53,7 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit();
-        adminFacet = new AdminFacet(block.chainid);
+        adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
@@ -84,7 +85,6 @@ contract UpgradeLogicTest is DiamondCutTest {
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
             baseTokenAssetId: DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken"))),
-            baseTokenBridge: makeAddr("baseTokenBridge"),
             storedBatchZero: bytes32(0),
             // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
             // genesisIndexRepeatedStorageChanges: 0,

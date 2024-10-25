@@ -118,6 +118,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function admin() external view returns (address);
 
+    function assetRouter() external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
@@ -196,6 +198,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
+
+    function settlementLayer(uint256 _chainId) external view returns (uint256);
 
     // function finalizeMigrationToGateway(
     //     uint256 _chainId,

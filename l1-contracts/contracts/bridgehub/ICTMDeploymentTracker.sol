@@ -22,5 +22,5 @@ interface ICTMDeploymentTracker is IL1AssetDeploymentTracker {
 
     function registerCTMAssetOnL1(address _ctmAddress) external;
 
-    function getAssetId(address _l1CTM) external view returns (bytes32);
+    function calculateAssetId(address _l1CTM) external view returns (bytes32);
 }

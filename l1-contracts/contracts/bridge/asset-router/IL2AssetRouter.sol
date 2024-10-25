@@ -2,9 +2,11 @@
 
 pragma solidity ^0.8.20;
 
+import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2AssetRouter {
+interface IL2AssetRouter is IAssetRouterBase {
     event WithdrawalInitiatedAssetRouter(
         uint256 chainId,
         address indexed l2Sender,
@@ -12,7 +14,7 @@ interface IL2AssetRouter {
         bytes assetData
     );
 
-    function withdraw(bytes32 _assetId, bytes calldata _transferData) external;
+    function withdraw(bytes32 _assetId, bytes calldata _transferData) external returns (bytes32);
 
     function L1_ASSET_ROUTER() external view returns (address);
 
