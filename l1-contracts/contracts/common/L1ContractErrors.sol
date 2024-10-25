@@ -408,8 +408,6 @@ error NotBridgehub(address addr);
 error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
-// 0x64846fe4
-error NotARestriction(address addr);
 // 0xccdd18d2
 error BytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x25d8333c
