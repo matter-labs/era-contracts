@@ -106,38 +106,55 @@ lazy_static! {
 struct Opt {
     /// Input path to scheduler verification key file.
     #[structopt(
-        short = "i",
-        long = "input_path",
-        default_value = "data/scheduler_key.json"
+        long = "plonk_input_path",
+        default_value = "data/plonk_scheduler_key.json"
     )]
-    input_path: String,
+    plonk_input_path: String,
+
+    /// Input path to scheduler verification key file for .
+    #[structopt(
+        long = "fflonk_input_path",
+        default_value = "data/fflonk_scheduler_key.json"
+    )]
+    fflonk_input_path: String,
 
     /// Output path to verifier contract file.
-    #[structopt(short = "o", long = "output_path", default_value = "data/Verifier.sol")]
-    output_path: String,
+    #[structopt(long = "fflonk_output_path", default_value = "data/VerifierFflonk.sol")]
+    fflonk_output_path: String,
+
+    /// Output path to verifier contract file.
+    #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
+    plonk_output_path: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
-    let reader = BufReader::new(File::open(&opt.input_path)?);
+    let plonk_reader = BufReader::new(File::open(&opt.plonk_input_path)?);
+    let fflonk_reader = BufReader::new(File::open(&opt.fflonk_input_path)?);
 
-    let vk: HashMap<String, Value> = from_reader(reader)?;
+    let plonk_vk: HashMap<String, Value> = from_reader(plonk_reader)?;
+    let fflonk_vk: HashMap<String, Value> = from_reader(fflonk_reader)?;
 
-    let verifier_contract_template = fs::read_to_string("data/verifier_contract_template.txt")?;
+    let plonk_verifier_contract_template = fs::read_to_string("data/plonk_verifier_contract_template.txt")?;
+    let fflonk_verifier_contract_template = fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
 
-    let verification_key = fs::read_to_string(&opt.input_path)
-        .expect(&format!("Unable to read from {}", &opt.input_path));
+    let plonk_verification_key = fs::read_to_string(&opt.plonk_input_path)
+        .expect(&format!("Unable to read from {}", &opt.plonk_input_path));
+    let fflonk_verification_key = fs::read_to_string(&opt.fflonk_input_path)
+        .expect(&format!("Unable to read from {}", &opt.fflonk_input_path));
 
-    let verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
-        serde_json::from_str(&verification_key).unwrap();
+    let plonk_verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
+        serde_json::from_str(&plonk_verification_key).unwrap();
+    let fflonk_verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
+        serde_json::from_str(&fflonk_verification_key).unwrap();
 
-    let vk_hash = hex::encode(calculate_verification_key_hash(verification_key).to_fixed_bytes());
+    let plonk_vk_hash = hex::encode(calculate_verification_key_hash(verification_key).to_fixed_bytes());
 
     let verifier_contract_template =
-        insert_residue_elements_and_commitments(&verifier_contract_template, &vk, &vk_hash)?;
+        insert_residue_elements_and_commitments(&verifier_contract_template, &vk, &plonk_vk_hash)?;
 
-    let mut file = File::create(opt.output_path)?;
+    let mut file = File::create(opt.plonk_output_path)?;
 
     file.write_all(verifier_contract_template.as_bytes())?;
     Ok(())
