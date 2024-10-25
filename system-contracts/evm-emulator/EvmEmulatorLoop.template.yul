@@ -116,14 +116,16 @@ for { } true { } {
         popStackCheck(sp, 2)
         a, sp, exponent := popStackItemWithoutCheck(sp, stackHead)
 
-        stackHead := exp(a, exponent)
-
         let to_charge := 0
-        for {} gt(exponent,0) {} { // while exponent > 0
+        let exponentCopy := exponent
+        for {} gt(exponentCopy, 0) {} { // while exponent > 0
             to_charge := add(to_charge, 50)
-            exponent := shr(8, exponent)
+            exponentCopy := shr(8, exponentCopy)
         } 
         evmGasLeft := chargeGas(evmGasLeft, to_charge)
+
+        stackHead := exp(a, exponent)
+
         ip := add(ip, 1)
     }
     case 0x0B { // OP_SIGNEXTEND
