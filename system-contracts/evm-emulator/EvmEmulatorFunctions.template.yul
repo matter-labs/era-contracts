@@ -309,7 +309,7 @@ function bitMaskFromBytes(nBytes) -> bitMask {
 // This function can overflow, it is the job of the caller to ensure that it does not.
 // The argument to this function is the offset into the memory region IN BYTES.
 function expandMemory(offset, size) -> gasCost {
-    // memory expansion costs 0 is size is 0
+    // memory expansion costs 0 if size is 0
     if size {
         let oldSizeInWords := mload(MEM_OFFSET())
 
