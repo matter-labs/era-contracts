@@ -430,6 +430,8 @@ error InvalidDAForPermanentRollup();
 error IncorrectPricingMode();
 // 0xd0266e26
 error NotSettlementLayer();
+// 0x7a4902ad
+error TimerAlreadyStarted();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

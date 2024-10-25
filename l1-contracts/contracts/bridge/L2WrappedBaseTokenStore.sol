@@ -15,10 +15,10 @@ import {ZeroAddress, Unauthorized} from "../common/L1ContractErrors.sol";
 /// - Each new chain (before the new protocol version is available) will have to double check that the admin
 /// has set the correct value in this contract. If the admin did not set a correct value, the chain should be discarded.
 /// - Once the upgrade is done, this contract will no longer be needed. Even though it is unlikely for a chain to be corrupted,
-/// the governornance can fix any corrupted chains in the next upgrade.
+/// the governance can fix any corrupted chains in the next upgrade.
 /// @dev This contract is not expected to be deployed as a proxy, but rather a standalone contract.
 /// @dev The `admin` of this contract is expected to be some cold wallet, trusted to provide correct values. However,
-/// due to process above, even its malicious behavior should impact security of the ecosystem.
+/// due to process above, even its malicious behavior should not impact security of the ecosystem.
 /// @dev The `owner` of this contract is trusted decentralized governance.
 contract L2WrappedBaseTokenStore is Ownable2Step {
     /// @notice Mapping from chain ID to L2 wrapped base token address.

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ZeroAddress, CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineNotGreaterThanCurrent, NewDeadlineExceedsMaxDeadline} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, TimerAlreadyStarted, CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineNotGreaterThanCurrent, NewDeadlineExceedsMaxDeadline} from "../common/L1ContractErrors.sol";
 
 /// @title Governance Upgrade Timer
 /// @author Matter Labs
@@ -66,6 +66,10 @@ contract GovernanceUpgradeTimer is Ownable2Step {
     ///
     /// Emits a {TimerStarted} event.
     function startTimer() external onlyTimerAdmin {
+        if (deadline != 0) {
+            revert TimerAlreadyStarted();
+        }
+
         deadline = block.timestamp + INITIAL_DELAY;
         maxDeadline = deadline + MAX_ADDITIONAL_DELAY;
 
