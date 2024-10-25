@@ -90,8 +90,8 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
             }
 
             (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
-            address stmAddress = BRIDGE_HUB.ctmAssetIdToAddress(decodedAssetId);
-            return (stmAddress != address(0));
+            address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(decodedAssetId);
+            return (ctmAddress != address(0));
         }
 
         return whitelistedSenders[sender];
