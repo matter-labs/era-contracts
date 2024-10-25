@@ -144,4 +144,26 @@ library FullMerkle {
     function root(FullTree storage self) internal view returns (bytes32) {
         return self._nodes[self._height][0];
     }
+
+    /**
+     * @dev Returns merkle path for a certain leaf index.
+     * @param _index The index of the leaf to calculate proof for.
+     */
+    function merklePath(FullTree storage self, uint256 _index) public view returns (bytes32[] memory) {
+        uint256 maxNodeNumber = self._leafNumber - 1;
+        if (_index > maxNodeNumber) {
+            revert MerkleWrongIndex(_index, maxNodeNumber);
+        }
+        bytes32[] memory proof = new bytes32[](self._height);
+        for (uint256 i = 0; i < self._height; i = i.uncheckedInc()) {
+            if (_index % 2 == 0) {
+                proof[i] = maxNodeNumber == _index ? self._zeros[i] : self._nodes[i][_index + 1];
+            } else {
+                proof[i] = self._nodes[i][_index - 1];
+            }
+            _index /= 2;
+            maxNodeNumber /= 2;
+        }
+        return proof;
+    }
 }

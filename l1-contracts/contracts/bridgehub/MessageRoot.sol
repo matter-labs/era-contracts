@@ -8,6 +8,7 @@ import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, TooManyChains} from "./L1BridgehubErrors.sol";
+import {ChainIdNotRegistered} from "../common/L1ContractErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -166,5 +167,17 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
 
         emit AddedChain(_chainId, cachedChainCount);
+    }
+
+    /**
+     * @dev Returns merkle path in `sharedTree` for a certain chain.
+     * @param _chainId Id of the chain to get merkle path for.
+     */
+    function getMerklePathForChain(uint256 _chainId) public view returns (bytes32[] memory) {
+        if (!chainRegistered(_chainId)) {
+            revert ChainIdNotRegistered(_chainId);
+        }
+        uint256 index = chainIndex[_chainId];
+        return sharedTree.merklePath(index);
     }
 }

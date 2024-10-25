@@ -115,4 +115,29 @@ contract MessageRootTest is Test {
 
         assertEq(messageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
+
+    function test_getMerklePathForChain() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId);
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(betaChainId);
+
+        bytes32 hash0 = MessageHashing.chainIdLeafHash(0x00, block.chainid);
+        bytes32 hash1 = MessageHashing.chainIdLeafHash(0x00, alphaChainId);
+        bytes32 hash2 = MessageHashing.chainIdLeafHash(0x00, betaChainId);
+
+        bytes32[] memory pathFor1 = messageRoot.getMerklePathForChain(alphaChainId);
+        bytes32[] memory expectedPath = new bytes32[](2);
+        expectedPath[0] = hash0;
+        expectedPath[1] = keccak256(abi.encodePacked(hash2, SHARED_ROOT_TREE_EMPTY_HASH));
+        assertEq(pathFor1, expectedPath, "Incorrect path for alpha chain");
+
+        bytes32[] memory pathFor2 = messageRoot.getMerklePathForChain(betaChainId);
+        expectedPath[0] = SHARED_ROOT_TREE_EMPTY_HASH;
+        expectedPath[1] = keccak256(abi.encodePacked(hash0, hash1));
+        assertEq(pathFor2, expectedPath, "Incorrect path for beta chain");
+    }
 }

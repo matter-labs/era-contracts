@@ -23,9 +23,6 @@ error AssetIdAlreadyRegistered();
 // 0xc630ef3c
 error CTMNotRegistered();
 
-// 0x4c0f5001
-error ChainIdNotRegistered();
-
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 
