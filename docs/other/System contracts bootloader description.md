@@ -656,7 +656,7 @@ The contract provides two methods:
 
 ## Pubdata Chunk Publisher
 
-This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](./Pubdata%20Post%204844.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes as the circuits will require that the chunk is of exact size. 
+This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](./Rollup%20DA.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes as the circuits will require that the chunk is of exact size. 
 
 This contract can be utilized by L2DAValidators, e.g. [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol) uses it to compress the pubdata into blobs.
 
