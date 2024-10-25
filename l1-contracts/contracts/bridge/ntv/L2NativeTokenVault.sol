@@ -22,7 +22,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -86,9 +86,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
-        tokenAddress[assetId] = _l2TokenAddress;
-        originChainId[assetId] = L1_CHAIN_ID;
+        if (l1TokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
+        tokenAddress[newAssetId] = _l2TokenAddress;
+        originChainId[newAssetId] = L1_CHAIN_ID;
     }
 
     /// @notice Ensures that the token is deployed.
