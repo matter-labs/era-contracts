@@ -63,7 +63,7 @@ contract L2WrappedBaseTokenStoreTest is Test {
         // Attempt from other
         vm.startPrank(other);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, other));
-        store.initializeChain(chainId  + 2, l2WBaseToken);
+        store.initializeChain(chainId + 2, l2WBaseToken);
         vm.stopPrank();
     }
 

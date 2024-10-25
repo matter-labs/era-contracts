@@ -100,12 +100,19 @@ contract GovernanceUpgradeTimerTest is Test {
 
         vm.startPrank(timerGovernance);
         vm.expectEmit(true, true, false, true);
-        emit TimerStarted(currentBlockTimestamp + initialDelay, currentBlockTimestamp + initialDelay + maxAdditionalDelay);
+        emit TimerStarted(
+            currentBlockTimestamp + initialDelay,
+            currentBlockTimestamp + initialDelay + maxAdditionalDelay
+        );
         timer.startTimer();
         vm.stopPrank();
 
         assertEq(timer.deadline(), currentBlockTimestamp + initialDelay, "Deadline should be set correctly");
-        assertEq(timer.maxDeadline(), currentBlockTimestamp + initialDelay + maxAdditionalDelay, "MaxDeadline should be set correctly");
+        assertEq(
+            timer.maxDeadline(),
+            currentBlockTimestamp + initialDelay + maxAdditionalDelay,
+            "MaxDeadline should be set correctly"
+        );
     }
 
     function testStartTimerCanNotBeCalledMultipleTimesByTimerGovernance() public {
@@ -239,4 +246,3 @@ contract GovernanceUpgradeTimerTest is Test {
         vm.stopPrank();
     }
 }
-

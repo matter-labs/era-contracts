@@ -59,19 +59,19 @@ contract RollupDAManagerTest is Test {
 
     function testUpdateDAPairRevertsOnZeroAddresses() public {
         vm.startPrank(owner);
-        
+
         // Both addresses zero
         vm.expectRevert(ZeroAddress.selector);
         rollupDAManager.updateDAPair(zeroAddress, zeroAddress, true);
-        
+
         // L1DAValidator zero
         vm.expectRevert(ZeroAddress.selector);
         rollupDAManager.updateDAPair(zeroAddress, l2DAValidator1, true);
-        
+
         // L2DAValidator zero
         vm.expectRevert(ZeroAddress.selector);
         rollupDAManager.updateDAPair(l1DAValidator1, zeroAddress, true);
-        
+
         vm.stopPrank();
     }
 
@@ -79,42 +79,42 @@ contract RollupDAManagerTest is Test {
 
     function testUpdateDAPairSetsAllowedDAPairsMapping() public {
         vm.startPrank(owner);
-        
+
         // Initially, the pair should not be allowed
         bool allowed = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
         assertFalse(allowed, "DA pair should initially be disallowed");
-        
+
         // Update the DA pair to allowed
         vm.expectEmit(true, true, false, true);
         emit DAPairUpdated(l1DAValidator1, l2DAValidator1, true);
         rollupDAManager.updateDAPair(l1DAValidator1, l2DAValidator1, true);
         allowed = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
         assertTrue(allowed, "DA pair should be allowed after update");
-        
+
         // Update the DA pair to disallowed
         vm.expectEmit(true, true, false, true);
         emit DAPairUpdated(l1DAValidator1, l2DAValidator1, false);
         rollupDAManager.updateDAPair(l1DAValidator1, l2DAValidator1, false);
         allowed = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
         assertFalse(allowed, "DA pair should be disallowed after update");
-        
+
         vm.stopPrank();
     }
 
     function testUpdateMultipleDAPairs() public {
         vm.startPrank(owner);
-        
+
         // Update multiple DA pairs
         rollupDAManager.updateDAPair(l1DAValidator1, l2DAValidator1, true);
         rollupDAManager.updateDAPair(l1DAValidator2, l2DAValidator2, true);
-        
+
         // Check both pairs
         bool allowed1 = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
         bool allowed2 = rollupDAManager.isPairAllowed(l1DAValidator2, l2DAValidator2);
-        
+
         assertTrue(allowed1, "First DA pair should be allowed");
         assertTrue(allowed2, "Second DA pair should be allowed");
-        
+
         vm.stopPrank();
     }
 }
