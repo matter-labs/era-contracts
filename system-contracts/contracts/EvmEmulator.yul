@@ -969,12 +969,12 @@ object "EvmEmulator" {
                     // does not allow to compute a valid result, all the gas sent is consumed.
                     gasToCharge := 6000
                 }
-                // 35,000 * k + 45,000 gas, where k is the number of pairings being computed.
+                // 34,000 * k + 45,000 gas, where k is the number of pairings being computed.
                 // The input must always be a multiple of 6 32-byte values.
                 case 0x08 { // ecPairing
                     gasToCharge := 45000
                     let k := div(argsSize, 0xC0) // 0xC0 == 6*32
-                    gasToCharge := add(gasToCharge, mul(k, 35000))
+                    gasToCharge := add(gasToCharge, mul(k, 34000))
                 }
                 case 0x09 { // blake2f
                     // argsOffset[0; 3] (4 bytes) Number of rounds (big-endian uint)
@@ -3996,12 +3996,12 @@ object "EvmEmulator" {
                         // does not allow to compute a valid result, all the gas sent is consumed.
                         gasToCharge := 6000
                     }
-                    // 35,000 * k + 45,000 gas, where k is the number of pairings being computed.
+                    // 34,000 * k + 45,000 gas, where k is the number of pairings being computed.
                     // The input must always be a multiple of 6 32-byte values.
                     case 0x08 { // ecPairing
                         gasToCharge := 45000
                         let k := div(argsSize, 0xC0) // 0xC0 == 6*32
-                        gasToCharge := add(gasToCharge, mul(k, 35000))
+                        gasToCharge := add(gasToCharge, mul(k, 34000))
                     }
                     case 0x09 { // blake2f
                         // argsOffset[0; 3] (4 bytes) Number of rounds (big-endian uint)
