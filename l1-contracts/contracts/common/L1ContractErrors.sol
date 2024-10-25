@@ -101,10 +101,6 @@ error EmptyDeposit();
 error ETHDepositNotSupported();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
-// 0x79e12cc3
-error FacetIsFrozen(bytes4 func);
-// 0xd37a223a
-error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x6d4a7df8
@@ -129,8 +125,6 @@ error InsufficientChainBalance();
 error InvalidCaller(address);
 // 0x4fbe5dba
 error InvalidDelay();
-// 0x0af806e0
-error InvalidHash();
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0xd8e9405c
@@ -293,8 +287,6 @@ error Unauthorized(address caller);
 error UndefinedDiamondCutAction();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
-// 0xa4dde386
-error UnimplementedMessage(string);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
 // 0x084a1449
