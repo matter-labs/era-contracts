@@ -60,7 +60,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_nullifyChainBalanceByNTV_wrongCaller() public {
-        vm.expectRevert("L1N: not NTV");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         l1Nullifier.nullifyChainBalanceByNTV(chainId, address(token));
     }
 
