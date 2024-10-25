@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-length-in-loops
 
-import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";

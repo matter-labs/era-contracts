@@ -10,7 +10,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
-import {NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress, NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainAdminTest is Test {
@@ -72,6 +72,14 @@ contract ChainAdminTest is Test {
         vm.expectRevert(abi.encodeWithSelector(NotARestriction.selector, address(badRestriction)));
         chainAdmin.addRestriction(address(badRestriction));
         vm.stopPrank();
+    }
+
+    function test_addRestrictionZeroAddress() public {
+        address[] memory restrictions = chainAdmin.getRestrictions();
+
+        vm.prank(address(chainAdmin));
+        vm.expectRevert();
+        chainAdmin.addRestriction(address(0));
     }
 
     function test_addRestrictionRevert() public {
