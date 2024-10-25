@@ -7,7 +7,7 @@ import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperc
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
 import {Restriction} from "./restriction/Restriction.sol";
