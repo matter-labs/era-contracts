@@ -192,16 +192,16 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         // If the method is called by an EVM contract, then we need to increase deployment
         // nonce for a contract even if contract creation actually failed
-        if (SystemContractHelper.isSystemCall() && ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender)) {
+        /*if (SystemContractHelper.isSystemCall() && ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender)) {
             // EVM emulator provides infinite gas
             try this.evmDeployOnAddress{value: msg.value}(msg.sender, newAddress, _initCode) {} catch {
                 newAddress = address(0);
             }
         } else {
             this.evmDeployOnAddress{value: msg.value}(msg.sender, newAddress, _initCode);
-        }
+        }*/
 
-        //_evmDeployOnAddress(newAddress, _initCode);
+        _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
         return newAddress;
     }
