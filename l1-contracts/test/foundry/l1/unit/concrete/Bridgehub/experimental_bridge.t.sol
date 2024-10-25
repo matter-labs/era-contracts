@@ -28,10 +28,11 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehub.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {AssetIdNotSupported, ZeroChainId, AssetIdAlreadyRegistered, AddressTooLow, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, TokenNotRegistered, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {AssetIdNotSupported, ZeroChainId, AssetIdAlreadyRegistered, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered} from "contracts/common/L1ContractErrors.sol";
+import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ExperimentalBridgeTest is Test {
@@ -1319,7 +1320,13 @@ contract ExperimentalBridgeTest is Test {
         );
 
         l2TxnReq2BridgeOut.secondBridgeAddress = address(secondBridgeAddressValue);
-        vm.expectRevert(abi.encodeWithSelector(AddressTooLow.selector, secondBridgeAddress));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SecondBridgeAddressTooLow.selector,
+                secondBridgeAddress,
+                BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS
+            )
+        );
         vm.prank(randomCaller);
         bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }

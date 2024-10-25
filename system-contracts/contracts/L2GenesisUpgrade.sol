@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
+import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 
 import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
@@ -18,8 +19,9 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
     ) external payable {
-        // solhint-disable-next-line gas-custom-errors
-        require(_chainId != 0, "Invalid chainId");
+        if (_chainId == 0) {
+            revert InvalidChainId();
+        }
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
 
         L2GatewayUpgradeHelper.performForceDeployedContractsInit(

@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
@@ -29,7 +27,9 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
-import {Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadySet, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadySet, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {WrongL2Sender, NotNTV, NativeTokenVaultAlreadySet, EthTransferFailed, WrongMsgLength} from "./L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -182,7 +182,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assembly {
                 callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "L1N: eth transfer failed");
+            if (!callSuccess) {
+                revert EthTransferFailed();
+            }
         } else {
             IERC20(_token).safeTransfer(ntvAddress, IERC20(_token).balanceOf(address(this)));
         }
@@ -230,8 +232,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Should be called only once by the owner.
     /// @param _l1NativeTokenVault The address of the native token vault.
     function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwner {
-        require(address(l1NativeTokenVault) == address(0), "L1N: native token vault already set");
-        require(address(_l1NativeTokenVault) != address(0), "L1N: native token vault 0");
+        if (address(l1NativeTokenVault) != address(0)) {
+            revert NativeTokenVaultAlreadySet();
+        }
+        if (address(_l1NativeTokenVault) == address(0)) {
+            revert ZeroAddress();
+        }
         l1NativeTokenVault = _l1NativeTokenVault;
     }
 
@@ -242,7 +248,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         if (address(l1AssetRouter) != address(0)) {
             revert AddressAlreadySet(address(_l1AssetRouter));
         }
-        require(_l1AssetRouter != address(0), "ShB: nullifier 0");
+        if (_l1AssetRouter == address(0)) {
+            revert ZeroAddress();
+        }
         l1AssetRouter = IL1AssetRouter(_l1AssetRouter);
     }
 
@@ -410,10 +418,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         if (_isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber)) {
             // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex);
-            require(!alreadyFinalized, "L1N: Withdrawal is already finalized 2");
+            if (alreadyFinalized) {
+                revert WithdrawalAlreadyFinalized();
+            }
         }
         if (_isPreSharedBridgeEraTokenWithdrawal(chainId, l2BatchNumber)) {
-            require(!legacyBridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex), "L1N: legacy withdrawal");
+            if (legacyBridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex)) {
+                revert WithdrawalAlreadyFinalized();
+            }
         }
 
         l1AssetRouter.finalizeDeposit(chainId, assetId, transferData);
@@ -500,15 +512,13 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
-            require(
-                /// @dev for legacy function calls we hardcode the sender as the L2AssetRouter as we don't know if it is
-                /// a base token or erc20 token withdrawal beforehand,
-                /// so we have to allow that option even if we override it.
-                l2Sender == L2_ASSET_ROUTER_ADDR ||
-                    l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
-                    l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId],
-                "L1N: wrong l2 sender"
-            );
+
+            bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
+                l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
+                l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
+            if (!isL2SenderCorrect) {
+                revert WrongL2Sender(l2Sender);
+            }
 
             l2ToL1Message = L2Message({
                 txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
@@ -595,7 +605,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             });
         } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
-            require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length
+            if (_l2ToL1message.length < 36) {
+                revert WrongMsgLength(36, _l2ToL1message.length);
+            }
             // slither-disable-next-line unused-return
             (, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);

@@ -16,7 +16,7 @@ import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
+import {DiamondAlreadyFrozen, Unauthorized, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
