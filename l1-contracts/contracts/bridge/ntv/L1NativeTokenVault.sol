@@ -22,8 +22,8 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed, WrongCounterpart} from "../../common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred} from "../L1BridgeContractErrors.sol";
+import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
