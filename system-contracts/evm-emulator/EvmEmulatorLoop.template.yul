@@ -290,7 +290,7 @@ for { } true { } {
         // an expansion, which costs gas.
         // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(add(offset, size)))
+        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         stackHead := keccak256(add(MEM_OFFSET_INNER(), offset), size)
@@ -362,7 +362,7 @@ for { } true { } {
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(add(destOffset, size)))
+        let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         calldatacopy(add(destOffset, MEM_OFFSET_INNER()), offset, size)
@@ -391,7 +391,7 @@ for { } true { } {
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dstOffset, len)))
+        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         dstOffset := add(dstOffset, MEM_OFFSET_INNER())
@@ -444,7 +444,7 @@ for { } true { } {
         // minimum_word_size = (size + 31) / 32
         let dynamicGas := add(
             mul(3, shr(5, add(len, 31))),
-            expandMemory(add(dest, len))
+            expandMemory(dest, len)
         )
         
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -482,7 +482,7 @@ for { } true { } {
 
         // minimum_word_size = (size + 31) / 32
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dstOffset, len)))
+        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         checkOverflow(sourceOffset, len)
@@ -573,7 +573,7 @@ for { } true { } {
         let offset := accessStackHead(sp, stackHead)
 
         checkMemIsAccessible(offset, 32)
-        let expansionGas := expandMemory(add(offset, 32))
+        let expansionGas := expandMemory(offset, 32)
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         stackHead := mload(add(MEM_OFFSET_INNER(), offset))
@@ -590,7 +590,7 @@ for { } true { } {
         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
         checkMemIsAccessible(offset, 32)
-        let expansionGas := expandMemory(add(offset, 32))
+        let expansionGas := expandMemory(offset, 32)
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         mstore(add(MEM_OFFSET_INNER(), offset), value)
@@ -606,7 +606,7 @@ for { } true { } {
         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
         checkMemIsAccessible(offset, 1)
-        let expansionGas := expandMemory(add(offset, 1))
+        let expansionGas := expandMemory(offset, 1)
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
@@ -1226,7 +1226,7 @@ for { } true { } {
         checkMemIsAccessible(offset, size)
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         log0(add(offset, MEM_OFFSET_INNER()), size)
@@ -1247,7 +1247,7 @@ for { } true { } {
         checkMemIsAccessible(offset, size)
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
         dynamicGas := add(dynamicGas, 375)
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
@@ -1273,7 +1273,7 @@ for { } true { } {
         checkMemIsAccessible(offset, size)
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
         dynamicGas := add(dynamicGas, 750)
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
@@ -1300,7 +1300,7 @@ for { } true { } {
         checkMemIsAccessible(offset, size)
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
         dynamicGas := add(dynamicGas, 1125)
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
@@ -1328,7 +1328,7 @@ for { } true { } {
         checkMemIsAccessible(offset, size)
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
         dynamicGas := add(dynamicGas, 1500)
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
@@ -1372,7 +1372,7 @@ for { } true { } {
 
         checkMemIsAccessible(offset, size)
 
-        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
 
         returnLen := size
         
@@ -1406,7 +1406,7 @@ for { } true { } {
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
         checkMemIsAccessible(offset, size)
-        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
 
         // Don't check overflow here since previous checks are enough to ensure this is safe
         offset := add(offset, MEM_OFFSET_INNER())

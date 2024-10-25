@@ -368,21 +368,34 @@ object "EvmEmulator" {
         
         // This function can overflow, it is the job of the caller to ensure that it does not.
         // The argument to this function is the offset into the memory region IN BYTES.
-        function expandMemory(newSize) -> gasCost {
-            let oldSizeInWords := mload(MEM_OFFSET())
+        function expandMemory(offset, size) -> gasCost {
+            // memory expansion costs 0 is size is 0
+            if size {
+                let oldSizeInWords := mload(MEM_OFFSET())
         
-            // The add 31 here before dividing is there to account for misaligned
-            // memory expansions, where someone calls this with a newSize that is not
-            // a multiple of 32. For instance, if someone calls it with an offset of 33,
-            // the new size in words should be 2, not 1, but dividing by 32 will give 1.
-            // Adding 31 solves it.
-            let newSizeInWords := div(add(newSize, 31), 32)
-        
-            if gt(newSizeInWords, oldSizeInWords) {
-                let new_minus_old := sub(newSizeInWords, oldSizeInWords)
-                gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
-        
-                mstore(MEM_OFFSET(), newSizeInWords)
+                // div rounding up
+                let newSizeInWords := div(add(add(offset, size), 31), 32)
+            
+                // memory_size_word = (memory_byte_size + 31) / 32
+                // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+                // memory_expansion_cost = new_memory_cost - last_memory_cost
+                if gt(newSizeInWords, oldSizeInWords) {
+                    let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+                    let quadraticPart := sub(
+                        div(
+                            mul(newSizeInWords, newSizeInWords),
+                            512
+                        ),
+                        div(
+                            mul(oldSizeInWords, oldSizeInWords),
+                            512
+                        )
+                    )
+            
+                    gasCost := add(linearPart, quadraticPart)
+            
+                    mstore(MEM_OFFSET(), newSizeInWords)
+                }
             }
         }
         
@@ -874,13 +887,12 @@ object "EvmEmulator" {
         }
         
         function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-            maxExpand := add(retOffset, retSize)
-            switch lt(maxExpand, add(argsOffset, argsSize)) 
+            switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
             case 0 {
-                maxExpand := expandMemory(maxExpand)
+                maxExpand := expandMemory(retOffset, retSize)
             }
             default {
-                maxExpand := expandMemory(add(argsOffset, argsSize))
+                maxExpand := expandMemory(argsOffset, argsSize)
             }
         }
         
@@ -1124,7 +1136,7 @@ object "EvmEmulator" {
             let minimum_word_size := div(add(size, 31), 32) // rounding up
             let dynamicGas := add(
                 mul(2, minimum_word_size),
-                expandMemory(add(offset, size))
+                expandMemory(offset, size)
             )
             if isCreate2 {
                 // hash_cost = 6 * minimum_word_size
@@ -1575,7 +1587,7 @@ object "EvmEmulator" {
                     // an expansion, which costs gas.
                     // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
-                    let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(add(offset, size)))
+                    let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     stackHead := keccak256(add(MEM_OFFSET_INNER(), offset), size)
@@ -1647,7 +1659,7 @@ object "EvmEmulator" {
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
-                    let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(add(destOffset, size)))
+                    let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     calldatacopy(add(destOffset, MEM_OFFSET_INNER()), offset, size)
@@ -1676,7 +1688,7 @@ object "EvmEmulator" {
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
-                    let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dstOffset, len)))
+                    let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     dstOffset := add(dstOffset, MEM_OFFSET_INNER())
@@ -1729,7 +1741,7 @@ object "EvmEmulator" {
                     // minimum_word_size = (size + 31) / 32
                     let dynamicGas := add(
                         mul(3, shr(5, add(len, 31))),
-                        expandMemory(add(dest, len))
+                        expandMemory(dest, len)
                     )
                     
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1767,7 +1779,7 @@ object "EvmEmulator" {
             
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                    let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dstOffset, len)))
+                    let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     checkOverflow(sourceOffset, len)
@@ -1858,7 +1870,7 @@ object "EvmEmulator" {
                     let offset := accessStackHead(sp, stackHead)
             
                     checkMemIsAccessible(offset, 32)
-                    let expansionGas := expandMemory(add(offset, 32))
+                    let expansionGas := expandMemory(offset, 32)
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
                     stackHead := mload(add(MEM_OFFSET_INNER(), offset))
@@ -1875,7 +1887,7 @@ object "EvmEmulator" {
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMemIsAccessible(offset, 32)
-                    let expansionGas := expandMemory(add(offset, 32))
+                    let expansionGas := expandMemory(offset, 32)
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
                     mstore(add(MEM_OFFSET_INNER(), offset), value)
@@ -1891,7 +1903,7 @@ object "EvmEmulator" {
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMemIsAccessible(offset, 1)
-                    let expansionGas := expandMemory(add(offset, 1))
+                    let expansionGas := expandMemory(offset, 1)
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
                     mstore8(add(MEM_OFFSET_INNER(), offset), value)
@@ -2511,7 +2523,7 @@ object "EvmEmulator" {
                     checkMemIsAccessible(offset, size)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     log0(add(offset, MEM_OFFSET_INNER()), size)
@@ -2532,7 +2544,7 @@ object "EvmEmulator" {
                     checkMemIsAccessible(offset, size)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                     dynamicGas := add(dynamicGas, 375)
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
@@ -2558,7 +2570,7 @@ object "EvmEmulator" {
                     checkMemIsAccessible(offset, size)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                     dynamicGas := add(dynamicGas, 750)
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
@@ -2585,7 +2597,7 @@ object "EvmEmulator" {
                     checkMemIsAccessible(offset, size)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                     dynamicGas := add(dynamicGas, 1125)
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
@@ -2613,7 +2625,7 @@ object "EvmEmulator" {
                     checkMemIsAccessible(offset, size)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                     dynamicGas := add(dynamicGas, 1500)
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
@@ -2657,7 +2669,7 @@ object "EvmEmulator" {
             
                     checkMemIsAccessible(offset, size)
             
-                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
+                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
             
                     returnLen := size
                     
@@ -2691,7 +2703,7 @@ object "EvmEmulator" {
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMemIsAccessible(offset, size)
-                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
+                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
             
                     // Don't check overflow here since previous checks are enough to ensure this is safe
                     offset := add(offset, MEM_OFFSET_INNER())
@@ -3393,21 +3405,34 @@ object "EvmEmulator" {
             
             // This function can overflow, it is the job of the caller to ensure that it does not.
             // The argument to this function is the offset into the memory region IN BYTES.
-            function expandMemory(newSize) -> gasCost {
-                let oldSizeInWords := mload(MEM_OFFSET())
+            function expandMemory(offset, size) -> gasCost {
+                // memory expansion costs 0 is size is 0
+                if size {
+                    let oldSizeInWords := mload(MEM_OFFSET())
             
-                // The add 31 here before dividing is there to account for misaligned
-                // memory expansions, where someone calls this with a newSize that is not
-                // a multiple of 32. For instance, if someone calls it with an offset of 33,
-                // the new size in words should be 2, not 1, but dividing by 32 will give 1.
-                // Adding 31 solves it.
-                let newSizeInWords := div(add(newSize, 31), 32)
-            
-                if gt(newSizeInWords, oldSizeInWords) {
-                    let new_minus_old := sub(newSizeInWords, oldSizeInWords)
-                    gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
-            
-                    mstore(MEM_OFFSET(), newSizeInWords)
+                    // div rounding up
+                    let newSizeInWords := div(add(add(offset, size), 31), 32)
+                
+                    // memory_size_word = (memory_byte_size + 31) / 32
+                    // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+                    // memory_expansion_cost = new_memory_cost - last_memory_cost
+                    if gt(newSizeInWords, oldSizeInWords) {
+                        let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+                        let quadraticPart := sub(
+                            div(
+                                mul(newSizeInWords, newSizeInWords),
+                                512
+                            ),
+                            div(
+                                mul(oldSizeInWords, oldSizeInWords),
+                                512
+                            )
+                        )
+                
+                        gasCost := add(linearPart, quadraticPart)
+                
+                        mstore(MEM_OFFSET(), newSizeInWords)
+                    }
                 }
             }
             
@@ -3899,13 +3924,12 @@ object "EvmEmulator" {
             }
             
             function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-                maxExpand := add(retOffset, retSize)
-                switch lt(maxExpand, add(argsOffset, argsSize)) 
+                switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
                 case 0 {
-                    maxExpand := expandMemory(maxExpand)
+                    maxExpand := expandMemory(retOffset, retSize)
                 }
                 default {
-                    maxExpand := expandMemory(add(argsOffset, argsSize))
+                    maxExpand := expandMemory(argsOffset, argsSize)
                 }
             }
             
@@ -4149,7 +4173,7 @@ object "EvmEmulator" {
                 let minimum_word_size := div(add(size, 31), 32) // rounding up
                 let dynamicGas := add(
                     mul(2, minimum_word_size),
-                    expandMemory(add(offset, size))
+                    expandMemory(offset, size)
                 )
                 if isCreate2 {
                     // hash_cost = 6 * minimum_word_size
@@ -4600,7 +4624,7 @@ object "EvmEmulator" {
                         // an expansion, which costs gas.
                         // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
-                        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(add(offset, size)))
+                        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
                         stackHead := keccak256(add(MEM_OFFSET_INNER(), offset), size)
@@ -4672,7 +4696,7 @@ object "EvmEmulator" {
                 
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
-                        let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(add(destOffset, size)))
+                        let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
                         calldatacopy(add(destOffset, MEM_OFFSET_INNER()), offset, size)
@@ -4701,7 +4725,7 @@ object "EvmEmulator" {
                 
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
-                        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dstOffset, len)))
+                        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
                         dstOffset := add(dstOffset, MEM_OFFSET_INNER())
@@ -4754,7 +4778,7 @@ object "EvmEmulator" {
                         // minimum_word_size = (size + 31) / 32
                         let dynamicGas := add(
                             mul(3, shr(5, add(len, 31))),
-                            expandMemory(add(dest, len))
+                            expandMemory(dest, len)
                         )
                         
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -4792,7 +4816,7 @@ object "EvmEmulator" {
                 
                         // minimum_word_size = (size + 31) / 32
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dstOffset, len)))
+                        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
                         checkOverflow(sourceOffset, len)
@@ -4883,7 +4907,7 @@ object "EvmEmulator" {
                         let offset := accessStackHead(sp, stackHead)
                 
                         checkMemIsAccessible(offset, 32)
-                        let expansionGas := expandMemory(add(offset, 32))
+                        let expansionGas := expandMemory(offset, 32)
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
                         stackHead := mload(add(MEM_OFFSET_INNER(), offset))
@@ -4900,7 +4924,7 @@ object "EvmEmulator" {
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMemIsAccessible(offset, 32)
-                        let expansionGas := expandMemory(add(offset, 32))
+                        let expansionGas := expandMemory(offset, 32)
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
                         mstore(add(MEM_OFFSET_INNER(), offset), value)
@@ -4916,7 +4940,7 @@ object "EvmEmulator" {
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMemIsAccessible(offset, 1)
-                        let expansionGas := expandMemory(add(offset, 1))
+                        let expansionGas := expandMemory(offset, 1)
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
                         mstore8(add(MEM_OFFSET_INNER(), offset), value)
@@ -5536,7 +5560,7 @@ object "EvmEmulator" {
                         checkMemIsAccessible(offset, size)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
                         log0(add(offset, MEM_OFFSET_INNER()), size)
@@ -5557,7 +5581,7 @@ object "EvmEmulator" {
                         checkMemIsAccessible(offset, size)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                         dynamicGas := add(dynamicGas, 375)
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
@@ -5583,7 +5607,7 @@ object "EvmEmulator" {
                         checkMemIsAccessible(offset, size)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                         dynamicGas := add(dynamicGas, 750)
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
@@ -5610,7 +5634,7 @@ object "EvmEmulator" {
                         checkMemIsAccessible(offset, size)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                         dynamicGas := add(dynamicGas, 1125)
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
@@ -5638,7 +5662,7 @@ object "EvmEmulator" {
                         checkMemIsAccessible(offset, size)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                         dynamicGas := add(dynamicGas, 1500)
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
@@ -5682,7 +5706,7 @@ object "EvmEmulator" {
                 
                         checkMemIsAccessible(offset, size)
                 
-                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
                 
                         returnLen := size
                         
@@ -5716,7 +5740,7 @@ object "EvmEmulator" {
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMemIsAccessible(offset, size)
-                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(offset, size)))
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
                 
                         // Don't check overflow here since previous checks are enough to ensure this is safe
                         offset := add(offset, MEM_OFFSET_INNER())
