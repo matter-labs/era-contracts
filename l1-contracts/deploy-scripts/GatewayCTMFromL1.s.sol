@@ -7,6 +7,10 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+// It's required to disable lints to force the compiler to compile the contracts
+// solhint-disable no-unused-import
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -16,6 +20,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_CREATE2_FACTORY_ADDRESS} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -58,6 +64,9 @@ contract GatewayCTMFromL1 is Script {
         address chainTypeManagerProxy;
         address sharedBridgeProxy;
         address governance;
+        address governanceAddr;
+        address deployerAddr;
+        address baseToken;
         uint256 chainChainId;
         uint256 eraChainId;
         uint256 l1ChainId;
@@ -96,6 +105,10 @@ contract GatewayCTMFromL1 is Script {
 
     function prepareAddresses() external {
         initializeConfig();
+        if (config.baseToken != ADDRESS_ONE) {
+            distributeBaseToken();
+        }
+        deployGatewayContracts();
 
         (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
@@ -245,6 +258,23 @@ contract GatewayCTMFromL1 is Script {
             protocolVersion: config.latestProtocolVersion
         });
     }
+    
+    function distributeBaseToken() internal {
+        deployerAddress = msg.sender;
+        uint256 amountForDistribution = 100000000000000000000;
+        L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
+        bytes32 baseTokenAssetID = nativeTokenVault.assetId(config.baseToken);
+        uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetID);
+        TestnetERC20Token baseToken = TestnetERC20Token(config.baseToken);
+
+        vm.startBroadcast();
+        if (baseTokenOriginChainId == block.chainid) {
+            baseToken.mint(config.governanceAddr, amountForDistribution);
+        } else {
+            baseToken.transfer(config.governanceAddr, amountForDistribution);
+        }
+        vm.stopBroadcast();
 
     function saveOutput() internal {
         vm.serializeAddress(
