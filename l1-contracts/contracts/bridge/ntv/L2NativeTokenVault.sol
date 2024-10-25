@@ -192,15 +192,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
-    /// @param _tokenOriginChainId The chain id of the origin token.
-    /// @param _l1Token The address of token on L1.
+    /// @param _originChainId The chain id of the origin token.
+    /// @param _nonNativeToken The address of token on its origin chain..
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
-        uint256 _tokenOriginChainId,
-        address _l1Token
+        uint256 _originChainId,
+        address _nonNativeToken
     ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
-            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
+        bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
+        bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
             bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
             bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _l1Token);
