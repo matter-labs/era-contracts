@@ -781,7 +781,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain
-    /// @param _zkChain Address of the zkChain
+    /// @param _zkChain Address of the ZK Chain
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner onlyL1 {
         if (_zkChain == address(0)) {
             revert ZeroAddress();

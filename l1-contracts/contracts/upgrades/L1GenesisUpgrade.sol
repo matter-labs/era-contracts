@@ -22,6 +22,11 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
     /// @notice The main function that will be called by the upgrade proxy.
+    /// @param _l1GenesisUpgrade The Diamond initializer contract used during genesis upgrade.
+    /// @param _chainId The chain ID of the network being upgraded in the genesis.
+    /// @param _l1CtmDeployerAddress The L1 address of CTM deployment tracker.
+    /// @param _forceDeploymentsData
+    /// @param _factoryDeps 
     function genesisUpgrade(
         address _l1GenesisUpgrade,
         uint256 _chainId,
