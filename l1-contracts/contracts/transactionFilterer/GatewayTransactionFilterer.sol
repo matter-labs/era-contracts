@@ -82,10 +82,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
     ) external view returns (bool) {
         if (sender == L1_ASSET_ROUTER) {
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
-            if (
-                (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) &&
-                (IL2Bridge.finalizeDeposit.selector != l2TxSelector)
-            ) {
+            if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 
