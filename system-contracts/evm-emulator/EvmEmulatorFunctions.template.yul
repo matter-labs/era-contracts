@@ -22,6 +22,10 @@ function EVM_GAS_MANAGER_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008013
 }
 
+function MSG_VALUE_SYSTEM_CONTRACT() -> addr {
+    addr :=  0x0000000000000000000000000000000000008009
+}
+
 function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
     offset := mul(32, 32)
 }
@@ -958,6 +962,40 @@ function _eraseReturndataPointer() {
 //                 CREATE FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
+function performSystemCallForCreate(
+    value,
+    bytecodeStart,
+    bytecodeLen,
+) -> success {
+    let farCallAbi := shl(248, 1) // system call
+    // dataOffset is 0
+    farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
+    farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
+    farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+    // shardId is 0
+    // forwardingMode is 0
+    // not constructor call (ContractDeployer will call constructor)
+
+    switch iszero(value)
+    case 0 {
+        success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, DEPLOYER_SYSTEM_CONTRACT(), 1, 0)
+    }
+    default {
+        success := verbatim_6i_1o("system_call", DEPLOYER_SYSTEM_CONTRACT(), farCallAbi, 0, 0, 0, 0)
+    }
+}
+
+function incrementDeploymentNonce() -> nonce {
+    // function incrementDeploymentNonce(address _address)
+    mstore(0, 0x306395c600000000000000000000000000000000000000000000000000000000)
+    mstore(4, address())
+
+    performSystemCall(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
+
+    returndatacopy(0, 0, 32)
+    nonce := mload(0)
+}
+
 function _fetchConstructorReturnGas() -> gasLeft {
     mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
 
@@ -988,7 +1026,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
     _pushEVMFrame(gasForTheCall, false)
 
     if isCreate2 {
-        // Create2EVM selector
+        // selector: create2EVM(bytes32 _salt, bytes calldata _initCode)
         mstore(sub(offset, 0x80), 0x4e96f4c0)
         // salt
         mstore(sub(offset, 0x60), salt)
@@ -997,31 +1035,47 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
         // Length of the init code
         mstore(sub(offset, 0x20), size)
 
-
-        result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 32)
+        result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
     }
 
 
     if iszero(isCreate2) {
-        // CreateEVM selector
-        mstore(sub(offset, 0x60), 0xff311601)
-        // Where the arg starts (second word)
-        mstore(sub(offset, 0x40), 0x20)
+        if gt(value, selfbalance()) { // it should be checked before actual deploy call
+            panic()
+        }
+
+        // we want to calculate the address of new contract
+        // and if it is deployable, we need to increment deploy nonce
+
+        // selector: function prepareForEvmCreateFromEmulator()
+        mstore(0, 0x3ec89a4e00000000000000000000000000000000000000000000000000000000)
+        performSystemCall(DEPLOYER_SYSTEM_CONTRACT(), 4)
+        returndatacopy(0, 0, 32)
+        addr := mload(0)
+
+        // so even if constructor reverts, nonce stays incremented
+
+        // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
+        mstore(sub(offset, 0x80), 0xe43cec64)
+        // address
+        mstore(sub(offset, 0x60), addr)
+        // Where the arg starts (third word)
+        mstore(sub(offset, 0x40), 0x40)
         // Length of the init code
         mstore(sub(offset, 0x20), size)
 
-
-        result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+        result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
     }
-
-    addr := mload(0)
 
     let gasLeft
     switch result
         case 0 {
+            addr := 0
             gasLeft := _saveReturndataAfterEVMCall(0, 0)
         }
         default {
+            returndatacopy(0, 0, 32)
+            addr := mload(0)
             gasLeft := _fetchConstructorReturnGas()
         }
 

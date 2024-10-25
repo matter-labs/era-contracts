@@ -141,7 +141,13 @@ contract DefaultAccount is IAccount {
 
         // TODO: if possible, maybe implement some way to avoid memory copying here.
         if ((_transaction.reserved[1] != 0) && (to == address(0))) {
-            DEPLOYER_SYSTEM_CONTRACT.createEVM{value: value}(data);
+            // Note, that createEVM can only be called with "isSystem" flag.
+            SystemContractsCaller.systemCallWithPropagatedRevert(
+                uint32(gasleft()),
+                address(DEPLOYER_SYSTEM_CONTRACT),
+                value,
+                abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
+            );
             return;
         }
 
