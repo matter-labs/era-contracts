@@ -19,7 +19,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {DeployingBridgedTokenForNativeToken, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, DeployingBridgedTokenForNativeToken, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {EmptyToken} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
@@ -93,7 +93,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (_nativeToken.code.length == 0) {
             revert EmptyToken();
         }
-        require(assetId[_nativeToken] == bytes32(0), "NTV: asset id already registered");
+        if (assetId[_nativeToken] != bytes32(0)) {
+            revert AssetIdAlreadyRegistered();
+        }
         _unsafeRegisterNativeToken(_nativeToken);
     }
 
