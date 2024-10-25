@@ -2076,10 +2076,12 @@ object "EvmEmulator" {
                     checkMemIsAccessible(offset, size)
                     checkMemIsAccessible(destOffset, size)
             
-                    {
-                        let maxExpand := getMaxMemoryExpansionCost(offset, size, destOffset, size)
-                        evmGasLeft := chargeGas(evmGasLeft, maxExpand)
-                    }
+                    // dynamic_gas = 3 * words_copied + memory_expansion_cost
+                    let dynamicGas := getMaxMemoryExpansionCost(offset, size, destOffset, size)
+                    let wordsCopied := div(add(size, 31), 32) // div rounding up
+                    dynamicGas := add(dynamicGas, mul(3, wordsCopied))
+            
+                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
                     ip := add(ip, 1)
@@ -5112,10 +5114,12 @@ object "EvmEmulator" {
                         checkMemIsAccessible(offset, size)
                         checkMemIsAccessible(destOffset, size)
                 
-                        {
-                            let maxExpand := getMaxMemoryExpansionCost(offset, size, destOffset, size)
-                            evmGasLeft := chargeGas(evmGasLeft, maxExpand)
-                        }
+                        // dynamic_gas = 3 * words_copied + memory_expansion_cost
+                        let dynamicGas := getMaxMemoryExpansionCost(offset, size, destOffset, size)
+                        let wordsCopied := div(add(size, 31), 32) // div rounding up
+                        dynamicGas := add(dynamicGas, mul(3, wordsCopied))
+                
+                        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
                         mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
                         ip := add(ip, 1)
