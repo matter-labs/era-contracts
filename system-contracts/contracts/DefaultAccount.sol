@@ -7,7 +7,7 @@ import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol"
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, INTEROP_HANDLER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
 
@@ -215,6 +215,9 @@ contract DefaultAccount is IAccount {
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
+        if (_transaction.to == address(INTEROP_HANDLER_SYSTEM_CONTRACT)) {
+            INTEROP_HANDLER_SYSTEM_CONTRACT.executePaymasterBundle(_transaction);
+        }
         bool success = _transaction.payToTheBootloader();
         if (!success) {
             revert FailedToPayOperator();

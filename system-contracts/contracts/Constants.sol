@@ -16,6 +16,7 @@ import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
+import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -98,6 +99,8 @@ IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(S
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
+
+IInteropHandler constant INTEROP_HANDLER_SYSTEM_CONTRACT = IInteropHandler(address(SYSTEM_CONTRACTS_OFFSET + 0x12));
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

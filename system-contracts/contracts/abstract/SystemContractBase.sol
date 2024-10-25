@@ -51,4 +51,13 @@ abstract contract SystemContractBase {
         }
         _;
     }
+
+        /// @notice Modifier that makes sure that the method
+    /// can only be called from the bootloader.
+    modifier onlyCallFromBootloaderOrInteropHandler() {
+        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != INTEROP_HANDLER_SYSTEM_CONTRACT) {
+            revert CallerMustBeBootloader();
+        }
+        _;
+    }
 }
