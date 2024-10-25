@@ -1,7 +1,11 @@
 FIXME: read and fix any issues
 
 
-# Handling pubdata
+# Standard pubdata format
+
+While with the introduction of custom DA validators, any pubdata logic could be applied for each chain (including calldata-based pubdata), ZK chains are generally optimized for using state-diffs based rollup model.
+
+Using document will describe how the standard pubdata format looks like. This is the format that is enforced for permanent rollup chains (FIXME: link to permanent rollup description). 
 
 Pubdata in zkSync can be divided up into 4 different categories:
 

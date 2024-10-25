@@ -17,7 +17,7 @@ When committing a batch, the L1DAValidator (FIXME: link to the description of pu
 
 Note, that the `Executor.sol` (and the contract itself) is not responsible for checking that the provided `blobHash` and `blobCommitments` in any way correspond to the pubdata inside the batch as it is the job of the DA Validator pair (FIXME: link).
 
-# How it is done in rollups
+# Publishing pubdata to L1
 
 Let's see an example of how the approach above works in rollup DA validators.
 
@@ -66,3 +66,7 @@ assert uint256(res[32:]) == BLS_MODULUS
 ```
 
 The final `blobCommitment` is calculated as the hash between the `blobVersionedHash`, `opening point` and the `claimed value`. The zero knowledge circuits will verify that the opening point and the claimed value were calculated correctly and correspond to the data that was hashed under the `blobHash`.
+
+# Structure of the pubdata
+
+Rollups maintain the same structure of pubdata and apply the same rules for compresison as those that were used in the previous versions of the system. These can be read [here](./Handling%20pubdata.md).
