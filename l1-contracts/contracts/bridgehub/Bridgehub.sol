@@ -46,7 +46,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
-    /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
+    /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     address public assetRouter;
 
     /// @notice ChainTypeManagers that are registered, and ZKchains that use these CTMs can use this bridgehub as settlement layer.
@@ -239,7 +239,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     //// Registry
 
-    /// @notice State Transition can be any contract with the appropriate interface/functionality
+    /// @notice Chain Type Manager can be any contract with the appropriate interface/functionality
     /// @param _chainTypeManager the state transition manager address to be added
     function addChainTypeManager(address _chainTypeManager) external onlyOwner {
         if (_chainTypeManager == address(0)) {
@@ -253,8 +253,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit ChainTypeManagerAdded(_chainTypeManager);
     }
 
-    /// @notice State Transition can be any contract with the appropriate interface/functionality
-    /// @notice this stops new Chains from using the STF, old chains are not affected
+    /// @notice Chain Type Manager can be any contract with the appropriate interface/functionality
+    /// @notice this stops new Chains from using the CTM, old chains are not affected
     /// @param _chainTypeManager the state transition manager address to be removed
     function removeChainTypeManager(address _chainTypeManager) external onlyOwner {
         if (_chainTypeManager == address(0)) {
@@ -429,7 +429,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// this assumes that either ether is the base token or
     /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
+    /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
@@ -708,7 +708,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
-    /// @param _assetId the assetId of the chain's STM
+    /// @param _assetId the assetId of the chain's CTM
     /// @param _bridgehubMintData the data for the mint
     function bridgeMint(
         uint256, // originChainId
