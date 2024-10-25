@@ -235,7 +235,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         // Note, that we do not use an explicit call here to ensure that the function does not panic in case of
         // incorrect `_chain` address.
-        (bool success, bytes memory data) = _chain.staticcall(abi.encodeWithSelector(IGetters.getChainId.selector));
+        (bool success, bytes memory data) = _chain.staticcall(abi.encodeCall(IGetters.getChainId));
         if (!success || data.length < 32) {
             revert NotAHyperchain(_chain);
         }

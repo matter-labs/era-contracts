@@ -50,7 +50,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
         );
         // slither-disable-next-line controlled-delegatecall
         (bool success, ) = THIS_ADDRESS.delegatecall(
-            abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
+            abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade)
         );
         // solhint-disable-next-line gas-custom-errors
         require(success, "GatewayUpgrade: upgrade failed");
