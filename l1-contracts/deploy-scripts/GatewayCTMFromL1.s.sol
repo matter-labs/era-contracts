@@ -258,7 +258,7 @@ contract GatewayCTMFromL1 is Script {
             protocolVersion: config.latestProtocolVersion
         });
     }
-    
+
     function distributeBaseToken() internal {
         deployerAddress = msg.sender;
         uint256 amountForDistribution = 100000000000000000000;
@@ -275,6 +275,7 @@ contract GatewayCTMFromL1 is Script {
             baseToken.transfer(config.governanceAddr, amountForDistribution);
         }
         vm.stopBroadcast();
+    }
 
     function saveOutput() internal {
         vm.serializeAddress(
