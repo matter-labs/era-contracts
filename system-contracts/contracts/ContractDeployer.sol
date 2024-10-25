@@ -176,7 +176,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         return createAccount(_salt, _bytecodeHash, _input, AccountAbstractionVersion.None);
     }
 
-    function createEVM(bytes calldata _initCode) external payable override returns (address) {
+    function createEVM(bytes calldata _initCode) external payable override onlySystemCall returns (address) {
         // TODO only for semantic tests?
         uint256 deploymentNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(msg.sender);
         if ((msg.sender != tx.origin) && deploymentNonce == 0) {
@@ -189,17 +189,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             ? NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1
             : NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
-
-        // If the method is called by an EVM contract, then we need to increase deployment
-        // nonce for a contract even if contract creation actually failed
-        /*if (SystemContractHelper.isSystemCall() && ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender)) {
-            // EVM emulator provides infinite gas
-            try this.evmDeployOnAddress{value: msg.value}(msg.sender, newAddress, _initCode) {} catch {
-                newAddress = address(0);
-            }
-        } else {
-            this.evmDeployOnAddress{value: msg.value}(msg.sender, newAddress, _initCode);
-        }*/
 
         _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
@@ -215,7 +204,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _initCode The init code for the contract
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
-    function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable override returns (address) {
+    function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable override onlySystemCall returns (address) {
         // No collision is possible with the zksync's non-EVM CREATE2, since
         // the prefixes are different
         bytes32 bytecodeHash = EfficientCall.keccak(_initCode);
