@@ -46,8 +46,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
 
-    /// @dev A mapping assetId => tokenAddress
-    mapping(bytes32 assetId => uint256 chainId) public originChainId;
+    /// @dev A mapping assetId => originChainId
+    mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
@@ -160,7 +160,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
+    /// @notice Allows bridgehub to acquire mintValue for L1->L2 and L2->L1 transactions.
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _receiver.
     function bridgeBurn(
         uint256 _chainId,
