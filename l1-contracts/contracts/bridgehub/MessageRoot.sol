@@ -169,10 +169,8 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         emit AddedChain(_chainId, cachedChainCount);
     }
 
-    /**
-     * @dev Returns merkle path in `sharedTree` for a certain chain.
-     * @param _chainId Id of the chain to get merkle path for.
-     */
+    /// @dev Returns merkle path in `sharedTree` for a certain chain.
+    /// @param _chainId Id of the chain to get merkle path for.
     function getMerklePathForChain(uint256 _chainId) public view returns (bytes32[] memory) {
         if (!chainRegistered(_chainId)) {
             revert ChainIdNotRegistered(_chainId);
