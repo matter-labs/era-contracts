@@ -577,6 +577,14 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
 
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
 
+    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+    if precompileCost {
+        if lt(gasToPass, precompileCost) {
+            evmGasLeft := chargeGas(evmGasLeft, gasToPass)
+            gasToPass := 0 
+        }
+    }
+
     let success, frameGasLeft := _performCall(
         addr,
         gasToPass,
@@ -587,19 +595,20 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
         retSize
     )
 
-    let gasUsed := 0
+    let gasUsedByCall := sub(gasToPass, frameGasLeft)
 
-    // TODO precompile should be called, but return nothing if gasPassed is too low
-    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-    switch iszero(precompileCost)
-    case 1 {
-        gasUsed := sub(gasToPass, frameGasLeft)
-    }
-    default {
-        gasUsed := precompileCost
+    if precompileCost {
+        switch success 
+        case 0 {
+            gasUsedByCall := gasToPass
+        }
+        default {
+            gasUsedByCall := precompileCost
+        }
     }
 
-    newGasLeft := chargeGas(evmGasLeft, gasUsed)
+    newGasLeft := chargeGas(evmGasLeft, gasUsedByCall)
+
     stackHead := success
 }
 
@@ -632,6 +641,14 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
 
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
 
+    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+    if precompileCost {
+        if lt(gasToPass, precompileCost) {
+            evmGasLeft := chargeGas(evmGasLeft, gasToPass)
+            gasToPass := 0 
+        }
+    }
+
     let success, frameGasLeft := _performStaticCall(
         addr,
         gasToPass,
@@ -641,18 +658,19 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
         retSize
     )
 
-    let gasUsed := 0
+    let gasUsedByCall := sub(gasToPass, frameGasLeft)
 
-    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-    switch iszero(precompileCost)
-    case 1 {
-        gasUsed := sub(gasToPass, frameGasLeft)
-    }
-    default {
-        gasUsed := precompileCost
+    if precompileCost {
+        switch success 
+        case 0 {
+            gasUsedByCall := gasToPass
+        }
+        default {
+            gasUsedByCall := precompileCost
+        }
     }
 
-    newGasLeft := chargeGas(evmGasLeft, gasUsed)
+    newGasLeft := chargeGas(evmGasLeft, gasUsedByCall)
 
     stackHead := success
 }
