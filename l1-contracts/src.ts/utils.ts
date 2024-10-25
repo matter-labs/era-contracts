@@ -298,6 +298,7 @@ export function compileInitialCutHash(
     {
       chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
       bridgehub: "0x0000000000000000000000000000000000001234",
+      interopCenter: "0x0000000000000000000000000000000000001235",
       chainTypeManager: "0x0000000000000000000000000000000000002234",
       protocolVersion: "0x0000000000000000000000000000000000002234",
       admin: "0x0000000000000000000000000000000000003234",
@@ -314,7 +315,7 @@ export function compileInitialCutHash(
     },
   ]);
 
-  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 8 * 32) * 2));
+  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
 }
 
 export enum PubdataSource {

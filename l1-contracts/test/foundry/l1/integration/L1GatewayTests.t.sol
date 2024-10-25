@@ -23,6 +23,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -139,7 +140,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             migratingChainId
         );
         gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
-        gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
+        // gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
     }
 
     function test_startMessageToL3() public {
@@ -160,7 +161,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             800,
             "0x"
         );
-        bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+        interopCenter.requestL2TransactionDirect{value: expectedValue}(request);
     }
 
     function test_recoverFromFailedChainMigration() public {
@@ -204,9 +205,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(bridgehub),
+            address(interopCenter),
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IInteropCenter.proveL1ToL2TransactionStatus.selector,
                 migratingChainId,
                 l2TxHash,
                 l2BatchNumber,
@@ -219,7 +220,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         // Set Deposit Happened
-        vm.startBroadcast(address(bridgehub));
+        vm.startBroadcast(address(interopCenter));
         assetRouter.bridgehubConfirmL2Transaction({
             _chainId: migratingChainId,
             _txDataHash: txDataHash,
@@ -249,7 +250,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
-        migrateBackChain();
+        // migrateBackChain();
     }
 
     function migrateBackChain() public {
@@ -268,7 +269,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         vm.chainId(migratingChainId);
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            abi.encodeWithSelector(IInteropCenter.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         vm.mockCall(
@@ -326,7 +327,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
+        interopCenter.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
 

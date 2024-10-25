@@ -137,7 +137,7 @@ export async function requestL2TransactionDirect(
   const ntv = IL1NativeTokenVaultFactory.connect(deployedAddresses.Bridges.NativeTokenVaultProxy, wallet);
   gasPrice ??= await bridgehub.provider.getGasPrice();
 
-  const expectedCost = await bridgehub.l2TransactionBaseCost(
+  const expectedCost = await interopCenter.l2TransactionBaseCost(
     chainId,
     gasPrice,
     l2GasLimit,
@@ -154,7 +154,7 @@ export async function requestL2TransactionDirect(
     const tx = await baseToken.approve(baseTokenBridge, expectedCost);
     await tx.wait();
   }
-  return await bridgehub.requestL2TransactionDirect(
+  return await interopCenter.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: l2Contract,

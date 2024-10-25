@@ -78,6 +78,7 @@ address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
 address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
+address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.

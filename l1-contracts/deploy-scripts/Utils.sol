@@ -6,8 +6,9 @@ pragma solidity 0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -359,9 +360,10 @@ library Utils {
         PrepareL1L2TransactionParams memory params
     ) internal returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
         IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
+        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(
+            interopCenter.l2TransactionBaseCost(
                 params.chainId,
                 params.l1GasPrice,
                 params.l2GasLimit,
@@ -396,9 +398,10 @@ library Utils {
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            interopCenter.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
             2;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
@@ -427,7 +430,8 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal {
-        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IBridgehub bridgehub = Bridgehub(bridgehubAddress);
+        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
@@ -454,7 +458,7 @@ library Utils {
         }
 
         vm.broadcast();
-        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        interopCenter.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
@@ -519,7 +523,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionDirect,
+            IInteropCenter.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -572,13 +576,14 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionTwoBridges,
+            IInteropCenter.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
+        address interopCenter = address(Bridgehub(bridgehubAddress).interopCenter());
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(governor, salt, interopCenter, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
@@ -653,7 +658,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionDirect,
+            IInteropCenter.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -712,16 +717,17 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionTwoBridges,
+            IInteropCenter.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
+        IInteropCenter interopCenter = IInteropCenter(Bridgehub(bridgehubAddress).interopCenter());
 
         console.log("Executing transaction");
         vm.recordLogs();
         adminExecute(
             admin,
             accessControlRestriction,
-            bridgehubAddress,
+            address(interopCenter),
             l2TransactionRequestCalldata,
             requiredValueToDeploy
         );

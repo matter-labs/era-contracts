@@ -27,6 +27,7 @@ import {UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExis
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -61,6 +62,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
+    modifier onlyInteropCenterOrEra(uint256 _chainId) {
+        if (msg.sender != address(INTEROP_CENTER) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
             revert Unauthorized(msg.sender);
@@ -89,10 +98,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     constructor(
         address _l1WethAddress,
         address _bridgehub,
+        address _interopCenter,
         address _l1Nullifier,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    ) reentrancyGuardInitializer AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub)) {
+    )
+        reentrancyGuardInitializer
+        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), IInteropCenter(_interopCenter))
+    {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
@@ -214,7 +227,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         payable
         virtual
         override(AssetRouterBase, IAssetRouterBase)
-        onlyBridgehub
+        onlyInteropCenter
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
@@ -226,7 +239,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyBridgehub whenNotPaused {
+    ) external override onlyInteropCenter whenNotPaused {
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
     }
 
@@ -449,7 +462,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+            txHash = INTEROP_CENTER.requestL2TransactionDirect{value: msg.value}(request);
         }
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2

@@ -10,6 +10,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -66,6 +67,7 @@ contract L1AssetRouterTest is Test {
     L1Nullifier l1NullifierImpl;
     L1Nullifier l1Nullifier;
     address bridgehubAddress;
+    address interopCenterAddress;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
     address l2SharedBridge;
@@ -106,6 +108,7 @@ contract L1AssetRouterTest is Test {
         proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
+        interopCenterAddress = makeAddr("interopCenter");
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
         l1WethAddress = makeAddr("weth");
@@ -128,6 +131,7 @@ contract L1AssetRouterTest is Test {
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         l1NullifierImpl = new L1Nullifier({
             _bridgehub: IBridgehub(bridgehubAddress),
+            _interopCenter: IInteropCenter(interopCenterAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
@@ -140,6 +144,7 @@ contract L1AssetRouterTest is Test {
         sharedBridgeImpl = new L1AssetRouter({
             _l1WethAddress: l1WethAddress,
             _bridgehub: bridgehubAddress,
+            _interopCenter: interopCenterAddress,
             _l1Nullifier: address(l1Nullifier),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
@@ -199,13 +204,8 @@ contract L1AssetRouterTest is Test {
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, chainId),
-            abi.encode(ETH_TOKEN_ASSET_ID)
-        );
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            interopCenterAddress,
+            abi.encodeWithSelector(IInteropCenter.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
 
@@ -219,6 +219,7 @@ contract L1AssetRouterTest is Test {
         _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
 
         vm.deal(bridgehubAddress, amount);
+        vm.deal(interopCenterAddress, amount);
         vm.deal(address(sharedBridge), amount);
         vm.deal(address(l1Nullifier), amount);
         vm.deal(address(nativeTokenVault), amount);

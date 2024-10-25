@@ -23,8 +23,8 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
-        vm.prank(address(bridgehub));
+        vm.deal(interopCenter, 100 ether);
+        vm.prank(address(interopCenter));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
@@ -40,8 +40,8 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
-        vm.prank(address(bridgehub));
+        vm.deal(interopCenter, 100 ether);
+        vm.prank(address(interopCenter));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
@@ -57,8 +57,8 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
-        vm.prank(address(bridgehub));
+        vm.deal(interopCenter, 100 ether);
+        vm.prank(address(interopCenter));
         vm.expectRevert(TransactionNotAllowed.selector);
         mailboxFacet.bridgehubRequestL2Transaction(req);
     }
@@ -102,8 +102,8 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
-        vm.deal(bridgehub, 100 ether);
-        vm.prank(address(bridgehub));
+        vm.deal(interopCenter, 100 ether);
+        vm.prank(address(interopCenter));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
 

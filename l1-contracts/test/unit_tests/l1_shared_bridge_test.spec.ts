@@ -1,12 +1,13 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import type { L1AssetRouter, Bridgehub, L1NativeTokenVault, MockExecutorFacet } from "../../typechain";
+import type { L1AssetRouter, Bridgehub, InteropCenter, L1NativeTokenVault, MockExecutorFacet } from "../../typechain";
 import {
   L1AssetRouterFactory,
   BridgehubFactory,
   TestnetERC20TokenFactory,
   MockExecutorFacetFactory,
+  InteropCenterFactory,
 } from "../../typechain";
 import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
@@ -24,6 +25,7 @@ describe("Shared Bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let bridgehub: Bridgehub;
+  let interopCenter: InteropCenter;
   let l1NativeTokenVault: L1NativeTokenVault;
   let proxyAsMockExecutor: MockExecutorFacet;
   let l1SharedBridge: L1AssetRouter;
@@ -78,6 +80,7 @@ describe("Shared Bridge tests", () => {
 
     l1SharedBridge = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    interopCenter = InteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet)
     l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet
@@ -101,7 +104,7 @@ describe("Shared Bridge tests", () => {
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, mintValue.mul(10))).wait();
 
     const revertReason = await getCallRevertReason(
-      bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+      interopCenter.connect(randomSigner).requestL2TransactionTwoBridges(
         {
           chainId,
           mintValue,
@@ -132,7 +135,7 @@ describe("Shared Bridge tests", () => {
     const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
 
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
-    await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+    await interopCenter.connect(randomSigner).requestL2TransactionTwoBridges(
       {
         chainId,
         mintValue,

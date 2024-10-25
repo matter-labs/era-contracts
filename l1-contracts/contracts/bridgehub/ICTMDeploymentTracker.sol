@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {L2TransactionRequestTwoBridgesInner, IBridgehub} from "./IBridgehub.sol";
+import {IInteropCenter} from "./IInteropCenter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -19,6 +20,8 @@ interface ICTMDeploymentTracker is IL1AssetDeploymentTracker {
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function L1_ASSET_ROUTER() external view returns (IAssetRouterBase);
+
+    function INTEROP_CENTER() external view returns (IInteropCenter);
 
     function registerCTMAssetOnL1(address _ctmAddress) external;
 

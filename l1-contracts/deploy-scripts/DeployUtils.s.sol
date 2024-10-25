@@ -66,6 +66,7 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 interopCenterBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     address l2BridgeProxyOwnerAddress;
@@ -107,6 +108,8 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
+    address interopCenterImplementation;
+    address interopCenterProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -371,7 +374,10 @@ contract DeployUtils is Script {
 
     function deployChainTypeManagerImplementation() internal {
         bytes memory bytecode = type(ChainTypeManager).creationCode;
-        bytes memory constructorArgs = abi.encode(addresses.bridgehub.bridgehubProxy);
+        bytes memory constructorArgs = abi.encode(
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridgehub.interopCenterProxy
+        );
         address contractAddress = deployViaCreate2(bytecode, constructorArgs);
         console.log("ChainTypeManagerImplementation deployed at:", contractAddress);
         addresses.stateTransition.chainTypeManagerImplementation = contractAddress;

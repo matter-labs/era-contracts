@@ -73,7 +73,13 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { BridgehubFactory, ChainAdminFactory, ERC20Factory, ChainTypeManagerFactory } from "../typechain";
+import {
+  BridgehubFactory,
+  ChainAdminFactory,
+  ERC20Factory,
+  ChainTypeManagerFactory,
+  InteropCenterFactory,
+} from "../typechain";
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
@@ -464,6 +470,43 @@ export class Deployer {
     this.addresses.Bridgehub.BridgehubProxy = contractAddress;
   }
 
+  public async deployInteropCenterImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    const contractAddress = await this.deployViaCreate2(
+      "InteropCenter",
+      [this.addresses.Bridgehub.BridgehubProxy, await this.getL1ChainId(), this.addresses.Governance],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_INTEROP_CENTER_IMPL_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.InteropCenterImplementation = contractAddress;
+  }
+
+  public async deployInteropCenterProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("InteropCenter").abi);
+
+    const initCalldata = bridgehub.encodeFunctionData("initialize", [this.addresses.Governance]);
+
+    const contractAddress = await this.deployViaCreate2(
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
+      [this.addresses.Bridgehub.InteropCenterImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_INTEROP_CENTER_PROXY_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.InteropCenterProxy = contractAddress;
+  }
+
   public async deployMessageRootImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const contractAddress = await this.deployViaCreate2(
       "MessageRoot",
@@ -504,7 +547,7 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       "ChainTypeManager",
-      [this.addresses.Bridgehub.BridgehubProxy],
+      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridgehub.InteropCenterProxy],
       create2Salt,
       {
         ...ethTxOptions,
@@ -749,7 +792,8 @@ export class Deployer {
     printOperation: boolean = false
   ) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const value = await bridgehub.l2TransactionBaseCost(
+    const interopCenter = this.interopCenter(this.deployWallet);
+    const value = await interopCenter.l2TransactionBaseCost(
       chainId,
       gasPrice,
       l2GasLimit,
@@ -766,7 +810,7 @@ export class Deployer {
         baseToken.interface.encodeFunctionData("approve", [this.addresses.Bridges.SharedBridgeProxy, value])
       );
     }
-    const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
+    const l1Calldata = interopCenter.interface.encodeFunctionData("requestL2TransactionDirect", [
       {
         chainId,
         l2Contract: targetAddress,
@@ -819,7 +863,7 @@ export class Deployer {
     const contractName = isCurrentNetworkLocal() ? "L1NullifierDev" : "L1Nullifier";
     const contractAddress = await this.deployViaCreate2(
       contractName,
-      [this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy],
+      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy],
       create2Salt,
       ethTxOptions
     );
@@ -863,6 +907,7 @@ export class Deployer {
       [
         l1WethToken,
         this.addresses.Bridgehub.BridgehubProxy,
+        this.addresses.Bridgehub.InteropCenterProxy,
         this.addresses.Bridges.L1NullifierProxy,
         eraChainId,
         eraDiamondProxy,
@@ -1015,7 +1060,11 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       "CTMDeploymentTracker",
-      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.SharedBridgeProxy],
+      [
+        this.addresses.Bridgehub.BridgehubProxy,
+        this.addresses.Bridgehub.InteropCenterProxy,
+        this.addresses.Bridges.SharedBridgeProxy,
+      ],
       create2Salt,
       ethTxOptions
     );
@@ -1066,13 +1115,19 @@ export class Deployer {
 
   public async registerAddresses() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
+    const interopCenter = this.interopCenter(this.deployWallet);
 
     const upgradeData1 = await bridgehub.interface.encodeFunctionData("setAddresses", [
       this.addresses.Bridges.SharedBridgeProxy,
       this.addresses.Bridgehub.CTMDeploymentTrackerProxy,
       this.addresses.Bridgehub.MessageRootProxy,
+      this.addresses.Bridgehub.InteropCenterProxy,
+    ]);
+    const upgradeData2 = await interopCenter.interface.encodeFunctionData("setAddresses", [
+      this.addresses.Bridges.SharedBridgeProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
+    await this.executeUpgrade(this.addresses.Bridgehub.InteropCenterProxy, 0, upgradeData2);
     if (this.verbose) {
       console.log("Shared bridge was registered in Bridgehub");
     }
@@ -1154,6 +1209,8 @@ export class Deployer {
     await this.deployBridgehubProxy(create2Salt, { gasPrice });
     await this.deployMessageRootImplementation(create2Salt, { gasPrice });
     await this.deployMessageRootProxy(create2Salt, { gasPrice });
+    await this.deployInteropCenterImplementation(create2Salt, { gasPrice });
+    await this.deployInteropCenterProxy(create2Salt, { gasPrice });
   }
 
   public async deployChainTypeManagerContract(
@@ -1205,7 +1262,7 @@ export class Deployer {
         if (this.verbose) {
           console.log("CTM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
           console.log(
-            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetIdFromAddress(this.addresses.StateTransition.StateTransitionProxy)}`
           );
         }
 
@@ -1219,7 +1276,7 @@ export class Deployer {
             receipt3.gasUsed.toString()
           );
           console.log(
-            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetIdFromAddress(this.addresses.StateTransition.StateTransitionProxy)}`
           );
         }
       } else {
@@ -1244,8 +1301,9 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
+    const interopCenter = this.interopCenter(this.deployWallet);
     const expectedCost = (
-      await bridgehub.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+      await interopCenter.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);
 
     // We are creating the new DiamondProxy for our chain, to be deployed on top of sync Layer.
@@ -1416,7 +1474,7 @@ export class Deployer {
 
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
       console.log(
-        `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+        `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetIdFromAddress(this.addresses.StateTransition.StateTransitionProxy)}`
       );
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
     }
@@ -1828,6 +1886,10 @@ export class Deployer {
 
   public bridgehubContract(signerOrProvider: Signer | providers.Provider) {
     return BridgehubFactory.connect(this.addresses.Bridgehub.BridgehubProxy, signerOrProvider);
+  }
+
+  public interopCenter(signerOrProvider: Signer | providers.Provider) {
+    return InteropCenterFactory.connect(this.addresses.Bridgehub.InteropCenterProxy, signerOrProvider);
   }
 
   public chainTypeManagerContract(signerOrProvider: Signer | providers.Provider) {

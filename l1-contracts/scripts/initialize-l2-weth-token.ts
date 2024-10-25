@@ -65,7 +65,7 @@ async function getL1TxInfo(
     },
   ]);
 
-  const neededValue = await bridgehub.l2TransactionBaseCost(
+  const neededValue = await interopCenter.l2TransactionBaseCost(
     chainId,
     gasPrice,
     DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
@@ -168,8 +168,8 @@ async function main() {
         verbose: true,
       });
 
-      const bridgehub = deployer.bridgehubContract(deployWallet);
-      const requiredValueToInitializeBridge = await bridgehub.l2TransactionBaseCost(
+      const interopCenter = deployer.interopCenter(deployWallet);
+      const requiredValueToInitializeBridge = await interopCenter.l2TransactionBaseCost(
         chainId,
         gasPrice,
         DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
@@ -177,7 +177,7 @@ async function main() {
       );
       const calldata = getL2Calldata(l2SharedBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
 
-      const tx = await bridgehub.requestL2TransactionDirect(
+      const tx = await interopCenter.requestL2TransactionDirect(
         {
           chainId,
           l2Contract: l2WethTokenProxyAddress,

@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 
 /// @dev The encoding version used for legacy txs.
 bytes1 constant LEGACY_ENCODING_VERSION = 0x00;
@@ -52,6 +53,8 @@ interface IAssetRouterBase {
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+
+    function INTEROP_CENTER() external view returns (IInteropCenter);
 
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
     /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
