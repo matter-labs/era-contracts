@@ -62,13 +62,13 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// @param _l2Bridge Address of the L2 bridge
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
-    function initializeV2(
+    function initializeV3(
         string calldata name_,
         string calldata symbol_,
         address _l2Bridge,
         address _l1Address,
         bytes32 _baseTokenAssetId
-    ) external reinitializer(2) {
+    ) external reinitializer(3) {
         if (_l2Bridge == address(0)) {
             revert ZeroAddress();
         }

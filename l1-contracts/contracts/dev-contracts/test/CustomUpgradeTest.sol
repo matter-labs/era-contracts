@@ -34,12 +34,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
 
         bytes32 txHash;
-        txHash = _setL2SystemContractUpgrade(
-            _proposedUpgrade.l2ProtocolUpgradeTx,
-            _proposedUpgrade.factoryDeps,
-            newMinorVersion,
-            isPatchOnly
-        );
+        txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
 
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
