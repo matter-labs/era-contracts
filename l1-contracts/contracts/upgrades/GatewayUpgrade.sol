@@ -32,6 +32,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
 
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
+    /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         (bytes memory l2TxDataStart, bytes memory l2TxDataFinish) = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
@@ -58,9 +59,8 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
     }
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
+    /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
-        // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(this), "GatewayUpgrade: upgradeExternal");
         super.upgrade(_proposedUpgrade);
     }
 }
