@@ -25,6 +25,10 @@ interface INativeTokenVault {
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external;
 
+    /// @notice Ensures that the native token is registered with the NTV.
+    /// @dev This function is used to ensure that the token is registered with the NTV.
+    function ensureTokenIsRegistered(address _nativeToken) external;
+
     /// @notice Used to get the assetId of a token
     function getAssetId(uint256 _chainId, address _tokenAddress) external view returns (bytes32);
 

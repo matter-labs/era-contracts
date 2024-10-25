@@ -52,6 +52,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
+    /// @dev A mapping tokenAddress => assetId
+    mapping(address tokenAddress => bytes32 assetId) public assetId;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
@@ -90,6 +93,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         require(_nativeToken.code.length > 0, "NTV: empty token");
         _unsafeRegisterNativeToken(_nativeToken);
+    }
+
+    /// @inheritdoc INativeTokenVault
+    function ensureTokenIsRegistered(address _nativeToken) public {
+        if (assetId[_nativeToken] == bytes32(0)) {
+            _registerToken(_nativeToken);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -331,10 +341,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
+        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
-        tokenAddress[assetId] = _nativeToken;
-        originChainId[assetId] = block.chainid;
+        tokenAddress[newAssetId] = _nativeToken;
+        assetId[_nativeToken] = newAssetId;
+        originChainId[newAssetId] = block.chainid;
     }
 
     function _handleChainBalanceIncrease(
@@ -383,6 +394,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @notice Returns the origin chain id from the token data.
     function tokenDataOriginChainId(bytes calldata _erc20Data) public view returns (uint256 tokenOriginChainId) {
+        // slither-disable-next-line unused-return
         (tokenOriginChainId, , , ) = DataEncoding.decodeTokenData(_erc20Data);
         if (tokenOriginChainId == 0) {
             tokenOriginChainId = L1_CHAIN_ID;
