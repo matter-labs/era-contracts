@@ -63,7 +63,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Notifies about complete upgrade
     event UpgradeComplete(uint256 indexed newProtocolVersion, bytes32 indexed l2UpgradeTxHash, ProposedUpgrade upgrade);
 
-    /// @notice The main function that will be provided by the upgrade proxy
+    /// @notice The main function that will be delegate-called by the chain.
     /// @dev This is a virtual function and should be overridden by custom upgrade implementations.
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @return txHash The hash of the L2 system contract upgrade transaction.

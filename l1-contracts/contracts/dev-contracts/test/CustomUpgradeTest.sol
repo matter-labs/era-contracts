@@ -25,7 +25,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     /// upgrade.
     function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal override {}
 
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);

@@ -30,7 +30,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
         THIS_ADDRESS = address(this);
     }
 
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         (bytes memory l2TxDataStart, bytes memory l2TxDataFinish) = abi.decode(
