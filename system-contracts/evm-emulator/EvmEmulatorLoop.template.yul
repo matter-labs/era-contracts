@@ -284,8 +284,6 @@ for { } true { } {
 
         checkMemIsAccessible(offset, size)
 
-        let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-
         // When an offset is first accessed (either read or write), memory may trigger 
         // an expansion, which costs gas.
         // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
@@ -293,7 +291,8 @@ for { } true { } {
         let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(add(offset, size)))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        stackHead := keccak
+        stackHead := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+
         ip := add(ip, 1)
     }
     case 0x30 { // OP_ADDRESS
