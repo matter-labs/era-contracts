@@ -52,13 +52,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
 
-    /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID;
-
-    constructor(address _initialOwner, uint32 _executionDelay, uint256 _eraChainId) {
+    constructor(address _initialOwner, uint32 _executionDelay) {
         _transferOwnership(_initialOwner);
         executionDelay = _executionDelay;
-        ERA_CHAIN_ID = _eraChainId;
     }
 
     /// @notice Checks if the caller is the admin of the chain.
