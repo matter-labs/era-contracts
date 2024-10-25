@@ -65,8 +65,6 @@ error ChainIdCantBeCurrentChain();
 error ChainIdMismatch();
 // 0x23f3c357
 error ChainIdNotRegistered(uint256 chainId);
-// 0x78d2ed02
-error ChainAlreadyLive();
 // 0x8f620a06
 error ChainIdTooBig();
 // 0xf7a01e4d
@@ -139,16 +137,6 @@ error InvalidSelector(bytes4 func);
 error InvalidTxType(uint256 txType);
 // 0x0214acb6
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0xcb5e4247
-error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
-// 0xaa7feadc
-error InvalidValue();
-// 0x888b2f09
-error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
-// 0xa4f62e33
-error L2BridgeNotDeployed(uint256 chainId);
-// 0xff8811ff
-error L2BridgeNotSet(uint256 chainId);
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0xd2c011d6
@@ -326,10 +314,6 @@ error IncorrectBatchBounds(
 error AssetHandlerNotRegistered(bytes32 assetId);
 // 0x64846fe4
 error NotARestriction(address addr);
-// 0x10f30e75
-error NotBridgehub(address addr);
-// 0x2554babc
-error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0xccdd18d2
