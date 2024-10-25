@@ -11,14 +11,14 @@ import {Call} from "./Common.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The Restriction that is designed to provide the access control logic for the `ChainAdmin` contract.
-/// @dev It inherits from `AccessControlDefaultAdminRules` without overriding `_setRoleAdmin` functionaity. In other
+/// @dev It inherits from `AccessControlDefaultAdminRules` without overriding `_setRoleAdmin` functionality. In other
 /// words, the `DEFAULT_ADMIN_ROLE` is the only role that can manage roles. This is done for simplicity.
 /// @dev An instance of this restriction should be deployed separately for each `ChainAdmin` contract.
 /// @dev IMPORTANT: this function does not validate the ability of the invoker to use `msg.value`. Thus,
 /// either all callers with access to functions should be trusted to not steal ETH from the `ChainAdmin` account
-/// or not ETH should be passively stored in `ChainAdmin` account.
+/// or no ETH should be passively stored in `ChainAdmin` account.
 contract AccessControlRestriction is Restriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
-    /// @notice Required roles to call a specific functions.
+    /// @notice Required roles to call a specific function.
     /// @dev Note, that the role 0 means the `DEFAULT_ADMIN_ROLE` from the `AccessControlDefaultAdminRules` contract.
     mapping(address target => mapping(bytes4 selector => bytes32 requiredRole)) public requiredRoles;
 
