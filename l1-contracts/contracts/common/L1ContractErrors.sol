@@ -141,6 +141,14 @@ error InvalidTxType(uint256 txType);
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xcb5e4247
 error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
+// 0xaa7feadc
+error InvalidValue();
+// 0x888b2f09
+error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
+// 0xa4f62e33
+error L2BridgeNotDeployed(uint256 chainId);
+// 0xff8811ff
+error L2BridgeNotSet(uint256 chainId);
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0xd2c011d6
@@ -277,8 +285,6 @@ error TxnBodyGasLimitNotEnoughGas();
 error Unauthorized(address caller);
 // 0xe52478c7
 error UndefinedDiamondCutAction();
-// 0x07218375
-error UnexpectedNumberOfFactoryDeps();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
 // 0xf093c2e5
@@ -326,6 +332,26 @@ error NotBridgehub(address addr);
 error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
+// 0xccdd18d2
+error BytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x25d8333c
+error CallerNotTimerAdmin();
+// 0x907f8e51
+error DeadlineNotYetPassed();
+// 0x6eef58d1
+error NewDeadlineNotGreaterThanCurrent();
+// 0x8b7e144a
+error NewDeadlineExceedsMaxDeadline();
+// 0x2a5989a0
+error AlreadyPermanentRollup();
+// 0x92daded2
+error InvalidDAForPermanentRollup();
+// 0x6e3331f5
+error IncorrectPricingMode();
+// 0xd0266e26
+error NotSettlementLayer();
+// 0x7a4902ad
+error TimerAlreadyStarted();
 
 // 0x09aa9830
 error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);

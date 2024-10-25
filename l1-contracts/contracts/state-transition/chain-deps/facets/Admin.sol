@@ -11,8 +11,9 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, IncorrectPricingMode, InvalidDAForPermanentRollup, AlreadyPermanentRollup} from "../../../common/L1ContractErrors.sol";
 import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
+import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -31,8 +32,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
-    constructor(uint256 _l1ChainId) {
+    /// @notice The address that is responsible for determining whether a certain DA pair is allowed for rollups.
+    RollupDAManager internal immutable ROLLUP_DA_MANAGER;
+
+    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager) {
         L1_CHAIN_ID = _l1ChainId;
+        ROLLUP_DA_MANAGER = _rollupDAManager;
     }
 
     modifier onlyL1() {
@@ -127,10 +132,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
-        // Validium mode can be set only before the first batch is processed
-        if (s.totalBatchesCommitted != 0) {
-            revert ChainAlreadyLive();
+        if (s.isPermanentRollup && _pricingMode != PubdataPricingMode.Rollup) {
+            revert IncorrectPricingMode();
         }
+
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
@@ -162,7 +167,30 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert L2DAValidatorAddressIsZero();
         }
 
+        if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DAValidator)) {
+            revert InvalidDAForPermanentRollup();
+        }
+
         _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
+    }
+
+    /// @inheritdoc IAdmin
+    function makePermanentRollup() external onlyAdmin onlySettlementLayer {
+        if (s.isPermanentRollup) {
+            revert AlreadyPermanentRollup();
+        }
+
+        if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
+            // The correct data availability pair should be set beforehand.
+            revert InvalidDAForPermanentRollup();
+        }
+
+        if (s.feeParams.pubdataPricingMode != PubdataPricingMode.Rollup) {
+            // The correct pubdata pricing mode should be set beforehand.
+            revert IncorrectPricingMode();
+        }
+
+        s.isPermanentRollup = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -304,6 +332,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.totalBatchesCommitted = batchesCommitted;
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
+        s.isPermanentRollup = _commitment.isPermanentRollup;
 
         // Some consistency checks just in case.
         if (batchesExecuted > batchesVerified) {
@@ -405,6 +434,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
+        commitment.isPermanentRollup = s.isPermanentRollup;
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {

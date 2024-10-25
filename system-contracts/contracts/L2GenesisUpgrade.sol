@@ -7,7 +7,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 
-import {L2GenesisUpgradeHelper} from "./L2GenesisUpgradeHelper.sol";
+import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -24,7 +24,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         }
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
 
-        L2GenesisUpgradeHelper.performForceDeployedContractsInit(
+        L2GatewayUpgradeHelper.performForceDeployedContractsInit(
             _ctmDeployer,
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData

@@ -10,8 +10,6 @@ error ProtocolMajorVersionNotZero();
 error PatchCantSetUpgradeTxn();
 // 0xd2c011d6
 error L2UpgradeNonceNotEqualToNewProtocolVersion(uint256 nonce, uint256 protocolVersion);
-// 0xcb5e4247
-error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
 // 0x88d7b498
 error ProtocolVersionTooSmall();
 // 0x56d45b12
@@ -34,8 +32,6 @@ error PatchUpgradeCantSetBootloader();
 error PreviousUpgradeNotFinalized(bytes32 txHash);
 // 0xa0f47245
 error PreviousUpgradeNotCleaned();
-// 0x07218375
-error UnexpectedNumberOfFactoryDeps();
 // 0x76da24b9
 error TooManyFactoryDeps();
 // 0x5cb29523
