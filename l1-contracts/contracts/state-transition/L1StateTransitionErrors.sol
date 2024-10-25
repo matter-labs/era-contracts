@@ -142,3 +142,6 @@ error ContractNotDeployed();
 
 // 0xd7b2559b
 error NotMigrated();
+
+// 0x52595598
+error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);

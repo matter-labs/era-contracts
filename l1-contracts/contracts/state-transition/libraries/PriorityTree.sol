@@ -101,16 +101,18 @@ library PriorityTree {
     }
 
     /// @notice Reinitialize the tree from a commitment on L1.
-    function checkL1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal view {
+    function l1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         if (_tree.startIndex != _commitment.startIndex) {
             revert InvalidStartIndex(_tree.startIndex, _commitment.startIndex);
         }
-        if (_tree.unprocessedIndex < _commitment.unprocessedIndex) {
+        if (_tree.unprocessedIndex > _commitment.unprocessedIndex) {
             revert InvalidUnprocessedIndex(_tree.unprocessedIndex, _commitment.unprocessedIndex);
         }
         if (_tree.tree._nextLeafIndex < _commitment.nextLeafIndex) {
             revert InvalidNextLeafIndex(_tree.tree._nextLeafIndex, _commitment.nextLeafIndex);
         }
+
+        _tree.unprocessedIndex = _commitment.unprocessedIndex;
     }
 
     /// @notice Reinitialize the tree from a commitment on GW.

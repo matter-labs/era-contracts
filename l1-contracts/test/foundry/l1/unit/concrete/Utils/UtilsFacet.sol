@@ -32,14 +32,6 @@ contract UtilsFacet is ZKChainBase {
         return s.baseTokenAssetId;
     }
 
-    function util_setBaseTokenBridge(address _baseTokenBridge) external {
-        s.baseTokenBridge = _baseTokenBridge;
-    }
-
-    function util_getBaseTokenBridge() external view returns (address) {
-        return s.baseTokenBridge;
-    }
-
     function util_setVerifier(IVerifier _verifier) external {
         s.verifier = _verifier;
     }

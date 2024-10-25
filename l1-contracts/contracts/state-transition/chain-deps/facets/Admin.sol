@@ -342,7 +342,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             if (s.settlementLayer == address(0)) {
                 revert NotMigrated();
             }
-            s.priorityTree.checkL1Reinit(_commitment.priorityTree);
+            s.priorityTree.l1Reinit(_commitment.priorityTree);
         } else if (_contractAlreadyDeployed) {
             if (s.settlementLayer == address(0)) {
                 revert NotMigrated();

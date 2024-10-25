@@ -149,7 +149,7 @@ struct ZKChainStorage {
     /// @dev The address of the baseToken contract. Eth is address(1)
     address __DEPRECATED_baseToken;
     /// @dev The address of the baseTokenbridge. Eth also uses the shared bridge
-    address baseTokenBridge;
+    address __DEPRECATED_baseTokenBridge;
     /// @notice gasPriceMultiplier for each baseToken, so that each L1->L2 transaction pays for its transaction on the destination
     /// we multiply by the nominator, and divide by the denominator
     uint128 baseTokenGasPriceMultiplierNominator;

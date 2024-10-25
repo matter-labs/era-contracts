@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -21,11 +23,13 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {FinalizeL1DepositParams} from "contracts/bridge/L1Nullifier.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -34,14 +38,20 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
-contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
+contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
 
     uint256 migratingChainId = 10;
+    IZKChain migratingChain;
+
     uint256 gatewayChainId = 11;
+    IZKChain gatewayChain;
+
     uint256 mintChainId = 12;
 
     // generate MAX_USERS addresses and append it to users array
@@ -83,46 +93,66 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
 
         _initializeGatewayScript();
 
-        vm.deal(Ownable(l1Script.getBridgehubProxyAddress()).owner(), 100000000000000000000000000000000000);
-        vm.deal(l1Script.getOwnerAddress(), 100000000000000000000000000000000000);
-        IZKChain chain = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(migratingChainId));
-        IZKChain chain2 = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(gatewayChainId));
-        vm.deal(chain.getAdmin(), 100000000000000000000000000000000000);
-        vm.deal(chain2.getAdmin(), 100000000000000000000000000000000000);
+        vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
+        migratingChain = IZKChain(IBridgehub(bridgehub).getZKChain(migratingChainId));
+        gatewayChain = IZKChain(IBridgehub(bridgehub).getZKChain(gatewayChainId));
+        vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
+        vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
-        // vm.deal(l1Script.getBridgehubProxyAddress(), 100000000000000000000000000000000000);
+        // vm.deal(bridgehub, 100000000000000000000000000000000000);
+    }
+
+    // This is a method to simplify porting the tests for now.
+    // Here we rely that the first restriction is the AccessControlRestriction
+    function _extractAccessControlRestriction(address admin) internal returns (address) {
+        return ChainAdmin(payable(admin)).getRestrictions()[0];
     }
 
     function setUp() public {
         prepare();
     }
 
+    function _setUpGatewayWithFilterer() internal {
+        gatewayScript.governanceRegisterGateway();
+        gatewayScript.deployAndSetGatewayTransactionFilterer();
+    }
+
     //
     function test_registerGateway() public {
-        gatewayScript.registerGateway();
+        _setUpGatewayWithFilterer();
     }
 
     //
     function test_moveChainToGateway() public {
-        gatewayScript.registerGateway();
-        gatewayScript.moveChainToGateway();
-        // require(bridgehub.settlementLayer())
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
+        require(bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
-        gatewayScript.registerGateway();
-        gatewayScript.moveChainToGateway();
-        gatewayScript.registerL2Contracts();
-    }
-
-    function test_finishMoveChain() public {
-        finishMoveChain();
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
+        gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
+        gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
     }
 
     function test_startMessageToL3() public {
-        finishMoveChain();
-        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
+        IBridgehub bridgehub = IBridgehub(bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
@@ -136,31 +166,28 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
     }
 
-    function test_forwardToL3OnGateway() public {
-        finishMoveChain();
-
-        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        vm.chainId(12345);
-        vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
-        vm.stopBroadcast();
-    }
-
     function test_recoverFromFailedChainMigration() public {
-        gatewayScript.registerGateway();
-        gatewayScript.moveChainToGateway();
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
 
         // Setup
-        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        IChainTypeManager ctm = IChainTypeManager(l1Script.getCTM());
+        IBridgehub bridgehub = IBridgehub(bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         bytes memory transferData;
 
         {
             IZKChain chain = IZKChain(bridgehub.getZKChain(migratingChainId));
-            bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
             bytes memory chainData = abi.encode(chain.getProtocolVersion());
-            bytes memory ctmData = abi.encode(address(1), msg.sender, ctm.protocolVersion(), initialDiamondCut);
+            bytes memory ctmData = abi.encode(
+                address(1),
+                msg.sender,
+                chainTypeManager.protocolVersion(),
+                ecosystemConfig.contracts.diamondCutData
+            );
             BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
                 chainId: migratingChainId,
                 ctmData: ctmData,
@@ -195,7 +222,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         );
 
         // Set Deposit Happened
-        vm.startBroadcast(address(bridgeHub));
+        vm.startBroadcast(address(bridgehub));
         assetRouter.bridgehubConfirmL2Transaction({
             _chainId: migratingChainId,
             _txDataHash: txDataHash,
@@ -218,73 +245,18 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         vm.stopBroadcast();
     }
 
-    function test_registerAlreadyDeployedZKChain() public {
-        gatewayScript.registerGateway();
-        IChainTypeManager stm = IChainTypeManager(l1Script.getCTM());
-        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        address owner = Ownable(address(bridgeHub)).owner();
-
-        {
-            uint256 chainId = currentZKChainId++;
-            bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
-
-            address chain = _deployZkChain(
-                chainId,
-                baseTokenAssetId,
-                address(bridgehub.sharedBridge()),
-                owner,
-                stm.protocolVersion(),
-                stm.storedBatchZero(),
-                address(bridgehub)
-            );
-
-            address stmAddr = IZKChain(chain).getChainTypeManager();
-
-            vm.startBroadcast(owner);
-            bridgeHub.addChainTypeManager(stmAddr);
-            bridgeHub.addTokenAssetId(baseTokenAssetId);
-            bridgeHub.registerAlreadyDeployedZKChain(chainId, chain);
-            vm.stopBroadcast();
-
-            address bridgeHubStmForChain = bridgeHub.chainTypeManager(chainId);
-            bytes32 bridgeHubBaseAssetIdForChain = bridgeHub.baseTokenAssetId(chainId);
-            address bridgeHubChainAddressdForChain = bridgeHub.getZKChain(chainId);
-            address bhAddr = IZKChain(chain).getBridgehub();
-
-            assertEq(bridgeHubStmForChain, stmAddr);
-            assertEq(bridgeHubBaseAssetIdForChain, baseTokenAssetId);
-            assertEq(bridgeHubChainAddressdForChain, chain);
-            assertEq(bhAddr, address(bridgeHub));
-        }
-
-        {
-            uint256 chainId = currentZKChainId++;
-            bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
-            address chain = _deployZkChain(
-                chainId,
-                baseTokenAssetId,
-                address(bridgehub.sharedBridge()),
-                owner,
-                stm.protocolVersion(),
-                stm.storedBatchZero(),
-                address(bridgehub.sharedBridge())
-            );
-
-            address stmAddr = IZKChain(chain).getChainTypeManager();
-
-            vm.startBroadcast(owner);
-            bridgeHub.addTokenAssetId(baseTokenAssetId);
-            vm.expectRevert(
-                abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(bridgehub.sharedBridge()))
-            );
-            bridgeHub.registerAlreadyDeployedZKChain(chainId, chain);
-            vm.stopBroadcast();
-        }
+    function test_finishMigrateBackChain() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(
+            migratingChain.getAdmin(),
+            _extractAccessControlRestriction(migratingChain.getAdmin()),
+            migratingChainId
+        );
+        migrateBackChain();
     }
 
-    function finishMoveChain() public {
-        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        IChainTypeManager ctm = IChainTypeManager(l1Script.getCTM());
+    function migrateBackChain() public {
+        IBridgehub bridgehub = IBridgehub(bridgehub);
         IZKChain migratingChain = IZKChain(bridgehub.getZKChain(migratingChainId));
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
@@ -292,27 +264,73 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         bridgehub.registerSettlementLayer(gatewayChainId, true);
         vm.stopBroadcast();
 
-        bytes32 baseTokenAssetId = keccak256("baseTokenAssetId");
-        bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
-        bytes memory chainData = abi.encode(AdminFacet(address(migratingChain)).prepareChainCommitment());
-        bytes memory ctmData = abi.encode(baseTokenAssetId, msg.sender, ctm.protocolVersion(), initialDiamondCut);
+        bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
+
+        uint256 currentChainId = block.chainid;
+        // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
+        vm.chainId(migratingChainId);
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehub.ctmAssetIdFromChainId.selector),
+            abi.encode(assetId)
+        );
+        vm.mockCall(
+            address(chainTypeManager),
+            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+            abi.encode(chainTypeManager.protocolVersion())
+        );
+
+        uint256 protocolVersion = chainTypeManager.getProtocolVersion(migratingChainId);
+
+        bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
+        bytes memory ctmData = abi.encode(
+            baseTokenAssetId,
+            msg.sender,
+            protocolVersion,
+            ecosystemConfig.contracts.diamondCutData
+        );
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
-            chainId: mintChainId,
+            chainId: migratingChainId,
             baseTokenAssetId: baseTokenAssetId,
             ctmData: ctmData,
             chainData: chainData
         });
         bytes memory bridgehubMintData = abi.encode(data);
-        vm.startBroadcast(address(bridgehub.sharedBridge()));
-        uint256 currentChainId = block.chainid;
-        vm.chainId(migratingChainId);
-        bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
-        vm.stopBroadcast();
+        bytes memory message = abi.encodePacked(
+            IAssetRouterBase.finalizeDeposit.selector,
+            gatewayChainId,
+            assetId,
+            bridgehubMintData
+        );
+        gatewayScript.finishMigrateChainFromGateway(
+            migratingChainId,
+            gatewayChainId,
+            0,
+            0,
+            0,
+            message,
+            new bytes32[](0)
+        );
+
         vm.chainId(currentChainId);
 
-        assertEq(bridgehub.baseTokenAssetId(mintChainId), baseTokenAssetId);
-        IZKChain mintedZKChain = IZKChain(bridgehub.getZKChain(mintChainId));
-        assertEq(mintedZKChain.getBaseTokenAssetId(), baseTokenAssetId);
+        assertEq(bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
+        IZKChain migratingChainContract = IZKChain(bridgehub.getZKChain(migratingChainId));
+        assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
+    }
+
+    /// to increase coverage, properly tested in L2GatewayTests
+    function test_forwardToL3OnGateway() public {
+        _setUpGatewayWithFilterer();
+        vm.chainId(12345);
+        vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
+        bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
+        vm.stopBroadcast();
     }
 
     // add this to be excluded from coverage report

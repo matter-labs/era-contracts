@@ -16,6 +16,7 @@ import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-proces
 import { ethTestConfig } from "../../src.ts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
+import { registerZKChain } from "../../src.ts/deploy-process";
 
 describe("Initial deployment test", function () {
   let bridgehub: Bridgehub;
@@ -99,5 +100,10 @@ describe("Initial deployment test", function () {
     const ntvAddress3 = await l1AssetRouter.nativeTokenVault();
     expect(ntvAddress1.toLowerCase()).equal(ntvAddress2.toLowerCase());
     expect(ntvAddress1.toLowerCase()).equal(ntvAddress3.toLowerCase());
+  });
+
+  it("Check L2SharedBridge", async () => {
+    const gasPrice = await owner.provider.getGasPrice();
+    await registerZKChain(deployer, false, [], gasPrice, "", "0x33", true, true);
   });
 });

@@ -14,7 +14,6 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
 import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
 
@@ -98,6 +97,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public __DEPRECATED_chainBalance;
+
+    /// @dev Admin has the ability to register new chains within the shared bridge.
+    address public __DEPRECATED_admin;
+
+    /// @dev The pending admin, i.e. the candidate to the admin role.
+    address public __DEPRECATED_pendingAdmin;
 
     /// @dev Address of L1 asset router.
     IL1AssetRouter public l1AssetRouter;
@@ -218,6 +223,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function l2BridgeAddress(uint256 _chainId) external view returns (address) {
         // slither-disable-next-line uninitialized-state-variables
         return __DEPRECATED_l2BridgeAddress[_chainId];
+    }
+
+    /// @notice Legacy function used for migration, do not use!
+    /// @param _chainId The chain id we want to get the balance for.
+    /// @param _token The address of the token.
+    // slither-disable-next-line uninitialized-state-variables
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256) {
+        // slither-disable-next-line uninitialized-state-variables
+        return __DEPRECATED_chainBalance[_chainId][_token];
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.
@@ -509,7 +523,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return transferData The transfer data used to finalize withdawal.
     function _verifyWithdrawal(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+    ) internal returns (bytes32 assetId, bytes memory transferData) {
         (assetId, transferData) = _parseL2WithdrawalMessage(
             _finalizeWithdrawalParams.chainId,
             _finalizeWithdrawalParams.message
@@ -556,7 +570,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+    ) internal returns (bytes32 assetId, bytes memory transferData) {
         // Please note that there are three versions of the message:
         // 1. The message that is sent from `L2BaseToken` to withdraw base token.
         // 2. The message that is sent from L2 Legacy Shared Bridge to withdraw ERC20 tokens or base token.
@@ -600,6 +614,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // slither-disable-next-line unused-return
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
+            l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
@@ -614,7 +629,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 revert WrongMsgLength(36, _l2ToL1message.length);
             }
             // slither-disable-next-line unused-return
-            (, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
+            (, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
@@ -646,7 +661,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Token);
+        bytes32 assetId = l1NativeTokenVault.assetId(_l1Token);
+        if (assetId == bytes32(0)) {
+            assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
+        }
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));
@@ -700,7 +718,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external override onlyLegacyBridge {
         bytes memory assetData = abi.encode(_amount, _depositSender);
         /// the legacy bridge can only be used with L1 native tokens.
-        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Asset);
 
         _verifyAndClearFailedTransfer({
             _checkedInLegacyBridge: true,

@@ -10,6 +10,7 @@ import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -43,6 +44,9 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @dev Address of the native token vault that is used as trustee who can mint/burn tokens
     address public nativeTokenVault;
 
+    /// @dev The assetId of the token.
+    bytes32 public assetId;
+
     /// @dev This also sets the native token vault to the default value if it is not set.
     /// It is not set only on the L2s for legacy tokens.
     modifier onlyNTV() {
@@ -50,6 +54,10 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         if (ntv == address(0)) {
             ntv = L2_NATIVE_TOKEN_VAULT_ADDR;
             nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+            assetId = DataEncoding.encodeNTVAssetId(
+                INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L1_CHAIN_ID(),
+                originToken
+            );
         }
         if (msg.sender != ntv) {
             revert Unauthorized(msg.sender);
@@ -74,20 +82,24 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
     /// @dev Stores the L1 address of the bridge and set `name`/`symbol`/`decimals` getters that L1 token has.
+    /// @param _assetId The assetId of the token.
     /// @param _originToken Address of the origin token that can be deposited to mint this bridged token
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
-    function bridgeInitialize(address _originToken, bytes calldata _data) external initializer returns (uint256) {
+    function bridgeInitialize(bytes32 _assetId, address _originToken, bytes calldata _data) external initializer {
         if (_originToken == address(0)) {
             revert ZeroAddress();
         }
         originToken = _originToken;
+        assetId = _assetId;
 
         nativeTokenVault = msg.sender;
 
         // We parse the data exactly as they were created on the L1 bridge
-        (uint256 chainId, bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = DataEncoding
-            .decodeTokenData(_data);
+        // slither-disable-next-line unused-return
+        (, bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = DataEncoding.decodeTokenData(
+            _data
+        );
 
         ERC20Getters memory getters;
         string memory decodedName;
@@ -129,7 +141,6 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
         availableGetters = getters;
         emit BridgeInitialize(_originToken, decodedName, decodedSymbol, decimals_);
-        return chainId;
     }
 
     /// @notice A method to be called by the governor to update the token's metadata.

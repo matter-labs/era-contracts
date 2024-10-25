@@ -19,7 +19,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {DeployingBridgedTokenForNativeToken, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {EmptyToken} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
@@ -51,12 +51,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
+    /// @dev A mapping tokenAddress => assetId
+    mapping(address tokenAddress => bytes32 assetId) public assetId;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
@@ -91,6 +94,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             revert EmptyToken();
         }
         _unsafeRegisterNativeToken(_nativeToken);
+    }
+
+    /// @inheritdoc INativeTokenVault
+    function ensureTokenIsRegistered(address _nativeToken) public {
+        if (assetId[_nativeToken] == bytes32(0)) {
+            _registerToken(_nativeToken);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -133,7 +143,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         (, receiver, originToken, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
 
         if (token == address(0)) {
-            token = _ensureTokenDeployed(_originChainId, _assetId, originToken, erc20Data);
+            token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
         _handleChainBalanceDecrease(_originChainId, _assetId, amount, false);
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
@@ -197,6 +207,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         address bridgedToken = tokenAddress[_assetId];
         IBridgedStandardToken(bridgedToken).bridgeBurn(_originalCaller, _amount);
+        _handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
 
         emit BridgeBurn({
             chainId: _chainId,
@@ -253,15 +264,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             }
             _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (_depositAmount != amount) {
-                revert ValueMismatch(amount, msg.value);
+                revert ValueMismatch(_depositAmount, amount);
             }
         } else {
             // The Bridgehub also checks this, but we want to be sure
             if (msg.value != 0) {
                 revert NonEmptyMsgValue();
             }
-            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             amount = _depositAmount;
+            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (!_depositChecked) {
                 uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
                 // The token has non-standard transfer logic
@@ -320,21 +331,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         return BridgeHelper.getERC20Getters(_token, _originChainId);
     }
 
-    /// @notice Returns the parsed assetId.
-    /// @param _nativeToken The address of the token to be parsed.
-    /// @dev Shows the assetId for a given chain and token address
-    function getAssetId(uint256 _chainId, address _nativeToken) external pure override returns (bytes32) {
-        return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
-    }
-
     /// @notice Registers a native token address for the vault.
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
+        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
-        tokenAddress[assetId] = _nativeToken;
-        originChainId[assetId] = block.chainid;
+        tokenAddress[newAssetId] = _nativeToken;
+        assetId[_nativeToken] = newAssetId;
+        originChainId[newAssetId] = block.chainid;
     }
 
     function _handleChainBalanceIncrease(
@@ -355,15 +360,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                             TOKEN DEPLOYER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _ensureTokenDeployed(
-        uint256 _originChainId,
+    function _ensureAndSaveTokenDeployed(
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
     ) internal virtual returns (address expectedToken) {
-        expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
-        _ensureTokenDeployedInner({
-            _originChainId: _originChainId,
+        uint256 tokenOriginChainId;
+        (expectedToken, tokenOriginChainId) = _calculateExpectedTokenAddress(_originToken, _erc20Data);
+        _ensureAndSaveTokenDeployedInner({
+            _tokenOriginChainId: tokenOriginChainId,
             _assetId: _assetId,
             _originToken: _originToken,
             _erc20Data: _erc20Data,
@@ -371,57 +376,81 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         });
     }
 
-    function _assetIdCheck(
-        uint256 _originChainId,
-        bytes32 _assetId,
-        address _originToken
-    ) internal view returns (address expectedToken) {
-        expectedToken = calculateCreate2TokenAddress(_originChainId, _originToken);
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_originChainId, _originToken);
+    /// @notice Calculates the bridged token address corresponding to native token counterpart.
+    function _calculateExpectedTokenAddress(
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal view returns (address expectedToken, uint256 tokenOriginChainId) {
+        /// @dev calling externally to convert from memory to calldata
+        tokenOriginChainId = this.tokenDataOriginChainId(_erc20Data);
+        expectedToken = calculateCreate2TokenAddress(tokenOriginChainId, _originToken);
+    }
+
+    /// @notice Returns the origin chain id from the token data.
+    function tokenDataOriginChainId(bytes calldata _erc20Data) public view returns (uint256 tokenOriginChainId) {
+        // slither-disable-next-line unused-return
+        (tokenOriginChainId, , , ) = DataEncoding.decodeTokenData(_erc20Data);
+        if (tokenOriginChainId == 0) {
+            tokenOriginChainId = L1_CHAIN_ID;
+        }
+    }
+
+    /// @notice Checks that the assetId is correct for the origin token and chain.
+    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal view {
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
         if (_assetId != expectedAssetId) {
             // Make sure that a NativeTokenVault sent the message
             revert AssetIdMismatch(_assetId, expectedAssetId);
         }
     }
 
-    function _ensureTokenDeployedInner(
-        uint256 _originChainId,
+    function _ensureAndSaveTokenDeployedInner(
+        uint256 _tokenOriginChainId,
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data,
         address _expectedToken
     ) internal {
-        address deployedToken = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
+        _assetIdCheck(_tokenOriginChainId, _assetId, _originToken);
+
+        address deployedToken = _deployBridgedToken(_tokenOriginChainId, _assetId, _originToken, _erc20Data);
         if (deployedToken != _expectedToken) {
             revert AddressMismatch(_expectedToken, deployedToken);
         }
 
         tokenAddress[_assetId] = _expectedToken;
+        assetId[_expectedToken] = _assetId;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
+    /// @param _tokenOriginChainId The chain id of the origin token.
     /// @param _bridgeToken The address of native token.
     /// @return The address of bridged token.
     function calculateCreate2TokenAddress(
-        uint256 _originChainId,
+        uint256 _tokenOriginChainId,
         address _bridgeToken
     ) public view virtual override returns (address);
 
     /// @notice Deploys and initializes the bridged token for the native counterpart.
+    /// @param _tokenOriginChainId The chain id of the origin token.
     /// @param _originToken The address of origin token.
     /// @param _erc20Data The ERC20 metadata of the token deployed.
     /// @return The address of the beacon proxy (bridged token).
     function _deployBridgedToken(
-        uint256 _originChainId,
+        uint256 _tokenOriginChainId,
+        bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
     ) internal returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _originToken);
+        if (_tokenOriginChainId == block.chainid) {
+            revert DeployingBridgedTokenForNativeToken();
+        }
+        bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
 
-        BeaconProxy l2Token = _deployBeaconProxy(salt);
-        uint256 tokenOriginChainId = BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
-        tokenOriginChainId = tokenOriginChainId == 0 ? L1_CHAIN_ID : tokenOriginChainId;
-        originChainId[DataEncoding.encodeNTVAssetId(tokenOriginChainId, _originToken)] = tokenOriginChainId;
+        BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
+        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_assetId, _originToken, _erc20Data);
+
+        originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);
     }
 
@@ -437,7 +466,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of the bridged token (we pass the native token address).
     /// @return proxy The beacon proxy, i.e. bridged token.
-    function _deployBeaconProxy(bytes32 _salt) internal virtual returns (BeaconProxy proxy);
+    function _deployBeaconProxy(
+        bytes32 _salt,
+        uint256 _tokenOriginChainId
+    ) internal virtual returns (BeaconProxy proxy);
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

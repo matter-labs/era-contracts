@@ -84,6 +84,13 @@
     "sourceCodeHash": "0x8bdd2b4d0b53dba84c9f0af250bbaa2aad10b3de6747bba957f0bd3721090dfa"
   },
   {
+    "contractName": "L2GatewayUpgrade",
+    "bytecodePath": "artifacts-zk/contracts-preprocessed/L2GatewayUpgrade.sol/L2GatewayUpgrade.json",
+    "sourceCodePath": "contracts-preprocessed/L2GatewayUpgrade.sol",
+    "bytecodeHash": "0x0100019db8d039fb6ef02a7aea5eb8cbfd917afdf3dc88659f28e18b6a43e5df",
+    "sourceCodeHash": "0xc69d0c1819a366fc91a43a9ad2d747540a7b8ee2071b48e4adfd301ec40e8600"
+  },
+  {
     "contractName": "L2GenesisUpgrade",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L2GenesisUpgrade.sol/L2GenesisUpgrade.json",
     "sourceCodePath": "contracts-preprocessed/L2GenesisUpgrade.sol",
