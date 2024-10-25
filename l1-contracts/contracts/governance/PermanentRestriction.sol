@@ -7,7 +7,7 @@ import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperc
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
 import {Restriction} from "./restriction/Restriction.sol";
@@ -258,42 +258,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         address admin = IZKChain(_chain).getAdmin();
         if (admin != _potentialAdmin) {
             revert NotAnAdmin(admin, _potentialAdmin);
-        }
-    }
-
-    /// @notice Tries to call `IGetters.getChainId()` function on the `_chain`.
-    /// It ensures that the returndata is of correct format and if not, it returns false.
-    /// @param _chain The address of the potential chain
-    /// @return chainId The chainId of the chain. 
-    /// @return success Whether the call was successful.
-    /// If the second item is `false`, the caller should ignore the first value. 
-    function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
-        bytes4 selector = IGetters.getChainId.selector;
-        
-        // Note, that we do use assembly here to ensure that the function does not panic in case of
-        // either incorrect `_chain` address or in case the returndata is too large
-        assembly {
-            // We use scratch space here, so it is safe
-            mstore(0, selector)
-            success := staticcall(
-                gas(),
-                _chain,
-                0,
-                4,
-                0,
-                0
-            )
-
-            let isReturndataSizeCorrect := eq(returndatasize(), 32)
-
-            success := and(success, isReturndataSizeCorrect)
-
-            if success {
-                // We use scratch space here, so it is safe
-                returndatacopy(0, 0, 32)
-
-                chainId := mload(0)
-            }
         }
     }
 

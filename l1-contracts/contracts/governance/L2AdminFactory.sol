@@ -32,20 +32,20 @@ contract L2AdminFactory {
     /// @return admin The address of the deployed admin contract.
     // solhint-disable-next-line gas-calldata-parameters
     function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
-        // Even though the chain admin will likely perform similar checks, 
+        // Even though the chain admin will likely perform similar checks,
         // we keep those here just in case, since it is not expensive, while allowing to fail fast.
         _validateRestrctions(_additionalRestrictions);
         uint256 cachedRequired = requiredRestrictions.length;
         uint256 cachedAdditional = _additionalRestrictions.length;
         address[] memory restrictions = new address[](cachedRequired + cachedAdditional);
-        
+
         unchecked {
             for (uint256 i = 0; i < cachedRequired; ++i) {
                 restrictions[i] = requiredRestrictions[i];
             }
             for (uint256 i = 0; i < cachedAdditional; ++i) {
                 restrictions[cachedRequired + i] = _additionalRestrictions[i];
-            }   
+            }
         }
 
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
@@ -57,7 +57,7 @@ contract L2AdminFactory {
     function _validateRestrctions(address[] memory _restrictions) internal view {
         unchecked {
             uint256 length = _restrictions.length;
-            for(uint256 i = 0; i < length; ++i) {
+            for (uint256 i = 0; i < length; ++i) {
                 RestrictionValidator.validateRestriction(_restrictions[i]);
             }
         }

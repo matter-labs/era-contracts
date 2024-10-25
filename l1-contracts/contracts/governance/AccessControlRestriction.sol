@@ -60,7 +60,7 @@ contract AccessControlRestriction is Restriction, IAccessControlRestriction, Acc
     }
 
     /// @inheritdoc Restriction
-    function validateCall(Call calldata _call, address _invoker) external override view {
+    function validateCall(Call calldata _call, address _invoker) external view override {
         // Note, that since `DEFAULT_ADMIN_ROLE` is 0 and the default storage value for the
         // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
         // role for all the functions.

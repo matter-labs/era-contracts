@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-length-in-loops
 
-import {ZeroAddress, NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
+import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
@@ -16,8 +16,8 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The contract is designed to hold the `admin` role in ZKSync Chain (State Transition) contracts.
-/// @dev Note, that it does not implement any form of access control by default, but instead utilizes 
-/// so called "restrictions": contracts that implement the `IRestriction` interface and ensure that 
+/// @dev Note, that it does not implement any form of access control by default, but instead utilizes
+/// so called "restrictions": contracts that implement the `IRestriction` interface and ensure that
 /// particular restrictions are ensured for the contract, including access control, security invariants, etc.
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -123,7 +123,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @param _restriction The address of the restriction contract to be added.
     function _addRestriction(address _restriction) private {
         RestrictionValidator.validateRestriction(_restriction);
-        
+
         if (!activeRestrictions.add(_restriction)) {
             revert RestrictionWasAlreadyPresent(_restriction);
         }
