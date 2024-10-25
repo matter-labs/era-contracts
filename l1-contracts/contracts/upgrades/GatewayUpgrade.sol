@@ -24,6 +24,8 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
+    /// @notice The address of this contract.
+    /// @dev needed as this address is delegateCalled, and we delegateCall it again.
     address public immutable THIS_ADDRESS;
 
     constructor() {
