@@ -34,7 +34,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal l2TokenProxyBytecodeHash;
+    bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy. 
@@ -64,7 +64,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             revert EmptyAddress();
         }
 
-        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
+        L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
 
         if (_contractsDeployedAlready) {
@@ -129,25 +129,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
-    /// @notice Ensures that the token is deployed inner for legacy tokens. 
-    function _ensureAndSaveTokenDeployedInnerLegacyToken(
-        bytes32 _assetId,
-        address _originToken,
-        address _expectedToken,
-        address _l1LegacyToken
-    ) internal {
-        _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
-
-        /// token is a legacy token, no need to deploy
-        if (_l1LegacyToken != _originToken) {
-            revert AddressMismatch(_originToken, _l1LegacyToken);
-        }
-
-        tokenAddress[_assetId] = _expectedToken;
-    }
-
-    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract or the legacy shared bridge.
-    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
+    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
+    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
     /// @param _tokenOriginChainId The origin chain id of the token.
@@ -165,7 +148,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
                 0,
                 abi.encodeCall(
                     IContractDeployer.create2,
-                    (_salt, l2TokenProxyBytecodeHash, abi.encode(address(bridgedTokenBeacon), ""))
+                    (_salt, L2_TOKEN_PROXY_BYTECODE_HASH, abi.encode(address(bridgedTokenBeacon), ""))
                 )
             );
 
@@ -213,7 +196,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
                 L2ContractHelper.computeCreate2Address(
                     address(this),
                     salt,
-                    l2TokenProxyBytecodeHash,
+                    L2_TOKEN_PROXY_BYTECODE_HASH,
                     constructorInputHash
                 );
         }
