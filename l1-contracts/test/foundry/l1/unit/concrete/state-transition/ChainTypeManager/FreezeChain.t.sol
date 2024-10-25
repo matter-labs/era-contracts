@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {FacetIsFrozen} from "contracts/common/L1ContractErrors.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract freezeChainTest is ChainTypeManagerTest {

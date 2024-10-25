@@ -31,7 +31,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {Unauthorized, UnimplementedMessage, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
 
 abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     function test_shouldDepositWethByCallingDeposit() public {

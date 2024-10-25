@@ -2,14 +2,12 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, TooManyChains} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -59,14 +57,18 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "MR: only bridgehub");
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+        }
         _;
     }
 
     /// @notice only the bridgehub can call
     /// @param _chainId the chainId of the chain
     modifier onlyChain(uint256 _chainId) {
-        require(msg.sender == BRIDGE_HUB.getZKChain(_chainId), "MR: only chain");
+        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        }
         _;
     }
 
@@ -84,7 +86,9 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
-        require(!chainRegistered(_chainId), "MR: chain exists");
+        if (chainRegistered(_chainId)) {
+            revert ChainExists();
+        }
         _addNewChain(_chainId);
     }
 
@@ -98,7 +102,9 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
     ) external onlyChain(_chainId) {
-        require(chainRegistered(_chainId), "MR: not registered");
+        if (!chainRegistered(_chainId)) {
+            revert MessageRootNotRegistered();
+        }
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
@@ -145,7 +151,9 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @param _chainId the chainId of the chain
     function _addNewChain(uint256 _chainId) internal {
         uint256 cachedChainCount = chainCount;
-        require(cachedChainCount < MAX_NUMBER_OF_ZK_CHAINS, "MR: too many chains");
+        if (cachedChainCount >= MAX_NUMBER_OF_ZK_CHAINS) {
+            revert TooManyChains(cachedChainCount, MAX_NUMBER_OF_ZK_CHAINS);
+        }
 
         ++chainCount;
         chainIndex[_chainId] = cachedChainCount;

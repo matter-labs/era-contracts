@@ -58,7 +58,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev Expected to be delegatecalled by the `TransparentUpgradableProxy`
     /// upon initialization.
     function initialize(address _initialOwner) external initializer {
-        // solhint-disable-next-line gas-custom-errors, reason-string
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }

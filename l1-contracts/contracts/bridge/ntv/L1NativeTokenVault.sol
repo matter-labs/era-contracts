@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
@@ -24,7 +22,8 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed, OriginChainIdNotFound} from "../../common/L1ContractErrors.sol";
+import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -107,10 +106,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 nullifierChainBalance = IERC20(_token).balanceOf(address(L1_NULLIFIER));
-            require(nullifierChainBalance > 0, "NTV: 0 amount to transfer");
+            if (nullifierChainBalance == 0) {
+                revert ZeroAmountToTransfer();
+            }
             L1_NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore >= nullifierChainBalance, "NTV: wrong amount transferred");
+            if (balanceAfter - balanceBefore < nullifierChainBalance) {
+                revert WrongAmountTransferred(balanceAfter - balanceBefore, nullifierChainBalance);
+            }
         }
     }
 
@@ -134,7 +137,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyAssetRouter {
-        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");
+        if (_assetHandlerAddressOnCounterpart != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert WrongCounterpart();
+        }
     }
 
     function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
@@ -208,7 +213,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
+            if (!callSuccess) {
+                revert ClaimFailedDepositFailed();
+            }
         } else {
             uint256 originChainId = _getOriginChainId(_assetId);
             if (originChainId == block.chainid) {
