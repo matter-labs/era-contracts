@@ -48,7 +48,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     mapping(bytes allowedCalldata => bool isAllowed) public allowedCalls;
 
     /// @notice The mapping of the validated selectors.
-    mapping(bytes4 selector => bool isValidated) public validatedSelectors;
+    mapping(bytes4 selector => bool isValidated) public selectorsToValidate;
 
     /// @notice The mapping of whitelisted L2 admins.
     mapping(address adminAddress => bool isWhitelisted) public allowedL2Admins;
@@ -73,7 +73,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Allows a certain `ChainAdmin` implementation to be used as an admin.
     /// @param _implementationHash The hash of the implementation code.
     /// @param _isAllowed The flag that indicates if the implementation is allowed.
-    function allowAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
+    function setAllowedAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
         allowedAdminImplementations[_implementationHash] = _isAllowed;
 
         emit AdminImplementationAllowed(_implementationHash, _isAllowed);
@@ -91,8 +91,8 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Allows a certain selector to be validated.
     /// @param _selector The selector of the function.
     /// @param _isValidated The flag that indicates if the selector is validated.
-    function setSelectorIsValidated(bytes4 _selector, bool _isValidated) external onlyOwner {
-        validatedSelectors[_selector] = _isValidated;
+    function setSelectorShouldBeValidated(bytes4 _selector, bool _isValidated) external onlyOwner {
+        selectorsToValidate[_selector] = _isValidated;
 
         emit SelectorValidationChanged(_selector, _isValidated);
     }
@@ -165,7 +165,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return;
         }
 
-        if (!validatedSelectors[selector]) {
+        if (!selectorsToValidate[selector]) {
             // The selector is not validated, any data is allowed.
             return;
         }
