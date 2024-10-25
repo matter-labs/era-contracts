@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.24;
 
-import {UnsupportedEncodingVersion, CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed, NotBridgehub, InvalidSelector, InvalidAddress, NotEnoughGas} from "../common/L1ContractErrors.sol";
+import {CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
 import {Restriction} from "./restriction/Restriction.sol";
@@ -19,18 +19,13 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 
-/// @dev We use try-catch to test whether some of the conditions should be checked.
-/// To avoid attacks based on the 63/64 gas limitations, we ensure that each such call
-/// has at least this amount.
-uint256 constant MIN_GAS_FOR_FALLABLE_CALL = 5_000_000;
-
 /// @title PermanentRestriction contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract should be used by chains that wish to guarantee that certain security
 /// properties are preserved forever.
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
-/// @dev One of the instances of such contract is enough to ensure that a ZkSyncHyperchain is a rollup forever.
+/// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
@@ -48,13 +43,12 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     mapping(bytes allowedCalldata => bool isAllowed) public allowedCalls;
 
     /// @notice The mapping of the validated selectors.
-    mapping(bytes4 selector => bool isValidated) public selectorsToValidate;
+    mapping(bytes4 selector => bool isValidated) public validatedSelectors;
 
     /// @notice The mapping of whitelisted L2 admins.
     mapping(address adminAddress => bool isWhitelisted) public allowedL2Admins;
 
     constructor(IBridgehub _bridgehub, address _l2AdminFactory) {
-        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L2_ADMIN_FACTORY = _l2AdminFactory;
     }
@@ -73,7 +67,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Allows a certain `ChainAdmin` implementation to be used as an admin.
     /// @param _implementationHash The hash of the implementation code.
     /// @param _isAllowed The flag that indicates if the implementation is allowed.
-    function setAllowedAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
+    function allowAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
         allowedAdminImplementations[_implementationHash] = _isAllowed;
 
         emit AdminImplementationAllowed(_implementationHash, _isAllowed);
@@ -91,8 +85,8 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Allows a certain selector to be validated.
     /// @param _selector The selector of the function.
     /// @param _isValidated The flag that indicates if the selector is validated.
-    function setSelectorShouldBeValidated(bytes4 _selector, bool _isValidated) external onlyOwner {
-        selectorsToValidate[_selector] = _isValidated;
+    function setSelectorIsValidated(bytes4 _selector, bool _isValidated) external onlyOwner {
+        validatedSelectors[_selector] = _isValidated;
 
         emit SelectorValidationChanged(_selector, _isValidated);
     }
@@ -133,20 +127,18 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @param _call The call data.
     /// @dev Note that we do not need to validate the migration to the L1 layer as the admin
     /// is not changed in this case.
-    function _validateMigrationToL2(Call calldata _call) private view {
-        _ensureEnoughGas();
-        try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
+    function _validateMigrationToL2(Call calldata _call) internal view {
+        (address admin, bool isMigration) = _getNewAdminFromMigration(_call);
+        if (isMigration) {
             if (!allowedL2Admins[admin]) {
                 revert NotAllowed(admin);
             }
-        } catch {
-            // It was not the migration call, so we do nothing
         }
     }
 
     /// @notice Validates the call as the chain admin
     /// @param _call The call data.
-    function _validateAsChainAdmin(Call calldata _call) private view {
+    function _validateAsChainAdmin(Call calldata _call) internal view {
         if (!_isAdminOfAChain(_call.target)) {
             // We only validate calls related to being an admin of a chain
             return;
@@ -165,7 +157,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return;
         }
 
-        if (!selectorsToValidate[selector]) {
+        if (!validatedSelectors[selector]) {
             // The selector is not validated, any data is allowed.
             return;
         }
@@ -178,7 +170,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Validates the correctness of the new admin.
     /// @param _call The call data.
     /// @dev Ensures that the admin has a whitelisted implementation and does not remove this restriction.
-    function _validateNewAdmin(Call calldata _call) private view {
+    function _validateNewAdmin(Call calldata _call) internal view {
         address newChainAdmin = abi.decode(_call.data[4:], (address));
 
         bytes32 implementationCodeHash = newChainAdmin.codehash;
@@ -197,7 +189,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Validates the removal of the restriction.
     /// @param _call The call data.
     /// @dev Ensures that this restriction is not removed.
-    function _validateRemoveRestriction(Call calldata _call) private view {
+    function _validateRemoveRestriction(Call calldata _call) internal view {
         if (_call.target != msg.sender) {
             return;
         }
@@ -215,20 +207,9 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
     /// @param _chain The address of the chain.
-    function _isAdminOfAChain(address _chain) private view returns (bool) {
-        _ensureEnoughGas();
-        (bool success, ) = address(this).staticcall(abi.encodeCall(this.tryCompareAdminOfAChain, (_chain, msg.sender)));
-        return success;
-    }
-
-    /// @notice Tries to compare the admin of a chain with the potential admin.
-    /// @param _chain The address of the chain.
-    /// @param _potentialAdmin The address of the potential admin.
-    /// @dev This function reverts if the `_chain` is not a ZkSyncHyperchain or the `_potentialAdmin` is not the
-    /// admin of the chain.
-    function tryCompareAdminOfAChain(address _chain, address _potentialAdmin) external view {
+    function _isAdminOfAChain(address _chain) internal view returns (bool) {
         if (_chain == address(0)) {
-            revert ChainZeroAddress();
+            return false;
         }
 
         // Unfortunately there is no easy way to double check that indeed the `_chain` is a ZkSyncHyperchain.
@@ -237,27 +218,27 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
 
-        // Note, that we do not use an explicit call here to ensure that the function does not panic in case of
-        // incorrect `_chain` address.
-        (bool success, bytes memory data) = _chain.staticcall(abi.encodeWithSelector(IGetters.getChainId.selector));
-        if (!success || data.length < 32) {
-            revert NotAHyperchain(_chain);
-        }
+        // Note, that we do use assembly here to ensure that the function does not panic in case of
+        // either incorrect `_chain` address or in case the returndata is too large
 
-        // Can not fail
-        uint256 chainId = abi.decode(data, (uint256));
+        (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
+
+        if (!chainIdQuerySuccess) {
+            // It is not a hyperchain, so we can return `false` here.
+            return false;
+        }
 
         // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
         // is compatible with the legacy ones.
         if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
-            revert NotAHyperchain(_chain);
+            // It is not a hyperchain, so we can return `false` here.
+            return false;
         }
 
-        // Now, the chain is known to be a hyperchain, so it should implement the corresponding interface
+        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
         address admin = IZKChain(_chain).getAdmin();
-        if (admin != _potentialAdmin) {
-            revert NotAnAdmin(admin, _potentialAdmin);
-        }
+
+        return admin == msg.sender;
     }
 
     /// @notice Tries to call `IGetters.getChainId()` function on the `_potentialChainAddress`.
@@ -289,54 +270,76 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
     /// @notice Tries to get the new admin from the migration.
     /// @param _call The call data.
-    /// @dev This function reverts if the provided call was not a migration call.
-    function tryGetNewAdminFromMigration(Call calldata _call) external view returns (address) {
+    /// @return Returns a tuple of of the new admin and whether the transaction is indeed the migration.
+    /// If the second item is `false`, the caller should ignore the first value.
+    /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
+    /// error that should be bubbled up by the caller.
+    function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
         if (_call.target != address(BRIDGE_HUB)) {
-            revert NotBridgehub(_call.target);
+            return (address(0), false);
+        }
+
+        if (_call.data.length < 4) {
+            return (address(0), false);
         }
 
         if (bytes4(_call.data[:4]) != IBridgehub.requestL2TransactionTwoBridges.selector) {
-            revert InvalidSelector(bytes4(_call.data[:4]));
+            return (address(0), false);
         }
 
         address sharedBridge = BRIDGE_HUB.sharedBridge();
 
+        // Assuming that correctly encoded calldata is provided, the following line must never fail,
+        // since the correct selector was checked before.
         L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
             _call.data[4:],
             (L2TransactionRequestTwoBridgesOuter)
         );
 
         if (request.secondBridgeAddress != sharedBridge) {
-            revert InvalidAddress(sharedBridge, request.secondBridgeAddress);
+            return (address(0), false);
         }
 
         bytes memory secondBridgeData = request.secondBridgeCalldata;
+        if (secondBridgeData.length == 0) {
+            return (address(0), false);
+        }
+
         if (secondBridgeData[0] != NEW_ENCODING_VERSION) {
-            revert UnsupportedEncodingVersion();
+            return (address(0), false);
         }
         bytes memory encodedData = new bytes(secondBridgeData.length - 1);
         assembly {
             mcopy(add(encodedData, 0x20), add(secondBridgeData, 0x21), mload(encodedData))
         }
 
+        // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
+        // supported only in the new protocol version with Gateway support, so we can assume
+        // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
+
+        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`.
+        // If it fails, it would mean that the data is not correct and the call would eventually fail anyway.
         (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
+
         // We will just check that the chainAssetId is a valid chainAssetId.
         // For now, for simplicity, we do not check that the admin is exactly the admin
         // of this chain.
         address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(chainAssetId);
         if (ctmAddress == address(0)) {
-            revert ZeroAddress();
+            return (address(0), false);
         }
 
+        // Almost certainly it will be Bridgehub, but we add this check just in case we have circumstances
+        // that require us to use a different asset handler.
+        address assetHandlerAddress = IAssetRouterBase(sharedBridge).assetHandlerAddress(chainAssetId);
+        if (assetHandlerAddress != address(BRIDGE_HUB)) {
+            return (address(0), false);
+        }
+
+        // The asset handler of CTM is the bridgehub and so the following decoding should work
         BridgehubBurnCTMAssetData memory burnData = abi.decode(bridgehubData, (BridgehubBurnCTMAssetData));
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 
-        return l2Admin;
-    }
-
-    function _ensureEnoughGas() private view {
-        if (gasleft() < MIN_GAS_FOR_FALLABLE_CALL) {
-            revert NotEnoughGas();
-        }
+        return (l2Admin, true);
     }
 }

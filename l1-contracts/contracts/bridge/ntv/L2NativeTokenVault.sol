@@ -204,8 +204,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         uint256 _originChainId,
         address _nonNativeToken
     ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-        bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {

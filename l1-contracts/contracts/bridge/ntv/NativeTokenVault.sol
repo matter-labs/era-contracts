@@ -174,7 +174,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 and L2->L1 transactions.
+    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _receiver.
     function bridgeBurn(
         uint256 _chainId,
