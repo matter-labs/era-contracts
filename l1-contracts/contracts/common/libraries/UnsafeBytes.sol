@@ -30,13 +30,6 @@ library UnsafeBytes {
         }
     }
 
-    function readUint128(bytes memory _bytes, uint256 _start) internal pure returns (uint128 result, uint256 offset) {
-        assembly {
-            offset := add(_start, 16)
-            result := mload(add(_bytes, offset))
-        }
-    }
-
     function readUint256(bytes memory _bytes, uint256 _start) internal pure returns (uint256 result, uint256 offset) {
         assembly {
             offset := add(_start, 32)
