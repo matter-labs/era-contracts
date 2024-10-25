@@ -24,7 +24,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {AddressAlreadyUsed, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InvalidProof, NoFundsTransferred, DepositDoesNotExist, WithdrawalAlreadyFinalized, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
-import {EthTransferFailed, NotNTV, EmptyToken, NativeTokenVaultAlreadySet, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {WrongCounterpart, EthTransferFailed, NotNTV, EmptyToken, NativeTokenVaultAlreadySet, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -106,7 +106,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
 
         vm.prank(bridgehubAddress);
-        vm.expectRevert("NTV: wrong counterpart");
+        vm.expectRevert(abi.encodeWithSelector(WrongCounterpart.selector));
         sharedBridge.bridgehubDeposit(eraChainId, owner, 0, data);
     }
 
