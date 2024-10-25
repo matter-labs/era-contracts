@@ -37,7 +37,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
-    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy. 
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
@@ -129,6 +129,23 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    /// @notice Ensures that the token is deployed inner for legacy tokens.
+    function _ensureAndSaveTokenDeployedInnerLegacyToken(
+        bytes32 _assetId,
+        address _originToken,
+        address _expectedToken,
+        address _l1LegacyToken
+    ) internal {
+        _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
+
+        /// token is a legacy token, no need to deploy
+        if (_l1LegacyToken != _originToken) {
+            revert AddressMismatch(_originToken, _l1LegacyToken);
+        }
+
+        tokenAddress[_assetId] = _expectedToken;
+    }
+
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
@@ -191,7 +208,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
             bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-            bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _l1Token);
+            bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
             return
                 L2ContractHelper.computeCreate2Address(
                     address(this),

@@ -69,7 +69,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /// @dev Disable the initialization to prevent Parity hack.
-    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy. 
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
     constructor(
         uint256 _l1ChainId,
@@ -144,10 +144,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc AssetRouterBase
-    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+    /// @notice Ensures the token is registered with NTV.
+    /// @param _token The address of the token that has to be registered.
+    function _ensureTokenRegisteredWithNTV(address _token) internal {
         IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        nativeTokenVault.ensureTokenIsRegistered(_token);
+        nativeTokenVault.registerToken(_token);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1

@@ -376,15 +376,15 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // And if there is not enough allowance for the NTV
         bool weCanTransfer = false;
         if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {
-           _originalCaller = address(legacyBridge);
-           _weCanTransfer = true;
+            _originalCaller = address(legacyBridge);
+            weCanTransfer = true;
         } else if (
             l1Token.allowance(_originalCaller, address(this)) >= _amount &&
             l1Token.allowance(_originalCaller, address(nativeTokenVault)) < _amount
         ) {
-            _weCanTransfer = true;
-        } 
-        if (_weCanTransfer) {
+            weCanTransfer = true;
+        }
+        if (weCanTransfer) {
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_originalCaller, address(nativeTokenVault), _amount);
             return true;
