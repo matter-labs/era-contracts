@@ -461,6 +461,8 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(bridgeOwner);
         bridgeHub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
         vm.stopPrank();
+        vm.assume(randomCaller != bridgeOwner);
+        vm.assume(randomCaller != bridgeHub.admin());
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
 
