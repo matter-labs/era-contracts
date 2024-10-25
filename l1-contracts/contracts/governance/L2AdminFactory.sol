@@ -35,8 +35,10 @@ contract L2AdminFactory {
         // Even though the chain admin will likely perform similar checks, 
         // we keep those here just in case, since it is not expensive, while allowing to fail fast.
         _validateRestrctions(_additionalRestrictions);
-        address[] memory restrictions = new address[](requiredRestrictions.length + _additionalRestrictions.length);
-
+        uint256 cachedRequired = requiredRestrictions.length;
+        uint256 cachedAdditional = _additionalRestrictions.length;
+        address[] memory restrictions = new address[](cachedRequired + cachedAdditional);
+        
         unchecked {
             for (uint256 i = 0; i < cachedRequired; ++i) {
                 restrictions[i] = requiredRestrictions[i];
