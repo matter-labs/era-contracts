@@ -1039,12 +1039,15 @@ object "EvmEmulator" {
             }
         }
         
-        function increaseDeploymentNonce() {
+        function incrementDeploymentNonce() -> nonce {
             // function incrementDeploymentNonce(address _address)
             mstore(0, 0x306395c600000000000000000000000000000000000000000000000000000000)
             mstore(4, address())
         
             performSystemCall(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
+        
+            returndatacopy(0, 0, 32)
+            nonce := mload(0)
         }
         
         function _fetchConstructorReturnGas() -> gasLeft {
@@ -1091,20 +1094,37 @@ object "EvmEmulator" {
         
         
             if iszero(isCreate2) {
-                // selector: function createEvmFromEmulator(bytes calldata _initCode)
-                mstore(sub(offset, 0x60), 0x9bdc7a37)
-                // Where the arg starts (second word)
-                mstore(sub(offset, 0x40), 0x20)
+                if gt(value, selfbalance()) { // it should be checked before actual deploy call
+                    panic()
+                }
+        
+                // we want to calculate the address of new contract
+                // and if it is deployable, we need to increment deploy nonce
+        
+                // selector: function prepareForEvmCreateFromEmulator()
+                mstore(0, 0x3ec89a4e00000000000000000000000000000000000000000000000000000000)
+                performSystemCall(DEPLOYER_SYSTEM_CONTRACT(), 4)
+                returndatacopy(0, 0, 32)
+                addr := mload(0)
+        
+                // so even if constructor reverts, nonce stays incremented
+        
+                // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
+                mstore(sub(offset, 0x80), 0xe43cec64)
+                // address
+                mstore(sub(offset, 0x60), addr)
+                // Where the arg starts (third word)
+                mstore(sub(offset, 0x40), 0x40)
                 // Length of the init code
                 mstore(sub(offset, 0x20), size)
         
-        
-                result := performSystemCallForCreate(value, sub(offset, 0x44), add(size, 0x44))
+                result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
             }
         
             let gasLeft
             switch result
                 case 0 {
+                    addr := 0
                     gasLeft := _saveReturndataAfterEVMCall(0, 0)
                 }
                 default {
@@ -4029,12 +4049,15 @@ object "EvmEmulator" {
                 }
             }
             
-            function increaseDeploymentNonce() {
+            function incrementDeploymentNonce() -> nonce {
                 // function incrementDeploymentNonce(address _address)
                 mstore(0, 0x306395c600000000000000000000000000000000000000000000000000000000)
                 mstore(4, address())
             
                 performSystemCall(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
+            
+                returndatacopy(0, 0, 32)
+                nonce := mload(0)
             }
             
             function _fetchConstructorReturnGas() -> gasLeft {
@@ -4081,20 +4104,37 @@ object "EvmEmulator" {
             
             
                 if iszero(isCreate2) {
-                    // selector: function createEvmFromEmulator(bytes calldata _initCode)
-                    mstore(sub(offset, 0x60), 0x9bdc7a37)
-                    // Where the arg starts (second word)
-                    mstore(sub(offset, 0x40), 0x20)
+                    if gt(value, selfbalance()) { // it should be checked before actual deploy call
+                        panic()
+                    }
+            
+                    // we want to calculate the address of new contract
+                    // and if it is deployable, we need to increment deploy nonce
+            
+                    // selector: function prepareForEvmCreateFromEmulator()
+                    mstore(0, 0x3ec89a4e00000000000000000000000000000000000000000000000000000000)
+                    performSystemCall(DEPLOYER_SYSTEM_CONTRACT(), 4)
+                    returndatacopy(0, 0, 32)
+                    addr := mload(0)
+            
+                    // so even if constructor reverts, nonce stays incremented
+            
+                    // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
+                    mstore(sub(offset, 0x80), 0xe43cec64)
+                    // address
+                    mstore(sub(offset, 0x60), addr)
+                    // Where the arg starts (third word)
+                    mstore(sub(offset, 0x40), 0x40)
                     // Length of the init code
                     mstore(sub(offset, 0x20), size)
             
-            
-                    result := performSystemCallForCreate(value, sub(offset, 0x44), add(size, 0x44))
+                    result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
                 }
             
                 let gasLeft
                 switch result
                     case 0 {
+                        addr := 0
                         gasLeft := _saveReturndataAfterEVMCall(0, 0)
                     }
                     default {

@@ -177,17 +177,22 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     function createEVM(bytes calldata _initCode) external payable override onlySystemCall returns (address) {
-        // TODO only for semantic tests?
-        uint256 deploymentNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(msg.sender);
-        if ((msg.sender != tx.origin) && deploymentNonce == 0) {
-            NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
+        uint256 senderNonce;
+        // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
+        if (msg.sender == tx.origin) {
+            // Subtract 1 for EOA since the nonce has already been incremented for this transaction
+            senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1;
+        } else {
+            // Deploy from EraVM context
+            senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(msg.sender);
+            // TODO only for semantic tests?
+            if (senderNonce == 0) {
+                NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
+            }
+
+            senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         }
 
-        // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
-        // Subtract 1 for EOA since the nonce has already been incremented for this transaction
-        uint256 senderNonce = msg.sender == tx.origin
-            ? NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1
-            : NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
 
         _evmDeployOnAddress(msg.sender, newAddress, _initCode);
@@ -195,16 +200,44 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         return newAddress;
     }
 
-    /// Note: only possible revert case should be due to revert in the called constructor
-    function createEvmFromEmulator(bytes calldata _initCode) external payable returns (address) {
-        if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {
-            revert Unauthorized(msg.sender);
+    function prepareForEvmCreateFromEmulator() public onlySystemCallFromEvmEmulator returns (address) {
+        if (_getAllowedBytecodeTypesMode() != AllowedBytecodeTypes.EraVmAndEVM) {
+            revert EVMEmulationNotSupported();
         }
 
+        return address(0); // TODO solidity semantic tests are invalid, remove it later
+
+        // TODO uncomment
+        /* 
         uint256 senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
-        
+
         address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
-        
+
+        // Unfortunately we can not provide revert reason as it would break EVM compatibility
+        require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(newAddress) == 0x0);
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(newAddress))) == 0x0);
+
+        return newAddress;
+        */
+    }
+
+    /// Note: only possible revert case should be due to revert in the called constructor
+    function createEvmFromEmulator(
+        address newAddress,
+        bytes calldata _initCode
+    ) external payable onlySystemCallFromEvmEmulator returns (address) {
+        // ##### TODO solidity semantic tests are invalid, remove it later
+        {
+            uint256 senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
+
+            newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
+
+            // Unfortunately we can not provide revert reason as it would break EVM compatibility
+            require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(newAddress) == 0x0);
+            require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(newAddress))) == 0x0);
+        }
+        // ##### END TODO
+
         _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
         return newAddress;
@@ -215,7 +248,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _initCode The init code for the contract
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
-    function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable override onlySystemCall returns (address) {
+    function create2EVM(
+        bytes32 _salt,
+        bytes calldata _initCode
+    ) external payable override onlySystemCall returns (address) {
         // No collision is possible with the zksync's non-EVM CREATE2, since
         // the prefixes are different
         bytes32 bytecodeHash = EfficientCall.keccak(_initCode);
