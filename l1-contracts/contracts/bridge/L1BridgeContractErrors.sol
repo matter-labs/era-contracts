@@ -28,3 +28,6 @@ error ClaimFailedDepositFailed();
 
 // 0x636c90db
 error WrongL2Sender(address providedL2Sender);
+
+// 0xb4aeddbc
+error WrongCounterpart();

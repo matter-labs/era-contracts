@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed, WrongCounterpart} from "../../common/L1ContractErrors.sol";
 import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
@@ -137,7 +137,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyAssetRouter {
-        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");
+        if (_assetHandlerAddressOnCounterpart != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert WrongCounterpart();
+        }
     }
 
     function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
