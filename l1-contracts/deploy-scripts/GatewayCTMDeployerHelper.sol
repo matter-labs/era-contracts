@@ -66,7 +66,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.validatorTimelock = _deployInternal(
             "ValidatorTimelock",
             "ValidatorTimelock.sol",
-            abi.encode(ctmDeployerAddress, 0, eraChainId),
+            abi.encode(ctmDeployerAddress, 0),
             innerConfig
         );
 
