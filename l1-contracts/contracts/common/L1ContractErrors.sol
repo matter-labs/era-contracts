@@ -15,12 +15,6 @@ error RestrictionWasNotPresent(address restriction);
 error RestrictionWasAlreadyPresent(address restriction);
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
-// 0x59e1b0d2
-error ChainZeroAddress();
-// 0xff4bbdf1
-error NotAHyperchain(address chainAddress);
-// 0xa3decdf3
-error NotAnAdmin(address expected, address actual);
 // 0xf6fd7071
 error RemovingPermanentRestriction();
 // 0xfcb9b2e1
@@ -143,8 +137,6 @@ error InvalidSelector(bytes4 func);
 error InvalidTxType(uint256 txType);
 // 0x0214acb6
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0x2554babc
-error InvalidAddress(address expected, address actual);
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0xd2c011d6
@@ -193,8 +185,6 @@ error NonSequentialVersion();
 error NotEnoughGas();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
-// 0x10f30e75
-error NotBridgehub(address addr);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
