@@ -9,12 +9,15 @@ const FILES_WITH_CUSTOM_ERRORS = [
   "contracts/bridge/L1BridgeContractErrors.sol",
   "contracts/bridgehub/L1BridgehubErrors.sol",
   "contracts/state-transition/L1StateTransitionErrors.sol",
+  "contracts/upgrades/ZkSyncUpgradeErrors.sol",
+  "deploy-scripts/ZkSyncScriptErrors.sol",
   "../l2-contracts/contracts/errors/L2ContractErrors.sol",
   "../system-contracts/contracts/SystemContractErrors.sol",
   "../da-contracts/contracts/DAContractsErrors.sol",
 ]; // Replace with your file paths
 const CONTRACTS_DIRECTORIES = [
   "contracts",
+  "deploy-scripts",
   "test/foundry",
   "../l2-contracts/contracts",
   "../system-contracts/contracts",

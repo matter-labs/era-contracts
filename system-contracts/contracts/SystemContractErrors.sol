@@ -98,6 +98,10 @@ error UnsupportedTxType(uint256);
 error ValueMismatch(uint256 expected, uint256 actual);
 // 0x6818f3f9
 error ZeroNonceError();
+// 0x4f2b5b33
+error SloadContractBytecodeUnknown();
+// 0x43197434
+error PreviousBytecodeUnknown();
 
 // 0x7a47c9a2
 error InvalidChainId();

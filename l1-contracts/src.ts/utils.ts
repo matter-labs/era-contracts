@@ -28,6 +28,7 @@ export const L2_BRIDGEHUB_ADDRESS = "0x0000000000000000000000000000000000010002"
 export const L2_ASSET_ROUTER_ADDRESS = "0x0000000000000000000000000000000000010003";
 export const L2_NATIVE_TOKEN_VAULT_ADDRESS = "0x0000000000000000000000000000000000010004";
 export const L2_MESSAGE_ROOT_ADDRESS = "0x0000000000000000000000000000000000010005";
+export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
@@ -45,6 +46,9 @@ export const DIAMOND_CUT_DATA_ABI_STRING =
 export const FORCE_DEPLOYMENT_ABI_STRING =
   "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
 export const BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes ctmData, bytes chainData)";
+export const FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING =
+  "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl)";
+export const ADDITIONAL_FORCE_DEPLOYMENTS_DATA_ABI_STRING = "tuple(bytes32 baseTokenAssetId, address l2Weth)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
@@ -57,6 +61,10 @@ export function readBytecode(path: string, fileName: string) {
 export function readInterface(path: string, fileName: string) {
   const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })).abi;
   return new ethers.utils.Interface(abi);
+}
+
+export function readContract(path: string, fileName: string) {
+  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" }));
 }
 
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
@@ -159,7 +167,6 @@ export interface FeeParams {
 export interface ProposedUpgrade {
   // The tx for the upgrade call to the l2 system upgrade contract
   l2ProtocolUpgradeTx: L2CanonicalTransaction;
-  factoryDeps: BytesLike[];
   bootloaderHash: BytesLike;
   defaultAccountHash: BytesLike;
   verifier: string;
@@ -313,7 +320,6 @@ export function compileInitialCutHash(
       admin: "0x0000000000000000000000000000000000003234",
       validatorTimelock: "0x0000000000000000000000000000000000004234",
       baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000004234",
-      baseTokenBridge: "0x0000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
       verifier,
       verifierParams,
@@ -325,7 +331,7 @@ export function compileInitialCutHash(
     },
   ]);
 
-  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
+  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 8 * 32) * 2));
 }
 
 export enum PubdataSource {

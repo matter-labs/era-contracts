@@ -15,7 +15,9 @@
     "fast-glob": "^3.3.2",
     "hardhat": "=2.22.2",
     "preprocess": "^3.2.0",
-    "zksync-ethers": "^5.9.0"
+    "zksync-ethers": "^5.9.0",
+    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@4.9.5",
+    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@4.9.5"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.2.0",

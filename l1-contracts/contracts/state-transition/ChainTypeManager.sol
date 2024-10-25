@@ -122,7 +122,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
-        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
         validatorTimelock = _initializeData.validatorTimelock;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
@@ -210,7 +210,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
     /// @param _validatorTimelock the new validatorTimelock address
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
@@ -230,8 +230,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
-        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
+        _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
@@ -244,11 +244,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
-    /// @dev set the protocol version timestamp
+    /// @notice Set the protocol version deadline
     /// @param _protocolVersion the protocol version
     /// @param _timestamp the timestamp is the deadline
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        _setProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -343,13 +343,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
     /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
-    /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
     function _deployNewChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _sharedBridge,
         address _admin,
         bytes memory _diamondCut
     ) internal returns (address zkChainAddress) {
@@ -382,7 +380,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             bytes32(uint256(uint160(_admin))),
             bytes32(uint256(uint160(validatorTimelock))),
             _baseTokenAssetId,
-            bytes32(uint256(uint160(_sharedBridge))),
             storedBatchZero,
             diamondCut.initCalldata
         );
@@ -399,7 +396,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice called by Bridgehub when a chain registers
     /// @param _chainId the chain's id
     /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
-    /// @param _assetRouter the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
     /// @param _factoryDeps the factory dependencies used for the genesis upgrade
@@ -407,7 +403,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function createNewChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _assetRouter,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
@@ -415,7 +410,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
 
         // solhint-disable-next-line func-named-parameters
-        zkChainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _assetRouter, _admin, _diamondCut);
+        zkChainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _admin, _diamondCut);
 
         {
             // check input
@@ -503,7 +498,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         chainAddress = _deployNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
-            _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
             _admin: _admin,
             _diamondCut: _diamondCut
         });
@@ -524,12 +518,31 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // state updates that occur.
     }
 
+    /// @notice Set the protocol version deadline
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
+    function _setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) internal {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Legacy functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice return the chain contract address for a chainId
     function getHyperchain(uint256 _chainId) public view returns (address) {
+        // During upgrade, there will be a period when the zkChains mapping on
+        // bridgehub will not be filled yet, while the ValidatorTimelock
+        // will still query the address to obtain the chain id.
+        //
+        // To cover this case, we firstly use the existing storage and only then
+        // we use the bridgehub if the former was not present.
+        // This logic should be deleted in one of the future upgrades.
+        address legacyAddress = getZKChainLegacy(_chainId);
+        if (legacyAddress != address(0)) {
+            return legacyAddress;
+        }
         return getZKChain(_chainId);
     }
 }

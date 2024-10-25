@@ -108,7 +108,7 @@ library DataEncoding {
         if (_encodingVersion == LEGACY_ENCODING_VERSION) {
             address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
+            txDataHash = encodeLegacyTxDataHash(_originalCaller, tokenAddress, depositAmount);
         } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.
             // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
@@ -120,12 +120,25 @@ library DataEncoding {
         }
     }
 
+    /// @notice Encodes the legacy transaction data hash.
+    /// @dev the encoding strats with 0t
+    /// @param _originalCaller The address of the entity that initiated the deposit.
+    /// @param _l1Token The address of the L1 token.
+    /// @param _amount The amount of the L1 token.
+    /// @return txDataHash The resulting encoded transaction data hash.
+    function encodeLegacyTxDataHash(
+        address _originalCaller,
+        address _l1Token,
+        uint256 _amount
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_originalCaller, _l1Token, _amount));
+    }
+
     /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
     function decodeTokenData(
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
         bytes1 encodingVersion = _tokenData[0];
-        // kl todo check correct
         if (encodingVersion == LEGACY_ENCODING_VERSION) {
             (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
         } else if (encodingVersion == NEW_ENCODING_VERSION) {

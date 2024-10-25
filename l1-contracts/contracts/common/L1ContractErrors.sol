@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
 error AccessToFunctionDenied(address target, bytes4 selector, address invoker);
+// 0x8164f842
+error ApprovalFailed();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x52e22c98
@@ -13,12 +15,6 @@ error RestrictionWasNotPresent(address restriction);
 error RestrictionWasAlreadyPresent(address restriction);
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
-// 0x59e1b0d2
-error ChainZeroAddress();
-// 0xff4bbdf1
-error NotAHyperchain(address chainAddress);
-// 0xa3decdf3
-error NotAnAdmin(address expected, address actual);
 // 0xf6fd7071
 error RemovingPermanentRestriction();
 // 0xfcb9b2e1
@@ -69,8 +65,6 @@ error ChainIdCantBeCurrentChain();
 error ChainIdMismatch();
 // 0x23f3c357
 error ChainIdNotRegistered(uint256 chainId);
-// 0x78d2ed02
-error ChainAlreadyLive();
 // 0x8f620a06
 error ChainIdTooBig();
 // 0xf7a01e4d
@@ -79,6 +73,8 @@ error DelegateCallFailed(bytes returnData);
 error DenominatorIsZero();
 // 0xb4f54111
 error DeployFailed();
+// 0x138ee1a3
+error DeployingBridgedTokenForNativeToken();
 // 0xc7c9660f
 error DepositDoesNotExist();
 // 0xad2fa98e
@@ -141,8 +137,6 @@ error InvalidSelector(bytes4 func);
 error InvalidTxType(uint256 txType);
 // 0x0214acb6
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0xcb5e4247
-error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0xd2c011d6
@@ -201,6 +195,8 @@ error OperationExists();
 error OperationMustBePending();
 // 0xe1c1ff37
 error OperationMustBeReady();
+// 0xb926450e
+error OriginChainIdNotFound();
 // 0xd7f50a9d
 error PatchCantSetUpgradeTxn();
 // 0x962fd7d0
@@ -277,8 +273,6 @@ error TxnBodyGasLimitNotEnoughGas();
 error Unauthorized(address caller);
 // 0xe52478c7
 error UndefinedDiamondCutAction();
-// 0x07218375
-error UnexpectedNumberOfFactoryDeps();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
 // 0xf093c2e5
@@ -318,12 +312,30 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
-// 0x10f30e75
-error NotBridgehub(address addr);
-// 0x2554babc
-error InvalidAddress(address expected, address actual);
+// 0x64846fe4
+error NotARestriction(address addr);
 // 0xfa5cd00f
 error NotAllowed(address addr);
+// 0xccdd18d2
+error BytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x25d8333c
+error CallerNotTimerAdmin();
+// 0x907f8e51
+error DeadlineNotYetPassed();
+// 0x6eef58d1
+error NewDeadlineNotGreaterThanCurrent();
+// 0x8b7e144a
+error NewDeadlineExceedsMaxDeadline();
+// 0x2a5989a0
+error AlreadyPermanentRollup();
+// 0x92daded2
+error InvalidDAForPermanentRollup();
+// 0x6e3331f5
+error IncorrectPricingMode();
+// 0xd0266e26
+error NotSettlementLayer();
+// 0x7a4902ad
+error TimerAlreadyStarted();
 
 // 0x09aa9830
 error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);

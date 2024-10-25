@@ -41,9 +41,6 @@ interface IGetters is IZKChainBase {
     /// @return The address of the base token
     function getBaseTokenAssetId() external view returns (bytes32);
 
-    /// @return The address of the base token bridge
-    function getBaseTokenBridge() external view returns (address);
-
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256);
 
@@ -58,6 +55,10 @@ interface IGetters is IZKChainBase {
 
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
+
+    /// @return The start index of the priority tree, i.e. the index of the first priority operation that
+    /// was included into the priority tree.
+    function getPriorityTreeStartIndex() external view returns (uint256);
 
     /// @return The root hash of the priority tree
     function getPriorityTreeRoot() external view returns (bytes32);

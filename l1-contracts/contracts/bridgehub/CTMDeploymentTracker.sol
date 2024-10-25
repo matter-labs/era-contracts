@@ -15,6 +15,9 @@ import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
 import {OnlyBridgehub, CTMNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
 import {UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
 
+/// @dev The encoding version of the data.
+bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
@@ -24,9 +27,6 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
-
-    /// @dev The encoding version of the data.
-    bytes1 internal constant ENCODING_VERSION = 0x01;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -96,7 +96,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
             revert NotOwner(_originalCaller, owner());
         }
         bytes1 encodingVersion = _data[0];
-        if (encodingVersion != ENCODING_VERSION) {
+        if (encodingVersion != CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION) {
             revert UnsupportedEncodingVersion();
         }
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
@@ -122,7 +122,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         }
     }
 
-    function getAssetId(address _l1CTM) public view override returns (bytes32) {
+    function calculateAssetId(address _l1CTM) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1CTM)))));
     }
 
