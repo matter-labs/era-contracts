@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
+import {MAX_SYSTEM_CONTRACT_ADDRESS, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "../Constants.sol";
 import {Utils} from "./Utils.sol";
 
 import {SystemContractsCaller, CalldataForwardingMode, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS, MIMIC_CALL_CALL_ADDRESS} from "./SystemContractsCaller.sol";
@@ -344,6 +344,13 @@ library SystemContractHelper {
     /// @return `true` or `false` based on whether the `_address` is a system contract.
     function isSystemContract(address _address) internal pure returns (bool) {
         return uint160(_address) <= uint160(MAX_SYSTEM_CONTRACT_ADDRESS);
+    }
+
+    /// @notice Returns whether the current call is a system call from EVM emulator.
+    /// @return `true` or `false` based on whether the current call is a system call from EVM emulator.
+    function isSystemCallFromEvmEmulator() internal view returns (bool) {
+        if (!isSystemCall()) return false;
+        return ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender);
     }
 
     /// @notice Method used for burning a certain amount of gas.

@@ -1023,7 +1023,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
     _pushEVMFrame(gasForTheCall, false)
 
     if isCreate2 {
-        // Create2EVM selector
+        // selector: create2EVM(bytes32 _salt, bytes calldata _initCode)
         mstore(sub(offset, 0x80), 0x4e96f4c0)
         // salt
         mstore(sub(offset, 0x60), salt)
@@ -1037,8 +1037,8 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
 
 
     if iszero(isCreate2) {
-        // CreateEVM selector
-        mstore(sub(offset, 0x60), 0xff311601)
+        // selector: function createEvmFromEmulator(bytes calldata _initCode)
+        mstore(sub(offset, 0x60), 0x9bdc7a37)
         // Where the arg starts (second word)
         mstore(sub(offset, 0x40), 0x20)
         // Length of the init code

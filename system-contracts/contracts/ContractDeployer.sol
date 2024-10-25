@@ -195,8 +195,19 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         return newAddress;
     }
 
-    function evmDeployOnAddress(address _sender, address _newAddress, bytes calldata _initCode) external payable onlySelf {
-        _evmDeployOnAddress(_sender, _newAddress, _initCode);
+    /// Note: only possible revert case should be due to revert in the called constructor
+    function createEvmFromEmulator(bytes calldata _initCode) external payable returns (address) {
+        if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {
+            revert Unauthorized(msg.sender);
+        }
+
+        uint256 senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
+        
+        address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
+        
+        _evmDeployOnAddress(msg.sender, newAddress, _initCode);
+
+        return newAddress;
     }
 
     /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE2` opcode
