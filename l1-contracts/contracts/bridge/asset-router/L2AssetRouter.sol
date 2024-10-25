@@ -144,11 +144,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Ensures the token is registered with NTV.
-    /// @param _token The address of the token that has to be registered.
-    function _ensureTokenRegisteredWithNTV(address _token) internal {
+    /// @notice Ensures that token is registered with native token vault.
+    /// @dev Only used when deposit is made with legacy data encoding format.
+    /// @param _token The L2 token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _token) internal returns (bytes32 assetId) {
         IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        nativeTokenVault.registerToken(_token);
+        nativeTokenVault.ensureTokenIsRegistered(_token);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -229,6 +231,35 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _amount,
         bytes calldata _data
     ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
+        // solhint-disable-next-line func-named-parameters
+        bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
+        this.finalizeDeposit(L1_CHAIN_ID, assetId, data);
+    }
+
+    function finalizeDepositLegacyBridge(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) external onlyLegacyBridge {
+        _translateLegacyFinalizeDeposit({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
+    }
+
+    function _translateLegacyFinalizeDeposit(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) internal {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);

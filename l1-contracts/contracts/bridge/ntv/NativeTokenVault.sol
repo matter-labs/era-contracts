@@ -92,6 +92,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             revert TokenNotSupported(WETH_TOKEN);
         }
         require(_nativeToken.code.length > 0, "NTV: empty token");
+        require(assetId[_nativeToken] == bytes32(0), "NTV: asset id already registered");
         _unsafeRegisterNativeToken(_nativeToken);
     }
 
@@ -342,10 +343,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal {
         bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
-        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
+        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
     function _handleChainBalanceIncrease(
