@@ -526,7 +526,11 @@ for { } true { } {
     }
     case 0x41 { // OP_COINBASE
         evmGasLeft := chargeGas(evmGasLeft, 2)
-        sp, stackHead := pushStackItem(sp, BOOTLOADER_FORMAL_ADDRESS(), stackHead) // Value is hardcoded
+        let _coinbase := mload(COINBASE_CACHE_OFFSET())
+        if iszero(_coinbase) {
+            _coinbase := cached(COINBASE_CACHE_OFFSET(), coinbase())
+        }
+        sp, stackHead := pushStackItem(sp, _coinbase, stackHead)
         ip := add(ip, 1)
     }
     case 0x42 { // OP_TIMESTAMP
@@ -549,7 +553,11 @@ for { } true { } {
     }
     case 0x44 { // OP_PREVRANDAO
         evmGasLeft := chargeGas(evmGasLeft, 2)
-        sp, stackHead := pushStackItem(sp, BLOCK_DIFFICULTY(), stackHead) // Value is hardcoded
+        let _prevrandao := mload(PREVRANDAO_CACHE_OFFSET())
+        if iszero(_prevrandao) {
+            _prevrandao := cached(PREVRANDAO_CACHE_OFFSET(), prevrandao())
+        }
+        sp, stackHead := pushStackItem(sp, _prevrandao, stackHead)
         ip := add(ip, 1)
     }
     case 0x45 { // OP_GASLIMIT

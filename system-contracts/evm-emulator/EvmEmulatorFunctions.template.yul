@@ -26,27 +26,27 @@ function MSG_VALUE_SYSTEM_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008009
 }
 
-function BOOTLOADER_FORMAL_ADDRESS() -> addr {
-    addr := 0x0000000000000000000000000000000000008001
-}
-
-function BLOCK_DIFFICULTY() -> difficulty {
-    difficulty := 2500000000000000
-}
-
 function ORIGIN_CACHE_OFFSET() -> offset {
-    offset := mul(25, 32)
+    offset := mul(23, 32)
 }
 
 function GASPRICE_CACHE_OFFSET() -> offset {
-    offset := mul(26, 32)
+    offset := mul(24, 32)
+}
+
+function COINBASE_CACHE_OFFSET() -> offset {
+    offset := mul(25, 32)
 }
 
 function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
-    offset := mul(27, 32)
+    offset := mul(26, 32)
 }
 
 function BLOCKNUMBER_CACHE_OFFSET() -> offset {
+    offset := mul(27, 32)
+}
+
+function PREVRANDAO_CACHE_OFFSET() -> offset {
     offset := mul(28, 32)
 }
 
