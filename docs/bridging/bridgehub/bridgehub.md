@@ -1,116 +1,13 @@
 FIXME: read and fix any issues
 
 
-# Intro & Prerequisites
-
-Ethereum's future is rollup-centric. This means breaking with the current paradigm of isolated EVM chains to infrastructure that is focused on an ecosystem of interconnected zkEVMs/zkVMs, (which we name ZK chain). This ecosystem will be grounded on Ethereum, requiring the appropriate L1 smart contracts. Here we outline our ZK Stack approach for these contracts, their interfaces, the needed changes to the existing architecture, as well as future features to be implemented.
-
-If you want to know more about ZK chains, check this [blog post](https://blog.matter-labs.io/introduction-to-hyperchains-fdb33414ead7), or go through [our docs](https://era.zksync.io/docs/reference/concepts/hyperscaling.html).
-
-This document will assume the reader already knows how rollups (esp. zkSync Era) work.
-
-## Long term goal
-
-We want to create a system where:
-
-- ZK chains should be launched permissionlessly within the ecosystem.
-- Interop is seamless and enables unified liquidity for assets across the ecosystem.
-- Multi-chain smart contracts need to be easy to develop, which means easy access to traditional bridges, and other supporting architecture.
-
-
 ### Images:
 
 ![Contracts](./img/gateway-architecture.png)
 
 > This document will not cover how ZK Gateway works, you can check it out in a separate doc (TODO: link).
 
-# Table of content
-
-# ST & CTM
-
-## State transition (Diamond Proxy)
-
-A high-level recap on how zk rollups work:
-
-- Offchain operators collect transactions, process those and submit a tuple of `(old_state, new_state, proof)` to the L1 contract.
-- The L1 contract then verifies that the proof is correct. If the proof is indeed correct, the `new_state` gets saved on the L1 contract. This `new_state` may not only include the storage root, but also a tree for L2→L1 messages (which allow to conduct withdrawals of funds from the L2), etc.
-
-In other words, we can imagine the L1 part of each rollup as a basically a “state transition function verifier”, the only role of which is to check whether the state transition proposed by the operator of the chain is correct. 
-
-To not commit to a specific type or option of this “state transition function”, we’ll call each rollup a   *State Transition* or ST. Note, that STs can be Validiums. An ST does not even have to be an L2 chain, it can also be an L3, etc.
-
-But for now, whenever you see any mentioning of ST, Diamond Proxy, just imagine a single instance of an L2 chain. e.g. zkSync Era is an ST. 
-
 > You can also see the term "ZK chain". It is the same as ST and these terms are interchangeable. 
-
-## Chain Type Manager (CTM)
-
-> If someone is already familiar with the [previous version](https://github.com/code-423n4/2024-03-zksync) of zkSync architecture, this contract was previously known as "State Transition Manager (CTM)".
-
-Currently bridging between different zk rollups requires the funds to pass through L1. This is slow & expensive.
-
-The vision of seamless internet of value requires transfers of value to be *both* seamless and trustless. This means that for instance different STs need to share the same L1 liquidity, i.e. a transfer of funds should never touch L1 in the process. However, it requires some sort of trust between two chains. If a malicious (or broken) rollup becomes a part of the shared liquidity pool it can steal all the funds. 
-
-However, can two instances of the same zk rollup trust each other? The answer is yes, because no new additions of rollups introduce new trust assumptions. Assuming there are no bugs in circuits, the system will work as intended.
-
-How can two rollups know that they are two different instances of the same system? We can create a factory of such contracts (and so we would know that each new rollup created by this instance is correct one). But just creating correct contracts is not enough. Ethereum changes, new bugs may be found in the original system & so an instance that does not keep itself up-to-date with the upgrades may exploit some bug from the past and jeopardize the entire system. Just deploying is not enough. We need to constantly make sure that all STs are up to date and maintain whatever other invariants are needed for these STs to trust each other.  
-
-Let’s define as *Chain Type Manager* (CTM) **as a contract that is responsible for the following:
-
-- It serves as a factory to deploy STs (new ZK chains)
-- It is responsible for ensuring that all the STs deployed by it are up-to-date.
-
-Note, that this means that STs have a “weaker” governance. I.e. governance can only do very limited number of things, such as setting the validator. ST admin can not set its own upgrades and it can only “execute” the upgrade that has already been prepared by the CTM.
-
-In the long term vision STs deployment will be permissionless, however CTM will always remain the main point of trust and will have to be explicitly whitelisted by the decentralized governance of the entire ecosystem before its ST can get the access to the shared liquidity.
-
-## Configurability in the first release
-
-For now, only one CTM will be supported — the one that deploys instances of zkSync Era, possibly using other DA layers. To read more about different DA layers, check out this document (FIXME link).
-
-The exact process of deploying & registering a ST will be described in [sections below](#creating-new-chains-with-bridgehub). Overall, each ST in the first release will have the following parameters:
-
-| ST parameter | Updatability | Comment |
-| --- | --- | --- |
-| chainId | Permanent | Permanent identifier of the ST. Due to wallet support reasons, for now chainId has to be small (48 bits). This is one of the reasons why for now we’ll deploy STs manually, to prevent STs from having the same chainId as some another popular chain.  In the future it will be trustlessly assigned as a random 32-byte value.|
-| baseTokenAssetId | Permanent | Each ST can have their own custom base token (i.e. token used for paying the fees). It is set once during creation and can never be changed. Note, that we refer to and "asset id" here instead of an L1 address. To read more about what is assetId and how it works check out the document for custom asset bridging (FIXME: link) |
-| chainTypeManager | Permanent | The CTM that deployed the ST. In principle, it could be possible to migrate between CTMs (assuming both CTMs support that). However, in practice it may be very hard and as of now such functionality is not supported. |
-| admin | By admin of ST | The admin of the ST. It has some limited powers to govern the chain. To read more about which powers are available to a chain admin and which precautions should be taken, check out this document (FIXME: link to document about admin precauotions) |
-| validatorTimelock | CTM | For now, we want all the chains to use the same 21h timelock period before their batches are finalized. Only CTM can update the address that can submit state transitions to the rollup (that is, the validatorTimelock).  |
-| validatorTimelock.validator | By admin of ST | The admin of ST can choose who can submit new batches to the ValidatorTimelock.  |
-|  priorityTx FeeParams | By admin of ST | The admin of a ZK chain can amend the priority transaction fee params. |
-|  transactionFilterer | By admin of ST | A chain may put an additional filter to the incoming L1->L2 transactions. This may be needed by a permissioned chain (e.g. a Validium bank-lile corporate chain). |
-|  DA validation / permanent rollup status | By admin of ST | A chain can decide which DA layer to use. You check out more about safe DA management here (FIXME: link to admin doc) |
-| executing upgrades | By admin of ST | While exclusively CTM governance can set the content of the upgrade, STs will typically be able to choose suitable time for them to actually execute it. In the first release, STs will have to follow our upgrades. |
-| settlement layer | By admin of ST | The admin of the chain can enact migrations to other settlement layers. |
-
-> Note, that if we take a look at the access control for the corresponding functions inside the [AdminFacet](../../l1-contracts/contracts/state-transition/chain-deps/facets/Admin.sol), the may see that a lot of methods from above that are marked as "By admin of ST" could be in theory amended by the ChainTypeManager. However, this sort of action requires approval from decentralized governance. Also, in case of an urgent high risk situation, the decentralized governance might force upgrade the contract via CTM.
-
-## Upgradability in the current release
-
-In the first release, each chain will be an instance of zkSync Era and so the upgrade process of each individual ST will be similar to that of zkSync Era.
-
-1. Firstly, the governance of the CTM will publish the server (including sequencer, prover, etc) that support the new version . This is done offchain. Enough time should be given to various zkStack devs to update their version.
-2. The governance of the CTM will publish the upgrade onchain by atomatically executing the following three transactions:
-
-- `setChainCreationParams` ⇒ to ensure that new chains will be created with the version 
-- `setValidatorTimelock` (if needed) ⇒ to ensure that the new chains will use the new validator timelock right-away
-- `setNewVersionUpgrade` ⇒ to save the upgrade information that each ST will need to follow to conduct the upgrade on their side.
-
-3. After that, each ChainAdmin can upgrade to the new version in suitable time for them. 
-
-> Note, that while the governance does try to give the maximal possible time for chains to upgrade, the governance will typically put restrictions (aka deadlines) on the time by which the chain has to be upgraded. If the deadline is passed, the chain can not commit new batches until the upgrade is executed.
-
-### Emergency upgrade
-
-In case of an emergency, the [security council](https://blog.zknation.io/introducing-zk-nation/) has the ability to freeze the ecosystem and conduct an emergency upgrade (FIXME: link to governance doc).
-
-In case we are aware that some of the committed batches on an ST are dangerous to be executed, the CTM can call `revertBatches` on that ST. For faster reaction, the admin of the ChainTypeManager has the ability to do so without waiting for govenrnace approval that may take a lot of time. This action does not lead to funds being lost, so it is considered suitable for the partially trusted role of the admin of the ChainTypeManager.
-
-### Issues & caveats
-
-- If an ZK chain skips an upgrade (i.e. it has version X, it did not upgrade to `X + 1` and now the latest protocol version is `X + 2` there is no built-in way to upgrade). This team will require manual intervention from us to upgrade.
-- The approach of calling `revertBatches` for malicious STs is not scalable (O(N) of the number of chains). The situation is very rare, so it is fine in the short term, but not in the long run.
 
 # BridgeHub & Asset Routers
 
@@ -118,59 +15,6 @@ In the previous section we discussed how STs and CTMs work. However, these are j
 
 In this section we’ll explore how exactly unified liquidity is achieved and how do STs get deployed. 
 
-## Creating new chains with BridgeHub
-
-The main contract of the whole hyperchain ecosystem is called *`BridgeHub`*. It contains:
-
-- the registry from chainId to CTMs that is responsible for that chainId
-- the base token for each chainId.
-- the whitelist of CTMs
-- the whitelist of tokens allowed to be `baseTokens` of chains.
-- the whitelist of settlement layers
-- etc
-
-BridgeHub is responsible for creating new STs. It is also the main point of entry for L1→L2 transactions for all the STs. Users won't be able to interact with STs directly, all the actions must be done through the BridgeHub, which will ensure that the fees have been paid and will route the call to the corresponding ST. One of the reasons it was done this way was to have the unified interface for all STs that will ever be included in the hyperchain ecosystem.
-
-To create a chain, the `BridgeHub.createNewChain` function needs to be called:
-
-```solidity
-/// @notice register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
-/// @notice for Eth the baseToken address is 1
-/// @param _chainId the chainId of the chain
-/// @param _chainTypeManager the state transition manager address
-/// @param _baseTokenAssetId the base token asset id of the chain
-/// @param _salt the salt for the chainId, currently not used
-/// @param _admin the admin of the chain
-/// @param _initData the fixed initialization data for the chain
-/// @param _factoryDeps the factory dependencies for the chain's deployment
-function createNewChain(
-    uint256 _chainId,
-    address _chainTypeManager,
-    bytes32 _baseTokenAssetId,
-    // solhint-disable-next-line no-unused-vars
-    uint256 _salt,
-    address _admin,
-    bytes calldata _initData,
-    bytes[] calldata _factoryDeps
-) external
-```
-
-BridgeHub will check that the CTM as well as the base token are whitelisted and route the call to the State 
-
-![newChain (2).png](./L1%20smart%20contracts/newChain.png)
-
-### Creation of a chain in the first release
-
-In the future, ST creation will be permissionless. A securely random `chainId` will be generated for each chain to be registered. However, generating 32-byte chainId is not feasible with the current SDK expectations on EVM and so for now chainId is of type `uint48`. And so it has to be chosen by the admin of `BridgeHub`. Also, for the first release we would want to avoid chains being able to choose their own initialization parameter to prevent possible malicious input.
-
-For this reason, there will be an entity called `admin` which is basically a hot key managed by us and it will be used to deploy new STs. 
-
-So the flow for deploying their own ST for users will be the following:
-
-1. Users tell us that they want to deploy a ST with certain governance, CTM (we’ll likely allow only one for now), and baseToken. 
-2. Our server will generate a chainId not reserved by any other major chain and the `admin` will call the `BridgeHub.createNewChain` . This will call the `CTM.createNewChain` that will deploy the instance of the rollup as well as initialize the first transaction there — the system upgrade transaction needed to set the chainId on L2.
-
-After that, the ST is ready to be used. Note, that the admin of the newly created chain (this will be the organization that will manage this chain from now on) will have to conduct certain configurations before the chain can be used securely (FIXME: link).
 
 ## Asset router as the main asset bridging entrypoint
 
@@ -229,13 +73,13 @@ If the transaction is successful, the `request.l2Value`  will be minted on the `
 
 ***Diagram of the L1→L2 transaction flow on L1 for direct user calls, the baseToken can be ETH or an ERC20:***
 
-![requestL2TransactionDirect (ETH) (2).png](./L1%20smart%20contracts/requestL2TransactionDirect.png)
+![requestL2TransactionDirect (ETH) (2).png](./img/requestL2TransactionDirect.png)
 
 ***Diagram of the L1→L2 transaction flow on L2 (it is the same regardless of the baseToken):***
 
-![requestL2TransactionTwoBridges](./L1%20smart%20contracts/requestL2TransactionTwoBridges_token.png)
+![requestL2TransactionTwoBridges](./img/requestL2TransactionTwoBridges_token.png)
 
-![L1-_L2 tx processing on L2.png](./L1%20smart%20contracts/L1_L2_tx_processing_on_L2.png)
+![L1-_L2 tx processing on L2.png](./img/L1_L2_tx_processing_on_L2.png)
 
 ### Limitations of custom base tokens in the first release
 
@@ -302,7 +146,7 @@ This call will return the parameters to call the l2 contract with (the address o
 
 ***Diagram of a depositing ETH onto a chain with USDC as the baseToken. Note that some contract calls (like `USDC.transerFrom` are omitted for the sake of consiceness):***
 
-![requestL2TransactionTwoBridges (SharedBridge) (1).png](./L1%20smart%20contracts/requestL2TransactionTwoBridges_depositEthToUSDC.png)
+![requestL2TransactionTwoBridges (SharedBridge) (1).png](./img/requestL2TransactionTwoBridges_depositEthToUSDC.png)
 
 ## Generic usage of `BridgeHub.requestL2TransactionTwoBridges`
 
@@ -398,18 +242,8 @@ Note, however, that it is not the way to withdraw base token. To withdraw base t
 
 After the batch with the withdrawal request has been executed, the user can finalize the withdrawal on L1 by calling `L1AssetRouter.finalizeWithdrawal`, where the user provides the proof of the corresponding withdrawal message.
 
-# Additional limitations for the current release
+# Additional limitations for the current version
 
-In the current release creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
+In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
 
 Also, since in the current release, there will be little benefits from shared liquidity, i.e. the there will be no direct ST<>ST transfers supported, as a measure of additional security we’ll also keep track of balances for each individual ST and will not allow it to withdraw more than it has deposited into the system.
-
-# Other contracts
-
-## Governance
-
-The documentation about decentralized governance can be read here (FIXME: provide link).
-
-## ValidatorTimelock
-
-All the chains registered on the current CTM share the same timelock for batch execution. It is a security feature, you can read more about it [here](./L1%20smart%20contracts.md#validatortimelock). 
