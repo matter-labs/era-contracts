@@ -1116,52 +1116,25 @@ object "EvmEmulator" {
         //                 CREATE FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
         
-        function performSystemCallForCreate(
-            value,
-            bytecodeStart,
-            bytecodeLen,
-        ) -> success {
-            let farCallAbi := shl(248, 1) // system call
-            // dataOffset is 0
-            farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
-            farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-            farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
-            // shardId is 0
-            // forwardingMode is 0
-            // not constructor call (ContractDeployer will call constructor)
+        function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
+            let value, offset, size
         
-            switch iszero(value)
-            case 0 {
-                success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, DEPLOYER_SYSTEM_CONTRACT(), 1, 0)
-            }
-            default {
-                success := verbatim_6i_1o("system_call", DEPLOYER_SYSTEM_CONTRACT(), farCallAbi, 0, 0, 0, 0)
-            }
+            popStackCheck(oldSp, 3)
+            value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
+        
+            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
         }
         
-        function incrementDeploymentNonce() -> nonce {
-            // function incrementDeploymentNonce(address _address)
-            mstore(0, 0x306395c600000000000000000000000000000000000000000000000000000000)
-            mstore(4, address())
+        function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
+            let value, offset, size, salt
         
-            performSystemCall(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
+            popStackCheck(oldSp, 4)
+            value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
         
-            returndatacopy(0, 0, 32)
-            nonce := mload(0)
-        }
-        
-        function _fetchConstructorReturnGas() -> gasLeft {
-            mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
-        
-            let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        
-            returndatacopy(0, 0, 32)
-            gasLeft := mload(0)
+            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
         }
         
         function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
@@ -1190,13 +1163,21 @@ object "EvmEmulator" {
         
             _eraseReturndataPointer()
         
-            offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
-        
-            let gasForTheCall := capGasForCall(evmGasLeft, INF_PASS_GAS())
-        
-            if gt(value, selfbalance()) { // it should be checked before actual deploy call
-                revertWithGas(evmGasLeft) // gasForTheCall not consumed
+            let err := 0
+            if value {
+                if gt(value, selfbalance()) {
+                    err := 1
+                }
             }
+        
+            if iszero(err) {
+                offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
+                evmGasLeft, addr := _executeCreate(offset, size, value, evmGasLeft, isCreate2, salt)
+            }
+        }
+        
+        function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
+            let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
         
             let bytecodeHash := 0
             if isCreate2 {
@@ -1204,8 +1185,7 @@ object "EvmEmulator" {
             }
         
             // we want to calculate the address of new contract, and if it is deployable (no collision),
-            // we need to increment deploy nonce. Otherwise - panic. 
-            // We should revert with gas if nonce overflowed, but this should not happen in reality anyway
+            // we need to increment deploy nonce.
         
             // selector: function precreateEvmAccountFromEmulator(bytes32 salt, bytes32 evmBytecodeHash)
             mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
@@ -1214,9 +1194,10 @@ object "EvmEmulator" {
             let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
         
             if iszero(precreateResult) {
-                // collision, nonce overflow or EVM not allowed
-                // this is *internal* panic, consuming all passed gas
-                evmGasLeft := chargeGas(evmGasLeft, gasForTheCall)
+                // Collision, nonce overflow or EVM not allowed.
+                // This is *internal* panic, consuming all passed gas.
+                // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
+                evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
             }
         
             if precreateResult {
@@ -1262,29 +1243,45 @@ object "EvmEmulator" {
                     }
             
                 let gasUsed := sub(gasForTheCall, gasLeft)
-                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+                evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
             }
         }
         
-        function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
-            let value, offset, size
+        function performSystemCallForCreate(
+            value,
+            bytecodeStart,
+            bytecodeLen,
+        ) -> success {
+            let farCallAbi := shl(248, 1) // system call
+            // dataOffset is 0
+            farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
+            farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
+            farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+            // shardId is 0
+            // forwardingMode is 0
+            // not constructor call (ContractDeployer will call constructor)
         
-            popStackCheck(oldSp, 3)
-            value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
-        
-            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
+            switch iszero(value)
+            case 0 {
+                success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, DEPLOYER_SYSTEM_CONTRACT(), 1, 0)
+            }
+            default {
+                success := verbatim_6i_1o("system_call", DEPLOYER_SYSTEM_CONTRACT(), farCallAbi, 0, 0, 0, 0)
+            }
         }
         
-        function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
-            let value, offset, size, salt
+        function _fetchConstructorReturnGas() -> gasLeft {
+            mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
         
-            popStackCheck(oldSp, 4)
-            value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
+            let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
         
-            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        
+            returndatacopy(0, 0, 32)
+            gasLeft := mload(0)
         }
         
         ////////////////////////////////////////////////////////////////
@@ -4230,52 +4227,25 @@ object "EvmEmulator" {
             //                 CREATE FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
             
-            function performSystemCallForCreate(
-                value,
-                bytecodeStart,
-                bytecodeLen,
-            ) -> success {
-                let farCallAbi := shl(248, 1) // system call
-                // dataOffset is 0
-                farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
-                farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-                farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
-                // shardId is 0
-                // forwardingMode is 0
-                // not constructor call (ContractDeployer will call constructor)
+            function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
+                let value, offset, size
             
-                switch iszero(value)
-                case 0 {
-                    success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, DEPLOYER_SYSTEM_CONTRACT(), 1, 0)
-                }
-                default {
-                    success := verbatim_6i_1o("system_call", DEPLOYER_SYSTEM_CONTRACT(), farCallAbi, 0, 0, 0, 0)
-                }
+                popStackCheck(oldSp, 3)
+                value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
+            
+                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
             }
             
-            function incrementDeploymentNonce() -> nonce {
-                // function incrementDeploymentNonce(address _address)
-                mstore(0, 0x306395c600000000000000000000000000000000000000000000000000000000)
-                mstore(4, address())
+            function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
+                let value, offset, size, salt
             
-                performSystemCall(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
+                popStackCheck(oldSp, 4)
+                value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
             
-                returndatacopy(0, 0, 32)
-                nonce := mload(0)
-            }
-            
-            function _fetchConstructorReturnGas() -> gasLeft {
-                mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
-            
-                let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            
-                returndatacopy(0, 0, 32)
-                gasLeft := mload(0)
+                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
             }
             
             function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
@@ -4304,13 +4274,21 @@ object "EvmEmulator" {
             
                 _eraseReturndataPointer()
             
-                offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
-            
-                let gasForTheCall := capGasForCall(evmGasLeft, INF_PASS_GAS())
-            
-                if gt(value, selfbalance()) { // it should be checked before actual deploy call
-                    revertWithGas(evmGasLeft) // gasForTheCall not consumed
+                let err := 0
+                if value {
+                    if gt(value, selfbalance()) {
+                        err := 1
+                    }
                 }
+            
+                if iszero(err) {
+                    offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
+                    evmGasLeft, addr := _executeCreate(offset, size, value, evmGasLeft, isCreate2, salt)
+                }
+            }
+            
+            function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
+                let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
             
                 let bytecodeHash := 0
                 if isCreate2 {
@@ -4318,8 +4296,7 @@ object "EvmEmulator" {
                 }
             
                 // we want to calculate the address of new contract, and if it is deployable (no collision),
-                // we need to increment deploy nonce. Otherwise - panic. 
-                // We should revert with gas if nonce overflowed, but this should not happen in reality anyway
+                // we need to increment deploy nonce.
             
                 // selector: function precreateEvmAccountFromEmulator(bytes32 salt, bytes32 evmBytecodeHash)
                 mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
@@ -4328,9 +4305,10 @@ object "EvmEmulator" {
                 let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
             
                 if iszero(precreateResult) {
-                    // collision, nonce overflow or EVM not allowed
-                    // this is *internal* panic, consuming all passed gas
-                    evmGasLeft := chargeGas(evmGasLeft, gasForTheCall)
+                    // Collision, nonce overflow or EVM not allowed.
+                    // This is *internal* panic, consuming all passed gas.
+                    // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
+                    evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
                 }
             
                 if precreateResult {
@@ -4376,29 +4354,45 @@ object "EvmEmulator" {
                         }
                 
                     let gasUsed := sub(gasForTheCall, gasLeft)
-                    evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+                    evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
                 }
             }
             
-            function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
-                let value, offset, size
+            function performSystemCallForCreate(
+                value,
+                bytecodeStart,
+                bytecodeLen,
+            ) -> success {
+                let farCallAbi := shl(248, 1) // system call
+                // dataOffset is 0
+                farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
+                farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
+                farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+                // shardId is 0
+                // forwardingMode is 0
+                // not constructor call (ContractDeployer will call constructor)
             
-                popStackCheck(oldSp, 3)
-                value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
-            
-                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
+                switch iszero(value)
+                case 0 {
+                    success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, DEPLOYER_SYSTEM_CONTRACT(), 1, 0)
+                }
+                default {
+                    success := verbatim_6i_1o("system_call", DEPLOYER_SYSTEM_CONTRACT(), farCallAbi, 0, 0, 0, 0)
+                }
             }
             
-            function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
-                let value, offset, size, salt
+            function _fetchConstructorReturnGas() -> gasLeft {
+                mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
             
-                popStackCheck(oldSp, 4)
-                value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
+                let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
             
-                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            
+                returndatacopy(0, 0, 32)
+                gasLeft := mload(0)
             }
             
             ////////////////////////////////////////////////////////////////
