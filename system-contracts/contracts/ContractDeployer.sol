@@ -223,7 +223,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(newAddress) == 0x0);
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(newAddress))) == 0x0);
 
-        return newAddress; // TODO solidity semantic tests are invalid, remove it later
+        return newAddress;
     }
 
     /// Note: only possible revert case should be due to revert in the called constructor
@@ -243,6 +243,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         bytes32 _salt,
         bytes calldata _initCode
     ) external payable override onlySystemCall returns (address) {
+        NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         // No collision is possible with the zksync's non-EVM CREATE2, since the prefixes are different
         bytes32 bytecodeHash = EfficientCall.keccak(_initCode);
         address newAddress = Utils.getNewAddressCreate2EVM(msg.sender, _salt, bytecodeHash);
