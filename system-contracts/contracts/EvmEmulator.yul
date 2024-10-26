@@ -175,6 +175,13 @@ object "EvmEmulator" {
             gasRemaining := sub(prevGas, toCharge)
         }
         
+        function providedErgs() -> ergs {
+            let _gas := gas()
+            if gt(_gas, EVM_GAS_STIPEND()) {
+                ergs := sub(_gas, EVM_GAS_STIPEND())
+            }
+        }
+        
         function checkMemIsAccessible(index, offset) {
             checkOverflow(index, offset)
         
@@ -798,7 +805,7 @@ object "EvmEmulator" {
         
             _pushEVMFrame(gasToPass, isStatic)
             let success := delegatecall(
-                0, // 0 gas since VM will add EVM_GAS_STIPEND() to gas
+                providedErgs(),
                 addr,
                 add(MEM_OFFSET_INNER(), argsOffset),
                 argsSize,
@@ -832,8 +839,8 @@ object "EvmEmulator" {
                 _pushEVMFrame(gasToPass, false)
                 // VM will add EVM_GAS_STIPEND() to gas for this call
                 // but if value != 0 we will firstly call MsgValueSimulator contract, which is zkVM system contract
-                // so we need to pass some gas for MsgValueSimulator
-                success := call(MSG_VALUE_SIMULATOR_STIPEND_GAS(), addr, value, argsOffset, argsSize, 0, 0)
+                // so we need to add some gas for MsgValueSimulator
+                success := call(add(MSG_VALUE_SIMULATOR_STIPEND_GAS(), providedErgs()), addr, value, argsOffset, argsSize, 0, 0)
                 frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
             }
         }
@@ -854,7 +861,7 @@ object "EvmEmulator" {
             }
             default {
                 _pushEVMFrame(gasToPass, true)
-                success := staticcall(0, addr, argsOffset, argsSize, 0, 0) // 0 gas since VM will add EVM_GAS_STIPEND() to gas
+                success := staticcall(providedErgs(), addr, argsOffset, argsSize, 0, 0)
                 frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
             }
         }
@@ -3208,6 +3215,13 @@ object "EvmEmulator" {
                 gasRemaining := sub(prevGas, toCharge)
             }
             
+            function providedErgs() -> ergs {
+                let _gas := gas()
+                if gt(_gas, EVM_GAS_STIPEND()) {
+                    ergs := sub(_gas, EVM_GAS_STIPEND())
+                }
+            }
+            
             function checkMemIsAccessible(index, offset) {
                 checkOverflow(index, offset)
             
@@ -3831,7 +3845,7 @@ object "EvmEmulator" {
             
                 _pushEVMFrame(gasToPass, isStatic)
                 let success := delegatecall(
-                    0, // 0 gas since VM will add EVM_GAS_STIPEND() to gas
+                    providedErgs(),
                     addr,
                     add(MEM_OFFSET_INNER(), argsOffset),
                     argsSize,
@@ -3865,8 +3879,8 @@ object "EvmEmulator" {
                     _pushEVMFrame(gasToPass, false)
                     // VM will add EVM_GAS_STIPEND() to gas for this call
                     // but if value != 0 we will firstly call MsgValueSimulator contract, which is zkVM system contract
-                    // so we need to pass some gas for MsgValueSimulator
-                    success := call(MSG_VALUE_SIMULATOR_STIPEND_GAS(), addr, value, argsOffset, argsSize, 0, 0)
+                    // so we need to add some gas for MsgValueSimulator
+                    success := call(add(MSG_VALUE_SIMULATOR_STIPEND_GAS(), providedErgs()), addr, value, argsOffset, argsSize, 0, 0)
                     frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 }
             }
@@ -3887,7 +3901,7 @@ object "EvmEmulator" {
                 }
                 default {
                     _pushEVMFrame(gasToPass, true)
-                    success := staticcall(0, addr, argsOffset, argsSize, 0, 0) // 0 gas since VM will add EVM_GAS_STIPEND() to gas
+                    success := staticcall(providedErgs(), addr, argsOffset, argsSize, 0, 0)
                     frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 }
             }

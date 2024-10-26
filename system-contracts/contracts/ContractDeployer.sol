@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SYSTEM_CONTEXT_CONTRACT, EVM_GAS_STIPEND} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -249,7 +249,15 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address newAddress,
         bytes calldata _initCode
     ) external payable onlySystemCallFromEvmEmulator returns (address) {
-        _evmDeployOnAddress(0, msg.sender, newAddress, _initCode);
+        uint32 providedErgs;
+        uint32 stipend = EVM_GAS_STIPEND;
+        assembly {
+            let _gas := gas()
+            if gt(_gas, stipend) {
+                providedErgs := sub(_gas, stipend)
+            }
+        }
+        _evmDeployOnAddress(providedErgs, msg.sender, newAddress, _initCode);
         return newAddress;
     }
 
