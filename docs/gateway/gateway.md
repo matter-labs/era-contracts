@@ -296,28 +296,7 @@ Also, each chain has its own admin. The structure of the chain admin can be deci
 - Updating token price in ETH on the contract
 - The full list can be observed by searching for `onlyAdmin` and `onlyAdminOrChainTypeManager` in the Admin.sol facet of the contract.
 
-### `ChainAdmin.sol` contract
-
-Some of the powers of the admin are dangerous not for the ecosystem, but for the chain itself. For example, if a rollup that claims to be permissionless wanted to stop the flow of L1→L2 transactions to zkSync Era, they could set up a transactionfilterer there. What’s even more dangerous is that the admin could quickly switch the chain to being a validium and publish unknown state. 
-
-This is beyond our security model as Era’s users’ should never be in danger regardless of actions of the Era’s admin. In order to ensure that it is the case, the `ChainAdmin.sol` was created. It is the intended chain admin of the Era chain. In order to ensure that it is flexible enough for future other chains to use, it uses a modular architecture to ensure that other chains could fit it to their needs. By default, this contract is not even `Ownable`, and anyone can execute transactions out of the name of it. In order to add new features such as restricting calling dangerous methods and access control, *restrictions* should be added there.
-
-Each restriction is a contract that implements the `IRestriction` interface. The following restrictions have been implemented so far:
-
-- `AccessControlRestriction` that allows to specify which addresses can call which methods. In the case of Era, only the `DEFAULT_ADMIN_ROLE`will be able to call any methods. This default admin will be the ML multisig.
-
-Other chains with non-ETH base token may need an account that would periodically call the L1 contract to update the ETH price there. They may create the `SET_TOKEN_MULTIPLIER_ROLE` role that is required to update the token price and give its rights to some hot private key.
-- `PermanentRestriction` that ensures that:
-
-a) This restriction could be lifted, i.e. the chain admin of the chain must forever have it. Even if the address of the `ChainAdmin` changes, it ensures that the new admin has this restriction turned on.
-b) It specifies the calldata this which certain methods can be called. For instance, in case a chain wants to keep itself as the permanent rollup (e.g. this is the case for Era), it will ensure that the only DA validation method that can be used is rollup. The decentralized governance will be responsible for whitelisting the allowed calldata for certain functions.
-
-The approach above does not only help in protecting Era, but also provides correct information for chains that are present in our ecosystem. For instance, if a chain claims to be a rollup, but allows changing the DA mode in any minute can not be considered secure for users. 
-
-# Known issues
-
-- Migration is not yet fully thought through. While a system bootstrapped from scratch should work, some changes are still needed to ensure smooth migration of the ecosystem to the new design (especially when it comes to L1<>L2 token bridging, handling legacy deposits and withdrawals).
-- Inconsistency in using custom errors: right now in some places custom errors are used and in some the old string-based are used.
+You can read more about chain admins [here](../chain_managment/admin_role.md).
 
 ## L1<>L2 token bridging considerations
 
