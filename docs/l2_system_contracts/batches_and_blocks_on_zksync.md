@@ -40,13 +40,15 @@ The SystemContext can immediately check whether the provided number is the corre
 
 ### `setL2Block`
 
+FIXME: fix link 
+
 Before each transaction, we call `setL2Block` [method](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/bootloader/bootloader.yul#L2825). There we will provide some data about the L2 block that the transaction belongs to:
 
 - `_l2BlockNumber` The number of the new L2 block.
 - `_l2BlockTimestamp` The timestamp of the new L2 block.
 - `_expectedPrevL2BlockHash` The expected hash of the previous L2 block.
 - `_isFirstInBatch` Whether this method is called for the first time in the batch.
-- `_maxVirtualBlocksToCreate` The maximum number of virtual block to create with this L2 block.
+- `_maxVirtualBlocksToCreate` The maximum number of virtual block to create with this L2 block. This is a legacy field that is always equal either to 0 or 1.
 
 If two transactions belong to the same L2 block, only the first one may have non-zero `_maxVirtualBlocksToCreate`. The rest of the data must be same.
 
@@ -64,17 +66,19 @@ The hash of an L2 block is `keccak256(abi.encode(_blockNumber, _blockTimestamp, 
 
 `_blockTxsRollingHash = keccak(keccak(0, tx1_hash), tx2_hash)` for a block with two txs, etc.
 
-To add a transaction hash to the current miniblock we use the `appendTransactionToCurrentL2Block` [function](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/contracts/SystemContext.sol#L402).
+To add a transaction hash to the current miniblock we use the `appendTransactionToCurrentL2Block` function of the `SystemContext` contract.
 
-Since zkSync is a state-diff based rollup, there is no way to deduce the hashes of the L2 blocks based on the transactions’ in the batch (because there is no access to the transaction’s hashes). At the same time, in order to execute `blockhash` method, the VM requires the knowledge of some of the previous L2 block hashes. In order to save up on pubdata (by making sure that the same storage slots are reused, i.e. we only have repeated writes) we [store](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/contracts/SystemContext.sol#L70) only the last 257 block hashes. You can read more on what are the repeated writes and how the pubdata is processed [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/Handling%20L1%E2%86%92L2%20ops%20on%20zkSync.md).
+Since zkSync is a state-diff based rollup, there is no way to deduce the hashes of the L2 blocks based on the transactions’ in the batch (because there is no access to the transaction’s hashes). At the same time, in order to execute `blockhash` method, the VM requires the knowledge of some of the previous L2 block hashes. In order to save up on pubdata (by making sure that the same storage slots are reused, i.e. we only have repeated writes) we [store](../../system-contracts/contracts/SystemContext.sol#L73) only the last 257 block hashes. You can read more on what are the repeated writes and how the pubdata is processed [here](../data_availability/Standard%20pubdata%20format.md).
 
 We store only the last 257 blocks, since the EVM requires only 256 previous ones and we use 257 as a safe margin.
 
 ### Legacy blockhash
 
-When initializing L2 blocks that do not have their hashes stored on L2 (basically these are blocks before the migration upgrade), we use the following formula for their hash:
+For L2 blocks that were created before we switched to the formulas from above, we use the following formula for their hash:
 
 `keccak256(abi.encodePacked(uint32(_blockNumber)))`
+
+These are only very old blocks on zkSync Era and other ZK chains don't have such blocks.
 
 ### Timing invariants
 
@@ -88,27 +92,17 @@ While the timestamp of each L2 block is provided by the operator, there are some
 
 ## Fictive L2 block & finalizing the batch
 
-At the end of the batch, the bootloader calls the `setL2Block` [one more time](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/bootloader/bootloader.yul#L4047) to allow the operator to create a new empty block. This is done purely for some of the technical reasons inside the node, where each batch ends with an empty L2 block.
+At the end of the batch, the bootloader calls the `setL2Block` [one more time](../../system-contracts/bootloader/bootloader.yul#L4110) to allow the operator to create a new empty block. This is done purely for some of the technical reasons inside the node, where each batch ends with an empty L2 block.
 
 We do not enforce that the last block is empty explicitly as it complicates the development process and testing, but in practice, it is, and either way, it should be secure.
 
 Also, at the end of the batch we send the timestamps of the batch as well as the timestamp of the last miniblock in order to check on L1 that both of these are realistic. Checking any other L2 block’s timestamp is not required since all of them are enforced to be between those two.
 
-## Migration & virtual blocks’ logic
-
-As already explained above, for a smoother upgrade for the ecosystem, there was a migration performed during which instead of returning either batch information or L2 block information, we returned the virtual block information until they had caught up with the L2 block’s number.
-
-### Production of the virtual blocks
-
-- In each batch, there should be at least one virtual block created.
-- Whenever a new L2 block is created, the operator can select how many virtual blocks it wants to create. This can be any number, however, if the number of the virtual block exceeds the L2 block number, the migration is considered complete and we switch to the mode where the L2 block information will be returned.
-
 ## Additional note on blockhashes
 
-Note, that if we used some complex formula for virtual blocks’ hashes (like we do for L2 blocks), we would have to put all of these into storage for the data availability. Even if we used the same storage trick that we used for the L2 blocks, where we store only the last 257’s block’s hashes under the current load/migration plans it would be expected that we have roughly ~250 virtual blocks per batch, practically meaning that we will publish all of these anyway. This would be too expensive. That is why we have to use a simple formula of `keccak(uint256(number))` for now. Note, that they do not collide with the legacy miniblock hash, since legacy miniblock hashes are calculated as `keccak(uint32(number))`.
+In the past, we had to apply different formulas based on whether or not the migration from batch environment info to L2 block info has finished. You can find these checks [here](../../system-contracts/contracts/SystemContext.sol#L137). But note, that the migration has ended quite some time ago, so in reality only the two cases above can be met:
 
-Also, we need to keep the consistency of previous blockhashes, i.e. if `blockhash(X)` returns a non-zero value, it should be consistent among the future blocks. For instance, let’s say that the hash of batch `1000` is `1`, i.e. `blockhash(1000) = 1`. Then, when we migrate to virtual blocks, we need to ensure that `blockhash(1000)` will return either 0 (if and only if the block is more than 256 blocks old) or `1`. Because of that for `blockhash` we will have the following complex [logic](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/contracts/SystemContext.sol#L132):
+- When the block is out of the readable range.
+- When it is a normal L2 block and so its hash has to be used.
 
-- For blocks that were created before the virtual block upgrade, use the batch hashes
-- For blocks that were created during the virtual block upgrade, use `keccak(uint256(number))`.
-- For blocks that were created after the virtual blocks have caught up with the L2 blocks, use L2 block hashes.
+The only edge case is when we ask for miniblock block number for which the base hash is returned. This edge case will be removed in future releases.
