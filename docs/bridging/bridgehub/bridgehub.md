@@ -1,19 +1,17 @@
 FIXME: read and fix any issues
 
-
 ### Images:
 
 ![Contracts](./img/gateway-architecture.png)
 
 > This document will not cover how ZK Gateway works, you can check it out in a separate doc (TODO: link).
 
-> You can also see the term "ZK chain". It is the same as ST and these terms are interchangeable. 
 
 # BridgeHub & Asset Routers
 
-In the previous section we discussed how STs and CTMs work. However, these are just means to get the collection of chains that can trust each other, while providing robust customizability for each individual chain. 
+In the previous section we discussed how ZKChains and CTMs work. However, these are just means to get the collection of chains that can trust each other, while providing robust customizability for each individual chain. 
 
-In this section we’ll explore how exactly unified liquidity is achieved and how do STs get deployed. 
+In this section we’ll explore how exactly unified liquidity is achieved and how do ZKChains get deployed. 
 
 
 ## Asset router as the main asset bridging entrypoint
@@ -54,7 +52,7 @@ struct L2TransactionRequestDirect {
 
 Most of the params are self-explanatory & replicate the logic of zkSync Era. The only non-trivial fields are:
 
-- `mintValue` is the total amount of the base tokens that should be minted on L2 as the result of this transaction. The requirement is that `request.mintValue >= request.l2Value + request.l2GasLimit * derivedL2GasPrice(...)`, where  `derivedL2GasPrice(...)` is the gas price to be used by this L1→L2 transaction. The exact price is defined by the ST.
+- `mintValue` is the total amount of the base tokens that should be minted on L2 as the result of this transaction. The requirement is that `request.mintValue >= request.l2Value + request.l2GasLimit * derivedL2GasPrice(...)`, where  `derivedL2GasPrice(...)` is the gas price to be used by this L1→L2 transaction. The exact price is defined by the ZKChain.
 
 Here is a quick guide on how this transaction is routed through the bridgehub. 
 
@@ -62,12 +60,12 @@ Here is a quick guide on how this transaction is routed through the bridgehub.
 
 This step ensures that the baseToken will be backed 1-1 on L1.
 
-2. After that, it just routes the corresponding call to the ST with the corresponding `chainId` . It is now the responsibility of the ST to validate that the transaction is correct and can be accepted by it. This validation includes, but not limited to:
+2. After that, it just routes the corresponding call to the ZKChain with the corresponding `chainId` . It is now the responsibility of the ZKChain to validate that the transaction is correct and can be accepted by it. This validation includes, but not limited to:
 
 - The fact that the user paid enough funds for the transaction (basically `request.l2GasLimit * derivedL2GasPrice(...) + request.l2Value >= request.mintValue`.
 - The fact the transaction is always executable (the `request.l2GasLimit`  is not high enough).
 - etc. 
-3. After the ST validates the tx, it includes it into its priority queue. Once the operator executes this transaction on L2, the `mintValue` of the baseToken will be minted on L2. The `derivedL2GasPrice(...) * gasUsed` will be given to the operator’s balance. The other funds can be routed either of the following way:
+3. After the ZKChain validates the tx, it includes it into its priority queue. Once the operator executes this transaction on L2, the `mintValue` of the baseToken will be minted on L2. The `derivedL2GasPrice(...) * gasUsed` will be given to the operator’s balance. The other funds can be routed either of the following way:
 
 If the transaction is successful, the `request.l2Value`  will be minted on the `request.l2Contract` address (it can potentially transfer these funds within the transaction).   The rest are minted to the `request.refundRecipient`  address. In case the transaction is not successful, all of the base token will be minted to the `request.refundRecipient` address. These are the same rules as for the zkSync Era.
 
@@ -83,14 +81,14 @@ If the transaction is successful, the `request.l2Value`  will be minted on the `
 
 ### Limitations of custom base tokens in the first release
 
-zkSync Era uses ETH as a base token. Upon creation of an ST other chains may want to use their own custom base tokens. Note, that for the first release all the possible base tokens are whitelisted. The other limitation is that all the base tokens must be backed 1-1 on L1 as well as they are solely implemented with `L2BaseToken`  contract. In other words:
+zkSync Era uses ETH as a base token. Upon creation of an ZKChain other chains may want to use their own custom base tokens. Note, that for the first release all the possible base tokens are whitelisted. The other limitation is that all the base tokens must be backed 1-1 on L1 as well as they are solely implemented with `L2BaseToken`  contract. In other words:
 
 - No custom logic is allowed on L2 for base tokens
 - Base tokens can not be minted on L2 without being backed by the corresponding L1 amount.
 
 If someone wants to build a protocol that mints base tokens on L2, the option for now is to “mint” an infinite amount of those on L1, deposit on L2 and then give those out as a way to “mint”. We will update this in the future.
 
-## General architecture and initialization of SharedBridge for a new ST
+## General architecture and initialization of SharedBridge for a new ZKChain
 
 Once the chain is created, its L2AssetRouter will be automatically deployed upon genesis. You can read more about it in the Chain creation flow (FIXME: link).
 
@@ -100,7 +98,7 @@ Once the chain is created, its L2AssetRouter will be automatically deployed upon
 
 > In the next paragraphs we will often refer to `L1AssetRouter` as performing something. It is good enough for understanding of how bridgehub functionality works. Under the hood though, it mainly serves as common entry that calls various asset handlers that are chosen based on asset id. You can read more about it in the custom asset bridging documentation (FIXME: link). 
 
-Let’s say that a ST has ETH as its base token. Let’s say that the depositor wants to bridge USDC to that chain. We can not use `BridgeHub.requestL2TransactionDirect`, because it only takes base token `mintValue` and then starts an L1→L2 transaction rightaway out of the name of the user and not the `L1AssetRouter`. 
+Let’s say that a ZKChain has ETH as its base token. Let’s say that the depositor wants to bridge USDC to that chain. We can not use `BridgeHub.requestL2TransactionDirect`, because it only takes base token `mintValue` and then starts an L1→L2 transaction rightaway out of the name of the user and not the `L1AssetRouter`. 
 
 We need some way to atomically deposit both ETH and USDC to the shared bridge + start a transaction from `L1AssetRouter`. For that we have a separate function on `Bridgehub`: `BridgeHub.requestL2TransactionTwoBridges`. The reason behind the name “two bridges” is a bit historical: the transaction supposed compose to do actions with two bridges: the bridge responsible for base tokens and the second bridge responsible for any other token.
 
@@ -125,18 +123,18 @@ struct L2TransactionRequestTwoBridgesOuter {
 The first few fields are the same as for the simple L1→L2 transaction case. However there are three new fields:
 
 - `secondBridgeAddress` is the address of the bridge (or contract in general) which will need to perform the L1->L2 transaction. In this case it should be the same `L1AssetRouter`
-- `secondBridgeValue`  is the `msg.value`  to be sent to the bridge which is responsible for the asset being deposited (in this case it is `L1AssetRouter` ). This can be used to deposit ETH to STs that have base token that is not ETH.
+- `secondBridgeValue`  is the `msg.value`  to be sent to the bridge which is responsible for the asset being deposited (in this case it is `L1AssetRouter` ). This can be used to deposit ETH to ZKChains that have base token that is not ETH.
 - `secondBridgeCalldata`  is the data to pass to the second contract. `L1AssetRouter` supports multiple formats of calldata, the list can be seen in the `bridgehubDeposit` function of the `L1AssetRouter`.
 
 The function will do the following:
 
 **L1**
 
-1. It will deposit the `request.mintValue`  of the ST’s base token the same way as during a simple L1→L2 transaction. These funds will be used for funding the `l2Value`  and the fee to the operator.
+1. It will deposit the `request.mintValue`  of the ZKChain’s base token the same way as during a simple L1→L2 transaction. These funds will be used for funding the `l2Value`  and the fee to the operator.
 2. It will call the `secondBridgeAddress` (`L1AssetRouter`) once again and this time it will deposit the funds to the `L1AssetRouter`, but this time it will be deposit not to pay the fees, but rather for the sake of bridging the desired token.
 
 This call will return the parameters to call the l2 contract with (the address of the L2 bridge counterpart,  the calldata and factory deps to call it with).
-3. After the BridgeHub will call the ST to add the corresponding L1→L2 transaction to the priority queue.
+3. After the BridgeHub will call the ZKChain to add the corresponding L1→L2 transaction to the priority queue.
 4. The BridgeHub will call the `SharedBridge` once again so that it can remember the hash of the corresponding deposit transaction. [This is needed in case the deposit fails](#claiming-failed-deposits).
 
 **L2**
@@ -215,7 +213,7 @@ Aside from the magical constant, the method should also return the information a
 
 ```solidity
 function bridgehubConfirmL2Transaction(
-    // `chainId` of the ST
+    // `chainId` of the ZKChain
     uint256 _chainId,
     // the same value that was returned by `bridgehubDeposit`
     bytes32 _txDataHash,
@@ -246,4 +244,4 @@ After the batch with the withdrawal request has been executed, the user can fina
 
 In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
 
-Also, since in the current release, there will be little benefits from shared liquidity, i.e. the there will be no direct ST<>ST transfers supported, as a measure of additional security we’ll also keep track of balances for each individual ST and will not allow it to withdraw more than it has deposited into the system.
+Also, since in the current release, there will be little benefits from shared liquidity, i.e. the there will be no direct ZKChain<>ZKChain transfers supported, as a measure of additional security we’ll also keep track of balances for each individual ZKChain and will not allow it to withdraw more than it has deposited into the system.

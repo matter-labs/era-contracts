@@ -1,12 +1,12 @@
 # Gateway protocol versioning and upgradability
 
-One of the hardest part about gateway (GW) is how do we synchronize interaction between L1 and L2 parts that can potentially have different versions of contracts. This synchronization should be compatible with any future STM that may be present on the gateway. 
+One of the hardest part about gateway (GW) is how do we synchronize interaction between L1 and L2 parts that can potentially have different versions of contracts. This synchronization should be compatible with any future CTM that may be present on the gateway. 
 
 Here we describe various scenarios of standard/emergency upgrades and how will those play out in the gateway setup. 
 
 # General idea
 
-We do not enshrine any particular approach on the protocol level of the GW. The following is the approach used by the standard Era STM, which also manages GW. 
+We do not enshrine any particular approach on the protocol level of the GW. The following is the approach used by the standard Era CTM, which also manages GW. 
 
 Upgrades will be split into two parts:
 
@@ -27,16 +27,16 @@ While the chain settles on L1 only, it will just do “active chain upgrades”.
 
 When a chain starts its migration to a new settlement layer (regardless of whether it is gateway or not):
 
-1. It will be checked the that the protocolVersion is the latest in the STM in the current settlement layer (just in case to not have to bother with backwards compatibility).
+1. It will be checked the that the protocolVersion is the latest in the CTM in the current settlement layer (just in case to not have to bother with backwards compatibility).
 2. The `s.settlementLayer` will be set for the chain. Now the chain becomes inactive and it can only take “inactive” upgrades.
-3. When migration finishes, it will be double checked that the `protocolVersion` is the same as the one in the target chains’ STM.
+3. When migration finishes, it will be double checked that the `protocolVersion` is the same as the one in the target chains’ CTM.
 
 If the chain has already been deployed there, it will be checked that the `protocolVersion` of the deployed contracts there is the same as the one of the chain that is being moved. 
 4. All “inactive” instances of a chain can receive “inactive” upgrades of a chain. The single “active” instance of a chain (the one on the settlement layer) can receive only active upgrades.
 
 In case step (3) fails (or for any other reason the chain fails), the migration recovery process should be available. (`L1AssetRouter.bridgeRecoverFailedTransfer` method). Recovering a chain id basically just changing its `settlementLayerId` to the current block.chainid. It will be double checked that the chain has not conducted any inactive upgrades in the meantime, i.e. the `protocolVersion` of the chain is the same as the one when the chain started its migration.
 
-In case we ever do need to do more than simply resetting `settlementLayerId` for a chain in case of a failed migration, it is the responsibility of the STM to ensure that the logic is compatible for all the versions.
+In case we ever do need to do more than simply resetting `settlementLayerId` for a chain in case of a failed migration, it is the responsibility of the CTM to ensure that the logic is compatible for all the versions.
 
 # Stuck state for L1→GW migration
 
@@ -50,17 +50,17 @@ This is considered to be a rare event, but it will be strongly recommended that 
 
 # Safety guards for GW→L1 migrations
 
-Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the step (3) from the above fails for some reason (e.g. a new protocol version id is available on the STM), then the chain is basically lost. 
+Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the step (3) from the above fails for some reason (e.g. a new protocol version id is available on the CTM), then the chain is basically lost. 
 
 ### Protocol version safety guards
 
-- Before a new protocol version is released, all the migrations will be paused, i.e. the `pauseMigration` function will be called by the owner of the Bridgehub on both L1 and L2. It should prevent migrations happening in the risky period when the new version is published to the STM.
-- Assuming that no new protocol versions are published to STM during the migration, the migration must succeed, since both STM on GW and on L1 will have the same version and so the checks will work fine.
+- Before a new protocol version is released, all the migrations will be paused, i.e. the `pauseMigration` function will be called by the owner of the Bridgehub on both L1 and L2. It should prevent migrations happening in the risky period when the new version is published to the CTM.
+- Assuming that no new protocol versions are published to CTM during the migration, the migration must succeed, since both CTM on GW and on L1 will have the same version and so the checks will work fine.
 - The finalization of any chain withdrawal is permissionless and so in the short term the team could help finalize the outstanding migrations to prevent funds loss.
 
  
 
-> The approach above is somewhat tricky as it requires careful coordination with the governance to ensure that at the time of when the new protocol version is published to STM, there are no outstanding migrations. 
+> The approach above is somewhat tricky as it requires careful coordination with the governance to ensure that at the time of when the new protocol version is published to CTM, there are no outstanding migrations. 
 
 In the future we will either make it more robust or add a recovery mechanism for failed GW → L1 migrations.
 > 
@@ -76,28 +76,28 @@ To prevent that, it is required for chains that migrate from GW that all their b
 The job of this proposal is to reduce the number of potential states in which the system can find itself in to a minimum. The cases that are removed:
 
 - Need to be able to migrate to a chain that has contracts from a different protocol version
-- Need to be able for STM to support migration of chains with different versions. Only `bridgeRecoverFailedTransfer` has to be supported for all the versions, but its logic is very trivial.
+- Need to be able for CTM to support migration of chains with different versions. Only `bridgeRecoverFailedTransfer` has to be supported for all the versions, but its logic is very trivial.
 
 The reason why we can not conduct “active” upgrades everywhere on both L1 and L2 part is that for the settlement layer we need to write the new protocol upgrade tx, while NOT allowing to override it. On other hand, for the “inactive” chain contracts, we need to ignore the upgrade transaction. 
 
 # Forcing “active chain upgrade”
 
-For L1-based chains, forcing those upgrades will work exactly same as before. Just during `commitBatches` the STM double checks that the protocol version is up to date.
+For L1-based chains, forcing those upgrades will work exactly same as before. Just during `commitBatches` the CTM double checks that the protocol version is up to date.
 
-The admin of the STM (GW) will call the STM (GW) with the new protocol version’s data. This transaction should not fail, but even if it does fail, we should be able to just re-try. For now, the GW operator will be trusted to not be malicious
+The admin of the CTM (GW) will call the CTM (GW) with the new protocol version’s data. This transaction should not fail, but even if it does fail, we should be able to just re-try. For now, the GW operator will be trusted to not be malicious
 
 ### Case of malicious Gateway operator
 
-In the future, malicious Gateway operator may try to exploit a known vulnerability in an STM. 
+In the future, malicious Gateway operator may try to exploit a known vulnerability in an CTM. 
 
 The recommended approach here is the following:
 
-- Admin of the STM (GW) will firstly commit to the upgrade (for example, preemptively freeze all the chains).
-- Once the chains are frozen, it can use L1→L2 communication to pass the new protocol upgrade to STM.
+- Admin of the CTM (GW) will firstly commit to the upgrade (for example, preemptively freeze all the chains).
+- Once the chains are frozen, it can use L1→L2 communication to pass the new protocol upgrade to CTM.
 
 > The approach above basically states that “if operator is censoring, we’ll be able to use standard censorship-resistance mechanism of a chain to bypass it”. The freezing part is just a way to not tell to the world the issue before all chains are safe from exploits.
 
-It is the responsibility of the STM to ensure that all the supported settlement layers are trusted enough to uphold to the above protocol. Using any sort of Validiums will be especially discouraged, since in theory those could get frozen forever without any true censorship resistance mechanisms. 
+It is the responsibility of the CTM to ensure that all the supported settlement layers are trusted enough to uphold to the above protocol. Using any sort of Validiums will be especially discouraged, since in theory those could get frozen forever without any true censorship resistance mechanisms. 
 
 Also, note that the freezing period should be long enough to ensure that censorship resistance mechanisms have enough time to kick in
 > 
@@ -109,7 +109,7 @@ Okay, imagine that there is a bug in an L1 implementation of a chain that has mi
 In case such situation does happen however, the current plan is just to:
 
 - Freeze the ecosystem.
-- Ask the admins nicely to upgrade their implementation. Decentralized token governance can also force-upgrade those via STM on L1.
+- Ask the admins nicely to upgrade their implementation. Decentralized token governance can also force-upgrade those via CTM on L1.
 
 # Backwards compatibility
 
@@ -125,23 +125,23 @@ So assume that Y is L1, and Z is ‘Gateway’.
 
 Definition:
 
-`Hyperchain(X)` - ‘a.k.a ST / DiamondProxy’ for a given chain id X
+`ZKChain(X)` - ‘a.k.a ST / DiamondProxy’ for a given chain id X
 
-`STM(X)` - the State transition manager for a given chain id X
+`CTM(X)` - the State transition manager for a given chain id X
 
-1. check that `Hyperchain(X).protocol_version == STM(X).protocol_version` on chain Y.
+1. check that `ZKChain(X).protocol_version == CTM(X).protocol_version` on chain Y.
 2. Start ‘burn’ process (on chain Y)
-    1. collect `‘payload’`  from `Hyperchain(X)` and `STM(X)` and `protocol_version` on chain Y.
-    2. set `Hyperchain(X).settlement_layer` to `address(Hyperchain(Z))`  on chain Y.
+    1. collect `‘payload’`  from `ZKChain(X)` and `CTM(X)` and `protocol_version` on chain Y.
+    2. set `ZKChain(X).settlement_layer` to `address(ZKChain(Z))`  on chain Y.
 3. Start ‘mint’ process (on chain Z)
-    1. check that `STM(X).protocol_version == payload.protocol_version`
-    2. Create new `Hyperchain(X)` on chain Z and register in the local bridgehub & STM.
-    3. pass `payload` to `Hyperchain(X)` and `STM(X)` to initialize the state.
+    1. check that `CTM(X).protocol_version == payload.protocol_version`
+    2. Create new `ZKChain(X)` on chain Z and register in the local bridgehub & CTM.
+    3. pass `payload` to `ZKChain(X)` and `CTM(X)` to initialize the state.
 4. If ‘mint’ fails - recover (on chain Y)
-    1. check that `Hyperchain(X).protocol_version == payload.protocol_version`
-        1. important, here we’re actually looking at the ‘HYPERCHAIN’ protocol version and not necessarily STM protocol version.
-    2. set `Hyperchain(X).settlement_layer` to `0`  on chain Y.
-    3. pass `payload` to `IHyperchain(X)` and `STM(X)` to initialize the state.
+    1. check that `ZKChain(X).protocol_version == payload.protocol_version`
+        1. important, here we’re actually looking at the ‘HYPERCHAIN’ protocol version and not necessarily CTM protocol version.
+    2. set `ZKChain(X).settlement_layer` to `0`  on chain Y.
+    3. pass `payload` to `IZKChain(X)` and `CTM(X)` to initialize the state.
 
 ### ‘Reverse’ chain migration - moving chain X ‘back’ from Z to Y.
 
@@ -150,7 +150,7 @@ Definition:
 1. Same as above (check protocol version - but on chain Z)
 2. Same as above (start burn process - but on chain Z)
     1. same as above
-    2. TODO: should we ‘remove’ the IHyperchain from Z completely? (’parent’ chain Y doesn’t really have an address on Z). 
+    2. TODO: should we ‘remove’ the IZKChain from Z completely? (’parent’ chain Y doesn’t really have an address on Z). 
 3. Same as above (start ‘mint’ - but on chain Y)
     1. same as above
     2. creation is probably not needed - as the contract was already there in a first place.
@@ -166,15 +166,15 @@ Definition:
 
 **Check 3a — protocol version on destination chain**
 
-- destination chain STM is on the OLDER version than the payload
-    - resolution: fail the transfer - seems that STMs were not upgraded.
-- destination chain STM is on the NEWER version that then payload
+- destination chain CTM is on the OLDER version than the payload
+    - resolution: fail the transfer - seems that CTMs were not upgraded.
+- destination chain CTM is on the NEWER version that then payload
     - For simplicity - we could fail the transfer here too.
 
 **Check 4a — protocol version on the source chain in case of transfer failure**
 
-- source IHyperchain is on the ‘older’ protocol version than the payload
-    - in theory - impossible, as this means that the IHyperchain protocol version was ‘reverted’.
-- source IHyperchain is on the ‘newer’ protocol version than the payload
-    - This is the **main** worst case scenario - as this means that the IHyperchain was updated (via ‘inactive’ update) while the protocol transfer was ongoing.
+- source IZKChain is on the ‘older’ protocol version than the payload
+    - in theory - impossible, as this means that the IZKChain protocol version was ‘reverted’.
+- source IZKChain is on the ‘newer’ protocol version than the payload
+    - This is the **main** worst case scenario - as this means that the IZKChain was updated (via ‘inactive’ update) while the protocol transfer was ongoing.
     - This is the ‘Stuck state’ case described in the paragraph above.

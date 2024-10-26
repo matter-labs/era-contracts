@@ -37,7 +37,7 @@ function createNewChain(
 
 BridgeHub will check that the CTM as well as the base token are whitelisted and route the call to the State 
 
-![newChain (2).png](./L1%20smart%20contracts/newChain.png)
+![newChain (2).png](./img/create_new_chain.png)
 
 ### Creation of a chain in the first release
 

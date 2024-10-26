@@ -22,14 +22,14 @@ This section contains some of the important changes that happened since the shar
 
 ### Bridgehub now has chainId → address mapping
 
-Before, Bridgehub contained a mapping from `chainId => stateTransitionManager`. The further resolution of the mapping should happen at the STM level. 
+Before, Bridgehub contained a mapping from `chainId => stateTransitionManager`. The further resolution of the mapping should happen at the CTM level. 
 For more intuitive management of the chains, a new mapping `chainId => hyperchainAddress` was added. This is considered more intuitive since “bridgehub is the owner of all the chains” mentality is more applicable with this new design.
 
-The upside of the previous approach was potentially easier migration within the same STM. However, in the end it was decided that the new approach is better.  
+The upside of the previous approach was potentially easier migration within the same CTM. However, in the end it was decided that the new approach is better.  
 
 #### Migration
 
-This new mapping will have to be filled up after upgrading the bridgehub. It is done by repeatedly calling the `setLegacyChainAddress` for each of the deployed chains. It is assumed that their number is relatively low. Also, this function is permissionless and so can be called by anyone after the upgrade is complete. This function will call the old STM and ask for the implementation of the chainId. 
+This new mapping will have to be filled up after upgrading the bridgehub. It is done by repeatedly calling the `setLegacyChainAddress` for each of the deployed chains. It is assumed that their number is relatively low. Also, this function is permissionless and so can be called by anyone after the upgrade is complete. This function will call the old CTM and ask for the implementation of the chainId. 
 
 Until the migration is done, all transactions with the old chains will not be working, but it is a short period of time. 
 
@@ -53,7 +53,7 @@ Now, however, the L2AssetRouter is set on the same constant on all chains.
 
 ### StateTransitionManager was renamed to ChainTypeManager
 
-STM was renamed to CTM (ChainTypeManager). This was done to use more intuitive naming as the chains of the same “type” share the same CTM.  
+CTM was renamed to CTM (ChainTypeManager). This was done to use more intuitive naming as the chains of the same “type” share the same CTM.  
 
 ### Hyperchains were renamed to ZK chains
 
@@ -225,7 +225,7 @@ CTMDeployer is a very lightweight contract used to facilitate chain migration. I
 - Assign bridgehub as the asset handler for the “asset” of the CTM on the supported settlement layer.
 
 Currently, it can only be done by the owner of the  CTMDeployer, but in the future, this method can become either permissionless or callable by the CTM owner.
-- Tell bridgehub which address on the L2 should serve as the L2 representation of the STM on L1. Currently, it can only be done by the owner of the  CTMDeployer, but in the future, this method can become callable by the CTM owner.
+- Tell bridgehub which address on the L2 should serve as the L2 representation of the CTM on L1. Currently, it can only be done by the owner of the  CTMDeployer, but in the future, this method can become callable by the CTM owner.
 
 ![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/703ee435-9e35-441a-b595-a8f42972ac1a/ec509988-b87c-4924-bd6c-316fd6d43d34/image.png)
 
@@ -315,7 +315,7 @@ You can read more about chain admins [here](../chain_managment/admin_role.md).
 
 This section is for auditors of the codebase. It includes some of the important invariants that the system relies on and which if broken could have bad consequences.
 
-- Assuming that the accepting STM is correct & efficient, the L1→GW part of the L1→GW→L3 transaction never fails. It is assumed that the provided max amount for gas is always enough for any transaction that can realistically come from L1.
+- Assuming that the accepting CTM is correct & efficient, the L1→GW part of the L1→GW→L3 transaction never fails. It is assumed that the provided max amount for gas is always enough for any transaction that can realistically come from L1.
 - GW → L1 migration never fails. If it is possible to get into a state where the migration is not possible to finish, then the chain is basically lost. There are some exceptions where for now it is the expected behavior. (check out the “Migration invariants  & protocol upgradability” section)
 - The general consistency of chains when migration between different settlement layers is done. Including the feasibility of emergency upgrades, etc. I.e. whether the whole system is thought-through.
 - Preimage attacks in the L3→L1 tree, we apply special prefixes to ensure that the tree structure is fixed, i.e. all logs are 88 bytes long (this is for backwards compatibility reasons). For batch leafs and chain id leafs we use special prefixes.
