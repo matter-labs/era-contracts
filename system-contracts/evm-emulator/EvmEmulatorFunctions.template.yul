@@ -626,7 +626,7 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
     // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
     // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
     // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
-    // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
+    // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called.
     // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
 
     let gasUsed := 100 // warm address access cost
@@ -634,28 +634,28 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
         gasUsed := 2600 // cold address access cost
     }
 
+    // memory_expansion_cost
+    gasUsed := add(gasUsed, getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize))
+
     if gt(value, 0) {
-        gasUsed := add(gasUsed, 6700) // positive_value_cost - stipend
-        gasToPass := add(gasToPass, 2300) // stipend TODO
+        gasUsed := add(gasUsed, 9000) // positive_value_cost
 
         if isAddrEmpty(addr) {
             gasUsed := add(gasUsed, 25000) // value_to_empty_account_cost
         }
     }
 
-    {
-        let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-        gasUsed := add(gasUsed, maxExpand)
-    }
-
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
+    evmGasLeft := sub(evmGasLeft, gasToPass)
+
+    if gt(value, 0) {
+        gasToPass := add(gasToPass, 2300)
+    }
 
     let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
     if precompileCost {
         if lt(gasToPass, precompileCost) {
-            evmGasLeft := chargeGas(evmGasLeft, gasToPass)
             gasToPass := 0 
         }
     }
@@ -670,20 +670,17 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
         retSize
     )
 
-    let gasUsedByCall := sub(gasToPass, frameGasLeft)
-
     if precompileCost {
         switch success 
         case 0 {
-            gasUsedByCall := gasToPass
+            frameGasLeft := 0
         }
         default {
-            gasUsedByCall := precompileCost
+            frameGasLeft := sub(gasToPass, precompileCost)
         }
     }
 
-    newGasLeft := chargeGas(evmGasLeft, gasUsedByCall)
-
+    newGasLeft := add(evmGasLeft, frameGasLeft)
     stackHead := success
 }
 
@@ -707,19 +704,15 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
         gasUsed := 2600
     }
 
-    {
-        let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-        gasUsed := add(gasUsed, maxExpand)
-    }
+    gasUsed := add(gasUsed, getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize))
 
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
+    evmGasLeft := sub(evmGasLeft, gasToPass)
 
     let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
     if precompileCost {
         if lt(gasToPass, precompileCost) {
-            evmGasLeft := chargeGas(evmGasLeft, gasToPass)
             gasToPass := 0 
         }
     }
@@ -733,25 +726,22 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
         retSize
     )
 
-    let gasUsedByCall := sub(gasToPass, frameGasLeft)
-
     if precompileCost {
         switch success 
         case 0 {
-            gasUsedByCall := gasToPass
+            frameGasLeft := 0
         }
         default {
-            gasUsedByCall := precompileCost
+            frameGasLeft := sub(gasToPass, precompileCost)
         }
     }
 
-    newGasLeft := chargeGas(evmGasLeft, gasUsedByCall)
-
+    newGasLeft := add(evmGasLeft, frameGasLeft)
     stackHead := success
 }
 
 
-function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEvmGasLeft, sp, stackHead {
+function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGasLeft, sp, stackHead {
     let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, 6)
@@ -771,10 +761,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEv
         gasUsed := 2600
     }
 
-    {
-        let maxExpand := getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize)
-        gasUsed := add(gasUsed, maxExpand)
-    }
+    gasUsed := add(gasUsed, getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize))
 
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
 
@@ -783,6 +770,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEv
     }
 
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
+    evmGasLeft := sub(evmGasLeft, gasToPass)
 
     _pushEVMFrame(gasToPass, isStatic)
     let success := delegatecall(
@@ -795,10 +783,8 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newEv
     )
 
     let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-    let gasUsed := sub(gasToPass, frameGasLeft)
 
-    newEvmGasLeft := chargeGas(evmGasLeft, gasUsed)
-
+    newGasLeft := add(evmGasLeft, frameGasLeft)
     stackHead := success
 }
 
