@@ -86,8 +86,44 @@ object "EvmEmulator" {
             addr :=  0x0000000000000000000000000000000000008009
         }
         
+        function ORIGIN_CACHE_OFFSET() -> offset {
+            offset := mul(23, 32)
+        }
+        
+        function GASPRICE_CACHE_OFFSET() -> offset {
+            offset := mul(24, 32)
+        }
+        
+        function COINBASE_CACHE_OFFSET() -> offset {
+            offset := mul(25, 32)
+        }
+        
+        function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
+            offset := mul(26, 32)
+        }
+        
+        function BLOCKNUMBER_CACHE_OFFSET() -> offset {
+            offset := mul(27, 32)
+        }
+        
+        function PREVRANDAO_CACHE_OFFSET() -> offset {
+            offset := mul(28, 32)
+        }
+        
+        function GASLIMIT_CACHE_OFFSET() -> offset {
+            offset := mul(29, 32)
+        }
+        
+        function CHAINID_CACHE_OFFSET() -> offset {
+            offset := mul(30, 32)
+        }
+        
+        function BASEFEE_CACHE_OFFSET() -> offset {
+            offset := mul(31, 32)
+        }
+        
         function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
-            offset := mul(32, 32)
+            offset := add(BASEFEE_CACHE_OFFSET(), 32)
         }
         
         function STACK_OFFSET() -> offset {
@@ -165,6 +201,11 @@ object "EvmEmulator" {
         function panic() {
             mstore(0, 0)
             revert(0, 32)
+        }
+        
+        function cached(cacheIndex, value) -> _value {
+            _value := value
+            mstore(cacheIndex, _value)
         }
         
         function chargeGas(prevGas, toCharge) -> gasRemaining {
@@ -1599,7 +1640,6 @@ object "EvmEmulator" {
                 }
                 case 0x30 { // OP_ADDRESS
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-            
                     sp, stackHead := pushStackItem(sp, address(), stackHead)
                     ip := add(ip, 1)
                 }
@@ -1619,8 +1659,11 @@ object "EvmEmulator" {
                 }
                 case 0x32 { // OP_ORIGIN
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-            
-                    sp, stackHead := pushStackItem(sp, origin(), stackHead)
+                    let _origin := mload(ORIGIN_CACHE_OFFSET())
+                    if iszero(_origin) {
+                        _origin := cached(ORIGIN_CACHE_OFFSET(), origin())
+                    }
+                    sp, stackHead := pushStackItem(sp, _origin, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x33 { // OP_CALLER
@@ -1708,8 +1751,11 @@ object "EvmEmulator" {
                 }
                 case 0x3A { // OP_GASPRICE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-            
-                    sp, stackHead := pushStackItem(sp, gasprice(), stackHead)
+                    let _gasprice := mload(GASPRICE_CACHE_OFFSET())
+                    if iszero(_gasprice) {
+                        _gasprice := cached(GASPRICE_CACHE_OFFSET(), gasprice())
+                    }
+                    sp, stackHead := pushStackItem(sp, _gasprice, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x3B { // OP_EXTCODESIZE
@@ -1821,32 +1867,56 @@ object "EvmEmulator" {
                 }
                 case 0x41 { // OP_COINBASE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp, stackHead := pushStackItem(sp, coinbase(), stackHead)
+                    let _coinbase := mload(COINBASE_CACHE_OFFSET())
+                    if iszero(_coinbase) {
+                        _coinbase := cached(COINBASE_CACHE_OFFSET(), coinbase())
+                    }
+                    sp, stackHead := pushStackItem(sp, _coinbase, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x42 { // OP_TIMESTAMP
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp, stackHead := pushStackItem(sp, timestamp(), stackHead)
+                    let _blocktimestamp := mload(BLOCKTIMESTAMP_CACHE_OFFSET())
+                    if iszero(_blocktimestamp) {
+                        _blocktimestamp := cached(BLOCKTIMESTAMP_CACHE_OFFSET(), timestamp())
+                    }
+                    sp, stackHead := pushStackItem(sp, _blocktimestamp, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x43 { // OP_NUMBER
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp, stackHead := pushStackItem(sp, number(), stackHead)
+                    let _blocknumber := mload(BLOCKNUMBER_CACHE_OFFSET())
+                    if iszero(_blocknumber) {
+                        _blocknumber := cached(BLOCKNUMBER_CACHE_OFFSET(), number())
+                    }
+                    sp, stackHead := pushStackItem(sp, _blocknumber, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x44 { // OP_PREVRANDAO
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp, stackHead := pushStackItem(sp, prevrandao(), stackHead)
+                    let _prevrandao := mload(PREVRANDAO_CACHE_OFFSET())
+                    if iszero(_prevrandao) {
+                        _prevrandao := cached(PREVRANDAO_CACHE_OFFSET(), prevrandao())
+                    }
+                    sp, stackHead := pushStackItem(sp, _prevrandao, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x45 { // OP_GASLIMIT
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp, stackHead := pushStackItem(sp, gaslimit(), stackHead)
+                    let _gasLimit := mload(GASLIMIT_CACHE_OFFSET())
+                    if iszero(_gasLimit) {
+                        _gasLimit := cached(GASLIMIT_CACHE_OFFSET(), gaslimit())
+                    }
+                    sp, stackHead := pushStackItem(sp, _gasLimit, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x46 { // OP_CHAINID
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp, stackHead := pushStackItem(sp, chainid(), stackHead)
+                    let _chainId := mload(CHAINID_CACHE_OFFSET())
+                    if iszero(_chainId) {
+                        _chainId := cached(CHAINID_CACHE_OFFSET(), chainid())
+                    }
+                    sp, stackHead := pushStackItem(sp, _chainId, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x47 { // OP_SELFBALANCE
@@ -1856,7 +1926,11 @@ object "EvmEmulator" {
                 }
                 case 0x48 { // OP_BASEFEE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp, stackHead := pushStackItem(sp, basefee(), stackHead)
+                    let _baseFee := mload(BASEFEE_CACHE_OFFSET())
+                    if iszero(_baseFee) {
+                        _baseFee := cached(BASEFEE_CACHE_OFFSET(), basefee())
+                    }
+                    sp, stackHead := pushStackItem(sp, _baseFee, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x50 { // OP_POP
@@ -3126,8 +3200,44 @@ object "EvmEmulator" {
                 addr :=  0x0000000000000000000000000000000000008009
             }
             
+            function ORIGIN_CACHE_OFFSET() -> offset {
+                offset := mul(23, 32)
+            }
+            
+            function GASPRICE_CACHE_OFFSET() -> offset {
+                offset := mul(24, 32)
+            }
+            
+            function COINBASE_CACHE_OFFSET() -> offset {
+                offset := mul(25, 32)
+            }
+            
+            function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
+                offset := mul(26, 32)
+            }
+            
+            function BLOCKNUMBER_CACHE_OFFSET() -> offset {
+                offset := mul(27, 32)
+            }
+            
+            function PREVRANDAO_CACHE_OFFSET() -> offset {
+                offset := mul(28, 32)
+            }
+            
+            function GASLIMIT_CACHE_OFFSET() -> offset {
+                offset := mul(29, 32)
+            }
+            
+            function CHAINID_CACHE_OFFSET() -> offset {
+                offset := mul(30, 32)
+            }
+            
+            function BASEFEE_CACHE_OFFSET() -> offset {
+                offset := mul(31, 32)
+            }
+            
             function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
-                offset := mul(32, 32)
+                offset := add(BASEFEE_CACHE_OFFSET(), 32)
             }
             
             function STACK_OFFSET() -> offset {
@@ -3205,6 +3315,11 @@ object "EvmEmulator" {
             function panic() {
                 mstore(0, 0)
                 revert(0, 32)
+            }
+            
+            function cached(cacheIndex, value) -> _value {
+                _value := value
+                mstore(cacheIndex, _value)
             }
             
             function chargeGas(prevGas, toCharge) -> gasRemaining {
@@ -4639,7 +4754,6 @@ object "EvmEmulator" {
                     }
                     case 0x30 { // OP_ADDRESS
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                
                         sp, stackHead := pushStackItem(sp, address(), stackHead)
                         ip := add(ip, 1)
                     }
@@ -4659,8 +4773,11 @@ object "EvmEmulator" {
                     }
                     case 0x32 { // OP_ORIGIN
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                
-                        sp, stackHead := pushStackItem(sp, origin(), stackHead)
+                        let _origin := mload(ORIGIN_CACHE_OFFSET())
+                        if iszero(_origin) {
+                            _origin := cached(ORIGIN_CACHE_OFFSET(), origin())
+                        }
+                        sp, stackHead := pushStackItem(sp, _origin, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x33 { // OP_CALLER
@@ -4748,8 +4865,11 @@ object "EvmEmulator" {
                     }
                     case 0x3A { // OP_GASPRICE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                
-                        sp, stackHead := pushStackItem(sp, gasprice(), stackHead)
+                        let _gasprice := mload(GASPRICE_CACHE_OFFSET())
+                        if iszero(_gasprice) {
+                            _gasprice := cached(GASPRICE_CACHE_OFFSET(), gasprice())
+                        }
+                        sp, stackHead := pushStackItem(sp, _gasprice, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x3B { // OP_EXTCODESIZE
@@ -4861,32 +4981,56 @@ object "EvmEmulator" {
                     }
                     case 0x41 { // OP_COINBASE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp, stackHead := pushStackItem(sp, coinbase(), stackHead)
+                        let _coinbase := mload(COINBASE_CACHE_OFFSET())
+                        if iszero(_coinbase) {
+                            _coinbase := cached(COINBASE_CACHE_OFFSET(), coinbase())
+                        }
+                        sp, stackHead := pushStackItem(sp, _coinbase, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x42 { // OP_TIMESTAMP
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp, stackHead := pushStackItem(sp, timestamp(), stackHead)
+                        let _blocktimestamp := mload(BLOCKTIMESTAMP_CACHE_OFFSET())
+                        if iszero(_blocktimestamp) {
+                            _blocktimestamp := cached(BLOCKTIMESTAMP_CACHE_OFFSET(), timestamp())
+                        }
+                        sp, stackHead := pushStackItem(sp, _blocktimestamp, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x43 { // OP_NUMBER
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp, stackHead := pushStackItem(sp, number(), stackHead)
+                        let _blocknumber := mload(BLOCKNUMBER_CACHE_OFFSET())
+                        if iszero(_blocknumber) {
+                            _blocknumber := cached(BLOCKNUMBER_CACHE_OFFSET(), number())
+                        }
+                        sp, stackHead := pushStackItem(sp, _blocknumber, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x44 { // OP_PREVRANDAO
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp, stackHead := pushStackItem(sp, prevrandao(), stackHead)
+                        let _prevrandao := mload(PREVRANDAO_CACHE_OFFSET())
+                        if iszero(_prevrandao) {
+                            _prevrandao := cached(PREVRANDAO_CACHE_OFFSET(), prevrandao())
+                        }
+                        sp, stackHead := pushStackItem(sp, _prevrandao, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x45 { // OP_GASLIMIT
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp, stackHead := pushStackItem(sp, gaslimit(), stackHead)
+                        let _gasLimit := mload(GASLIMIT_CACHE_OFFSET())
+                        if iszero(_gasLimit) {
+                            _gasLimit := cached(GASLIMIT_CACHE_OFFSET(), gaslimit())
+                        }
+                        sp, stackHead := pushStackItem(sp, _gasLimit, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x46 { // OP_CHAINID
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp, stackHead := pushStackItem(sp, chainid(), stackHead)
+                        let _chainId := mload(CHAINID_CACHE_OFFSET())
+                        if iszero(_chainId) {
+                            _chainId := cached(CHAINID_CACHE_OFFSET(), chainid())
+                        }
+                        sp, stackHead := pushStackItem(sp, _chainId, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x47 { // OP_SELFBALANCE
@@ -4896,7 +5040,11 @@ object "EvmEmulator" {
                     }
                     case 0x48 { // OP_BASEFEE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp, stackHead := pushStackItem(sp, basefee(), stackHead)
+                        let _baseFee := mload(BASEFEE_CACHE_OFFSET())
+                        if iszero(_baseFee) {
+                            _baseFee := cached(BASEFEE_CACHE_OFFSET(), basefee())
+                        }
+                        sp, stackHead := pushStackItem(sp, _baseFee, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x50 { // OP_POP

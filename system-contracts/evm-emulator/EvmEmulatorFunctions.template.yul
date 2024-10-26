@@ -26,8 +26,44 @@ function MSG_VALUE_SYSTEM_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008009
 }
 
+function ORIGIN_CACHE_OFFSET() -> offset {
+    offset := mul(23, 32)
+}
+
+function GASPRICE_CACHE_OFFSET() -> offset {
+    offset := mul(24, 32)
+}
+
+function COINBASE_CACHE_OFFSET() -> offset {
+    offset := mul(25, 32)
+}
+
+function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
+    offset := mul(26, 32)
+}
+
+function BLOCKNUMBER_CACHE_OFFSET() -> offset {
+    offset := mul(27, 32)
+}
+
+function PREVRANDAO_CACHE_OFFSET() -> offset {
+    offset := mul(28, 32)
+}
+
+function GASLIMIT_CACHE_OFFSET() -> offset {
+    offset := mul(29, 32)
+}
+
+function CHAINID_CACHE_OFFSET() -> offset {
+    offset := mul(30, 32)
+}
+
+function BASEFEE_CACHE_OFFSET() -> offset {
+    offset := mul(31, 32)
+}
+
 function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
-    offset := mul(32, 32)
+    offset := add(BASEFEE_CACHE_OFFSET(), 32)
 }
 
 function STACK_OFFSET() -> offset {
@@ -105,6 +141,11 @@ function revertWithGas(evmGasLeft) {
 function panic() {
     mstore(0, 0)
     revert(0, 32)
+}
+
+function cached(cacheIndex, value) -> _value {
+    _value := value
+    mstore(cacheIndex, _value)
 }
 
 function chargeGas(prevGas, toCharge) -> gasRemaining {
