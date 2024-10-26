@@ -6,18 +6,13 @@ FIXME: read and fix any issues
 ## Glossary
 
 - Batch - a set of transactions that the bootloader processes (`commitBatches`, `proveBatches`, and `executeBatches` work with it). A batch consists of multiple transactions.
-- L2 blocks - non-intersecting sub-sets of consecutively executed transactions in a batch. This is the kind of block you see in the API. This is the one that is used for `block.number`/`block.timestamp`/etc. Note that it wasn't this way before the virtual blocks [migration](#migration--virtual-blocks-logic).
-- Virtual block — a block, the data of which was being returned in the contract execution environment during the migration. They are called “virtual”, since they have no trace in our API, i.e. it is not possible to query information about them in any way. This is now mostly irrelevant, since the migration is alredy finished.
+- L2 blocks - non-intersecting sub-sets of consecutively executed transactions in a batch. This is the kind of block you see in the API. This is the one that is used for `block.number`/`block.timestamp`/etc. 
+
+> Note that sometimes in code you can see notion of "virtual blocks". In the past, we returned batch information for `block.number`/`block.timestamp`. However due to DevEx issues we decided to move to returned these values for L2 blocks. Virtual blocks were used during migration, but are not used anymore. You consider that there is one virtual block per one L2 block and it has exactly the same properties.
 
 ## Motivation
 
-Before the recent upgrade, `block.number`, `block.timestamp`, as well as `blockhash` in Solidity, returned information about *batches*, i.e. large blocks that are proven on L1 and which consist of many smaller L2 blocks. At the same time, API returns `block.number` and `block.timestamp` as for L2 blocks.
-
 L2 blocks were created for fast soft confirmation in wallets and block explorer. For example, MetaMask shows transactions as confirmed only after the block in which transaction execution was mined. So if the user needs to wait for the batch confirmation it would take at least a few minutes (for soft confirmation) and hours for full confirmation which is very bad UX. But API could return soft confirmation much earlier through L2 blocks.
-
-There was a huge outcry in the community for us to return the information for L2 blocks in `block.number`, `block.timestamp`, as well as `blockhash`, because of discrepancy of runtime execution and returned data by API.
-
-However, there were over 15mln L2 blocks, while less than 200k batches, meaning that if we simply “switched” from returning L1 batches’ info to L2 block’s info, some contracts (especially those that use `block.number` for measuring time intervals instead of `block.timestamp`) would break. For that, we decided to have an accelerated migration process, i.e. the `block.number` will grow faster and faster, until it becomes roughly 8x times the L2 block production speed, allowing it to gradually reach the L2 block number, after which the information on the L2 `block.number` will be returned. The blocks the info of which will be returned during this process are called “virtual blocks”. Their information will never be available in any of our APIs, which should not be a major breaking change, since our API already mostly works with L2 blocks, while L1 batches’s information is returned in the runtime.
 
 ## Adapting for Solidity
 
@@ -27,11 +22,7 @@ In order to get the returned value for `block.number`, `block.timestamp`, `block
 - `getBlockTimestamp`
 - `getBlockHashEVM`
 
-During the migration process, these returned the values of the virtual blocks. Currently, since the migration is complete, they return values for L2 blocks.
-
-## Migration status
-
-At the time of this writing, the migration has been complete on both testnet and mainnet, i.e. there we already have only the L2 block information returned. Mainnet migration ended in early November 2023.
+These return values for L2 blocks.
 
 # Blocks’ processing and consistency checks
 
@@ -39,7 +30,9 @@ Our `SystemContext` contract allows to get information about batches and L2 bloc
 
 ## Initializing L1 batch
 
-At the start of the batch, the operator [provides](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/bootloader/bootloader.yul#L3867) the timestamp of the batch, its number and the hash of the previous batch.. The root hash of the Merkle tree serves as the root hash of the batch.
+FIXME: correct bootloader code link
+
+At the start of the batch, the operator [provides](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/bootloader/bootloader.yul#L3867) the timestamp of the batch, its number and the hash of the previous batch. The root hash of the Merkle tree serves as the root hash of the batch.
 
 The SystemContext can immediately check whether the provided number is the correct batch number. It also immediately sends the previous batch hash to L1, where it will be checked during the commit operation. Also, some general consistency checks are performed. This logic can be found [here](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/contracts/SystemContext.sol#L466).
 
