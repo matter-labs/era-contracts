@@ -1048,16 +1048,10 @@ function _fetchConstructorReturnGas() -> gasLeft {
     gasLeft := mload(0)
 }
 
-function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt, oldStackHead) -> result, evmGasLeft, addr, stackHead  {
+function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr  {
     _eraseReturndataPointer()
 
     offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
-
-    pushStackCheck(sp, 4)
-    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
-    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
-    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
-    sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
 
     let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
 
@@ -1095,6 +1089,12 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
     
         // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
         _pushEVMFrame(gasForTheCall, false)
+
+        // move needed memory slots to the scratch space
+        mstore(mul(10, 32), mload(sub(offset, 0x80))
+        mstore(mul(11, 32), mload(sub(offset, 0x60))
+        mstore(mul(12, 32), mload(sub(offset, 0x40))
+        mstore(mul(13, 32), mload(sub(offset, 0x20))
     
         // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
         mstore(sub(offset, 0x80), 0xe43cec64)
@@ -1103,6 +1103,12 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
         mstore(sub(offset, 0x20), size) // Length of the init code
         
         result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
+
+        // move memory slots back
+        mstore(sub(offset, 0x80), mload(mul(10, 32))
+        mstore(sub(offset, 0x60), mload(mul(11, 32))
+        mstore(sub(offset, 0x40), mload(mul(12, 32))
+        mstore(sub(offset, 0x20), mload(mul(13, 32))
     
         let gasLeft
         switch result
@@ -1119,19 +1125,6 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftO
         let gasUsed := sub(gasForTheCall, gasLeft)
         evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
     }
-
-    // moving memory slots back
-    let back
-        
-    // skipping check since we pushed exactly 4 items earlier
-    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    mstore(sub(offset, 0x20), back)
-    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    mstore(sub(offset, 0x40), back)
-    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    mstore(sub(offset, 0x60), back)
-    back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    mstore(sub(offset, 0x80), back)
 }
 
 function performCreate(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
@@ -1166,7 +1159,7 @@ function performCreate(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp,
     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
     let result, addr
-    result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, false, 0, stackHead)
+    result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeft, false, 0)
 
     switch result
         case 0 { stackHead := 0 }
@@ -1206,7 +1199,7 @@ function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp
         expandMemory(add(offset, size))
     ))
 
-    result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, true, salt, stackHead)
+    result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeft, true, salt)
 }
 
 ////////////////////////////////////////////////////////////////
