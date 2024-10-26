@@ -135,9 +135,9 @@ object "EvmEmulator" {
         
         function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
         
-        // We need to pass some gas for MsgValueSimulator internal logic
+        // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
         function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                gas_stipend := 30000 // 27000 + a little bit more
+                gas_stipend := 35000 // 27000 + a little bit more
         }
         
         function OVERHEAD() -> overhead { overhead := 2000 }
@@ -1108,15 +1108,38 @@ object "EvmEmulator" {
             gasLeft := mload(0)
         }
         
-        function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr  {
+        function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
+            checkMemIsAccessible(offset, size)
+        
+            // EIP-3860
+            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
+                panic()
+            }
+        
+            // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+            // + hash_cost, if isCreate2
+            // minimum_word_size = (size + 31) / 32
+            // init_code_cost = 2 * minimum_word_size, EIP-3860
+            // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
+            let minimum_word_size := div(add(size, 31), 32) // rounding up
+            let dynamicGas := add(
+                mul(2, minimum_word_size),
+                expandMemory(add(offset, size))
+            )
+            if isCreate2 {
+                // hash_cost = 6 * minimum_word_size
+                dynamicGas := add(dynamicGas, mul(6, minimum_word_size))
+            }
+            evmGasLeft := chargeGas(evmGasLeftOld, dynamicGas)
+        
             _eraseReturndataPointer()
         
             offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
         
-            let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
+            let gasForTheCall := capGasForCall(evmGasLeft, INF_PASS_GAS())
         
             if gt(value, selfbalance()) { // it should be checked before actual deploy call
-                revertWithGas(evmGasLeftOld) // gasForTheCall not consumed
+                revertWithGas(evmGasLeft) // gasForTheCall not consumed
             }
         
             let bytecodeHash := 0
@@ -1137,7 +1160,7 @@ object "EvmEmulator" {
             if iszero(precreateResult) {
                 // collision, nonce overflow or EVM not allowed
                 // this is *internal* panic, consuming all passed gas
-                evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
+                evmGasLeft := chargeGas(evmGasLeft, gasForTheCall)
             }
         
             if precreateResult {
@@ -1162,7 +1185,7 @@ object "EvmEmulator" {
                 mstore(sub(offset, 0x40), 0x40) // Where the arg starts (third word)
                 mstore(sub(offset, 0x20), size) // Length of the init code
                 
-                result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
+                let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
         
                 // move memory slots back
                 mstore(sub(offset, 0x80), mload(mul(10, 32))
@@ -1183,83 +1206,29 @@ object "EvmEmulator" {
                     }
             
                 let gasUsed := sub(gasForTheCall, gasLeft)
-                evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
+                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
             }
         }
         
-        function performCreate(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
-            evmGasLeft := chargeGas(evmGas, 32000)
-        
-            if isStatic {
-                panic()
-            }
-        
+        function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
             let value, offset, size
         
             popStackCheck(oldSp, 3)
             value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
             offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
         
-            checkMemIsAccessible(offset, size)
-        
-            // EIP-3860
-            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
-                panic()
-            }
-        
-            // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-            // minimum_word_size = (size + 31) / 32
-            // init_code_cost = 2 * minimum_word_size, EIP-3860
-            // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-            let minimum_word_size := div(add(size, 31), 32) // rounding up
-            let dynamicGas := add(
-                mul(2, minimum_word_size),
-                expandMemory(add(offset, size))
-            )
-            evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-        
-            let result, addr
-            result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeft, false, 0)
-        
-            switch result
-                case 0 { stackHead := 0 }
-                default { stackHead := addr }
+            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
         }
         
-        function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, result, addr, stackHead {
-            evmGasLeft := chargeGas(evmGas, 32000)
-        
-            if isStatic {
-                panic()
-            }
-        
+        function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
             let value, offset, size, salt
         
             popStackCheck(oldSp, 4)
             value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
             offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
         
-            checkMemIsAccessible(offset, size)
-        
-            // EIP-3860
-            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
-                panic()
-            }
-        
-            // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-            // minimum_word_size = (size + 31) / 32
-            // init_code_cost = 2 * minimum_word_size, EIP-3860
-            // hash_cost = 6 * minimum_word_size
-            // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-            let minimum_word_size := div(add(size, 31), 32) // rounding up
-            evmGasLeft := chargeGas(evmGasLeft, add(
-                mul(8, minimum_word_size),
-                expandMemory(add(offset, size))
-            ))
-        
-            result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeft, true, salt)
+            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
         }
         
         ////////////////////////////////////////////////////////////////
@@ -2659,7 +2628,13 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0xF0 { // OP_CREATE
-                    evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, isStatic, stackHead)
+                    evmGasLeft := chargeGas(evmGasLeft, 32000)
+            
+                    if isStatic {
+                        panic()
+                    }
+            
+                    evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0xF1 { // OP_CALL
@@ -2695,11 +2670,13 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0xF5 { // OP_CREATE2
-                    let result, addr
-                    evmGasLeft, sp, result, addr, stackHead := performCreate2(evmGasLeft, sp, isStatic, stackHead)
-                    switch result
-                    case 0 { sp, stackHead := pushStackItem(sp, 0, stackHead) }
-                    default { sp, stackHead := pushStackItem(sp, addr, stackHead) }
+                    evmGasLeft := chargeGas(evmGasLeft, 32000)
+            
+                    if isStatic {
+                        panic()
+                    }
+            
+                    evmGasLeft, sp, stackHead := performCreate2(evmGasLeft, sp, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0xFA { // OP_STATICCALL
@@ -3183,9 +3160,9 @@ object "EvmEmulator" {
             
             function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
             
-            // We need to pass some gas for MsgValueSimulator internal logic
+            // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
             function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                    gas_stipend := 30000 // 27000 + a little bit more
+                    gas_stipend := 35000 // 27000 + a little bit more
             }
             
             function OVERHEAD() -> overhead { overhead := 2000 }
@@ -4156,15 +4133,38 @@ object "EvmEmulator" {
                 gasLeft := mload(0)
             }
             
-            function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr  {
+            function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
+                checkMemIsAccessible(offset, size)
+            
+                // EIP-3860
+                if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
+                    panic()
+                }
+            
+                // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+                // + hash_cost, if isCreate2
+                // minimum_word_size = (size + 31) / 32
+                // init_code_cost = 2 * minimum_word_size, EIP-3860
+                // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
+                let minimum_word_size := div(add(size, 31), 32) // rounding up
+                let dynamicGas := add(
+                    mul(2, minimum_word_size),
+                    expandMemory(add(offset, size))
+                )
+                if isCreate2 {
+                    // hash_cost = 6 * minimum_word_size
+                    dynamicGas := add(dynamicGas, mul(6, minimum_word_size))
+                }
+                evmGasLeft := chargeGas(evmGasLeftOld, dynamicGas)
+            
                 _eraseReturndataPointer()
             
                 offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
             
-                let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
+                let gasForTheCall := capGasForCall(evmGasLeft, INF_PASS_GAS())
             
                 if gt(value, selfbalance()) { // it should be checked before actual deploy call
-                    revertWithGas(evmGasLeftOld) // gasForTheCall not consumed
+                    revertWithGas(evmGasLeft) // gasForTheCall not consumed
                 }
             
                 let bytecodeHash := 0
@@ -4185,7 +4185,7 @@ object "EvmEmulator" {
                 if iszero(precreateResult) {
                     // collision, nonce overflow or EVM not allowed
                     // this is *internal* panic, consuming all passed gas
-                    evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
+                    evmGasLeft := chargeGas(evmGasLeft, gasForTheCall)
                 }
             
                 if precreateResult {
@@ -4210,7 +4210,7 @@ object "EvmEmulator" {
                     mstore(sub(offset, 0x40), 0x40) // Where the arg starts (third word)
                     mstore(sub(offset, 0x20), size) // Length of the init code
                     
-                    result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
+                    let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
             
                     // move memory slots back
                     mstore(sub(offset, 0x80), mload(mul(10, 32))
@@ -4231,83 +4231,29 @@ object "EvmEmulator" {
                         }
                 
                     let gasUsed := sub(gasForTheCall, gasLeft)
-                    evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
+                    evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                 }
             }
             
-            function performCreate(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
-                evmGasLeft := chargeGas(evmGas, 32000)
-            
-                if isStatic {
-                    panic()
-                }
-            
+            function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
                 let value, offset, size
             
                 popStackCheck(oldSp, 3)
                 value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
                 offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                checkMemIsAccessible(offset, size)
-            
-                // EIP-3860
-                if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
-                    panic()
-                }
-            
-                // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-                // minimum_word_size = (size + 31) / 32
-                // init_code_cost = 2 * minimum_word_size, EIP-3860
-                // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-                let minimum_word_size := div(add(size, 31), 32) // rounding up
-                let dynamicGas := add(
-                    mul(2, minimum_word_size),
-                    expandMemory(add(offset, size))
-                )
-                evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-            
-                let result, addr
-                result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeft, false, 0)
-            
-                switch result
-                    case 0 { stackHead := 0 }
-                    default { stackHead := addr }
+                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
             }
             
-            function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, result, addr, stackHead {
-                evmGasLeft := chargeGas(evmGas, 32000)
-            
-                if isStatic {
-                    panic()
-                }
-            
+            function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
                 let value, offset, size, salt
             
                 popStackCheck(oldSp, 4)
                 value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
                 offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
             
-                checkMemIsAccessible(offset, size)
-            
-                // EIP-3860
-                if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
-                    panic()
-                }
-            
-                // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-                // minimum_word_size = (size + 31) / 32
-                // init_code_cost = 2 * minimum_word_size, EIP-3860
-                // hash_cost = 6 * minimum_word_size
-                // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-                let minimum_word_size := div(add(size, 31), 32) // rounding up
-                evmGasLeft := chargeGas(evmGasLeft, add(
-                    mul(8, minimum_word_size),
-                    expandMemory(add(offset, size))
-                ))
-            
-                result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeft, true, salt)
+                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
             }
             
             ////////////////////////////////////////////////////////////////
@@ -5707,7 +5653,13 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0xF0 { // OP_CREATE
-                        evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, isStatic, stackHead)
+                        evmGasLeft := chargeGas(evmGasLeft, 32000)
+                
+                        if isStatic {
+                            panic()
+                        }
+                
+                        evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0xF1 { // OP_CALL
@@ -5743,11 +5695,13 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0xF5 { // OP_CREATE2
-                        let result, addr
-                        evmGasLeft, sp, result, addr, stackHead := performCreate2(evmGasLeft, sp, isStatic, stackHead)
-                        switch result
-                        case 0 { sp, stackHead := pushStackItem(sp, 0, stackHead) }
-                        default { sp, stackHead := pushStackItem(sp, addr, stackHead) }
+                        evmGasLeft := chargeGas(evmGasLeft, 32000)
+                
+                        if isStatic {
+                            panic()
+                        }
+                
+                        evmGasLeft, sp, stackHead := performCreate2(evmGasLeft, sp, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0xFA { // OP_STATICCALL

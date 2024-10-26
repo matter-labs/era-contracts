@@ -1343,7 +1343,13 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0xF0 { // OP_CREATE
-        evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, isStatic, stackHead)
+        evmGasLeft := chargeGas(evmGasLeft, 32000)
+
+        if isStatic {
+            panic()
+        }
+
+        evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, stackHead)
         ip := add(ip, 1)
     }
     case 0xF1 { // OP_CALL
@@ -1379,11 +1385,13 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0xF5 { // OP_CREATE2
-        let result, addr
-        evmGasLeft, sp, result, addr, stackHead := performCreate2(evmGasLeft, sp, isStatic, stackHead)
-        switch result
-        case 0 { sp, stackHead := pushStackItem(sp, 0, stackHead) }
-        default { sp, stackHead := pushStackItem(sp, addr, stackHead) }
+        evmGasLeft := chargeGas(evmGasLeft, 32000)
+
+        if isStatic {
+            panic()
+        }
+
+        evmGasLeft, sp, stackHead := performCreate2(evmGasLeft, sp, stackHead)
         ip := add(ip, 1)
     }
     case 0xFA { // OP_STATICCALL
