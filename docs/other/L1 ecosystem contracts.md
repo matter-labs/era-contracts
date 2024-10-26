@@ -216,15 +216,13 @@ This step ensures that the baseToken will be backed 1-1 on L1.
 
 If the transaction is successful, the `request.l2Value`  will be minted on the `request.l2Contract` address (it can potentially transfer these funds within the transaction).   The rest are minted to the `request.refundRecipient`  address. In case the transaction is not successful, all of the base token will be minted to the `request.refundRecipient` address. These are the same rules as for the zkSync Era.
 
-***Diagram of the L1→L2 transaction flow on L1 when the baseToken is ETH:***
+***Diagram of the L1→L2 transaction flow on L1 for direct user calls, the baseToken can be ETH or an ERC20:***
 
 ![requestL2TransactionDirect (ETH) (2).png](./L1%20smart%20contracts/requestL2TransactionDirect.png)
 
-***Diagram of the L1→L2 transaction flow on L1 when the baseToken is an ERC20:***
-
-![requestL2TransactionDirect (ERC20) (3).png](./L1%20smart%20contracts/requestL2TransactionDirect.png)
-
 ***Diagram of the L1→L2 transaction flow on L2 (it is the same regardless of the baseToken):***
+
+![requestL2TransactionTwoBridges](./L1%20smart%20contracts/requestL2TransactionTwoBridges_token.png)
 
 ![L1-_L2 tx processing on L2.png](./L1%20smart%20contracts/L1_L2_tx_processing_on_L2.png)
 
