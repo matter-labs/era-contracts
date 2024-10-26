@@ -114,8 +114,10 @@ object "EvmEmulator" {
             offset := add(MEM_OFFSET(), 32)
         }
         
+        // Used to simplify gas calculations for memory expansion.
+        // The cost to increase the memory to 4 MB is close to 30M gas
         function MAX_POSSIBLE_MEM() -> max {
-            max := 0x100000 // 1MB
+            max := 0x400000 // 4MB
         }
         
         function MAX_MEMORY_FRAME() -> max {
@@ -177,12 +179,6 @@ object "EvmEmulator" {
             checkOverflow(index, offset)
         
             if gt(add(index, offset), MAX_MEMORY_FRAME()) {
-                panic()
-            }
-        }
-        
-        function checkMemOverflow(location) {
-            if gt(location, MAX_MEMORY_FRAME()) {
                 panic()
             }
         }
@@ -3151,8 +3147,10 @@ object "EvmEmulator" {
                 offset := add(MEM_OFFSET(), 32)
             }
             
+            // Used to simplify gas calculations for memory expansion.
+            // The cost to increase the memory to 4 MB is close to 30M gas
             function MAX_POSSIBLE_MEM() -> max {
-                max := 0x100000 // 1MB
+                max := 0x400000 // 4MB
             }
             
             function MAX_MEMORY_FRAME() -> max {
@@ -3214,12 +3212,6 @@ object "EvmEmulator" {
                 checkOverflow(index, offset)
             
                 if gt(add(index, offset), MAX_MEMORY_FRAME()) {
-                    panic()
-                }
-            }
-            
-            function checkMemOverflow(location) {
-                if gt(location, MAX_MEMORY_FRAME()) {
                     panic()
                 }
             }
