@@ -23,6 +23,9 @@ Let's see an example of how the approach above works in rollup DA validators.
 
 ## RollupL2DAValidator
 
+![RollupL2DAValidator.png](./L1%20smart%20contracts/Rollup_DA.png)
+
+
 `RollupL2DAValidator` accepts the preimages for the data to publishes as well as their compressed format. After verifying the compression, it forms the `_totalPubdata` bytes array, which represents the entire blob of data that should be published to L1.
 
 It calls the `PubdataChunkPublisher` system contract to split this pubdata into multiple "chunks" of size `4096 * 31` bytes and return the `keccak256` hash of those, These will be the `blobHash` of from the section before.
