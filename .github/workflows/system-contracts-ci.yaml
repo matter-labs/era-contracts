@@ -27,15 +27,12 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
+      - name: Install dependencies
+        run: yarn
+
       - name: Build artifacts
         working-directory: system-contracts
-        run: |
-          yarn install
-          yarn preprocess:system-contracts
-          forge build --zksync --zk-enable-eravm-extensions
-          yarn preprocess:bootloader
-          forge build --zksync --zk-enable-eravm-extensions
-          yarn build
+        run: yarn sc build
 
       - name: Create cache
         uses: actions/cache/save@v3
