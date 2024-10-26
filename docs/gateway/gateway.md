@@ -314,11 +314,6 @@ b) It specifies the calldata this which certain methods can be called. For insta
 
 The approach above does not only help in protecting Era, but also provides correct information for chains that are present in our ecosystem. For instance, if a chain claims to be a rollup, but allows changing the DA mode in any minute can not be considered secure for users. 
 
-# Known issues
-
-- Migration is not yet fully thought through. While a system bootstrapped from scratch should work, some changes are still needed to ensure smooth migration of the ecosystem to the new design (especially when it comes to L1<>L2 token bridging, handling legacy deposits and withdrawals).
-- Inconsistency in using custom errors: right now in some places custom errors are used and in some the old string-based are used.
-
 ## L1<>L2 token bridging considerations
 
 - We have the L2SharedBridgeLegacy on chains that are live before the upgrade. This contract will keep on working, and where it exists it will also be used to:
