@@ -109,7 +109,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _transferOwnership(_owner);
     }
 
-    /// @notice Sets the L1ERC20Bridge contract address.
+    /// @notice Sets the NativeTokenVault contract address.
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
@@ -144,9 +144,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetRegistrationData,
         address _assetDeploymentTracker
     ) external onlyOwner {
-        bytes32 assetId = keccak256(
-            abi.encode(uint256(block.chainid), _assetDeploymentTracker, _assetRegistrationData)
-        );
+        bytes32 assetId = keccak256(abi.encode(block.chainid, _assetDeploymentTracker, _assetRegistrationData));
         assetDeploymentTracker[assetId] = _assetDeploymentTracker;
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
@@ -160,7 +158,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Used to set the asset handler address for a given asset ID on a remote ZK chain
-    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
     /// @param _chainId The ZK chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The encoding of asset ID.

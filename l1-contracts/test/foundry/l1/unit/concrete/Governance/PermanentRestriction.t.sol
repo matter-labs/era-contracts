@@ -90,12 +90,12 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
     }
 
-    function test_allowAdminImplementation(bytes32 implementationHash) public {
+    function test_setAllowedAdminImplementation(bytes32 implementationHash) public {
         vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.AdminImplementationAllowed(implementationHash, true);
 
         vm.prank(owner);
-        permRestriction.allowAdminImplementation(implementationHash, true);
+        permRestriction.setAllowedAdminImplementation(implementationHash, true);
     }
 
     function test_setAllowedData(bytes memory data) public {
@@ -106,12 +106,12 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         permRestriction.setAllowedData(data, true);
     }
 
-    function test_setSelectorIsValidated(bytes4 selector) public {
+    function test_setSelectorShouldBeValidated(bytes4 selector) public {
         vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.SelectorValidationChanged(selector, true);
 
         vm.prank(owner);
-        permRestriction.setSelectorIsValidated(selector, true);
+        permRestriction.setSelectorShouldBeValidated(selector, true);
     }
 
     function isAddressAdmin(address chainAddr, address _potentialAdmin) internal returns (bool) {
@@ -161,7 +161,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_validateCallSetPendingAdminRemovingPermanentRestriction() public {
         vm.prank(owner);
-        permRestriction.allowAdminImplementation(address(chainAdmin).codehash, true);
+        permRestriction.setAllowedAdminImplementation(address(chainAdmin).codehash, true);
 
         Call memory call = Call({
             target: hyperchain,
@@ -178,7 +178,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_validateCallSetPendingAdmin() public {
         vm.prank(owner);
-        permRestriction.allowAdminImplementation(address(chainAdmin).codehash, true);
+        permRestriction.setAllowedAdminImplementation(address(chainAdmin).codehash, true);
 
         vm.prank(address(chainAdmin));
         chainAdmin.addRestriction(address(permRestriction));
@@ -208,7 +208,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_validateCallCallNotAllowed() public {
         vm.prank(owner);
-        permRestriction.setSelectorIsValidated(IAdmin.acceptAdmin.selector, true);
+        permRestriction.setSelectorShouldBeValidated(IAdmin.acceptAdmin.selector, true);
         Call memory call = Call({
             target: hyperchain,
             value: 0,
@@ -224,7 +224,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_validateCall() public {
         vm.prank(owner);
-        permRestriction.setSelectorIsValidated(IAdmin.acceptAdmin.selector, true);
+        permRestriction.setSelectorShouldBeValidated(IAdmin.acceptAdmin.selector, true);
         Call memory call = Call({
             target: hyperchain,
             value: 0,
@@ -374,7 +374,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         // ctm deployer address is 0 in this test
         vm.startPrank(address(0));
-        bridgehub.setAssetHandlerAddress(
+        bridgehub.setCTMAssetAddress(
             bytes32(uint256(uint160(address(chainContractAddress)))),
             address(chainContractAddress)
         );

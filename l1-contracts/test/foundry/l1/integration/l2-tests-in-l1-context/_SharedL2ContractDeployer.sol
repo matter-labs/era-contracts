@@ -117,7 +117,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         vm.prank(ownerWallet);
         l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-        l2Bridgehub.setAssetHandlerAddress(
+        l2Bridgehub.setCTMAssetAddress(
             bytes32(uint256(uint160(l1CTM))),
             address(addresses.stateTransition.chainTypeManagerProxy)
         );

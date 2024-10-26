@@ -19,10 +19,8 @@ library FullMerkle {
     }
 
     /**
-     * @dev Initialize a {Bytes32PushTree} using {Merkle.efficientHash} to hash internal nodes.
+     * @dev Initialize a {FullTree} using {Merkle.efficientHash} to hash internal nodes.
      * The capacity of the tree (i.e. number of leaves) is set to `2**levels`.
-     *
-     * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
      *
      * IMPORTANT: The zero value should be carefully chosen since it will be stored in the tree representing
      * empty leaves. It should be a value that is not expected to be part of the tree.

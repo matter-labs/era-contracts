@@ -223,6 +223,8 @@ error ProtocolIdNotGreater();
 error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
 // 0x88d7b498
 error ProtocolVersionTooSmall();
+// 0x53dee67b
+error PubdataCommitmentsEmpty();
 // 0x959f26fb
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
