@@ -11,7 +11,7 @@ object "EvmEmulator" {
 
             let size := getActivePtrDataSize()
 
-            if gt(size, MAX_POSSIBLE_BYTECODE()) {
+            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
                 panic()
             }
 
@@ -40,15 +40,21 @@ object "EvmEmulator" {
             }
         }
 
-        function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
-            if len {
+        function validateBytecodeAndChargeGas(offset, deployedCodeLen, gasToReturn) -> returnGas {
+            if deployedCodeLen {
+                // EIP-3860
+                if gt(deployedCodeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE()) {
+                    panic()
+                }
+
+                // EIP-3541
                 let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
-                    revert(0, 0)
+                    panic()
                 }
             }
 
-            let gasForCode := mul(len, 200)
+            let gasForCode := mul(deployedCodeLen, 200)
             returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
@@ -92,12 +98,16 @@ object "EvmEmulator" {
             offset := add(STACK_OFFSET(), mul(1024, 32))
         }
         
-        function MAX_POSSIBLE_BYTECODE() -> max {
-            max := 32000
+        function MAX_POSSIBLE_DEPLOYED_BYTECODE() -> max {
+            max := 24576
+        }
+        
+        function MAX_POSSIBLE_INIT_BYTECODE() -> max {
+            max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE()) // EIP-3860
         }
         
         function MEM_OFFSET() -> offset {
-            offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_BYTECODE())
+            offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_INIT_BYTECODE())
         }
         
         function MEM_OFFSET_INNER() -> offset {
@@ -125,9 +135,9 @@ object "EvmEmulator" {
         
         function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
         
-        // We need to pass some gas for MsgValueSimulator internal logic
+        // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
         function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                gas_stipend := 30000 // 27000 + a little bit more
+                gas_stipend := 35000 // 27000 + a little bit more
         }
         
         function OVERHEAD() -> overhead { overhead := 2000 }
@@ -328,7 +338,7 @@ object "EvmEmulator" {
             let codeLen := _fetchDeployedCode(
                 getCodeAddress(),
                 add(BYTECODE_OFFSET(), 32),
-                MAX_POSSIBLE_BYTECODE()
+                MAX_POSSIBLE_DEPLOYED_BYTECODE()
             )
         
             mstore(BYTECODE_OFFSET(), codeLen)
@@ -379,7 +389,19 @@ object "EvmEmulator" {
         function performSystemCall(
             to,
             dataLength,
-        ) -> ret {
+        ) {
+            let success := performSystemCallRevertable(to, dataLength)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        }
+        
+        function performSystemCallRevertable(
+            to,
+            dataLength,
+        ) -> success {
             let farCallAbi := shl(248, 1) // system call
             // dataOffset is 0
             // dataStart is 0
@@ -389,12 +411,7 @@ object "EvmEmulator" {
             // forwardingMode is 0
             // not constructor call
         
-            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
+            success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         }
         
         function _isEVM(_addr) -> isEVM {
@@ -1091,161 +1108,127 @@ object "EvmEmulator" {
             gasLeft := mload(0)
         }
         
-        function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt, oldStackHead) -> result, evmGasLeft, addr, stackHead  {
-            _eraseReturndataPointer()
+        function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
+            checkMemIsAccessible(offset, size)
         
-            let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
-        
-            offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
-        
-            pushStackCheck(sp, 4)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
-            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
-        
-            _pushEVMFrame(gasForTheCall, false)
-        
-            if isCreate2 {
-                // selector: create2EVM(bytes32 _salt, bytes calldata _initCode)
-                mstore(sub(offset, 0x80), 0x4e96f4c0)
-                // salt
-                mstore(sub(offset, 0x60), salt)
-                // Where the arg starts (third word)
-                mstore(sub(offset, 0x40), 0x40)
-                // Length of the init code
-                mstore(sub(offset, 0x20), size)
-        
-                result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
-            }
-        
-        
-            if iszero(isCreate2) {
-                if gt(value, selfbalance()) { // it should be checked before actual deploy call
-                    panic()
-                }
-        
-                // we want to calculate the address of new contract
-                // and if it is deployable, we need to increment deploy nonce
-        
-                // selector: function prepareForEvmCreateFromEmulator()
-                mstore(0, 0x3ec89a4e00000000000000000000000000000000000000000000000000000000)
-                performSystemCall(DEPLOYER_SYSTEM_CONTRACT(), 4)
-                returndatacopy(0, 0, 32)
-                addr := mload(0)
-        
-                // so even if constructor reverts, nonce stays incremented
-        
-                // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
-                mstore(sub(offset, 0x80), 0xe43cec64)
-                // address
-                mstore(sub(offset, 0x60), addr)
-                // Where the arg starts (third word)
-                mstore(sub(offset, 0x40), 0x40)
-                // Length of the init code
-                mstore(sub(offset, 0x20), size)
-        
-                result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
-            }
-        
-            let gasLeft
-            switch result
-                case 0 {
-                    addr := 0
-                    gasLeft := _saveReturndataAfterEVMCall(0, 0)
-                }
-                default {
-                    returndatacopy(0, 0, 32)
-                    addr := mload(0)
-                    gasLeft := _fetchConstructorReturnGas()
-                }
-        
-            let gasUsed := sub(gasForTheCall, gasLeft)
-            evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
-        
-            // moving memory slots back
-            let back
-                
-            // skipping check since we pushed exactly 4 items earlier
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x20), back)
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x40), back)
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x60), back)
-            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            mstore(sub(offset, 0x80), back)
-        }
-        
-        function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
-            evmGasLeft := chargeGas(evmGas, 32000)
-        
-            if isStatic {
+            // EIP-3860
+            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
                 panic()
             }
         
+            // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+            // + hash_cost, if isCreate2
+            // minimum_word_size = (size + 31) / 32
+            // init_code_cost = 2 * minimum_word_size, EIP-3860
+            // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
+            let minimum_word_size := div(add(size, 31), 32) // rounding up
+            let dynamicGas := add(
+                mul(2, minimum_word_size),
+                expandMemory(add(offset, size))
+            )
+            if isCreate2 {
+                // hash_cost = 6 * minimum_word_size
+                dynamicGas := add(dynamicGas, mul(6, minimum_word_size))
+            }
+            evmGasLeft := chargeGas(evmGasLeftOld, dynamicGas)
+        
+            _eraseReturndataPointer()
+        
+            offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
+        
+            let gasForTheCall := capGasForCall(evmGasLeft, INF_PASS_GAS())
+        
+            if gt(value, selfbalance()) { // it should be checked before actual deploy call
+                revertWithGas(evmGasLeft) // gasForTheCall not consumed
+            }
+        
+            let bytecodeHash := 0
+            if isCreate2 {
+                bytecodeHash := keccak256(offset, size)
+            }
+        
+            // we want to calculate the address of new contract, and if it is deployable (no collision),
+            // we need to increment deploy nonce. Otherwise - panic. 
+            // We should revert with gas if nonce overflowed, but this should not happen in reality anyway
+        
+            // selector: function precreateEvmAccountFromEmulator(bytes32 salt, bytes32 evmBytecodeHash)
+            mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
+            mstore(4, salt)
+            mstore(36, bytecodeHash)
+            let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
+        
+            if iszero(precreateResult) {
+                // collision, nonce overflow or EVM not allowed
+                // this is *internal* panic, consuming all passed gas
+                evmGasLeft := chargeGas(evmGasLeft, gasForTheCall)
+            }
+        
+            if precreateResult {
+                returndatacopy(0, 0, 32)
+                addr := mload(0)
+            
+                pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
+                // so even if constructor reverts, nonce stays incremented and addr stays warm
+            
+                // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
+                _pushEVMFrame(gasForTheCall, false)
+        
+                // move needed memory slots to the scratch space
+                mstore(mul(10, 32), mload(sub(offset, 0x80))
+                mstore(mul(11, 32), mload(sub(offset, 0x60))
+                mstore(mul(12, 32), mload(sub(offset, 0x40))
+                mstore(mul(13, 32), mload(sub(offset, 0x20))
+            
+                // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
+                mstore(sub(offset, 0x80), 0xe43cec64)
+                mstore(sub(offset, 0x60), addr)
+                mstore(sub(offset, 0x40), 0x40) // Where the arg starts (third word)
+                mstore(sub(offset, 0x20), size) // Length of the init code
+                
+                let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
+        
+                // move memory slots back
+                mstore(sub(offset, 0x80), mload(mul(10, 32))
+                mstore(sub(offset, 0x60), mload(mul(11, 32))
+                mstore(sub(offset, 0x40), mload(mul(12, 32))
+                mstore(sub(offset, 0x20), mload(mul(13, 32))
+            
+                let gasLeft
+                switch result
+                    case 0 {
+                        addr := 0
+                        gasLeft := _saveReturndataAfterEVMCall(0, 0)
+                    }
+                    default {
+                        returndatacopy(0, 0, 32)
+                        addr := mload(0)
+                        gasLeft := _fetchConstructorReturnGas()
+                    }
+            
+                let gasUsed := sub(gasForTheCall, gasLeft)
+                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+            }
+        }
+        
+        function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
             let value, offset, size
         
             popStackCheck(oldSp, 3)
             value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
             offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
         
-            checkMemIsAccessible(offset, size)
-        
-            if gt(size, MAX_POSSIBLE_BYTECODE()) {
-                panic()
-            }
-        
-            // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-            // minimum_word_size = (size + 31) / 32
-            // init_code_cost = 2 * minimum_word_size
-            // code_deposit_cost = 200 * deployed_code_size
-            let dynamicGas := add(
-                shr(4, add(size, 31)),
-                expandMemory(add(offset, size))
-            )
-            evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-        
-            let result, addr
-            result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, false, 0, stackHead)
-        
-            switch result
-                case 0 { stackHead := 0 }
-                default { stackHead := addr }
+            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
         }
         
-        function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, result, addr, stackHead {
-            evmGasLeft := chargeGas(evmGas, 32000)
-        
-            if isStatic {
-                panic()
-            }
-        
+        function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
             let value, offset, size, salt
         
             popStackCheck(oldSp, 4)
             value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
             offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
         
-            checkMemIsAccessible(offset, size)
-        
-            if gt(size, MAX_POSSIBLE_BYTECODE()) {
-                panic()
-            }
-        
-            // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-            // minimum_word_size = (size + 31) / 32
-            // init_code_cost = 2 * minimum_word_size
-            // hash_cost = 6 * minimum_word_size
-            // code_deposit_cost = 200 * deployed_code_size
-            evmGasLeft := chargeGas(evmGasLeft, add(
-                expandMemory(add(offset, size)),
-                shr(2, add(size, 31))
-            ))
-        
-            result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, true, salt, stackHead)
+            evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
         }
         
         ////////////////////////////////////////////////////////////////
@@ -2645,7 +2628,13 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0xF0 { // OP_CREATE
-                    evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, isStatic, stackHead)
+                    evmGasLeft := chargeGas(evmGasLeft, 32000)
+            
+                    if isStatic {
+                        panic()
+                    }
+            
+                    evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0xF1 { // OP_CALL
@@ -2681,11 +2670,13 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0xF5 { // OP_CREATE2
-                    let result, addr
-                    evmGasLeft, sp, result, addr, stackHead := performCreate2(evmGasLeft, sp, isStatic, stackHead)
-                    switch result
-                    case 0 { sp, stackHead := pushStackItem(sp, 0, stackHead) }
-                    default { sp, stackHead := pushStackItem(sp, addr, stackHead) }
+                    evmGasLeft := chargeGas(evmGasLeft, 32000)
+            
+                    if isStatic {
+                        panic()
+                    }
+            
+                    evmGasLeft, sp, stackHead := performCreate2(evmGasLeft, sp, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0xFA { // OP_STATICCALL
@@ -3082,7 +3073,7 @@ object "EvmEmulator" {
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
 
-        gasToReturn := validateCorrectBytecode(offset, len, gasToReturn)
+        gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
 
         offset, len := padBytecode(offset, len)
 
@@ -3132,12 +3123,16 @@ object "EvmEmulator" {
                 offset := add(STACK_OFFSET(), mul(1024, 32))
             }
             
-            function MAX_POSSIBLE_BYTECODE() -> max {
-                max := 32000
+            function MAX_POSSIBLE_DEPLOYED_BYTECODE() -> max {
+                max := 24576
+            }
+            
+            function MAX_POSSIBLE_INIT_BYTECODE() -> max {
+                max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE()) // EIP-3860
             }
             
             function MEM_OFFSET() -> offset {
-                offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_BYTECODE())
+                offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_INIT_BYTECODE())
             }
             
             function MEM_OFFSET_INNER() -> offset {
@@ -3165,9 +3160,9 @@ object "EvmEmulator" {
             
             function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
             
-            // We need to pass some gas for MsgValueSimulator internal logic
+            // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
             function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                    gas_stipend := 30000 // 27000 + a little bit more
+                    gas_stipend := 35000 // 27000 + a little bit more
             }
             
             function OVERHEAD() -> overhead { overhead := 2000 }
@@ -3368,7 +3363,7 @@ object "EvmEmulator" {
                 let codeLen := _fetchDeployedCode(
                     getCodeAddress(),
                     add(BYTECODE_OFFSET(), 32),
-                    MAX_POSSIBLE_BYTECODE()
+                    MAX_POSSIBLE_DEPLOYED_BYTECODE()
                 )
             
                 mstore(BYTECODE_OFFSET(), codeLen)
@@ -3419,7 +3414,19 @@ object "EvmEmulator" {
             function performSystemCall(
                 to,
                 dataLength,
-            ) -> ret {
+            ) {
+                let success := performSystemCallRevertable(to, dataLength)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            }
+            
+            function performSystemCallRevertable(
+                to,
+                dataLength,
+            ) -> success {
                 let farCallAbi := shl(248, 1) // system call
                 // dataOffset is 0
                 // dataStart is 0
@@ -3429,12 +3436,7 @@ object "EvmEmulator" {
                 // forwardingMode is 0
                 // not constructor call
             
-                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
+                success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             }
             
             function _isEVM(_addr) -> isEVM {
@@ -4131,161 +4133,127 @@ object "EvmEmulator" {
                 gasLeft := mload(0)
             }
             
-            function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt, oldStackHead) -> result, evmGasLeft, addr, stackHead  {
-                _eraseReturndataPointer()
+            function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
+                checkMemIsAccessible(offset, size)
             
-                let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
-            
-                offset := add(MEM_OFFSET_INNER(), offset) // TODO gas check
-            
-                pushStackCheck(sp, 4)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
-                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
-            
-                _pushEVMFrame(gasForTheCall, false)
-            
-                if isCreate2 {
-                    // selector: create2EVM(bytes32 _salt, bytes calldata _initCode)
-                    mstore(sub(offset, 0x80), 0x4e96f4c0)
-                    // salt
-                    mstore(sub(offset, 0x60), salt)
-                    // Where the arg starts (third word)
-                    mstore(sub(offset, 0x40), 0x40)
-                    // Length of the init code
-                    mstore(sub(offset, 0x20), size)
-            
-                    result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
-                }
-            
-            
-                if iszero(isCreate2) {
-                    if gt(value, selfbalance()) { // it should be checked before actual deploy call
-                        panic()
-                    }
-            
-                    // we want to calculate the address of new contract
-                    // and if it is deployable, we need to increment deploy nonce
-            
-                    // selector: function prepareForEvmCreateFromEmulator()
-                    mstore(0, 0x3ec89a4e00000000000000000000000000000000000000000000000000000000)
-                    performSystemCall(DEPLOYER_SYSTEM_CONTRACT(), 4)
-                    returndatacopy(0, 0, 32)
-                    addr := mload(0)
-            
-                    // so even if constructor reverts, nonce stays incremented
-            
-                    // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
-                    mstore(sub(offset, 0x80), 0xe43cec64)
-                    // address
-                    mstore(sub(offset, 0x60), addr)
-                    // Where the arg starts (third word)
-                    mstore(sub(offset, 0x40), 0x40)
-                    // Length of the init code
-                    mstore(sub(offset, 0x20), size)
-            
-                    result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
-                }
-            
-                let gasLeft
-                switch result
-                    case 0 {
-                        addr := 0
-                        gasLeft := _saveReturndataAfterEVMCall(0, 0)
-                    }
-                    default {
-                        returndatacopy(0, 0, 32)
-                        addr := mload(0)
-                        gasLeft := _fetchConstructorReturnGas()
-                    }
-            
-                let gasUsed := sub(gasForTheCall, gasLeft)
-                evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
-            
-                // moving memory slots back
-                let back
-                    
-                // skipping check since we pushed exactly 4 items earlier
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x20), back)
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x40), back)
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x60), back)
-                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                mstore(sub(offset, 0x80), back)
-            }
-            
-            function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
-                evmGasLeft := chargeGas(evmGas, 32000)
-            
-                if isStatic {
+                // EIP-3860
+                if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
                     panic()
                 }
             
+                // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+                // + hash_cost, if isCreate2
+                // minimum_word_size = (size + 31) / 32
+                // init_code_cost = 2 * minimum_word_size, EIP-3860
+                // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
+                let minimum_word_size := div(add(size, 31), 32) // rounding up
+                let dynamicGas := add(
+                    mul(2, minimum_word_size),
+                    expandMemory(add(offset, size))
+                )
+                if isCreate2 {
+                    // hash_cost = 6 * minimum_word_size
+                    dynamicGas := add(dynamicGas, mul(6, minimum_word_size))
+                }
+                evmGasLeft := chargeGas(evmGasLeftOld, dynamicGas)
+            
+                _eraseReturndataPointer()
+            
+                offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
+            
+                let gasForTheCall := capGasForCall(evmGasLeft, INF_PASS_GAS())
+            
+                if gt(value, selfbalance()) { // it should be checked before actual deploy call
+                    revertWithGas(evmGasLeft) // gasForTheCall not consumed
+                }
+            
+                let bytecodeHash := 0
+                if isCreate2 {
+                    bytecodeHash := keccak256(offset, size)
+                }
+            
+                // we want to calculate the address of new contract, and if it is deployable (no collision),
+                // we need to increment deploy nonce. Otherwise - panic. 
+                // We should revert with gas if nonce overflowed, but this should not happen in reality anyway
+            
+                // selector: function precreateEvmAccountFromEmulator(bytes32 salt, bytes32 evmBytecodeHash)
+                mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
+                mstore(4, salt)
+                mstore(36, bytecodeHash)
+                let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
+            
+                if iszero(precreateResult) {
+                    // collision, nonce overflow or EVM not allowed
+                    // this is *internal* panic, consuming all passed gas
+                    evmGasLeft := chargeGas(evmGasLeft, gasForTheCall)
+                }
+            
+                if precreateResult {
+                    returndatacopy(0, 0, 32)
+                    addr := mload(0)
+                
+                    pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
+                    // so even if constructor reverts, nonce stays incremented and addr stays warm
+                
+                    // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
+                    _pushEVMFrame(gasForTheCall, false)
+            
+                    // move needed memory slots to the scratch space
+                    mstore(mul(10, 32), mload(sub(offset, 0x80))
+                    mstore(mul(11, 32), mload(sub(offset, 0x60))
+                    mstore(mul(12, 32), mload(sub(offset, 0x40))
+                    mstore(mul(13, 32), mload(sub(offset, 0x20))
+                
+                    // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
+                    mstore(sub(offset, 0x80), 0xe43cec64)
+                    mstore(sub(offset, 0x60), addr)
+                    mstore(sub(offset, 0x40), 0x40) // Where the arg starts (third word)
+                    mstore(sub(offset, 0x20), size) // Length of the init code
+                    
+                    let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
+            
+                    // move memory slots back
+                    mstore(sub(offset, 0x80), mload(mul(10, 32))
+                    mstore(sub(offset, 0x60), mload(mul(11, 32))
+                    mstore(sub(offset, 0x40), mload(mul(12, 32))
+                    mstore(sub(offset, 0x20), mload(mul(13, 32))
+                
+                    let gasLeft
+                    switch result
+                        case 0 {
+                            addr := 0
+                            gasLeft := _saveReturndataAfterEVMCall(0, 0)
+                        }
+                        default {
+                            returndatacopy(0, 0, 32)
+                            addr := mload(0)
+                            gasLeft := _fetchConstructorReturnGas()
+                        }
+                
+                    let gasUsed := sub(gasForTheCall, gasLeft)
+                    evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+                }
+            }
+            
+            function performCreate(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
                 let value, offset, size
             
                 popStackCheck(oldSp, 3)
                 value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
                 offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                checkMemIsAccessible(offset, size)
-            
-                if gt(size, MAX_POSSIBLE_BYTECODE()) {
-                    panic()
-                }
-            
-                // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-                // minimum_word_size = (size + 31) / 32
-                // init_code_cost = 2 * minimum_word_size
-                // code_deposit_cost = 200 * deployed_code_size
-                let dynamicGas := add(
-                    shr(4, add(size, 31)),
-                    expandMemory(add(offset, size))
-                )
-                evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-            
-                let result, addr
-                result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, false, 0, stackHead)
-            
-                switch result
-                    case 0 { stackHead := 0 }
-                    default { stackHead := addr }
+                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, false, 0)
             }
             
-            function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, result, addr, stackHead {
-                evmGasLeft := chargeGas(evmGas, 32000)
-            
-                if isStatic {
-                    panic()
-                }
-            
+            function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
                 let value, offset, size, salt
             
                 popStackCheck(oldSp, 4)
                 value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
                 offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                size, sp, salt := popStackItemWithoutCheck(sp, stackHead)
             
-                checkMemIsAccessible(offset, size)
-            
-                if gt(size, MAX_POSSIBLE_BYTECODE()) {
-                    panic()
-                }
-            
-                // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
-                // minimum_word_size = (size + 31) / 32
-                // init_code_cost = 2 * minimum_word_size
-                // hash_cost = 6 * minimum_word_size
-                // code_deposit_cost = 200 * deployed_code_size
-                evmGasLeft := chargeGas(evmGasLeft, add(
-                    expandMemory(add(offset, size)),
-                    shr(2, add(size, 31))
-                ))
-            
-                result, evmGasLeft, addr, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, true, salt, stackHead)
+                evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(offset, size, value, oldEvmGasLeft, true, salt)
             }
             
             ////////////////////////////////////////////////////////////////
@@ -5685,7 +5653,13 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0xF0 { // OP_CREATE
-                        evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, isStatic, stackHead)
+                        evmGasLeft := chargeGas(evmGasLeft, 32000)
+                
+                        if isStatic {
+                            panic()
+                        }
+                
+                        evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0xF1 { // OP_CALL
@@ -5721,11 +5695,13 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0xF5 { // OP_CREATE2
-                        let result, addr
-                        evmGasLeft, sp, result, addr, stackHead := performCreate2(evmGasLeft, sp, isStatic, stackHead)
-                        switch result
-                        case 0 { sp, stackHead := pushStackItem(sp, 0, stackHead) }
-                        default { sp, stackHead := pushStackItem(sp, addr, stackHead) }
+                        evmGasLeft := chargeGas(evmGasLeft, 32000)
+                
+                        if isStatic {
+                            panic()
+                        }
+                
+                        evmGasLeft, sp, stackHead := performCreate2(evmGasLeft, sp, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0xFA { // OP_STATICCALL

@@ -11,7 +11,7 @@ object "EvmEmulator" {
 
             let size := getActivePtrDataSize()
 
-            if gt(size, MAX_POSSIBLE_BYTECODE()) {
+            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
                 panic()
             }
 
@@ -40,15 +40,21 @@ object "EvmEmulator" {
             }
         }
 
-        function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
-            if len {
+        function validateBytecodeAndChargeGas(offset, deployedCodeLen, gasToReturn) -> returnGas {
+            if deployedCodeLen {
+                // EIP-3860
+                if gt(deployedCodeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE()) {
+                    panic()
+                }
+
+                // EIP-3541
                 let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
-                    revert(0, 0)
+                    panic()
                 }
             }
 
-            let gasForCode := mul(len, 200)
+            let gasForCode := mul(deployedCodeLen, 200)
             returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
@@ -88,7 +94,7 @@ object "EvmEmulator" {
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
 
-        gasToReturn := validateCorrectBytecode(offset, len, gasToReturn)
+        gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
 
         offset, len := padBytecode(offset, len)
 
