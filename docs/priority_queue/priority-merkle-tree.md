@@ -1,4 +1,4 @@
-# Migrating Priority Queue to Merkle Tree
+# Priority Queue to Merkle Tree
 
 ## Overview of the current implementation
 
