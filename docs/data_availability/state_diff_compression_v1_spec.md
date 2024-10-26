@@ -1,5 +1,3 @@
-FIXME: read and fix any issues
-
 # State diff compression v1 spec
 
 The most basic strategy to publish state diffs is to publish those in either of the following two forms:
