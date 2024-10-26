@@ -42,6 +42,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
     /// @notice The `block.coinbase` in the current transaction.
     /// @dev For the support of coinbase, we will use the bootloader formal address for now
+    /// @dev (!) EVM emulator doesn't expect this value to change
     address public coinbase = BOOTLOADER_FORMAL_ADDRESS;
 
     /// @notice Formal `block.difficulty` parameter.
