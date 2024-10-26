@@ -31,8 +31,8 @@
     "contractName": "ContractDeployer",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "contracts-preprocessed/ContractDeployer.sol",
-    "bytecodeHash": "0x010006893b07703146f0b1c9b4cd9d481e206eef99147d13fea699be2fdc8ad9",
-    "sourceCodeHash": "0xa4c2c1f55f5ef1281e18fd016865d9b83b71ad7facb2fd5130940b3b0b7de621"
+    "bytecodeHash": "0x01000689266290b864e2e99a658660f38c6fd94189fedc05fc8857dd50070720",
+    "sourceCodeHash": "0x934de0dd41f2ba3eb36787d8d1269ac38c9975ce48682c96e4837ff042402e75"
   },
   {
     "contractName": "Create2Factory",
@@ -122,8 +122,8 @@
     "contractName": "EvmEmulator",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmEmulator.yul/EvmEmulator.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmEmulator.yul",
-    "bytecodeHash": "0x01000cfd3587070007688bb490de58c423328c01e3da86f22ca879f97730842c",
-    "sourceCodeHash": "0x4ba86c74a23eb9d8b40cacaafa44cca294ab661f20f6d959ae004ee47599d177"
+    "bytecodeHash": "0x01000cfde1de893cd8162bb172f93aa6ecf3f2332d63439346c40e2a4b2682bc",
+    "sourceCodeHash": "0x33df3353ea289dae56465dfcc97ba35abfd2876a27bd34109e59d01f8ab06995"
   },
   {
     "contractName": "EvmGasManager",
