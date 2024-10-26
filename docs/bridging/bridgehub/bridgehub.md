@@ -242,18 +242,8 @@ Note, however, that it is not the way to withdraw base token. To withdraw base t
 
 After the batch with the withdrawal request has been executed, the user can finalize the withdrawal on L1 by calling `L1AssetRouter.finalizeWithdrawal`, where the user provides the proof of the corresponding withdrawal message.
 
-# Additional limitations for the current release
+# Additional limitations for the current version
 
-In the current release creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
+In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
 
 Also, since in the current release, there will be little benefits from shared liquidity, i.e. the there will be no direct ST<>ST transfers supported, as a measure of additional security we’ll also keep track of balances for each individual ST and will not allow it to withdraw more than it has deposited into the system.
-
-# Other contracts
-
-## Governance
-
-The documentation about decentralized governance can be read here (FIXME: provide link).
-
-## ValidatorTimelock
-
-All the chains registered on the current CTM share the same timelock for batch execution. It is a security feature, you can read more about it [here](./L1%20smart%20contracts.md#validatortimelock). 
