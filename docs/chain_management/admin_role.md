@@ -1,5 +1,24 @@
 # Safe ChainAdmin management
 
+<!-- ## Ecosystem admins
+
+Most of the ecosystem contracts (like Bridgehub) have two roles: *the owner* and *the admin*. The latter is responsible for more day-to-day tasks. I.e. the system should be generally okay-ish even if it behaves maliciously, i.e. no funds should be lost and the state should be recoverable by actions of the owner.
+
+The intended deployed admin is the multisig of ML team. It is intended to be able to move quickly while providing sufficient security.
+
+***Owner**,* on the other hand is a very powerful trusted role that is governed by the ZK token governance on L2. The complete design of the decentralized governance is out of scope of this document. However, owner is a critical role responsible for potentially dangerous unrecoverable operations, e.g. creating new protocol version.
+
+## Chain admins
+
+Also, each chain has its own admin. The structure of the chain admin can be decided by each chain and they have access to updating chain-specific parameters. There include:
+
+- Upgrading the chain. Only the decentralized governance can whitelist *the content* of the upgrade, but the chain admin is the one that usually triggers an upgrade for the chain.
+- Choosing the DA layer.
+- Updating token price in ETH on the contract
+- The full list can be observed by searching for `onlyAdmin` and `onlyAdminOrChainTypeManager` in the Admin.sol facet of the contract.
+
+You can read more about chain admins [here](../chain_managment/admin_role.md). -->
+
 While the ecosystem does a [decentralized trusted governance](https://blog.zknation.io/introducing-zk-nation/), each chain has its own Chain Admin. While the upgrade parameters are chosen by the governance, chain admin is still a powerful role and should be managed carefully.
 
 In this document we will explore what are the abilities of the ChainAdmin, how dangerous they are and how to mitigate potential issues.

@@ -1,2 +1,3 @@
+# Bridgehub
 
-# todo write intro for BH
+Bridging is available both on L1 and L2. 

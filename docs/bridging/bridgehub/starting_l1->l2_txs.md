@@ -6,13 +6,9 @@ FIXME: read and fix any issues
 
 > This document will not cover how ZK Gateway works, you can check it out in a separate doc (TODO: link).
 
-
 # BridgeHub & Asset Routers
 
-In the previous section we discussed how ZKChains and CTMs work. However, these are just means to get the collection of chains that can trust each other, while providing robust customizability for each individual chain. 
-
-In this section we’ll explore how exactly unified liquidity is achieved and how do ZKChains get deployed. 
-
+In this section we’ll explore how exactly unified liquidity is achieved. 
 
 ## Asset router as the main asset bridging entrypoint
 
@@ -239,9 +235,3 @@ The user needs to call the `L2AssetRouter.withdraw` function on L2, while provid
 Note, however, that it is not the way to withdraw base token. To withdraw base token, `L2BaseToken.withdraw` needs to be called.
 
 After the batch with the withdrawal request has been executed, the user can finalize the withdrawal on L1 by calling `L1AssetRouter.finalizeWithdrawal`, where the user provides the proof of the corresponding withdrawal message.
-
-# Additional limitations for the current version
-
-In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
-
-Also, since in the current release, there will be little benefits from shared liquidity, i.e. the there will be no direct ZKChain<>ZKChain transfers supported, as a measure of additional security we’ll also keep track of balances for each individual ZKChain and will not allow it to withdraw more than it has deposited into the system.

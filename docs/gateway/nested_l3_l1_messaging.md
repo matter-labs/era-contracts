@@ -4,7 +4,8 @@
 
 This document assumes that the reader is already aware of what SyncLayer (or how it is now called Gateway) is. To reduce the interactions with L1, on SyncLayer we will gather all the batch roots from all the chains into the tree with following structure:
 
-![NestedL3L1Messaging.png](./Nested_L3_L1_Messaging.png)
+![NestedL3L1Messaging.png](./img/nested_l3_l1_messaging.png)
+![NestedL3L1Messaging.png](./img/nested_l3_l1_messaging_2.png)
 
 > Note:
 

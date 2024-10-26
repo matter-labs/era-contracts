@@ -1,32 +1,46 @@
-# Custom Asset Bridging
+# AssetRouters (L1/L2) and NativeTokenVault
 
-## High-level Overview
+The main job of the asset router is to be the central point of coordination for bridging. All crosschain token bridging is done between asset routers only and once the message reaches asset router, it then routes it to the corresponding asset handler.
 
-### Reason for changes
+In order to make this easier, all L2 chains have the asset router located on the same address on every chain. It is `0x10003` and it is pre-deployed contract. More on how it is deployed can be seen in the [Chain Genesis](../../chain_management/chain_genesis.md) section.
 
-The goal was to be build a modular bridge which separates the logic of L1<>L2 messaging from the holding of the asset. This enables bridging many custom tokens, assets which accrue value over time (like LRTs), WETH, and even custom assets like NFTs.
+The endgame is to have L1 asset router have the same functionality as the L2 one. This is not the case yet, but some progress has been made: L2AssetRouter can now bridge L2-native assets to L1, from which it could be bridged to other chains in the ecosystem.
 
-This upgrade only contains the framework, the logic of the custom bridges can be developed by third parties.
+The specifics of the L2AssetRouter is the need to interact with the previously deployed L2SharedBridgeLegacy if it was already present. It has less “rights” than the L1AssetRouter: at the moment it is assumed that all asset deployment trackers are from L1, the only way to register an asset handler on L2 is to make an L1→L2 transaction.
 
-### Major changes
+> Note, that today registering new asset deployment trackers will be permissioned, but the plan is to make it permissionless in the future
+> 
 
-In order to achieve it, we separated the liquidity managing logic from the Shared Bridge to `Asset Handlers`. The basic cases will be handled by `Native Token Vaults`, which are handling all of the standard `ERC20 tokens`, as well as `ETH`.
+The specifics of the L1AssetRouter come from the need to be backwards compatible with the old L1SharedBridge. Yes, it will not share the same storage, but it will inherit the need to be backwards compatible with the current SDK. Also, L1AssetRouter needs to facilitate L1-only operations, such as recovering from failed deposits.
 
-### New concepts
+Also, L1AssetRouter is the only base token bridge contract that can participate in initiation of cross chain transactions via the bridgehub. This will change in the future with the support of interop.
 
-- AssetDeploymentTracker => contract that manages the deployment of asset handlers across chains. It is the contract that registers these asset handlers in the AssetRouters.
-- AssetHandler => contract that manages liquidity (burns/mints, locks/unlocks) for specific token (or a set of them)
-- assetId => identifier to track bridged assets across chains linked to specific asset handler.
+### L1Nullifier
 
-### Normal flow
+While the endgoal is to unify L1 and L2 asset routers, in reality, it may not be that easy: while L2 asset routers get called by L1→L2 transactions, L1 ones don't and require manual finalization of transactions, which involves proof verification, etc. To move this logic outside of the L1AssetRouter, it was moved into a separate L1Nullifier contract. 
 
-Assets Handlers are registered in the Routers based on their assetId. The assetId is used to identify the asset when bridging, it is sent with the cross-chain transaction data and Router routes the data to the appropriate Handler. If the asset handler is not registered in the L2 Router, then the L1->L2 bridging transaction will fail on the L2 (expect for NTV assets, see below).
+*This is the contract the previous L1SharedBridge will be upgraded to, so it should have the backwards compatible storage.*
 
-`assetId = keccak256(chainId, asset deployment tracker = msg.sender, additionalData)`
+### NativeTokenVault (L1/L2)
 
-Asset registration is handled by the AssetDeploymentTracker. It is expected that this contract is deployed on the L1. Registration can be permissionless depending on the Asset (e.g. the AssetHandler can be deployed on the chain at a predefined address, this can message the L1 ADT, which can then register the asset in the Router). Registering the L1 Handler in the L1 Router can be done via a direct function call from the L1 Deployment Tracker. Registration in the L2 Router is done indirectly via the L1 Router.
+NativeTokenVault is an asset handler that is available on all chains and is also predeployed. It is provides the functionality of the most basic bridging: locking funds on one chain and minting the bridged equivalent on the other one. On L2 chains NTV is predeployed at the `0x10004` address.
 
-![Asset Registration](./img/custom_asset_handler_registration.png)
+The L1 and L2 versions of the NTV are almost identical in functionality, the main differences come from the differences of the deployment functionality in L1 and L2 envs, where the former uses standard CREATE2 and the latter uses low level calls to `CONTRACT_DEPLOYER`system contract. 
 
-The Native Token Vault is a special case of the Asset Handler, as we want it to support automatic bridging. This means it should be possible to bridge a L1 token to an L2 without deploying the Token contract beforehand and without registering it in the L2 Router. For NTV assets, L1->L2 transactions where the AssetHandler is not registered will not fail, but the message will be automatically be forwarded to the L2NTV. Here the contract checks that the asset is indeed deployed by the L1NTV, by checking that the assetId contains the correct ADT address (note, for NTV assets the ADT is the NTV and the used address is the L2NTV address). If the assetId is correct, the token contract is deployed.
+Also, the L1NTV has the following specifics:
 
+- It operates the `chainBalance` mapping, ensuring that the chains do not go beyond their balances.
+- It allows recovering from failed L1→L2 transfers.
+- It needs to both be able to retrieve funds from the former L1SharedBridge (now this contract has L1Nullifier in its place), but also needs to support the old SDK that gives out allowance to the “l1 shared bridge” value returned from the API, i.e. in our case this is will the L1AssetRouter.
+
+### L2SharedBridgeLegacy
+
+L2AssetRouter has to be pre-deployed onto a specific address. The old L2SharedBridge will be upgraded to L2SharedBridgeLegacy contract. The main purpose of this contract is to ensure compatibility with the incoming deposits and re-route them to the shared bridge.
+
+This contract is never deployed for new chains.
+
+### Summary
+
+![image.png](./img/bridge_contracts.png)
+> New bridge contracts
+>
