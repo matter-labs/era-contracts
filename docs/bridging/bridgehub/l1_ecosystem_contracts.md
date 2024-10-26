@@ -14,13 +14,13 @@ This document will assume the reader already knows how rollups (esp. zkSync Era)
 We want to create a system where:
 
 - ZK chains should be launched permissionlessly within the ecosystem.
-- Hyperbridges should enable unified liquidity for assets across the ecosystem.
+- Interop is seamless and enables unified liquidity for assets across the ecosystem.
 - Multi-chain smart contracts need to be easy to develop, which means easy access to traditional bridges, and other supporting architecture.
 
 
 ### Images:
 
-![Contracts](./L1%20smart%20contracts/gateway-architecture.png)
+![Contracts](./img/gateway-architecture.png)
 
 > This document will not cover how ZK Gateway works, you can check it out in a separate doc (TODO: link).
 
