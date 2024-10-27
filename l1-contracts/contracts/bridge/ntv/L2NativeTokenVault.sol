@@ -16,7 +16,7 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
@@ -136,7 +136,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
             (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
                 uint32(gasleft()),
-                DEPLOYER_SYSTEM_CONTRACT,
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
                 0,
                 abi.encodeCall(
                     IContractDeployer.create2,

@@ -75,9 +75,6 @@ address constant L2_MESSAGE_ROOT_ADDR = address(0x10005);
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
-/// @dev the address of the deployer system contract
-address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
-
 /// @dev the address of the l2 messenger system contract
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
