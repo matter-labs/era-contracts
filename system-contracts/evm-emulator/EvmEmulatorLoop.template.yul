@@ -664,43 +664,48 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0x55 { // OP_SSTORE
-        evmGasLeft := chargeGas(evmGasLeft, 100)
-
         if isStatic {
             panic()
         }
 
-        let key, value, gasSpent
+        if lt(evmGasLeft, 2301) { // if <= 2300
+            panic()
+        }
+
+        let key, value
 
         popStackCheck(sp, 2)
         key, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
         ip := add(ip, 1)
-        {
-            // Here it is okay to read before we charge since we known anyway that
-            // the context has enough funds to compensate at least for the read.
-            // Im not sure if we need this before: require(gasLeft > GAS_CALL_STIPEND); // TODO
-            let currentValue := sload(key)
-            let wasWarm, originalValue := warmSlot(key, currentValue)
 
-            if eq(value, currentValue) {
-                continue
+        let dynamicGas := 100
+        // Here it is okay to read before we charge since we known anyway that
+        // the context has enough funds to compensate at least for the read.
+        let currentValue := sload(key)
+        let wasWarm, originalValue := warmSlot(key, currentValue)
+
+        if iszero(wasWarm) {
+            dynamicGas := add(dynamicGas, 2100)
+        }
+
+        if eq(value, currentValue) { // no-op
+            evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+            continue
+        }
+
+        if eq(originalValue, currentValue) {
+            switch originalValue
+            case 0 {
+                dynamicGas := add(dynamicGas, 19900)
             }
-
-            if eq(originalValue, currentValue) {
-                gasSpent := 19900
-                if originalValue {
-                    gasSpent := 2800
-                }
-            }
-
-            if iszero(wasWarm) {
-                gasSpent := add(gasSpent, 2100)
+            default {
+                dynamicGas := add(dynamicGas, 2800)
             }
         }
 
-        evmGasLeft := chargeGas(evmGasLeft, gasSpent)
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
         sstore(key, value)
     }
     // NOTE: We don't currently do full jumpdest validation
