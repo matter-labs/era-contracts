@@ -426,9 +426,9 @@ for { } true { } {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
-        switch _isEVM(addr) 
+        switch isEvmContract(addr) 
             case 0  { stackHead := extcodesize(addr) }
-            default { stackHead := _fetchDeployedCodeLen(addr) }
+            default { stackHead := fetchDeployedEvmCodeLen(addr) }
 
         ip := add(ip, 1)
     }
@@ -460,8 +460,8 @@ for { } true { } {
         $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, len)
     
         // Gets the code from the addr
-        if and(iszero(iszero(_getRawCodeHash(addr))), gt(len, 0)) {
-            pop(_fetchDeployedCodeWithDest(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
+        if and(iszero(iszero(getRawCodeHash(addr))), gt(len, 0)) {
+            pop(fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
         }
 
         ip := add(ip, 1)

@@ -209,7 +209,7 @@ object "EvmEmulator" {
             revert(0, 32)
         }
         
-        function panic() {
+        function panic() { // revert consuming all EVM gas
             mstore(0, 0)
             revert(0, 32)
         }
@@ -227,10 +227,53 @@ object "EvmEmulator" {
             gasRemaining := sub(prevGas, toCharge)
         }
         
+        function getEvmGasFromContext() -> evmGas {
+            // Caller must pass at least OVERHEAD() ergs
+            let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
+        
+            let _gas := gas()
+            if gt(_gas, requiredGas) {
+                evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+            }
+        }
+        
         function providedErgs() -> ergs {
             let _gas := gas()
             if gt(_gas, EVM_GAS_STIPEND()) {
                 ergs := sub(_gas, EVM_GAS_STIPEND())
+            }
+        }
+        
+        // This function can overflow, it is the job of the caller to ensure that it does not.
+        // The argument to this function is the offset into the memory region IN BYTES.
+        function expandMemory(offset, size) -> gasCost {
+            // memory expansion costs 0 if size is 0
+            if size {
+                let oldSizeInWords := mload(MEM_LEN_OFFSET())
+        
+                // div rounding up
+                let newSizeInWords := div(add(add(offset, size), 31), 32)
+            
+                // memory_size_word = (memory_byte_size + 31) / 32
+                // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+                // memory_expansion_cost = new_memory_cost - last_memory_cost
+                if gt(newSizeInWords, oldSizeInWords) {
+                    let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+                    let quadraticPart := sub(
+                        div(
+                            mul(newSizeInWords, newSizeInWords),
+                            512
+                        ),
+                        div(
+                            mul(oldSizeInWords, oldSizeInWords),
+                            512
+                        )
+                    )
+            
+                    gasCost := add(linearPart, quadraticPart)
+            
+                    mstore(MEM_LEN_OFFSET(), newSizeInWords)
+                }
             }
         }
         
@@ -326,13 +369,13 @@ object "EvmEmulator" {
             nonce := fetchFromSystemContract(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
         }
         
-        function _getRawCodeHash(account) -> hash {
+        function getRawCodeHash(account) -> hash {
             mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
             mstore(4, account)
             hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
         }
         
-        function _isEVM(_addr) -> isEVM {
+        function isEvmContract(_addr) -> isEVM {
             // function isAccountEVM(address _addr) external view returns (bool);
             mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
             mstore(4, _addr)
@@ -340,8 +383,8 @@ object "EvmEmulator" {
         }
         
         // Basically performs an extcodecopy, while returning the length of the bytecode.
-        function _fetchDeployedCodeWithDest(addr, dstOffset, srcOffset, len) -> codeLen {
-            let codeHash := _getRawCodeHash(addr)
+        function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> codeLen {
+            let codeHash := getRawCodeHash(addr)
             mstore(0, codeHash)
             // The first word of returndata is the true length of the bytecode
             codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
@@ -353,10 +396,9 @@ object "EvmEmulator" {
             returndatacopy(dstOffset, add(32, srcOffset), len)
         }
         
-        // Returns the length of the bytecode.
-        function _fetchDeployedCodeLen(addr) -> codeLen {
-            let codeHash := _getRawCodeHash(addr)
-        
+        // Returns the length of the EVM bytecode.
+        function fetchDeployedEvmCodeLen(addr) -> codeLen {
+            let codeHash := getRawCodeHash(addr)
             mstore(0, codeHash)
         
             let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
@@ -376,55 +418,10 @@ object "EvmEmulator" {
             }
         }
         
-        function getDeployedBytecode() {
-            let codeLen := _fetchDeployedCodeWithDest(
-                getCodeAddress(), 
-                BYTECODE_OFFSET(), // destination offset
-                0, // source offset
-                MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
-            )
-        
-            mstore(EMPTY_CODE_OFFSET(), 0)
-            mstore(BYTECODE_LEN_OFFSET(), codeLen)
-        }
-        
         function getMax(a, b) -> max {
             max := b
             if gt(a, b) {
                 max := a
-            }
-        }
-        
-        // This function can overflow, it is the job of the caller to ensure that it does not.
-        // The argument to this function is the offset into the memory region IN BYTES.
-        function expandMemory(offset, size) -> gasCost {
-            // memory expansion costs 0 if size is 0
-            if size {
-                let oldSizeInWords := mload(MEM_LEN_OFFSET())
-        
-                // div rounding up
-                let newSizeInWords := div(add(add(offset, size), 31), 32)
-            
-                // memory_size_word = (memory_byte_size + 31) / 32
-                // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
-                // memory_expansion_cost = new_memory_cost - last_memory_cost
-                if gt(newSizeInWords, oldSizeInWords) {
-                    let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
-                    let quadraticPart := sub(
-                        div(
-                            mul(newSizeInWords, newSizeInWords),
-                            512
-                        ),
-                        div(
-                            mul(oldSizeInWords, oldSizeInWords),
-                            512
-                        )
-                    )
-            
-                    gasCost := add(linearPart, quadraticPart)
-            
-                    mstore(MEM_LEN_OFFSET(), newSizeInWords)
-                }
             }
         }
         
@@ -448,16 +445,6 @@ object "EvmEmulator" {
             // not constructor call
         
             success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-        }
-        
-        function getEvmGasFromContext() -> evmGas {
-            // Caller must pass at least OVERHEAD() ergs
-            let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
-        
-            let _gas := gas()
-            if gt(_gas, requiredGas) {
-                evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
-            }
         }
         
         ////////////////////////////////////////////////////////////////
@@ -563,7 +550,7 @@ object "EvmEmulator" {
             // non-standard selector 0x01
             mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
             mstore(1, key)
-        
+            // should be call since we use TSTORE in gas manager
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
         
             if iszero(success) {
@@ -576,11 +563,11 @@ object "EvmEmulator" {
             }
         }
         
-        function warmSlot(key,currentValue) -> isWarm, originalValue {
+        function warmSlot(key, currentValue) -> isWarm, originalValue {
             // non-standard selector 0x02
             mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
             mstore(1, key)
-            mstore(33,currentValue)
+            mstore(33, currentValue)
         
             performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
         
@@ -591,11 +578,11 @@ object "EvmEmulator" {
             }
         }
         
-        function _pushEVMFrame(_passGas, _isStatic) {
+        function pushEvmFrame(passGas, isStatic) {
             // function pushEVMFrame
             // non-standard selector 0x03
-            mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
-            mstore(32, _passGas)
+            mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, isStatic))
+            mstore(32, passGas)
         
             performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
         }
@@ -782,14 +769,14 @@ object "EvmEmulator" {
             evmGasLeft := chargeGas(evmGasLeft, gasUsed)
         
             // it is not possible to delegatecall precompiles
-            if iszero(_isEVM(addr)) {
+            if iszero(isEvmContract(addr)) {
                 revertWithGas(evmGasLeft)
             }
         
             gasToPass := capGasForCall(evmGasLeft, gasToPass)
             evmGasLeft := sub(evmGasLeft, gasToPass)
         
-            _pushEVMFrame(gasToPass, isStatic)
+            pushEvmFrame(gasToPass, isStatic)
             let success := delegatecall(
                 providedErgs(),
                 addr,
@@ -806,7 +793,7 @@ object "EvmEmulator" {
         }
         
         function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-            switch _isEVM(addr)
+            switch isEvmContract(addr)
             case 0 {
                 // zkEVM native
                 let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
@@ -820,7 +807,7 @@ object "EvmEmulator" {
                 }
             }
             default {
-                _pushEVMFrame(gasToPass, false)
+                pushEvmFrame(gasToPass, false)
                 // VM will add EVM_GAS_STIPEND() to gas for this call
                 // but if value != 0 we will firstly call MsgValueSimulator contract, which is zkVM system contract
                 // so we need to add some gas for MsgValueSimulator
@@ -830,7 +817,7 @@ object "EvmEmulator" {
         }
         
         function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-            switch _isEVM(addr)
+            switch isEvmContract(addr)
             case 0 {
                 // zkEVM native
                 let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
@@ -844,7 +831,7 @@ object "EvmEmulator" {
                 }
             }
             default {
-                _pushEVMFrame(gasToPass, true)
+                pushEvmFrame(gasToPass, true)
                 success := staticcall(providedErgs(), addr, argsOffset, argsSize, 0, 0)
                 frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
             }
@@ -1086,7 +1073,7 @@ object "EvmEmulator" {
                 // so even if constructor reverts, nonce stays incremented and addr stays warm
             
                 // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
-                _pushEVMFrame(gasForTheCall, false)
+                pushEvmFrame(gasForTheCall, false)
         
                 // move needed memory slots to the scratch space
                 mstore(mul(10, 32), mload(sub(offset, 0x80))
@@ -1629,9 +1616,9 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    switch _isEVM(addr) 
+                    switch isEvmContract(addr) 
                         case 0  { stackHead := extcodesize(addr) }
-                        default { stackHead := _fetchDeployedCodeLen(addr) }
+                        default { stackHead := fetchDeployedEvmCodeLen(addr) }
             
                     ip := add(ip, 1)
                 }
@@ -1663,8 +1650,8 @@ object "EvmEmulator" {
                     $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, len)
                 
                     // Gets the code from the addr
-                    if and(iszero(iszero(_getRawCodeHash(addr))), gt(len, 0)) {
-                        pop(_fetchDeployedCodeWithDest(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
+                    if and(iszero(iszero(getRawCodeHash(addr))), gt(len, 0)) {
+                        pop(fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
                     }
             
                     ip := add(ip, 1)
@@ -3035,6 +3022,18 @@ object "EvmEmulator" {
                 max := MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
             }
 
+            function getDeployedBytecode() {
+                let codeLen := fetchDeployedCode(
+                    getCodeAddress(), 
+                    BYTECODE_OFFSET(), // destination offset
+                    0, // source offset
+                    MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
+                )
+            
+                mstore(EMPTY_CODE_OFFSET(), 0)
+                mstore(BYTECODE_LEN_OFFSET(), codeLen)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
@@ -3184,7 +3183,7 @@ object "EvmEmulator" {
                 revert(0, 32)
             }
             
-            function panic() {
+            function panic() { // revert consuming all EVM gas
                 mstore(0, 0)
                 revert(0, 32)
             }
@@ -3202,10 +3201,53 @@ object "EvmEmulator" {
                 gasRemaining := sub(prevGas, toCharge)
             }
             
+            function getEvmGasFromContext() -> evmGas {
+                // Caller must pass at least OVERHEAD() ergs
+                let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
+            
+                let _gas := gas()
+                if gt(_gas, requiredGas) {
+                    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+                }
+            }
+            
             function providedErgs() -> ergs {
                 let _gas := gas()
                 if gt(_gas, EVM_GAS_STIPEND()) {
                     ergs := sub(_gas, EVM_GAS_STIPEND())
+                }
+            }
+            
+            // This function can overflow, it is the job of the caller to ensure that it does not.
+            // The argument to this function is the offset into the memory region IN BYTES.
+            function expandMemory(offset, size) -> gasCost {
+                // memory expansion costs 0 if size is 0
+                if size {
+                    let oldSizeInWords := mload(MEM_LEN_OFFSET())
+            
+                    // div rounding up
+                    let newSizeInWords := div(add(add(offset, size), 31), 32)
+                
+                    // memory_size_word = (memory_byte_size + 31) / 32
+                    // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+                    // memory_expansion_cost = new_memory_cost - last_memory_cost
+                    if gt(newSizeInWords, oldSizeInWords) {
+                        let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+                        let quadraticPart := sub(
+                            div(
+                                mul(newSizeInWords, newSizeInWords),
+                                512
+                            ),
+                            div(
+                                mul(oldSizeInWords, oldSizeInWords),
+                                512
+                            )
+                        )
+                
+                        gasCost := add(linearPart, quadraticPart)
+                
+                        mstore(MEM_LEN_OFFSET(), newSizeInWords)
+                    }
                 }
             }
             
@@ -3301,13 +3343,13 @@ object "EvmEmulator" {
                 nonce := fetchFromSystemContract(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
             }
             
-            function _getRawCodeHash(account) -> hash {
+            function getRawCodeHash(account) -> hash {
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, account)
                 hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
             }
             
-            function _isEVM(_addr) -> isEVM {
+            function isEvmContract(_addr) -> isEVM {
                 // function isAccountEVM(address _addr) external view returns (bool);
                 mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
                 mstore(4, _addr)
@@ -3315,8 +3357,8 @@ object "EvmEmulator" {
             }
             
             // Basically performs an extcodecopy, while returning the length of the bytecode.
-            function _fetchDeployedCodeWithDest(addr, dstOffset, srcOffset, len) -> codeLen {
-                let codeHash := _getRawCodeHash(addr)
+            function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> codeLen {
+                let codeHash := getRawCodeHash(addr)
                 mstore(0, codeHash)
                 // The first word of returndata is the true length of the bytecode
                 codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
@@ -3328,10 +3370,9 @@ object "EvmEmulator" {
                 returndatacopy(dstOffset, add(32, srcOffset), len)
             }
             
-            // Returns the length of the bytecode.
-            function _fetchDeployedCodeLen(addr) -> codeLen {
-                let codeHash := _getRawCodeHash(addr)
-            
+            // Returns the length of the EVM bytecode.
+            function fetchDeployedEvmCodeLen(addr) -> codeLen {
+                let codeHash := getRawCodeHash(addr)
                 mstore(0, codeHash)
             
                 let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
@@ -3351,55 +3392,10 @@ object "EvmEmulator" {
                 }
             }
             
-            function getDeployedBytecode() {
-                let codeLen := _fetchDeployedCodeWithDest(
-                    getCodeAddress(), 
-                    BYTECODE_OFFSET(), // destination offset
-                    0, // source offset
-                    MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
-                )
-            
-                mstore(EMPTY_CODE_OFFSET(), 0)
-                mstore(BYTECODE_LEN_OFFSET(), codeLen)
-            }
-            
             function getMax(a, b) -> max {
                 max := b
                 if gt(a, b) {
                     max := a
-                }
-            }
-            
-            // This function can overflow, it is the job of the caller to ensure that it does not.
-            // The argument to this function is the offset into the memory region IN BYTES.
-            function expandMemory(offset, size) -> gasCost {
-                // memory expansion costs 0 if size is 0
-                if size {
-                    let oldSizeInWords := mload(MEM_LEN_OFFSET())
-            
-                    // div rounding up
-                    let newSizeInWords := div(add(add(offset, size), 31), 32)
-                
-                    // memory_size_word = (memory_byte_size + 31) / 32
-                    // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
-                    // memory_expansion_cost = new_memory_cost - last_memory_cost
-                    if gt(newSizeInWords, oldSizeInWords) {
-                        let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
-                        let quadraticPart := sub(
-                            div(
-                                mul(newSizeInWords, newSizeInWords),
-                                512
-                            ),
-                            div(
-                                mul(oldSizeInWords, oldSizeInWords),
-                                512
-                            )
-                        )
-                
-                        gasCost := add(linearPart, quadraticPart)
-                
-                        mstore(MEM_LEN_OFFSET(), newSizeInWords)
-                    }
                 }
             }
             
@@ -3423,16 +3419,6 @@ object "EvmEmulator" {
                 // not constructor call
             
                 success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-            }
-            
-            function getEvmGasFromContext() -> evmGas {
-                // Caller must pass at least OVERHEAD() ergs
-                let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
-            
-                let _gas := gas()
-                if gt(_gas, requiredGas) {
-                    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
-                }
             }
             
             ////////////////////////////////////////////////////////////////
@@ -3538,7 +3524,7 @@ object "EvmEmulator" {
                 // non-standard selector 0x01
                 mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
                 mstore(1, key)
-            
+                // should be call since we use TSTORE in gas manager
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
             
                 if iszero(success) {
@@ -3551,11 +3537,11 @@ object "EvmEmulator" {
                 }
             }
             
-            function warmSlot(key,currentValue) -> isWarm, originalValue {
+            function warmSlot(key, currentValue) -> isWarm, originalValue {
                 // non-standard selector 0x02
                 mstore(0, 0x0200000000000000000000000000000000000000000000000000000000000000)
                 mstore(1, key)
-                mstore(33,currentValue)
+                mstore(33, currentValue)
             
                 performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
             
@@ -3566,11 +3552,11 @@ object "EvmEmulator" {
                 }
             }
             
-            function _pushEVMFrame(_passGas, _isStatic) {
+            function pushEvmFrame(passGas, isStatic) {
                 // function pushEVMFrame
                 // non-standard selector 0x03
-                mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, _isStatic))
-                mstore(32, _passGas)
+                mstore(0, or(0x0300000000000000000000000000000000000000000000000000000000000000, isStatic))
+                mstore(32, passGas)
             
                 performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 64)
             }
@@ -3757,14 +3743,14 @@ object "EvmEmulator" {
                 evmGasLeft := chargeGas(evmGasLeft, gasUsed)
             
                 // it is not possible to delegatecall precompiles
-                if iszero(_isEVM(addr)) {
+                if iszero(isEvmContract(addr)) {
                     revertWithGas(evmGasLeft)
                 }
             
                 gasToPass := capGasForCall(evmGasLeft, gasToPass)
                 evmGasLeft := sub(evmGasLeft, gasToPass)
             
-                _pushEVMFrame(gasToPass, isStatic)
+                pushEvmFrame(gasToPass, isStatic)
                 let success := delegatecall(
                     providedErgs(),
                     addr,
@@ -3781,7 +3767,7 @@ object "EvmEmulator" {
             }
             
             function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-                switch _isEVM(addr)
+                switch isEvmContract(addr)
                 case 0 {
                     // zkEVM native
                     let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
@@ -3795,7 +3781,7 @@ object "EvmEmulator" {
                     }
                 }
                 default {
-                    _pushEVMFrame(gasToPass, false)
+                    pushEvmFrame(gasToPass, false)
                     // VM will add EVM_GAS_STIPEND() to gas for this call
                     // but if value != 0 we will firstly call MsgValueSimulator contract, which is zkVM system contract
                     // so we need to add some gas for MsgValueSimulator
@@ -3805,7 +3791,7 @@ object "EvmEmulator" {
             }
             
             function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-                switch _isEVM(addr)
+                switch isEvmContract(addr)
                 case 0 {
                     // zkEVM native
                     let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
@@ -3819,7 +3805,7 @@ object "EvmEmulator" {
                     }
                 }
                 default {
-                    _pushEVMFrame(gasToPass, true)
+                    pushEvmFrame(gasToPass, true)
                     success := staticcall(providedErgs(), addr, argsOffset, argsSize, 0, 0)
                     frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 }
@@ -4061,7 +4047,7 @@ object "EvmEmulator" {
                     // so even if constructor reverts, nonce stays incremented and addr stays warm
                 
                     // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
-                    _pushEVMFrame(gasForTheCall, false)
+                    pushEvmFrame(gasForTheCall, false)
             
                     // move needed memory slots to the scratch space
                     mstore(mul(10, 32), mload(sub(offset, 0x80))
@@ -4604,9 +4590,9 @@ object "EvmEmulator" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        switch _isEVM(addr) 
+                        switch isEvmContract(addr) 
                             case 0  { stackHead := extcodesize(addr) }
-                            default { stackHead := _fetchDeployedCodeLen(addr) }
+                            default { stackHead := fetchDeployedEvmCodeLen(addr) }
                 
                         ip := add(ip, 1)
                     }
@@ -4638,8 +4624,8 @@ object "EvmEmulator" {
                         $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, len)
                     
                         // Gets the code from the addr
-                        if and(iszero(iszero(_getRawCodeHash(addr))), gt(len, 0)) {
-                            pop(_fetchDeployedCodeWithDest(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
+                        if and(iszero(iszero(getRawCodeHash(addr))), gt(len, 0)) {
+                            pop(fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
                         }
                 
                         ip := add(ip, 1)

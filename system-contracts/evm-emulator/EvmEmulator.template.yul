@@ -110,6 +110,18 @@ object "EvmEmulator" {
                 max := MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
             }
 
+            function getDeployedBytecode() {
+                let codeLen := fetchDeployedCode(
+                    getCodeAddress(), 
+                    BYTECODE_OFFSET(), // destination offset
+                    0, // source offset
+                    MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
+                )
+            
+                mstore(EMPTY_CODE_OFFSET(), 0)
+                mstore(BYTECODE_LEN_OFFSET(), codeLen)
+            }
+
             <!-- @include EvmEmulatorFunctions.template.yul -->
 
             function $llvm_NoInline_llvm$_simulate(
