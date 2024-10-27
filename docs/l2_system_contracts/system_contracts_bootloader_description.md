@@ -129,7 +129,7 @@ Here are opcodes that can be generally accessed by any contract. Note that while
 - `near_call`. It is basically a “framed” jump to some location of the code of your contract. The difference between the `near_call` and ordinary jump are:
   1. It is possible to provide an ergsLimit for it. Note, that unlike “`far_call`”s (i.e. calls between contracts) the 63/64 rule does not apply to them.
   2. If the near call frame panics, all state changes made by it are reversed. Please note, that the memory changes will **not** be reverted.
-- `getMeta`. Returns an u256 packed value of [ZkSyncMeta](../../system-contracts/contracts/libraries/SystemContractHelper.sol#L18) struct. Note that this is not tight packing. The struct is formed by the [following rust code](https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/definitions/abi/meta.rs#L4).
+- `getMeta`. Returns an u256 packed value of [ZkSyncMeta](../../system-contracts/contracts/libraries/SystemContractHelper.sol#L18) struct. Note that this is not tight packing. The struct is formed by the [following rust code](https://github.com/matter-labs/zksync-protocol/blob/main/crates/zkevm_opcode_defs/src/definitions/abi/meta.rs#L4).
 - `getCodeAddress` — receives the address of the executed code. This is different from `this` , since in case of delegatecalls `this` is preserved, but `codeAddress` is not.
 
 #### Flags for calls
@@ -254,7 +254,7 @@ It is enforced by the ZKPs, that the state of the bootloader is equivalent to th
 
 For additional efficiency (and our convenience), the bootloader receives its parameters inside its memory. This is the only point of non-determinism: the bootloader _starts with its memory pre-filled with any data the operator wants_. That’s why it is responsible for validating the correctness of it and it should never rely on the initial contents of the memory to be correct & valid.
 
-For instance, for each transaction, we check that it is [properly ABI-encoded](../../system-contracts/bootloader/bootloader.yul#L3278) and that the transactions [go exactly one after another](../../system-contracts/bootloader/bootloader.yul#L3974). We also ensure that transactions do not exceed the limits of the memory space allowed for transactions.
+For instance, for each transaction, we check that it is [properly ABI-encoded](../../system-contracts/bootloader/bootloader.yul#L4044) and that the transactions [go exactly one after another](../../system-contracts/bootloader/bootloader.yul#L4037). We also ensure that transactions do not exceed the limits of the memory space allowed for transactions.
 
 ### Transaction types & their validation
 
@@ -274,7 +274,7 @@ The exact type of the transaction is marked by the `txType` field of the transac
 
 You can also read more on L1->L2 transactions and upgrade transactions [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
 
-However, as already stated, the bootloader’s memory is not deterministic and the operator is free to put anything it wants there. For all of the transaction types above the restrictions are imposed in the following ([method](../../system-contracts/bootloader/bootloader.yul#L3048)), which is called before starting processing the transaction.
+However, as already stated, the bootloader’s memory is not deterministic and the operator is free to put anything it wants there. For all of the transaction types above the restrictions are imposed in the following ([method](../../system-contracts/bootloader/bootloader.yul#L3107)), which is called before starting processing the transaction.
 
 ### Structure of the bootloader’s memory
 
@@ -293,7 +293,7 @@ The first 8 words are reserved for the batch information provided by the operato
 - `6` word — the base fee for the batch that is expected by the operator. While the base fee is deterministic, it is still provided to the bootloader just to make sure that the data that the operator has coincides with the data provided by the bootloader.
 - `7` word — reserved word. Unused on proved batch.
 
-The batch information slots [are used at the beginning of the batch](../../system-contracts/bootloader/bootloader.yul#2857). Once read, these slots can be used for temporary data.
+The batch information slots [are used at the beginning of the batch](../../system-contracts/bootloader/bootloader.yul#3921). Once read, these slots can be used for temporary data.
 
 #### **Temporary data for debug & transaction processing purposes**
 
@@ -376,8 +376,8 @@ These are memory slots that are used to track the success status of a transactio
 
 ### General flow of the bootloader’s execution
 
-1. At the start of the batch it [reads the initial batch information](../../system-contracts/bootloader/bootloader.yul#2857) and [sends the information](../../system-contracts/bootloader/bootloader.yul#L3912) about the current batch to the SystemContext system contract.
-2. It goes through each of [transaction’s descriptions](../../system-contracts/bootloader/bootloader.yul#L3954) and checks whether the `execute` field is set. If not, it ends processing of the transactions and ends execution of the batch. If the execute field is non-zero, the transaction will be executed and it goes to step 3.
+1. At the start of the batch it [reads the initial batch information](../../system-contracts/bootloader/bootloader.yul#L3928) and [sends the information](../../system-contracts/bootloader/bootloader.yul#L2857) about the current batch to the SystemContext system contract.
+2. It goes through each of [transaction’s descriptions](../../system-contracts/bootloader/bootloader.yul#L4016) and checks whether the `execute` field is set. If not, it ends processing of the transactions and ends execution of the batch. If the execute field is non-zero, the transaction will be executed and it goes to step 3.
 3. Based on the transaction’s type it decides whether the transaction is an L1 or L2 transaction and processes them accordingly. More on the processing of the L1 transactions can be read [here](#l1-l2-transactions). More on L2 transactions can be read [here](#l2-transactions).
 
 ### L2 transactions
@@ -388,22 +388,22 @@ Note, that if you call an account that is in kernel space and does not have any 
 
 We process the L2 transactions according to our account abstraction protocol: [https://docs.zksync.io/build/developer-reference/account-abstraction](https://docs.zksync.io/build/developer-reference/account-abstraction).
 
-1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1163) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zksync_fee_model.md).
+1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1263) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zksync_fee_model.md).
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
-3. We [conduct the validation step](../../system-contracts/bootloader/bootloader.yul#L1278) of the AA protocol:
+3. We [conduct the validation step](../../system-contracts/bootloader/bootloader.yul#L1287) of the AA protocol:
 
    - We calculate the hash of the transaction.
    - If enough gas has been provided, we near_call the validation function in the bootloader. It sets the tx.origin to the address of the bootloader, sets the ergsPrice. It also marks the factory dependencies provided by the transaction as marked and then invokes the validation method of the account and verifies the returned magic.
-   - Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L787) for any excess funds sent.
+   - Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L792) for any excess funds sent.
 
-4. [We perform the execution of the transaction](../../system-contracts/bootloader/bootloader.yul#L1343). Note, that if the sender is an EOA, tx.origin is set equal to the `from` the value of the transaction. During the execution of the transaction, the publishing of the compressed bytecodes happens: for each factory dependency if it has not been published yet and its hash is currently pointed to in the compressed bytecodes area of the bootloader, a call to the bytecode compressor is done. Also, at the end the call to the KnownCodeStorage is done to ensure all the bytecodes have indeed been published.
-5. We [refund](../../system-contracts/bootloader/bootloader.yul#L1553) the user for any excess funds he spent on the transaction:
+4. [We perform the execution of the transaction](../../system-contracts/bootloader/bootloader.yul#L1352). Note, that if the sender is an EOA, tx.origin is set equal to the `from` the value of the transaction. During the execution of the transaction, the publishing of the compressed bytecodes happens: for each factory dependency if it has not been published yet and its hash is currently pointed to in the compressed bytecodes area of the bootloader, a call to the bytecode compressor is done. Also, at the end the call to the KnownCodeStorage is done to ensure all the bytecodes have indeed been published.
+5. We [refund](../../system-contracts/bootloader/bootloader.yul#L1206) the user for any excess funds he spent on the transaction:
 
    - Firstly, the `postTransaction` operation is called to the paymaster.
    - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zksync_fee_model.md) of the fee model.
    - The bootloader refunds the user.
 
-6. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1211) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
+6. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1217) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
 
 ### L1->L2 transactions
 
@@ -424,7 +424,7 @@ You can read more about differences between those in the corresponding [document
 
 At the end of the batch we set `tx.origin` and `tx.gasprice` context variables to zero to save L1 gas on calldata and send the entire bootloader balance to the operator, effectively sending fees to him.
 
-Also, we [set](../../system-contracts/bootloader/bootloader.yul#L4047) the fictive L2 block’s data. Then, we call the system context to ensure that it publishes the timestamp of the L2 block as well as L1 batch. We also reset the `txNumberInBlock` counter to avoid its state diffs from being published on L1. You can read more about block processing on zkSync [here](./batches_and_blocks_on_zksync.md).
+Also, we [set](../../system-contracts/bootloader/bootloader.yul#L4110) the fictive L2 block’s data. Then, we call the system context to ensure that it publishes the timestamp of the L2 block as well as L1 batch. We also reset the `txNumberInBlock` counter to avoid its state diffs from being published on L1. You can read more about block processing on zkSync [here](./batches_and_blocks_on_zksync.md).
 
 After that, we publish the hash as well as the number of priority operations in this batch. More on it [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
 
@@ -726,20 +726,3 @@ The protocol, while conceptually complete, contains some known issues which will
 
 - Fee modeling is yet to be improved. More on it in the [document](./zksync_fee_model.md) on the fee model.
 - We may add some kind of default implementation for the contracts in the kernel space (i.e. if called, they wouldn’t revert but behave like an EOA).
-
-.github/SECURITY.md
-CONTRIBUTING.md
-SECURITY.md
-docs/overview.md
-docs/bridging/bridgehub/overview.md
-docs/l2_system_contracts/batches_and_blocks_on_zksync.md
-docs/l2_system_contracts/system_contracts_bootloader_description.md
-docs/settlement_contracts/data_availability/custom_da.md
-docs/settlement_contracts/data_availability/rollup_da.md
-docs/settlement_contracts/data_availability/standard_pubdata_format.md
-docs/settlement_contracts/priority_queue/priority-queue.md
-docs/settlement_contracts/priority_queue/processing_of_l1->l2_txs.md
-docs/settlement_contracts/zkchain_basics.md
-docs/upgrade_history/gateway_upgrade/gateway_diff_review.md
-docs/upgrade_history/gateway_upgrade/upgrade_process.md
-system-contracts/README.md

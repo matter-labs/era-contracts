@@ -23,7 +23,7 @@ of which we only care about the canonical hash.
 
 ### Inserting new operations
 
-The queue is implemented as a [library](https://github.com/matter-labs/era-contracts/blob/f3630fcb01ad8b6e2e423a6f313abefe8502c3a2/l1-contracts/contracts/zksync/libraries/PriorityQueue.sol#L20).
+The queue is implemented as a [library](../../../l1-contracts/contracts/state-transition/libraries/PriorityQueue.sol#L22).
 For each incoming priority operation, we simply `pushBack` its hash, expiration and layer2Tip.
 
 ### Checking validity
