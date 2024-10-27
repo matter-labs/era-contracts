@@ -112,6 +112,10 @@ bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGE
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
 /// @dev the maximum number of supported chains, this is an arbitrary limit.
+/// @dev Note, that in case of a malicious Bridgehub admin, the total number of chains 
+/// can be up to 2 times higher. This may be possible, in case the old ChainTypeManager
+/// had `100` chains and these were migrated to the Bridgehub only after `MAX_NUMBER_OF_ZK_CHAINS`
+/// were added to the bridgehub via creation of new chains. 
 uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
 
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.

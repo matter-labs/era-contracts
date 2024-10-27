@@ -16,7 +16,7 @@ contract DummyBridgehubSetter is Bridgehub {
     ) Bridgehub(_l1ChainId, _owner, _maxNumberOfZKChains) {}
 
     function setZKChain(uint256 _chainId, address _zkChain) external {
-        _registerNewZKChain(_chainId, _zkChain);
+        _registerNewZKChain(_chainId, _zkChain, true);
     }
 
     function setCTM(uint256 _chainId, address _ctm) external {
