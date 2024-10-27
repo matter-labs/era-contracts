@@ -82,6 +82,7 @@ function MAX_POSSIBLE_INIT_BYTECODE() -> max {
     max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE()) // EIP-3860
 }
 
+// reserved empty slot to simplify PUSH N opcodes
 function EMPTY_CODE_OFFSET() -> offset {
     offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
 }
@@ -192,6 +193,7 @@ function readIP(ip, bytecodeEndOffset) -> opcode {
 // It is the responsibility of the caller to ensure that start and length is correct
 function readBytes(start, length) -> value {
     value := shr(mul(8, sub(32, length)), mload(start))
+    // will be padded by zeroes if out of bounds (we have reserved EMPTY_CODE_OFFSET() slot)
 }
 
 function getCodeAddress() -> addr {
