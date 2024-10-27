@@ -1036,7 +1036,7 @@ object "EvmEmulator" {
                 }
                 case 0x09 { // blake2f
                     // argsOffset[0; 3] (4 bytes) Number of rounds (big-endian uint)
-                    gasToCharge := and(mload(argsOffset), 0xFFFFFFFF) // last 4bytes
+                    gasToCharge := and(mload(sub(argsOffset, 28)), 0xFFFFFFFF) // last 4bytes
                 }
                 default {
                     gasToCharge := 0
@@ -4123,7 +4123,7 @@ object "EvmEmulator" {
                     }
                     case 0x09 { // blake2f
                         // argsOffset[0; 3] (4 bytes) Number of rounds (big-endian uint)
-                        gasToCharge := and(mload(argsOffset), 0xFFFFFFFF) // last 4bytes
+                        gasToCharge := and(mload(sub(argsOffset, 28)), 0xFFFFFFFF) // last 4bytes
                     }
                     default {
                         gasToCharge := 0
