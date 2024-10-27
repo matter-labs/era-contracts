@@ -3,9 +3,9 @@
 pragma solidity ^0.8.20;
 
 /**
-* @author Matter Labs
-* @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
-* @custom:security-contact security@matterlabs.dev
+ * @author Matter Labs
+ * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
+ * @custom:security-contact security@matterlabs.dev
  */
 interface IMessageRoot {
     /// @notice The aggregated root of the batches from different chains.

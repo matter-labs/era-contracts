@@ -88,9 +88,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
                 return _checkSTMAssetId(decodedAssetId);
             }
 
-            if (
-                IAssetRouterBase.finalizeDeposit.selector != l2TxSelector
-            ) {
+            if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 

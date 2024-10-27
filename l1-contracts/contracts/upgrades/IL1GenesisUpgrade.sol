@@ -6,6 +6,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice L1 genesis upgrade interface. Every chain has to process an upgrade txs at its genesis.
  * @notice This is needed to set system params like the chainId and to deploy some system contracts.
  */
