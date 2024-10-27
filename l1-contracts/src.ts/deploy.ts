@@ -381,7 +381,7 @@ export class Deployer {
       // @ts-ignore
       // TODO try to make it work with zksync ethers
       const zkWal = this.deployWallet as ZkWallet;
-      // FIXME: this is a hack
+      // TODO: this is a hack
       const tmpContractFactory = await hardhat.ethers.getContractFactory(
         "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
         {

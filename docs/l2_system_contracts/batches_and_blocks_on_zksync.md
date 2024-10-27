@@ -1,6 +1,3 @@
-FIXME: read and fix any issues
-
-
 # Batches & L2 blocks on zkSync
 
 ## Glossary

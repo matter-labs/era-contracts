@@ -19,11 +19,11 @@ Note, that this means that STs have a “weaker” governance. I.e. governance c
 
 In the long term vision STs deployment will be permissionless, however CTM will always remain the main point of trust and will have to be explicitly whitelisted by the decentralized governance of the entire ecosystem before its ST can get the access to the shared liquidity.
 
-## Configurability in the first release
+## Configurability in the current release
 
 For now, only one CTM will be supported — the one that deploys instances of zkSync Era, possibly using other DA layers. To read more about different DA layers, check out this document (FIXME link).
 
-The exact process of deploying & registering a ST will be described in [sections below](#creating-new-chains-with-bridgehub). Overall, each ST in the first release will have the following parameters:
+The exact process of deploying & registering a ST will be described in [sections below](#creating-new-chains-with-bridgehub). Overall, each ST in the current release will have the following parameters:
 
 | ST parameter | Updatability | Comment |
 | --- | --- | --- |
@@ -36,14 +36,14 @@ The exact process of deploying & registering a ST will be described in [sections
 |  priorityTx FeeParams | By admin of ST | The admin of a ZK chain can amend the priority transaction fee params. |
 |  transactionFilterer | By admin of ST | A chain may put an additional filter to the incoming L1->L2 transactions. This may be needed by a permissioned chain (e.g. a Validium bank-lile corporate chain). |
 |  DA validation / permanent rollup status | By admin of ST | A chain can decide which DA layer to use. You check out more about safe DA management here (FIXME: link to admin doc) |
-| executing upgrades | By admin of ST | While exclusively CTM governance can set the content of the upgrade, STs will typically be able to choose suitable time for them to actually execute it. In the first release, STs will have to follow our upgrades. |
+| executing upgrades | By admin of ST | While exclusively CTM governance can set the content of the upgrade, STs will typically be able to choose suitable time for them to actually execute it. In the current release, STs will have to follow our upgrades. |
 | settlement layer | By admin of ST | The admin of the chain can enact migrations to other settlement layers. |
 
 > Note, that if we take a look at the access control for the corresponding functions inside the [AdminFacet](../../l1-contracts/contracts/state-transition/chain-deps/facets/Admin.sol), the may see that a lot of methods from above that are marked as "By admin of ST" could be in theory amended by the ChainTypeManager. However, this sort of action requires approval from decentralized governance. Also, in case of an urgent high risk situation, the decentralized governance might force upgrade the contract via CTM.
 
 ## Upgradability in the current release
 
-In the first release, each chain will be an instance of zkSync Era and so the upgrade process of each individual ST will be similar to that of zkSync Era.
+In the current release, each chain will be an instance of zkSync Era and so the upgrade process of each individual ST will be similar to that of zkSync Era.
 
 1. Firstly, the governance of the CTM will publish the server (including sequencer, prover, etc) that support the new version . This is done offchain. Enough time should be given to various zkStack devs to update their version.
 2. The governance of the CTM will publish the upgrade onchain by automatically executing the following three transactions:

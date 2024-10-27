@@ -4,7 +4,7 @@ One of the hardest part about gateway (GW) is how do we synchronize interaction 
 
 Here we describe various scenarios of standard/emergency upgrades and how will those play out in the gateway setup. 
 
-# General idea
+## General idea
 
 We do not enshrine any particular approach on the protocol level of the GW. The following is the approach used by the standard Era CTM, which also manages GW. 
 
@@ -21,7 +21,7 @@ The other difference is that while “active chain upgrades” are usually alway
 
 To reduce the boilerplate / make management of the upgrades easier, the abstraction will be basically implemented at the upgrade implementation level, that will check `if block.chainid == s.settlementLayer { ... perform active upgrade stuff } else { ... perform inactive upgrade stuff, typically nothing m}.`
 
-# Lifecycle of a chain
+## Lifecycle of a chain
 
 While the chain settles on L1 only, it will just do “active chain upgrades”. Everything is the same as now.
 
@@ -38,7 +38,7 @@ In case step (3) fails (or for any other reason the chain fails), the migration 
 
 In case we ever do need to do more than simply resetting `settlementLayerId` for a chain in case of a failed migration, it is the responsibility of the CTM to ensure that the logic is compatible for all the versions.
 
-# Stuck state for L1→GW migration
+## Stuck state for L1→GW migration
 
 The only unrecoverable state that a chain can achieve is:
 
@@ -48,7 +48,7 @@ The only unrecoverable state that a chain can achieve is:
 
 This is considered to be a rare event, but it will be strongly recommended that before conducting any inactive upgrades the migration transaction should be finalized. (TODO: we could actively force it, but it is a separate feature, i.e. require confirmation of a successful migration before any upgrades on a migrated chain could be done).
 
-# Safety guards for GW→L1 migrations
+## Safety guards for GW→L1 migrations
 
 Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the step (3) from the above fails for some reason (e.g. a new protocol version id is available on the CTM), then the chain is basically lost. 
 
@@ -57,8 +57,6 @@ Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the s
 - Before a new protocol version is released, all the migrations will be paused, i.e. the `pauseMigration` function will be called by the owner of the Bridgehub on both L1 and L2. It should prevent migrations happening in the risky period when the new version is published to the CTM.
 - Assuming that no new protocol versions are published to CTM during the migration, the migration must succeed, since both CTM on GW and on L1 will have the same version and so the checks will work fine.
 - The finalization of any chain withdrawal is permissionless and so in the short term the team could help finalize the outstanding migrations to prevent funds loss.
-
- 
 
 > The approach above is somewhat tricky as it requires careful coordination with the governance to ensure that at the time of when the new protocol version is published to CTM, there are no outstanding migrations. 
 
@@ -71,7 +69,7 @@ Another potential place that may lead for a chain to not be migratable to L1 is 
 
 To prevent that, it is required for chains that migrate from GW that all their batches are executed. This ensures that the number of batches’ hashes to be copied on L1 is constant (i.e. just 1 last batch). 
 
-# Motivation
+## Motivation
 
 The job of this proposal is to reduce the number of potential states in which the system can find itself in to a minimum. The cases that are removed:
 
@@ -80,7 +78,7 @@ The job of this proposal is to reduce the number of potential states in which th
 
 The reason why we can not conduct “active” upgrades everywhere on both L1 and L2 part is that for the settlement layer we need to write the new protocol upgrade tx, while NOT allowing to override it. On other hand, for the “inactive” chain contracts, we need to ignore the upgrade transaction. 
 
-# Forcing “active chain upgrade”
+## Forcing “active chain upgrade”
 
 For L1-based chains, forcing those upgrades will work exactly same as before. Just during `commitBatches` the CTM double checks that the protocol version is up to date.
 
@@ -102,7 +100,7 @@ It is the responsibility of the CTM to ensure that all the supported settlement 
 Also, note that the freezing period should be long enough to ensure that censorship resistance mechanisms have enough time to kick in
 > 
 
-# Forcing “inactive chain upgrade”
+## Forcing “inactive chain upgrade”
 
 Okay, imagine that there is a bug in an L1 implementation of a chain that has migrated to Gateway. This is a rather rare event as most of the action happens on the settlement layer, together with the ability to steal the most of funds.
 
@@ -111,7 +109,7 @@ In case such situation does happen however, the current plan is just to:
 - Freeze the ecosystem.
 - Ask the admins nicely to upgrade their implementation. Decentralized token governance can also force-upgrade those via CTM on L1.
 
-# Backwards compatibility
+## Backwards compatibility
 
 With this proposal the protocol version on the L1 part and on the settlement layer part is completely out of sync. This means that all new mailboxes need to support both accepting and sending all versions of relayed (L1 → GW → L2) transactions.   
 

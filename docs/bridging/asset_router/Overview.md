@@ -26,3 +26,6 @@ Asset registration is handled by the AssetDeploymentTracker. It is expected that
 
 The Native Token Vault is a special case of the Asset Handler, as we want it to support automatic bridging. This means it should be possible to bridge a L1 token to an L2 without deploying the Token contract beforehand and without registering it in the L2 Router. For NTV assets, L1->L2 transactions where the AssetHandler is not registered will not fail, but the message will be automatically be forwarded to the L2NTV. Here the contract checks that the asset is indeed deployed by the L1NTV, by checking that the assetId contains the correct ADT address (note, for NTV assets the ADT is the NTV and the used address is the L2NTV address). If the assetId is correct, the token contract is deployed.
 
+### Read more
+
+You can read more in the more in-depth about L1 and L2 asset routers and the default asset handler that is Native Token Vault [here](./asset_router.md).

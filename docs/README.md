@@ -1,35 +1,53 @@
 # ZK Stack contracts specs
 
+The order of the files here only roughly represents the order of reading. A lot of topics are intertwined, so it is recommended to read everything first to have a complete picture and then refer to specific documents for more details.
+
 - [Glossary](./glossary.md)
 - [Overview](./overview.md)
-- [Bridging](./bridging/overview.md)
-    - [Bridgehub](./bridgehub/overview.md)
-        - [Chain registry](./bridgehub/chain_registry.md)
-        - [L1 ecosystem contracts](./bridgehub/bridgehub.md)
-    - [Asset Router](./asset_router/overview.md)
-- [Chain Management](./chain_management/overview.md)
-    - [Chain type manager](./chain_management/chain_type_manager.md)
-    - [Admin roles](./chain_management/admin_roles.md)
-    - [Chain genesis](./chain_management/chain_genesis.md)
-    - [Upgrade process](./chain_management/upgrade_process.md)
-- [Settlement contracts](./settlement_contracts/overview.md)
-    - [L1 smart contracts](./settlement_contracts/l1_smart_contracts.md)
-    - [Data availability](./settlement_contracts/data_availability.md)
-        - [Custom DA](./settlement_contracts/data_availability/custom_da.md)
-        - [Rollup DA](./settlement_contracts/data_availability/rollup_da.md)
+- Contracts of an individual chain
+    - [L1 smart contracts](./settlement_contracts/overview.md)
+    - Data availability
+        - [Custom DA support](./settlement_contracts/data_availability/custom_da.md)
+        - [Rollup DA support](./settlement_contracts/data_availability/rollup_da.md)
         - [Standard pubdata format](./settlement_contracts/data_availability/standard_pubdata_format.md)
         - [State diff compression v1 spec](./settlement_contracts/data_availability/state_diff_compression_v1_spec.md)
-    - [Priority Queue](./settlement_contracts/priority_queue.md)
-- [L2 System Contracts](./l2_system_contracts.md)
+    - L1->L2 transaction handling
+        -  [Processing of L1->L2 transactions](./settlement_contracts/priority_queue/processing_of_l1->l2_txs.md)
+        - [Priority tree design][./settlement_contracts/priority_queue/priority-queue.md]
+- Chain Management
+    - [Chain type manager](./chain_management/chain_type_manager.md)
+    - [Admin role](./chain_management/admin_role.md)
+    - [Chain genesis](./chain_management/chain_genesis.md)
+    - [Standard Upgrade process](./chain_management/upgrade_process.md)
+- Bridging
+    - Bridgehub
+        - [Overview of the bridgehub functionality](./bridging/bridgehub/overview.md)
+    - [Asset Router](./bridging/asset_router/Overview.md)
+- L2 System Contracts
+    - [System contracts bootloader description](./l2_system_contracts/system_contracts_bootloader_description.md)
     - [Batches and blocks on ZKsync](./l2_system_contracts/batches_and_blocks_on_zksync.md)
     - [Elliptic curve precompiles](./l2_system_contracts/elliptic_curve_precompiles.md)
-    - [L2 processing of L1->L2 transactions](./l2_system_contracts/l2_processing_of_l1->l2_txs.md)
-    - [System contracts bootloader description](./l2_system_contracts/system_contracts_bootloader_description.md)
     - [ZKsync fee model](./l2_system_contracts/zksync_fee_model.md)
-- [Gateway](./gateway/overview.md)
+- Gateway
+    - [General overview](./gateway/overview.md)
     - [Chain migration](./gateway/chain_migration.md)
-    - [Gateway protocol upgrades](./gateway/gateway_protocol_upgrades.md)
+    - [L1->L3 messaging via gateway](./gateway/messaging_via_gateway.md)
+    - [L3->L1 messaging via gateway](./gateway/nested_l3_l1_messaging.md)
+    - [Gateway protocol versioning](./gateway/gateway_protocol_upgrades.md)
+    - [DA handling on Gateway](./gateway/gateway_da.md)
 - [Upgrade History](./upgrade_history.md)
     - [Gateway upgrade](./upgrade_history/gateway_upgrade.md)
 
 ![Reading order](./img/reading_order.png)
+
+> The reading order roughly describes sections and me a 
+
+# Invariants/tricky places to look out for
+
+This section is for auditors of the codebase. It includes some of the important invariants that the system relies on and which if broken could have bad consequences.
+
+- Assuming that the accepting CTM is correct & efficient, the L1→GW part of the L1→GW→L3 transaction never fails. It is assumed that the provided max amount for gas is always enough for any transaction that can realistically come from L1.
+- GW → L1 migration never fails. If it is possible to get into a state where the migration is not possible to finish, then the chain is basically lost. There are some exceptions where for now it is the expected behavior. (check out the “Migration invariants  & protocol upgradability” section)
+- The general consistency of chains when migration between different settlement layers is done. Including the feasibility of emergency upgrades, etc. I.e. whether the whole system is thought-through.
+- Preimage attacks in the L3→L1 tree, we apply special prefixes to ensure that the tree structure is fixed, i.e. all logs are 88 bytes long (this is for backwards compatibility reasons). For batch leafs and chain id leafs we use special prefixes.
+- Data availability guarantees. Whether rollup users can always restore all their storage slots, etc. An example of a potential tricky issue can be found in “Security notes for Gateway-based rollups” [in this document](./gateway/gateway_da.md).

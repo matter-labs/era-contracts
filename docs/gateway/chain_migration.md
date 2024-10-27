@@ -1,7 +1,5 @@
 # Chain migration
 
-# Chain migration
-
 ## Ecosystem Setup
 
 Chain migration reuses lots of logic from standard custom asset bridging which is enabled by the AssetRouter. The easiest way to imagine is that ZKChains are NFTs that are being migrated from one chain to another. Just like in case of the NFT contract, an CTM is assumed to have an `assetId := keccak256(abi.encode(L1_CHAIN_ID, address(ctmDeployer), bytes32(uint256(uint160(_ctmAddress)))))`. I.e. these are all assets with ADT = ctmDeployer contract on L1.
@@ -33,9 +31,10 @@ You can read more about how the safety is ensured in the “Migration invariants
 
 In this release we plan to only support a single whitelisted settlement layer, but if in the future more will be supported, as of now the plan is to migrate the chain firstly to L1 and then to GW.
 
-## Chain migration invariants  & protocol upgradability
+## Chain migration invariants & protocol upgradability
 
 Note, that once a chain migrates to a new settlement layer, there are two deployments of contracts for the same ZKChain. What’s more, the L1 part will always be used. 
 
 There is a need to ensure that the chains work smoothly during migration and there are not many issues during the protocol upgrade.
 
+You can read more about it [here](./gateway_protocol_upgrades.md).

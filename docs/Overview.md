@@ -27,4 +27,4 @@ deployment and interaction with Turing-complete smart contracts.
 All data that is needed to restore the L2 state are also pushed on-chain. There are two approaches, publishing inputs of
 L2 transactions on-chain and publishing the state transition diff. ZKsync follows the second option.
 
-See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html) to read more!
+See the [documentation](./README.md) to read more!

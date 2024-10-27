@@ -1,6 +1,3 @@
-FIXME: read and fix any issues
-
-
 # Handling L1→L2 ops on zkSync
 
 The transactions on zkSync can be initiated not only on L2, but also on L1. There are two types of transactions that can be initiated on L1:
@@ -10,7 +7,7 @@ The transactions on zkSync can be initiated not only on L2, but also on L1. Ther
 
 ## Prerequisites
 
-Please read the full [article](./System%20contracts%20bootloader%20description.md) on the general system contracts / bootloader structure as well as the pubdata structure to understand [the difference](./Standard%20pubdata%20format.md) between system and user logs.
+Please read the full [article](../../l2_system_contracts/system_contracts_bootloader_description.md) on the general system contracts / bootloader structure as well as the pubdata structure to understand [the difference](../data_availability/standard_pubdata_format.md) between system and user logs.
 
 # Priority operations
 
