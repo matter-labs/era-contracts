@@ -81,7 +81,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
         _verifyInputSecp256k1PublicKey(_attesterPubKey);
-        if ( _attesterWeight == 0) {
+        if (_attesterWeight == 0) {
             revert ZeroAttesterWeight();
         }
         if (_validatorWeight == 0) {
@@ -171,7 +171,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
     
-        _snapshotValidatorIfOutdated(_node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.active = false;
     
         emit ValidatorDeactivated(_nodeOwner);
@@ -205,7 +205,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _snapshotValidatorIfOutdated(_node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.active = true;
 
         emit ValidatorActivated(_nodeOwner);
