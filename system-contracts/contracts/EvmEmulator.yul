@@ -1,27 +1,24 @@
 object "EvmEmulator" {
     code {
         function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
-            max := MAX_POSSIBLE_INIT_BYTECODE()
+            max := MAX_POSSIBLE_INIT_BYTECODE_LEN()
         }
 
         /// @dev This function is used to get the initCode.
         /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
         /// to obtain the bytecode.
         function getConstructorBytecode() {
-            let bytecodeLengthOffset := BYTECODE_OFFSET()
-            let bytecodeOffset := add(BYTECODE_OFFSET(), 32)
-
             loadCalldataIntoActivePtr()
 
             let size := getActivePtrDataSize()
 
-            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
+            if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
                 panic()
             }
 
-            mstore(bytecodeLengthOffset, size)
+            mstore(BYTECODE_LEN_OFFSET(), size)
             mstore(EMPTY_CODE_OFFSET(), 0)
-            copyActivePtrData(bytecodeOffset, 0, size)
+            copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
         function padBytecode(offset, len) -> blobOffset, blobLen {
@@ -48,7 +45,7 @@ object "EvmEmulator" {
         function validateBytecodeAndChargeGas(offset, deployedCodeLen, gasToReturn) -> returnGas {
             if deployedCodeLen {
                 // EIP-3860
-                if gt(deployedCodeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE()) {
+                if gt(deployedCodeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
                     panic()
                 }
 
@@ -135,16 +132,12 @@ object "EvmEmulator" {
             offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
         }
         
-        function BYTECODE_OFFSET() -> offset {
+        function BYTECODE_LEN_OFFSET() -> offset {
             offset := add(STACK_OFFSET(), mul(1024, 32))
         }
         
-        function MAX_POSSIBLE_DEPLOYED_BYTECODE() -> max {
-            max := 24576
-        }
-        
-        function MAX_POSSIBLE_INIT_BYTECODE() -> max {
-            max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE()) // EIP-3860
+        function BYTECODE_OFFSET() -> offset {
+            offset := add(BYTECODE_LEN_OFFSET(), 32)
         }
         
         // reserved empty slot to simplify PUSH N opcodes
@@ -152,22 +145,30 @@ object "EvmEmulator" {
             offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
         }
         
-        function MEM_OFFSET() -> offset {
+        function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
+            max := 24576 // EIP-170
+        }
+        
+        function MAX_POSSIBLE_INIT_BYTECODE_LEN() -> max {
+            max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) // EIP-3860
+        }
+        
+        function MEM_LEN_OFFSET() -> offset {
             offset := add(EMPTY_CODE_OFFSET(), 32)
         }
         
-        function MEM_OFFSET_INNER() -> offset {
-            offset := add(MEM_OFFSET(), 32)
+        function MEM_OFFSET() -> offset {
+            offset := add(MEM_LEN_OFFSET(), 32)
         }
         
         // Used to simplify gas calculations for memory expansion.
         // The cost to increase the memory to 4 MB is close to 30M gas
-        function MAX_POSSIBLE_MEM() -> max {
+        function MAX_POSSIBLE_MEM_LEN() -> max {
             max := 0x400000 // 4MB
         }
         
         function MAX_MEMORY_FRAME() -> max {
-            max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
+            max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
         }
         
         function MAX_UINT() -> max_uint {
@@ -339,23 +340,17 @@ object "EvmEmulator" {
         }
         
         // Basically performs an extcodecopy, while returning the length of the bytecode.
-        function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
-            codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
-        }
-        
-        // Basically performs an extcodecopy, while returning the length of the bytecode.
-        function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
+        function _fetchDeployedCodeWithDest(addr, dstOffset, srcOffset, len) -> codeLen {
             let codeHash := _getRawCodeHash(addr)
-        
             mstore(0, codeHash)
             // The first word of returndata is the true length of the bytecode
             codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
         
-            if gt(_len, codeLen) {
-                _len := codeLen
+            if gt(len, codeLen) {
+                len := codeLen
             }
         
-            returndatacopy(dest, add(32, _offset), _len)
+            returndatacopy(dstOffset, add(32, srcOffset), len)
         }
         
         // Returns the length of the bytecode.
@@ -382,14 +377,15 @@ object "EvmEmulator" {
         }
         
         function getDeployedBytecode() {
-            let codeLen := _fetchDeployedCode(
-                getCodeAddress(),
-                add(BYTECODE_OFFSET(), 32),
-                MAX_POSSIBLE_DEPLOYED_BYTECODE()
+            let codeLen := _fetchDeployedCodeWithDest(
+                getCodeAddress(), 
+                BYTECODE_OFFSET(), // destination offset
+                0, // source offset
+                MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
             )
         
             mstore(EMPTY_CODE_OFFSET(), 0)
-            mstore(BYTECODE_OFFSET(), codeLen)
+            mstore(BYTECODE_LEN_OFFSET(), codeLen)
         }
         
         function getMax(a, b) -> max {
@@ -404,7 +400,7 @@ object "EvmEmulator" {
         function expandMemory(offset, size) -> gasCost {
             // memory expansion costs 0 if size is 0
             if size {
-                let oldSizeInWords := mload(MEM_OFFSET())
+                let oldSizeInWords := mload(MEM_LEN_OFFSET())
         
                 // div rounding up
                 let newSizeInWords := div(add(add(offset, size), 31), 32)
@@ -427,7 +423,7 @@ object "EvmEmulator" {
             
                     gasCost := add(linearPart, quadraticPart)
             
-                    mstore(MEM_OFFSET(), newSizeInWords)
+                    mstore(MEM_LEN_OFFSET(), newSizeInWords)
                 }
             }
         }
@@ -505,7 +501,7 @@ object "EvmEmulator" {
         }
         
         function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-            if iszero(lt(sp, BYTECODE_OFFSET())) {
+            if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
                 panic()
             }
         
@@ -533,7 +529,7 @@ object "EvmEmulator" {
         }
         
         function pushStackCheck(sp, numInputs) {
-            if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
+            if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
                 panic()
             }
         }
@@ -684,9 +680,9 @@ object "EvmEmulator" {
                 addr,
                 gasToPass,
                 value,
-                add(argsOffset, MEM_OFFSET_INNER()),
+                add(argsOffset, MEM_OFFSET()),
                 argsSize,
-                add(retOffset, MEM_OFFSET_INNER()),
+                add(retOffset, MEM_OFFSET()),
                 retSize
             )
         
@@ -740,9 +736,9 @@ object "EvmEmulator" {
             let success, frameGasLeft := _performStaticCall(
                 addr,
                 gasToPass,
-                add(MEM_OFFSET_INNER(), argsOffset),
+                add(MEM_OFFSET(), argsOffset),
                 argsSize,
-                add(MEM_OFFSET_INNER(), retOffset),
+                add(MEM_OFFSET(), retOffset),
                 retSize
             )
         
@@ -797,13 +793,13 @@ object "EvmEmulator" {
             let success := delegatecall(
                 providedErgs(),
                 addr,
-                add(MEM_OFFSET_INNER(), argsOffset),
+                add(MEM_OFFSET(), argsOffset),
                 argsSize,
                 0,
                 0
             )
         
-            let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+            let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
         
             newGasLeft := add(evmGasLeft, frameGasLeft)
             stackHead := success
@@ -902,7 +898,7 @@ object "EvmEmulator" {
         // The gas cost mentioned here is purely the cost of the contract, 
         // and does not consider the cost of the call itself nor the instructions 
         // to put the parameters in memory. 
-        // Take into account MEM_OFFSET_INNER() when passing the argsOffset
+        // Take into account MEM_OFFSET() when passing the argsOffset
         function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
             switch addr
                 case 0x01 { // ecRecover
@@ -1023,7 +1019,7 @@ object "EvmEmulator" {
             checkMemIsAccessible(offset, size)
         
             // EIP-3860
-            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
+            if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
                 panic()
             }
         
@@ -1053,7 +1049,7 @@ object "EvmEmulator" {
             }
         
             if iszero(err) {
-                offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
+                offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
                 evmGasLeft, addr := _executeCreate(offset, size, value, evmGasLeft, isCreate2, salt)
             }
         }
@@ -1202,17 +1198,17 @@ object "EvmEmulator" {
             isStatic,
         ) -> returnOffset, returnLen, retGasLeft {
 
-            returnOffset := MEM_OFFSET_INNER()
+            returnOffset := MEM_OFFSET()
             returnLen := 0
 
             // stack pointer - index to first stack element; empty stack = -1
             let sp := sub(STACK_OFFSET(), 32)
             // instruction pointer - index to next instruction. Not called pc because it's an
             // actual yul/evm instruction.
-            let ip := add(BYTECODE_OFFSET(), 32)
+            let ip := BYTECODE_OFFSET()
             let stackHead
             
-            let bytecodeEndOffset := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 32)
+            let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
             
             for { } true { } {
                 let opcode := readIP(ip, bytecodeEndOffset)
@@ -1499,7 +1495,7 @@ object "EvmEmulator" {
                     let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    stackHead := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+                    stackHead := keccak256(add(MEM_OFFSET(), offset), size)
             
                     ip := add(ip, 1)
                 }
@@ -1573,14 +1569,14 @@ object "EvmEmulator" {
                     let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    calldatacopy(add(destOffset, MEM_OFFSET_INNER()), offset, size)
+                    calldatacopy(add(destOffset, MEM_OFFSET()), offset, size)
                     ip := add(ip, 1)
                     
                 }
                 case 0x38 { // OP_CODESIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    let bytecodeLen := mload(BYTECODE_OFFSET())
+                    let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                     sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
                     ip := add(ip, 1)
                 }
@@ -1602,12 +1598,12 @@ object "EvmEmulator" {
                     let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    dstOffset := add(dstOffset, MEM_OFFSET_INNER())
-                    sourceOffset := add(add(sourceOffset, BYTECODE_OFFSET()), 32)
+                    dstOffset := add(dstOffset, MEM_OFFSET())
+                    sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
             
                     checkOverflow(sourceOffset, len)
                     // Check bytecode overflow
-                    if gt(add(sourceOffset, len), sub(MEM_OFFSET(), 1)) {
+                    if gt(add(sourceOffset, len), sub(MEM_LEN_OFFSET(), 1)) {
                         panic()
                     }
             
@@ -1642,20 +1638,20 @@ object "EvmEmulator" {
                 case 0x3C { // OP_EXTCODECOPY
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    let addr, dest, offset, len
+                    let addr, dstOffset, srcOffset, len
                     popStackCheck(sp, 4)
                     addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                    checkMemIsAccessible(dest, len)
+                    checkMemIsAccessible(dstOffset, len)
                 
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
                     // minimum_word_size = (size + 31) / 32
                     let dynamicGas := add(
                         mul(3, shr(5, add(len, 31))),
-                        expandMemory(dest, len)
+                        expandMemory(dstOffset, len)
                     )
                     
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1664,11 +1660,11 @@ object "EvmEmulator" {
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                    $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
+                    $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, len)
                 
                     // Gets the code from the addr
                     if and(iszero(iszero(_getRawCodeHash(addr))), gt(len, 0)) {
-                        pop(_fetchDeployedCodeWithDest(addr, offset, len, add(dest, MEM_OFFSET_INNER())))  
+                        pop(_fetchDeployedCodeWithDest(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
                     }
             
                     ip := add(ip, 1)
@@ -1703,7 +1699,7 @@ object "EvmEmulator" {
                         panic()
                     }
             
-                    copyActivePtrData(add(MEM_OFFSET_INNER(), dstOffset), sourceOffset, len)
+                    copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
                     ip := add(ip, 1)
                 }
                 case 0x3F { // OP_EXTCODEHASH
@@ -1815,7 +1811,7 @@ object "EvmEmulator" {
                     let expansionGas := expandMemory(offset, 32)
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
-                    stackHead := mload(add(MEM_OFFSET_INNER(), offset))
+                    stackHead := mload(add(MEM_OFFSET(), offset))
             
                     ip := add(ip, 1)
                 }
@@ -1832,7 +1828,7 @@ object "EvmEmulator" {
                     let expansionGas := expandMemory(offset, 32)
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
-                    mstore(add(MEM_OFFSET_INNER(), offset), value)
+                    mstore(add(MEM_OFFSET(), offset), value)
                     ip := add(ip, 1)
                 }
                 case 0x53 { // OP_MSTORE8
@@ -1848,7 +1844,7 @@ object "EvmEmulator" {
                     let expansionGas := expandMemory(offset, 1)
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
-                    mstore8(add(MEM_OFFSET_INNER(), offset), value)
+                    mstore8(add(MEM_OFFSET(), offset), value)
                     ip := add(ip, 1)
                 }
                 case 0x54 { // OP_SLOAD
@@ -1918,7 +1914,7 @@ object "EvmEmulator" {
                     let counter
                     counter, sp, stackHead := popStackItem(sp, stackHead)
             
-                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+                    ip := add(BYTECODE_OFFSET(), counter)
             
                     // Check next opcode is JUMPDEST
                     let nextOpcode := readIP(ip, bytecodeEndOffset)
@@ -1943,7 +1939,7 @@ object "EvmEmulator" {
                         continue
                     }
             
-                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+                    ip := add(BYTECODE_OFFSET(), counter)
             
                     // Check next opcode is JUMPDEST
                     let nextOpcode := readIP(ip, bytecodeEndOffset)
@@ -1960,14 +1956,14 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
             
                     // PC = ip - 32 (bytecode size) - 1 (current instruction)
-                    sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33), stackHead)
+                    sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_LEN_OFFSET()), 33), stackHead)
                 }
                 case 0x59 { // OP_MSIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
                     let size
             
-                    size := mload(MEM_OFFSET())
+                    size := mload(MEM_LEN_OFFSET())
                     size := shl(5, size)
                     sp, stackHead := pushStackItem(sp, size, stackHead)
                     ip := add(ip, 1)
@@ -2020,7 +2016,7 @@ object "EvmEmulator" {
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
+                    mcopy(add(destOffset, MEM_OFFSET()), add(offset, MEM_OFFSET()), size)
                     ip := add(ip, 1)
                 }
                 case 0x5F { // OP_PUSH0
@@ -2466,7 +2462,7 @@ object "EvmEmulator" {
                     let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    log0(add(offset, MEM_OFFSET_INNER()), size)
+                    log0(add(offset, MEM_OFFSET()), size)
                     ip := add(ip, 1)
                 }
                 case 0xA1 { // OP_LOG1
@@ -2491,7 +2487,7 @@ object "EvmEmulator" {
                     {   
                         let topic1
                         topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
+                        log1(add(offset, MEM_OFFSET()), size, topic1)
                     }
                     ip := add(ip, 1)
                 }
@@ -2518,7 +2514,7 @@ object "EvmEmulator" {
                         let topic1, topic2
                         topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
+                        log2(add(offset, MEM_OFFSET()), size, topic1, topic2)
                     }
                     ip := add(ip, 1)
                 }
@@ -2546,7 +2542,7 @@ object "EvmEmulator" {
                         topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log3(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3)
+                        log3(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3)
                     }     
                     ip := add(ip, 1)
                 }
@@ -2575,7 +2571,7 @@ object "EvmEmulator" {
                         topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log4(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3, topic4)
+                        log4(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3, topic4)
                     }     
                     ip := add(ip, 1)
                 }
@@ -2614,7 +2610,7 @@ object "EvmEmulator" {
                     returnLen := size
                     
                     // Don't check overflow here since previous checks are enough to ensure this is safe
-                    returnOffset := add(MEM_OFFSET_INNER(), offset)
+                    returnOffset := add(MEM_OFFSET(), offset)
                     break
                 }
                 case 0xF4 { // OP_DELEGATECALL
@@ -2646,7 +2642,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
             
                     // Don't check overflow here since previous checks are enough to ensure this is safe
-                    offset := add(offset, MEM_OFFSET_INNER())
+                    offset := add(offset, MEM_OFFSET())
             
                     if eq(isCallerEVM, 1) {
                         offset := sub(offset, 32)
@@ -3036,7 +3032,7 @@ object "EvmEmulator" {
     object "EvmEmulator_deployed" {
         code {
             function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
-                max := MAX_POSSIBLE_DEPLOYED_BYTECODE()
+                max := MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
             }
 
             ////////////////////////////////////////////////////////////////
@@ -3111,16 +3107,12 @@ object "EvmEmulator" {
                 offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
             }
             
-            function BYTECODE_OFFSET() -> offset {
+            function BYTECODE_LEN_OFFSET() -> offset {
                 offset := add(STACK_OFFSET(), mul(1024, 32))
             }
             
-            function MAX_POSSIBLE_DEPLOYED_BYTECODE() -> max {
-                max := 24576
-            }
-            
-            function MAX_POSSIBLE_INIT_BYTECODE() -> max {
-                max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE()) // EIP-3860
+            function BYTECODE_OFFSET() -> offset {
+                offset := add(BYTECODE_LEN_OFFSET(), 32)
             }
             
             // reserved empty slot to simplify PUSH N opcodes
@@ -3128,22 +3120,30 @@ object "EvmEmulator" {
                 offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
             }
             
-            function MEM_OFFSET() -> offset {
+            function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
+                max := 24576 // EIP-170
+            }
+            
+            function MAX_POSSIBLE_INIT_BYTECODE_LEN() -> max {
+                max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) // EIP-3860
+            }
+            
+            function MEM_LEN_OFFSET() -> offset {
                 offset := add(EMPTY_CODE_OFFSET(), 32)
             }
             
-            function MEM_OFFSET_INNER() -> offset {
-                offset := add(MEM_OFFSET(), 32)
+            function MEM_OFFSET() -> offset {
+                offset := add(MEM_LEN_OFFSET(), 32)
             }
             
             // Used to simplify gas calculations for memory expansion.
             // The cost to increase the memory to 4 MB is close to 30M gas
-            function MAX_POSSIBLE_MEM() -> max {
+            function MAX_POSSIBLE_MEM_LEN() -> max {
                 max := 0x400000 // 4MB
             }
             
             function MAX_MEMORY_FRAME() -> max {
-                max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
+                max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
             }
             
             function MAX_UINT() -> max_uint {
@@ -3315,23 +3315,17 @@ object "EvmEmulator" {
             }
             
             // Basically performs an extcodecopy, while returning the length of the bytecode.
-            function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
-                codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
-            }
-            
-            // Basically performs an extcodecopy, while returning the length of the bytecode.
-            function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
+            function _fetchDeployedCodeWithDest(addr, dstOffset, srcOffset, len) -> codeLen {
                 let codeHash := _getRawCodeHash(addr)
-            
                 mstore(0, codeHash)
                 // The first word of returndata is the true length of the bytecode
                 codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
             
-                if gt(_len, codeLen) {
-                    _len := codeLen
+                if gt(len, codeLen) {
+                    len := codeLen
                 }
             
-                returndatacopy(dest, add(32, _offset), _len)
+                returndatacopy(dstOffset, add(32, srcOffset), len)
             }
             
             // Returns the length of the bytecode.
@@ -3358,14 +3352,15 @@ object "EvmEmulator" {
             }
             
             function getDeployedBytecode() {
-                let codeLen := _fetchDeployedCode(
-                    getCodeAddress(),
-                    add(BYTECODE_OFFSET(), 32),
-                    MAX_POSSIBLE_DEPLOYED_BYTECODE()
+                let codeLen := _fetchDeployedCodeWithDest(
+                    getCodeAddress(), 
+                    BYTECODE_OFFSET(), // destination offset
+                    0, // source offset
+                    MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
                 )
             
                 mstore(EMPTY_CODE_OFFSET(), 0)
-                mstore(BYTECODE_OFFSET(), codeLen)
+                mstore(BYTECODE_LEN_OFFSET(), codeLen)
             }
             
             function getMax(a, b) -> max {
@@ -3380,7 +3375,7 @@ object "EvmEmulator" {
             function expandMemory(offset, size) -> gasCost {
                 // memory expansion costs 0 if size is 0
                 if size {
-                    let oldSizeInWords := mload(MEM_OFFSET())
+                    let oldSizeInWords := mload(MEM_LEN_OFFSET())
             
                     // div rounding up
                     let newSizeInWords := div(add(add(offset, size), 31), 32)
@@ -3403,7 +3398,7 @@ object "EvmEmulator" {
                 
                         gasCost := add(linearPart, quadraticPart)
                 
-                        mstore(MEM_OFFSET(), newSizeInWords)
+                        mstore(MEM_LEN_OFFSET(), newSizeInWords)
                     }
                 }
             }
@@ -3481,7 +3476,7 @@ object "EvmEmulator" {
             }
             
             function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-                if iszero(lt(sp, BYTECODE_OFFSET())) {
+                if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
                     panic()
                 }
             
@@ -3509,7 +3504,7 @@ object "EvmEmulator" {
             }
             
             function pushStackCheck(sp, numInputs) {
-                if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
+                if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
                     panic()
                 }
             }
@@ -3660,9 +3655,9 @@ object "EvmEmulator" {
                     addr,
                     gasToPass,
                     value,
-                    add(argsOffset, MEM_OFFSET_INNER()),
+                    add(argsOffset, MEM_OFFSET()),
                     argsSize,
-                    add(retOffset, MEM_OFFSET_INNER()),
+                    add(retOffset, MEM_OFFSET()),
                     retSize
                 )
             
@@ -3716,9 +3711,9 @@ object "EvmEmulator" {
                 let success, frameGasLeft := _performStaticCall(
                     addr,
                     gasToPass,
-                    add(MEM_OFFSET_INNER(), argsOffset),
+                    add(MEM_OFFSET(), argsOffset),
                     argsSize,
-                    add(MEM_OFFSET_INNER(), retOffset),
+                    add(MEM_OFFSET(), retOffset),
                     retSize
                 )
             
@@ -3773,13 +3768,13 @@ object "EvmEmulator" {
                 let success := delegatecall(
                     providedErgs(),
                     addr,
-                    add(MEM_OFFSET_INNER(), argsOffset),
+                    add(MEM_OFFSET(), argsOffset),
                     argsSize,
                     0,
                     0
                 )
             
-                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
             
                 newGasLeft := add(evmGasLeft, frameGasLeft)
                 stackHead := success
@@ -3878,7 +3873,7 @@ object "EvmEmulator" {
             // The gas cost mentioned here is purely the cost of the contract, 
             // and does not consider the cost of the call itself nor the instructions 
             // to put the parameters in memory. 
-            // Take into account MEM_OFFSET_INNER() when passing the argsOffset
+            // Take into account MEM_OFFSET() when passing the argsOffset
             function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
                 switch addr
                     case 0x01 { // ecRecover
@@ -3999,7 +3994,7 @@ object "EvmEmulator" {
                 checkMemIsAccessible(offset, size)
             
                 // EIP-3860
-                if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
+                if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
                     panic()
                 }
             
@@ -4029,7 +4024,7 @@ object "EvmEmulator" {
                 }
             
                 if iszero(err) {
-                    offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
+                    offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
                     evmGasLeft, addr := _executeCreate(offset, size, value, evmGasLeft, isCreate2, salt)
                 }
             }
@@ -4178,17 +4173,17 @@ object "EvmEmulator" {
                 isStatic,
             ) -> returnOffset, returnLen {
 
-                returnOffset := MEM_OFFSET_INNER()
+                returnOffset := MEM_OFFSET()
                 returnLen := 0
 
                 // stack pointer - index to first stack element; empty stack = -1
                 let sp := sub(STACK_OFFSET(), 32)
                 // instruction pointer - index to next instruction. Not called pc because it's an
                 // actual yul/evm instruction.
-                let ip := add(BYTECODE_OFFSET(), 32)
+                let ip := BYTECODE_OFFSET()
                 let stackHead
                 
-                let bytecodeEndOffset := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 32)
+                let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
                 
                 for { } true { } {
                     let opcode := readIP(ip, bytecodeEndOffset)
@@ -4475,7 +4470,7 @@ object "EvmEmulator" {
                         let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        stackHead := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+                        stackHead := keccak256(add(MEM_OFFSET(), offset), size)
                 
                         ip := add(ip, 1)
                     }
@@ -4549,14 +4544,14 @@ object "EvmEmulator" {
                         let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        calldatacopy(add(destOffset, MEM_OFFSET_INNER()), offset, size)
+                        calldatacopy(add(destOffset, MEM_OFFSET()), offset, size)
                         ip := add(ip, 1)
                         
                     }
                     case 0x38 { // OP_CODESIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        let bytecodeLen := mload(BYTECODE_OFFSET())
+                        let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                         sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
                         ip := add(ip, 1)
                     }
@@ -4578,12 +4573,12 @@ object "EvmEmulator" {
                         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        dstOffset := add(dstOffset, MEM_OFFSET_INNER())
-                        sourceOffset := add(add(sourceOffset, BYTECODE_OFFSET()), 32)
+                        dstOffset := add(dstOffset, MEM_OFFSET())
+                        sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
                 
                         checkOverflow(sourceOffset, len)
                         // Check bytecode overflow
-                        if gt(add(sourceOffset, len), sub(MEM_OFFSET(), 1)) {
+                        if gt(add(sourceOffset, len), sub(MEM_LEN_OFFSET(), 1)) {
                             panic()
                         }
                 
@@ -4618,20 +4613,20 @@ object "EvmEmulator" {
                     case 0x3C { // OP_EXTCODECOPY
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        let addr, dest, offset, len
+                        let addr, dstOffset, srcOffset, len
                         popStackCheck(sp, 4)
                         addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     
-                        checkMemIsAccessible(dest, len)
+                        checkMemIsAccessible(dstOffset, len)
                     
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
                         // minimum_word_size = (size + 31) / 32
                         let dynamicGas := add(
                             mul(3, shr(5, add(len, 31))),
-                            expandMemory(dest, len)
+                            expandMemory(dstOffset, len)
                         )
                         
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -4640,11 +4635,11 @@ object "EvmEmulator" {
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                     
-                        $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
+                        $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, len)
                     
                         // Gets the code from the addr
                         if and(iszero(iszero(_getRawCodeHash(addr))), gt(len, 0)) {
-                            pop(_fetchDeployedCodeWithDest(addr, offset, len, add(dest, MEM_OFFSET_INNER())))  
+                            pop(_fetchDeployedCodeWithDest(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
                         }
                 
                         ip := add(ip, 1)
@@ -4679,7 +4674,7 @@ object "EvmEmulator" {
                             panic()
                         }
                 
-                        copyActivePtrData(add(MEM_OFFSET_INNER(), dstOffset), sourceOffset, len)
+                        copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
                         ip := add(ip, 1)
                     }
                     case 0x3F { // OP_EXTCODEHASH
@@ -4791,7 +4786,7 @@ object "EvmEmulator" {
                         let expansionGas := expandMemory(offset, 32)
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
-                        stackHead := mload(add(MEM_OFFSET_INNER(), offset))
+                        stackHead := mload(add(MEM_OFFSET(), offset))
                 
                         ip := add(ip, 1)
                     }
@@ -4808,7 +4803,7 @@ object "EvmEmulator" {
                         let expansionGas := expandMemory(offset, 32)
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
-                        mstore(add(MEM_OFFSET_INNER(), offset), value)
+                        mstore(add(MEM_OFFSET(), offset), value)
                         ip := add(ip, 1)
                     }
                     case 0x53 { // OP_MSTORE8
@@ -4824,7 +4819,7 @@ object "EvmEmulator" {
                         let expansionGas := expandMemory(offset, 1)
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
-                        mstore8(add(MEM_OFFSET_INNER(), offset), value)
+                        mstore8(add(MEM_OFFSET(), offset), value)
                         ip := add(ip, 1)
                     }
                     case 0x54 { // OP_SLOAD
@@ -4894,7 +4889,7 @@ object "EvmEmulator" {
                         let counter
                         counter, sp, stackHead := popStackItem(sp, stackHead)
                 
-                        ip := add(add(BYTECODE_OFFSET(), 32), counter)
+                        ip := add(BYTECODE_OFFSET(), counter)
                 
                         // Check next opcode is JUMPDEST
                         let nextOpcode := readIP(ip, bytecodeEndOffset)
@@ -4919,7 +4914,7 @@ object "EvmEmulator" {
                             continue
                         }
                 
-                        ip := add(add(BYTECODE_OFFSET(), 32), counter)
+                        ip := add(BYTECODE_OFFSET(), counter)
                 
                         // Check next opcode is JUMPDEST
                         let nextOpcode := readIP(ip, bytecodeEndOffset)
@@ -4936,14 +4931,14 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                 
                         // PC = ip - 32 (bytecode size) - 1 (current instruction)
-                        sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33), stackHead)
+                        sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_LEN_OFFSET()), 33), stackHead)
                     }
                     case 0x59 { // OP_MSIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
                         let size
                 
-                        size := mload(MEM_OFFSET())
+                        size := mload(MEM_LEN_OFFSET())
                         size := shl(5, size)
                         sp, stackHead := pushStackItem(sp, size, stackHead)
                         ip := add(ip, 1)
@@ -4996,7 +4991,7 @@ object "EvmEmulator" {
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
+                        mcopy(add(destOffset, MEM_OFFSET()), add(offset, MEM_OFFSET()), size)
                         ip := add(ip, 1)
                     }
                     case 0x5F { // OP_PUSH0
@@ -5442,7 +5437,7 @@ object "EvmEmulator" {
                         let dynamicGas := add(shl(3, size), expandMemory(offset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        log0(add(offset, MEM_OFFSET_INNER()), size)
+                        log0(add(offset, MEM_OFFSET()), size)
                         ip := add(ip, 1)
                     }
                     case 0xA1 { // OP_LOG1
@@ -5467,7 +5462,7 @@ object "EvmEmulator" {
                         {   
                             let topic1
                             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
+                            log1(add(offset, MEM_OFFSET()), size, topic1)
                         }
                         ip := add(ip, 1)
                     }
@@ -5494,7 +5489,7 @@ object "EvmEmulator" {
                             let topic1, topic2
                             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
+                            log2(add(offset, MEM_OFFSET()), size, topic1, topic2)
                         }
                         ip := add(ip, 1)
                     }
@@ -5522,7 +5517,7 @@ object "EvmEmulator" {
                             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log3(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3)
+                            log3(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3)
                         }     
                         ip := add(ip, 1)
                     }
@@ -5551,7 +5546,7 @@ object "EvmEmulator" {
                             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log4(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3, topic4)
+                            log4(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3, topic4)
                         }     
                         ip := add(ip, 1)
                     }
@@ -5590,7 +5585,7 @@ object "EvmEmulator" {
                         returnLen := size
                         
                         // Don't check overflow here since previous checks are enough to ensure this is safe
-                        returnOffset := add(MEM_OFFSET_INNER(), offset)
+                        returnOffset := add(MEM_OFFSET(), offset)
                         break
                     }
                     case 0xF4 { // OP_DELEGATECALL
@@ -5622,7 +5617,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
                 
                         // Don't check overflow here since previous checks are enough to ensure this is safe
-                        offset := add(offset, MEM_OFFSET_INNER())
+                        offset := add(offset, MEM_OFFSET())
                 
                         if eq(isCallerEVM, 1) {
                             offset := sub(offset, 32)

@@ -1,27 +1,24 @@
 object "EvmEmulator" {
     code {
         function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
-            max := MAX_POSSIBLE_INIT_BYTECODE()
+            max := MAX_POSSIBLE_INIT_BYTECODE_LEN()
         }
 
         /// @dev This function is used to get the initCode.
         /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
         /// to obtain the bytecode.
         function getConstructorBytecode() {
-            let bytecodeLengthOffset := BYTECODE_OFFSET()
-            let bytecodeOffset := add(BYTECODE_OFFSET(), 32)
-
             loadCalldataIntoActivePtr()
 
             let size := getActivePtrDataSize()
 
-            if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
+            if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
                 panic()
             }
 
-            mstore(bytecodeLengthOffset, size)
+            mstore(BYTECODE_LEN_OFFSET(), size)
             mstore(EMPTY_CODE_OFFSET(), 0)
-            copyActivePtrData(bytecodeOffset, 0, size)
+            copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
         function padBytecode(offset, len) -> blobOffset, blobLen {
@@ -48,7 +45,7 @@ object "EvmEmulator" {
         function validateBytecodeAndChargeGas(offset, deployedCodeLen, gasToReturn) -> returnGas {
             if deployedCodeLen {
                 // EIP-3860
-                if gt(deployedCodeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE()) {
+                if gt(deployedCodeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
                     panic()
                 }
 
@@ -71,7 +68,7 @@ object "EvmEmulator" {
             isStatic,
         ) -> returnOffset, returnLen, retGasLeft {
 
-            returnOffset := MEM_OFFSET_INNER()
+            returnOffset := MEM_OFFSET()
             returnLen := 0
 
             <!-- @include EvmEmulatorLoop.template.yul -->
@@ -110,7 +107,7 @@ object "EvmEmulator" {
     object "EvmEmulator_deployed" {
         code {
             function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
-                max := MAX_POSSIBLE_DEPLOYED_BYTECODE()
+                max := MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
             }
 
             <!-- @include EvmEmulatorFunctions.template.yul -->
@@ -121,7 +118,7 @@ object "EvmEmulator" {
                 isStatic,
             ) -> returnOffset, returnLen {
 
-                returnOffset := MEM_OFFSET_INNER()
+                returnOffset := MEM_OFFSET()
                 returnLen := 0
 
                 <!-- @include EvmEmulatorLoop.template.yul -->

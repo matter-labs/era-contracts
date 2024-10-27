@@ -2,10 +2,10 @@
 let sp := sub(STACK_OFFSET(), 32)
 // instruction pointer - index to next instruction. Not called pc because it's an
 // actual yul/evm instruction.
-let ip := add(BYTECODE_OFFSET(), 32)
+let ip := BYTECODE_OFFSET()
 let stackHead
 
-let bytecodeEndOffset := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 32)
+let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
 
 for { } true { } {
     let opcode := readIP(ip, bytecodeEndOffset)
@@ -292,7 +292,7 @@ for { } true { } {
         let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        stackHead := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+        stackHead := keccak256(add(MEM_OFFSET(), offset), size)
 
         ip := add(ip, 1)
     }
@@ -366,14 +366,14 @@ for { } true { } {
         let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        calldatacopy(add(destOffset, MEM_OFFSET_INNER()), offset, size)
+        calldatacopy(add(destOffset, MEM_OFFSET()), offset, size)
         ip := add(ip, 1)
         
     }
     case 0x38 { // OP_CODESIZE
         evmGasLeft := chargeGas(evmGasLeft, 2)
 
-        let bytecodeLen := mload(BYTECODE_OFFSET())
+        let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
         sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
         ip := add(ip, 1)
     }
@@ -395,12 +395,12 @@ for { } true { } {
         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        dstOffset := add(dstOffset, MEM_OFFSET_INNER())
-        sourceOffset := add(add(sourceOffset, BYTECODE_OFFSET()), 32)
+        dstOffset := add(dstOffset, MEM_OFFSET())
+        sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
 
         checkOverflow(sourceOffset, len)
         // Check bytecode overflow
-        if gt(add(sourceOffset, len), sub(MEM_OFFSET(), 1)) {
+        if gt(add(sourceOffset, len), sub(MEM_LEN_OFFSET(), 1)) {
             panic()
         }
 
@@ -435,20 +435,20 @@ for { } true { } {
     case 0x3C { // OP_EXTCODECOPY
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
-        let addr, dest, offset, len
+        let addr, dstOffset, srcOffset, len
         popStackCheck(sp, 4)
         addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     
-        checkMemIsAccessible(dest, len)
+        checkMemIsAccessible(dstOffset, len)
     
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
         // minimum_word_size = (size + 31) / 32
         let dynamicGas := add(
             mul(3, shr(5, add(len, 31))),
-            expandMemory(dest, len)
+            expandMemory(dstOffset, len)
         )
         
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -457,11 +457,11 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
     
-        $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
+        $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, len)
     
         // Gets the code from the addr
         if and(iszero(iszero(_getRawCodeHash(addr))), gt(len, 0)) {
-            pop(_fetchDeployedCodeWithDest(addr, offset, len, add(dest, MEM_OFFSET_INNER())))  
+            pop(_fetchDeployedCodeWithDest(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
         }
 
         ip := add(ip, 1)
@@ -496,7 +496,7 @@ for { } true { } {
             panic()
         }
 
-        copyActivePtrData(add(MEM_OFFSET_INNER(), dstOffset), sourceOffset, len)
+        copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
         ip := add(ip, 1)
     }
     case 0x3F { // OP_EXTCODEHASH
@@ -608,7 +608,7 @@ for { } true { } {
         let expansionGas := expandMemory(offset, 32)
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
-        stackHead := mload(add(MEM_OFFSET_INNER(), offset))
+        stackHead := mload(add(MEM_OFFSET(), offset))
 
         ip := add(ip, 1)
     }
@@ -625,7 +625,7 @@ for { } true { } {
         let expansionGas := expandMemory(offset, 32)
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
-        mstore(add(MEM_OFFSET_INNER(), offset), value)
+        mstore(add(MEM_OFFSET(), offset), value)
         ip := add(ip, 1)
     }
     case 0x53 { // OP_MSTORE8
@@ -641,7 +641,7 @@ for { } true { } {
         let expansionGas := expandMemory(offset, 1)
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
-        mstore8(add(MEM_OFFSET_INNER(), offset), value)
+        mstore8(add(MEM_OFFSET(), offset), value)
         ip := add(ip, 1)
     }
     case 0x54 { // OP_SLOAD
@@ -711,7 +711,7 @@ for { } true { } {
         let counter
         counter, sp, stackHead := popStackItem(sp, stackHead)
 
-        ip := add(add(BYTECODE_OFFSET(), 32), counter)
+        ip := add(BYTECODE_OFFSET(), counter)
 
         // Check next opcode is JUMPDEST
         let nextOpcode := readIP(ip, bytecodeEndOffset)
@@ -736,7 +736,7 @@ for { } true { } {
             continue
         }
 
-        ip := add(add(BYTECODE_OFFSET(), 32), counter)
+        ip := add(BYTECODE_OFFSET(), counter)
 
         // Check next opcode is JUMPDEST
         let nextOpcode := readIP(ip, bytecodeEndOffset)
@@ -753,14 +753,14 @@ for { } true { } {
         ip := add(ip, 1)
 
         // PC = ip - 32 (bytecode size) - 1 (current instruction)
-        sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33), stackHead)
+        sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_LEN_OFFSET()), 33), stackHead)
     }
     case 0x59 { // OP_MSIZE
         evmGasLeft := chargeGas(evmGasLeft, 2)
 
         let size
 
-        size := mload(MEM_OFFSET())
+        size := mload(MEM_LEN_OFFSET())
         size := shl(5, size)
         sp, stackHead := pushStackItem(sp, size, stackHead)
         ip := add(ip, 1)
@@ -813,7 +813,7 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
+        mcopy(add(destOffset, MEM_OFFSET()), add(offset, MEM_OFFSET()), size)
         ip := add(ip, 1)
     }
     case 0x5F { // OP_PUSH0
@@ -1259,7 +1259,7 @@ for { } true { } {
         let dynamicGas := add(shl(3, size), expandMemory(offset, size))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        log0(add(offset, MEM_OFFSET_INNER()), size)
+        log0(add(offset, MEM_OFFSET()), size)
         ip := add(ip, 1)
     }
     case 0xA1 { // OP_LOG1
@@ -1284,7 +1284,7 @@ for { } true { } {
         {   
             let topic1
             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
+            log1(add(offset, MEM_OFFSET()), size, topic1)
         }
         ip := add(ip, 1)
     }
@@ -1311,7 +1311,7 @@ for { } true { } {
             let topic1, topic2
             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
+            log2(add(offset, MEM_OFFSET()), size, topic1, topic2)
         }
         ip := add(ip, 1)
     }
@@ -1339,7 +1339,7 @@ for { } true { } {
             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log3(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3)
+            log3(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3)
         }     
         ip := add(ip, 1)
     }
@@ -1368,7 +1368,7 @@ for { } true { } {
             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log4(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3, topic4)
+            log4(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3, topic4)
         }     
         ip := add(ip, 1)
     }
@@ -1407,7 +1407,7 @@ for { } true { } {
         returnLen := size
         
         // Don't check overflow here since previous checks are enough to ensure this is safe
-        returnOffset := add(MEM_OFFSET_INNER(), offset)
+        returnOffset := add(MEM_OFFSET(), offset)
         break
     }
     case 0xF4 { // OP_DELEGATECALL
@@ -1439,7 +1439,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
 
         // Don't check overflow here since previous checks are enough to ensure this is safe
-        offset := add(offset, MEM_OFFSET_INNER())
+        offset := add(offset, MEM_OFFSET())
 
         if eq(isCallerEVM, 1) {
             offset := sub(offset, 32)

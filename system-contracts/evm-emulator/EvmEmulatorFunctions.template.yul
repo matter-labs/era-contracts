@@ -70,16 +70,12 @@ function STACK_OFFSET() -> offset {
     offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
 }
 
-function BYTECODE_OFFSET() -> offset {
+function BYTECODE_LEN_OFFSET() -> offset {
     offset := add(STACK_OFFSET(), mul(1024, 32))
 }
 
-function MAX_POSSIBLE_DEPLOYED_BYTECODE() -> max {
-    max := 24576
-}
-
-function MAX_POSSIBLE_INIT_BYTECODE() -> max {
-    max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE()) // EIP-3860
+function BYTECODE_OFFSET() -> offset {
+    offset := add(BYTECODE_LEN_OFFSET(), 32)
 }
 
 // reserved empty slot to simplify PUSH N opcodes
@@ -87,22 +83,30 @@ function EMPTY_CODE_OFFSET() -> offset {
     offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
 }
 
-function MEM_OFFSET() -> offset {
+function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
+    max := 24576 // EIP-170
+}
+
+function MAX_POSSIBLE_INIT_BYTECODE_LEN() -> max {
+    max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) // EIP-3860
+}
+
+function MEM_LEN_OFFSET() -> offset {
     offset := add(EMPTY_CODE_OFFSET(), 32)
 }
 
-function MEM_OFFSET_INNER() -> offset {
-    offset := add(MEM_OFFSET(), 32)
+function MEM_OFFSET() -> offset {
+    offset := add(MEM_LEN_OFFSET(), 32)
 }
 
 // Used to simplify gas calculations for memory expansion.
 // The cost to increase the memory to 4 MB is close to 30M gas
-function MAX_POSSIBLE_MEM() -> max {
+function MAX_POSSIBLE_MEM_LEN() -> max {
     max := 0x400000 // 4MB
 }
 
 function MAX_MEMORY_FRAME() -> max {
-    max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
+    max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
 }
 
 function MAX_UINT() -> max_uint {
@@ -274,23 +278,17 @@ function _isEVM(_addr) -> isEVM {
 }
 
 // Basically performs an extcodecopy, while returning the length of the bytecode.
-function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
-    codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
-}
-
-// Basically performs an extcodecopy, while returning the length of the bytecode.
-function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
+function _fetchDeployedCodeWithDest(addr, dstOffset, srcOffset, len) -> codeLen {
     let codeHash := _getRawCodeHash(addr)
-
     mstore(0, codeHash)
     // The first word of returndata is the true length of the bytecode
     codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
 
-    if gt(_len, codeLen) {
-        _len := codeLen
+    if gt(len, codeLen) {
+        len := codeLen
     }
 
-    returndatacopy(dest, add(32, _offset), _len)
+    returndatacopy(dstOffset, add(32, srcOffset), len)
 }
 
 // Returns the length of the bytecode.
@@ -317,14 +315,15 @@ function _fetchDeployedCodeLen(addr) -> codeLen {
 }
 
 function getDeployedBytecode() {
-    let codeLen := _fetchDeployedCode(
-        getCodeAddress(),
-        add(BYTECODE_OFFSET(), 32),
-        MAX_POSSIBLE_DEPLOYED_BYTECODE()
+    let codeLen := _fetchDeployedCodeWithDest(
+        getCodeAddress(), 
+        BYTECODE_OFFSET(), // destination offset
+        0, // source offset
+        MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
     )
 
     mstore(EMPTY_CODE_OFFSET(), 0)
-    mstore(BYTECODE_OFFSET(), codeLen)
+    mstore(BYTECODE_LEN_OFFSET(), codeLen)
 }
 
 function getMax(a, b) -> max {
@@ -339,7 +338,7 @@ function getMax(a, b) -> max {
 function expandMemory(offset, size) -> gasCost {
     // memory expansion costs 0 if size is 0
     if size {
-        let oldSizeInWords := mload(MEM_OFFSET())
+        let oldSizeInWords := mload(MEM_LEN_OFFSET())
 
         // div rounding up
         let newSizeInWords := div(add(add(offset, size), 31), 32)
@@ -362,7 +361,7 @@ function expandMemory(offset, size) -> gasCost {
     
             gasCost := add(linearPart, quadraticPart)
     
-            mstore(MEM_OFFSET(), newSizeInWords)
+            mstore(MEM_LEN_OFFSET(), newSizeInWords)
         }
     }
 }
@@ -440,7 +439,7 @@ function popStackItem(sp, oldStackHead) -> a, newSp, stackHead {
 }
 
 function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-    if iszero(lt(sp, BYTECODE_OFFSET())) {
+    if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
         panic()
     }
 
@@ -468,7 +467,7 @@ function popStackCheck(sp, numInputs) {
 }
 
 function pushStackCheck(sp, numInputs) {
-    if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
+    if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
         panic()
     }
 }
@@ -619,9 +618,9 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
         addr,
         gasToPass,
         value,
-        add(argsOffset, MEM_OFFSET_INNER()),
+        add(argsOffset, MEM_OFFSET()),
         argsSize,
-        add(retOffset, MEM_OFFSET_INNER()),
+        add(retOffset, MEM_OFFSET()),
         retSize
     )
 
@@ -675,9 +674,9 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
     let success, frameGasLeft := _performStaticCall(
         addr,
         gasToPass,
-        add(MEM_OFFSET_INNER(), argsOffset),
+        add(MEM_OFFSET(), argsOffset),
         argsSize,
-        add(MEM_OFFSET_INNER(), retOffset),
+        add(MEM_OFFSET(), retOffset),
         retSize
     )
 
@@ -732,13 +731,13 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
     let success := delegatecall(
         providedErgs(),
         addr,
-        add(MEM_OFFSET_INNER(), argsOffset),
+        add(MEM_OFFSET(), argsOffset),
         argsSize,
         0,
         0
     )
 
-    let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+    let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
 
     newGasLeft := add(evmGasLeft, frameGasLeft)
     stackHead := success
@@ -837,7 +836,7 @@ function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> 
 // The gas cost mentioned here is purely the cost of the contract, 
 // and does not consider the cost of the call itself nor the instructions 
 // to put the parameters in memory. 
-// Take into account MEM_OFFSET_INNER() when passing the argsOffset
+// Take into account MEM_OFFSET() when passing the argsOffset
 function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
     switch addr
         case 0x01 { // ecRecover
@@ -958,7 +957,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
     checkMemIsAccessible(offset, size)
 
     // EIP-3860
-    if gt(size, MAX_POSSIBLE_INIT_BYTECODE()) {
+    if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
         panic()
     }
 
@@ -988,7 +987,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
     }
 
     if iszero(err) {
-        offset := add(MEM_OFFSET_INNER(), offset) // caller must ensure that it doesn't overflow
+        offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
         evmGasLeft, addr := _executeCreate(offset, size, value, evmGasLeft, isCreate2, salt)
     }
 }
