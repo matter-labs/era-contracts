@@ -9,7 +9,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {NotAllowed, NotAHyperchain, NotEnoughGas, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {NotAllowed, NotEnoughGas, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";

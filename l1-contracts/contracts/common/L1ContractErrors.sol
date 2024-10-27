@@ -314,8 +314,6 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
-// 0xff4bbdf1
-error NotAHyperchain(address chainAddress);
 // 0x64846fe4
 error NotARestriction(address addr);
 // 0xfa5cd00f

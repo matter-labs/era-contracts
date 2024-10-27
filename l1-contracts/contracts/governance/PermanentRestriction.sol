@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAHyperchain, NotAllowed} from "../common/L1ContractErrors.sol";
+import {CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
