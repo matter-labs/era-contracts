@@ -82,8 +82,12 @@ function MAX_POSSIBLE_INIT_BYTECODE() -> max {
     max := mul(2, MAX_POSSIBLE_DEPLOYED_BYTECODE()) // EIP-3860
 }
 
-function MEM_OFFSET() -> offset {
+function EMPTY_CODE_OFFSET() -> offset {
     offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
+}
+
+function MEM_OFFSET() -> offset {
+    offset := add(EMPTY_CODE_OFFSET(), 32)
 }
 
 function MEM_OFFSET_INNER() -> offset {
@@ -177,20 +181,17 @@ function checkOverflow(data1, data2) {
     }
 }
 
-// It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
-function readIP(ip,maxAcceptablePos) -> opcode {
-    if gt(ip, maxAcceptablePos) {
-        revert(0, 0)
+// It is the responsibility of the caller to ensure that ip is correct
+function readIP(ip, bytecodeEndOffset) -> opcode {
+    if lt(ip, bytecodeEndOffset) {
+        opcode := and(mload(sub(ip, 31)), 0xff)
     }
-
-    opcode := and(mload(sub(ip, 31)), 0xff)
+    // STOP else
 }
 
-function readBytes(start, maxAcceptablePos,length) -> value {
-    if gt(add(start,sub(length,1)), maxAcceptablePos) {
-        revert(0, 0)
-    }
-    value := shr(mul(8,sub(32,length)),mload(start))
+// It is the responsibility of the caller to ensure that start and length is correct
+function readBytes(start, length) -> value {
+    value := shr(mul(8, sub(32, length)), mload(start))
 }
 
 function getCodeAddress() -> addr {
@@ -325,12 +326,7 @@ function getDeployedBytecode() {
         MAX_POSSIBLE_DEPLOYED_BYTECODE()
     )
 
-
-    if iszero(codeLen) {
-        codeLen := 1
-        mstore(add(BYTECODE_OFFSET(), 32), 0) // pretend that bytecode is 0x00
-    }
-
+    mstore(EMPTY_CODE_OFFSET(), 0)
     mstore(BYTECODE_OFFSET(), codeLen)
 }
 

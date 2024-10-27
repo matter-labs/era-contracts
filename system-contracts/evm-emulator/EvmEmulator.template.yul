@@ -19,14 +19,9 @@ object "EvmEmulator" {
                 panic()
             }
 
-            copyActivePtrData(bytecodeOffset, 0, size)
-
-            if iszero(size) {
-                size := 1
-                mstore(bytecodeOffset, 0)  // pretend that bytecode is 0x00
-            }
-
             mstore(bytecodeLengthOffset, size)
+            mstore(EMPTY_CODE_OFFSET(), 0)
+            copyActivePtrData(bytecodeOffset, 0, size)
         }
 
         function padBytecode(offset, len) -> blobOffset, blobLen {
