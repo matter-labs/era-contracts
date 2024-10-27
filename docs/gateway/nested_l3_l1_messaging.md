@@ -45,7 +45,7 @@ At the end of the batch, the L1Messenger system contract would query the Message
 
 Only the final aggregated root will be stored on L1.
 
-# Proving that a message belongs to a chain on top of SyncLayer
+## Proving that a message belongs to a chain on top of SyncLayer
 
 The process will consist of two steps:
 

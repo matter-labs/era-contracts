@@ -23,19 +23,19 @@ In order to get the returned value for `block.number`, `block.timestamp`, `block
 
 These return values for L2 blocks.
 
-# Blocks’ processing and consistency checks
+## Blocks’ processing and consistency checks
 
 Our `SystemContext` contract allows to get information about batches and L2 blocks. Some of the information is hard to calculate onchain. For instace, time. The timing information (for both batches and L2 blocks) are provided by the operator. In order to check that the operator provided some realistic values, certain checks are done on L1. Generally though, we try to check as much as we can on L2.
 
-## Initializing L1 batch
+### Initializing L1 batch
 
 At the start of the batch, the operator [provides](../../system-contracts/bootloader/bootloader.yul#L3935) the timestamp of the batch, its number and the hash of the previous batch. The root hash of the Merkle tree serves as the root hash of the batch.
 
 The SystemContext can immediately check whether the provided number is the correct batch number. It also immediately sends the previous batch hash to L1, where it will be checked during the commit operation. Also, some general consistency checks are performed. This logic can be found [here](../../system-contracts/contracts/SystemContext.sol#L469).
 
-## L2 blocks processing and consistency checks
+### L2 blocks processing and consistency checks
 
-### `setL2Block`
+#### `setL2Block`
 
 Before each transaction, we call `setL2Block` [method](../../system-contracts/bootloader/bootloader.yul#L2884). There we will provide some data about the L2 block that the transaction belongs to:
 
@@ -49,7 +49,7 @@ If two transactions belong to the same L2 block, only the first one may have non
 
 The `setL2Block` [performs](../../system-contracts/contracts/SystemContext.sol#L355) a lot of similar consistency checks to the ones for the L1 batch.
 
-### L2 blockhash calculation and storage
+#### L2 blockhash calculation and storage
 
 Unlike L1 batch’s hash, the L2 blocks’ hashes can be checked on L2.
 
@@ -67,7 +67,7 @@ Since zkSync is a state-diff based rollup, there is no way to deduce the hashes 
 
 We store only the last 257 blocks, since the EVM requires only 256 previous ones and we use 257 as a safe margin.
 
-### Legacy blockhash
+#### Legacy blockhash
 
 For L2 blocks that were created before we switched to the formulas from above, we use the following formula for their hash:
 
@@ -75,7 +75,7 @@ For L2 blocks that were created before we switched to the formulas from above, w
 
 These are only very old blocks on zkSync Era and other ZK chains don't have such blocks.
 
-### Timing invariants
+#### Timing invariants
 
 While the timestamp of each L2 block is provided by the operator, there are some timing invariants that the system preserves:
 
@@ -85,7 +85,7 @@ While the timestamp of each L2 block is provided by the operator, there are some
 - The timestamp of a batch must be ≥ the timestamp of the latest L2 block which belonged to the previous batch.
 - The timestamp of the last miniblock in batch can not go too far into the future. This is enforced by publishing an L2→L1 log, with the timestamp which is then checked on L1.
 
-## Fictive L2 block & finalizing the batch
+### Fictive L2 block & finalizing the batch
 
 At the end of the batch, the bootloader calls the `setL2Block` [one more time](../../system-contracts/bootloader/bootloader.yul#L4110) to allow the operator to create a new empty block. This is done purely for some of the technical reasons inside the node, where each batch ends with an empty L2 block.
 

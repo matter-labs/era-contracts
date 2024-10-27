@@ -42,6 +42,7 @@ This facet responsible for the configuration setup and upgradabity, handling tas
 * Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
 
 Control over the AdminFacet is divided between two main entities:
+
 * CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to [this document](../chain_management/chain_type_manager.md). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below).
 * Chain Admin - Multisig smart contract managed by each individual chain that can perform non-critical changes to the system such as granting validator permissions.
 

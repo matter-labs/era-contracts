@@ -24,11 +24,11 @@ The use of each system contract will be explained down below.
 
 Some of the contracts need to be predeployed at the genesis, but they do not need the kernel space rights. To give them minimal permissiones, we predeploy them at consequtive addressess that start right at the `2^16`. These will be described in the following sections.
 
-# zkEVM internals
+## zkEVM internals
 
 Full specification of the zkEVM is beyond the scope of this document. However, this section will give you most of the details needed for understanding the L2 system smart contracts & basic differences between EVM and zkEVM.
 
-## Registers and memory management
+### Registers and memory management
 
 On EVM, during transaction execution, the following memory areas are available:
 
@@ -48,7 +48,7 @@ Unlike EVM, which is stack machine, zkEVM has 16 registers. Instead of receiving
 - A pointer can be converted to the u256 integer representing it, but an integer can not be converted to a pointer to prevent unallowed memory access.
 - It is not possible to return a pointer that points to a memory page with id smaller than the one for the current page. What this means is that it is only possible to `return` only pointer to the memory of the current frame or one of the pointers returned by the subcalls of the current frame.
 
-### Memory areas in zkEVM
+#### Memory areas in zkEVM
 
 For each frame, the following memory areas are allocated:
 
@@ -59,7 +59,7 @@ For each frame, the following memory areas are allocated:
 
 Also, as mentioned in the previous section, the contract receives the pointer to the calldata.
 
-### Managing returndata & calldata
+#### Managing returndata & calldata
 
 Whenever a contract finishes its execution, the parent’s frame receives a *pointer* as `returndata`. This pointer may point to the child frame’s Heap/AuxHeap or it can even be the same `returndata` pointer that the child frame received from some of its child frames.
 
@@ -85,7 +85,7 @@ Note, that the rule above is implemented by the principle "it is not possible to
 
 Some of these memory optimizations can be seen utilized in the [EfficientCall](../../system-contracts/contracts/libraries/EfficientCall.sol#L34) library that allows to perform a call while reusing the slice of calldata that the frame already has, without memory copying.
 
-### Returndata & precompiles
+#### Returndata & precompiles
 
 Some of the operations which are opcodes on Ethereum, have become calls to some of the system contracts. The most notable examples are `Keccak256`, `SystemContext`, etc. Note, that, if done naively, the following lines of code would work differently on zkSync and Ethereum:
 
@@ -97,13 +97,13 @@ returndatacopy(...)
 
 Since the call to keccak precompile would modify the `returndata`. To avoid this, our compiler does not override the latest `returndata` pointer after calls to such opcode-like precompiles.
 
-## zkSync specific opcodes
+### zkSync specific opcodes
 
 While some Ethereum opcodes are not supported out of the box, some of the new opcodes were added to facilitate the development of the system contracts.
 
 Note, that this lists does not aim to be specific about the internals, but rather explain methods in the [SystemContractHelper.sol](../../system-contracts/contracts/libraries/SystemContractHelper.sol#L44)
 
-### **Only for kernel space**
+#### **Only for kernel space**
 
 These opcodes are allowed only for contracts in kernel space (i.e. system contracts). If executed in other places they result in `revert(0,0)`.
 
@@ -122,7 +122,7 @@ Note, that currently we do not have access to the `tx_counter` within VM (i.e. 
 
 More on the difference between system and user logs can be read [here](../settlement_contracts/data_availability/standard_pubdata_format.md).
 
-### **Generally accessible**
+#### **Generally accessible**
 
 Here are opcodes that can be generally accessed by any contract. Note that while the VM allows to access these methods, it does not mean that this is easy: the compiler might not have convenient support for some use-cases yet.
 
@@ -132,7 +132,7 @@ Here are opcodes that can be generally accessed by any contract. Note that while
 - `getMeta`. Returns an u256 packed value of [ZkSyncMeta](../../system-contracts/contracts/libraries/SystemContractHelper.sol#L18) struct. Note that this is not tight packing. The struct is formed by the [following rust code](https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/definitions/abi/meta.rs#L4).
 - `getCodeAddress` — receives the address of the executed code. This is different from `this` , since in case of delegatecalls `this` is preserved, but `codeAddress` is not.
 
-### Flags for calls
+#### Flags for calls
 
 Besides the calldata, it is also possible to provide additional information to the callee when doing `call` , `mimic_call`, `delegate_call`. The called contract will receive the following information in its first 12 registers at the start of execution:
 
@@ -144,13 +144,13 @@ The compiler implementation is that these flags are remembered by the contract a
 
 If the caller provides inappropriate flags (i.e. tries to set `isSystem` flag when callee is not in the kernel space), the flags are ignored.
 
-### `onlySystemCall` modifier
+#### `onlySystemCall` modifier
 
 Some of the system contracts can act on behalf of the user or have a very important impact on the behavior of the account. That’s why we wanted to make it clear that users can not invoke potentially dangerous operations by doing a simple EVM-like `call`. Whenever a user wants to invoke some of the operations which we considered dangerous, they must provide “`isSystem`” flag with them.
 
 The `onlySystemCall` flag checks that the call was either done with the “isSystemCall” flag provided or the call is done by another system contract (since Matter Labs is fully aware of system contracts).
 
-### Simulations via our compiler
+#### Simulations via our compiler
 
 In the future, we plan to introduce our “extended” version of Solidity with more supported opcodes than the original one. However, right now it was beyond the capacity of the team to do, so in order to represent accessing zkSync-specific opcodes, we use `call` opcode with certain constant parameters that will be automatically replaced by the compiler with zkEVM native opcode.
 
@@ -173,7 +173,7 @@ We also use [verbatim-like](https://github.com/code-423n4/2024-03-zksync/blob/ma
 
 All the usages of the simulations in our Solidity code are implemented in the [SystemContractHelper](../../system-contracts/contracts/libraries//SystemContractHelper.sol) library and the [SystemContractsCaller](../../system-contracts/contracts//libraries/SystemContractsCaller.sol) library.
 
-**Simulating** `near_call` **(in Yul only)**
+#### Simulating `near_call` (in Yul only)
 
 In order to use `near_call` i.e. to call a local function, while providing a limit of ergs (gas) that this function can use, the following syntax is used:
 
@@ -185,13 +185,13 @@ Whenever a `near_call` panics, the `ZKSYNC_CATCH_NEAR_CALL` function is called.
 
 *Important note 2:* The 63/64 rule does not apply to `near_call`. Also, if 0 gas is provided to the near call, then actually all of the available gas will go to it.
 
-**Notes on security**
+#### Notes on security
 
 To prevent unintended substitution, the compiler requires `--system-mode` flag to be passed during compilation for the above substitutions to work.
 
 > Note, that in the more recent compiler versions this the `--system-mode` has been renamed to `enable_eravm_extensions` (this can be seen in e.g. our [foundry.toml](../../l1-contracts/foundry.toml))
 
-## Bytecode hashes
+### Bytecode hashes
 
 On zkSync the bytecode hashes are stored in the following format:
 
@@ -202,7 +202,7 @@ On zkSync the bytecode hashes are stored in the following format:
 
 The bytes are ordered in little-endian order (i.e. the same way as for `bytes32` ).
 
-### Bytecode validity
+#### Bytecode validity
 
 A bytecode is valid if it:
 
@@ -214,17 +214,17 @@ Note, that it does not have to consist of only correct opcodes. In case the VM e
 
 A call to a contract with invalid bytecode can not be proven. That is why it is **essential** that no contract with invalid bytecode is ever deployed on zkSync. It is the job of the [KnownCodesStorage](#knowncodestorage) to ensure that all allowed bytecodes in the system are valid.
 
-# Account abstraction
+## Account abstraction
 
 One of the other important features of zkSync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://era.zksync.io/docs/reference/concepts/account-abstraction.html#introduction](https://era.zksync.io/docs/reference/concepts/account-abstraction.html#introduction)
 
-### Account versioning
+#### Account versioning
 
 Each account can also specify which version of the account abstraction protocol do they support. This is needed to allow breaking changes of the protocol in the future.
 
 Currently, two versions are supported: `None` (i.e. it is a simple contract and it should never be used as `from` field of a transaction), and `Version1`.
 
-### Nonce ordering
+#### Nonce ordering
 
 Accounts can also signal to the operator which nonce ordering it should expect from these accounts: `Sequential` or `Arbitrary`.
 
@@ -234,21 +234,21 @@ Accounts can also signal to the operator which nonce ordering it should expect f
 
 Note, that this is not enforced by system contracts in any way. Some sanity checks may be present, but the accounts are allowed to do however they like. It is more of a suggestion to the operator on how to manage the mempool.
 
-### Returned magic value
+#### Returned magic value
 
 Now, both accounts and paymasters are required to return a certain magic value upon validation. This magic value will be enforced to be correct on the mainnet, but will be ignored during fee estimation. Unlike Ethereum, the signature verification + fee charging/nonce increment are not included as part of the intrinsic costs of the transaction. These are paid as part of the execution and so they need to be estimated as part of the estimation for the transaction’s costs.
 
 Generally, the accounts are recommended to perform as many operations as during normal validation, but only return the invalid magic in the end of the validation. This will allow to correctly (or at least as correctly as possible) estimate the price for the validation of the account.
 
-# Bootloader
+## Bootloader
 
 Bootloader is the program that accepts an array of transactions and executes the entire zkSync batch. This section will expand on its invariants and methods.
 
-## Playground bootloader vs proved bootloader
+### Playground bootloader vs proved bootloader
 
 For convenience, we use the same implementation of the bootloader both in the mainnet batches and for emulating ethCalls or other testing activities. *Only* *proved* bootloader is ever used for batch-building and thus this document describes only it.
 
-## Start of the batch
+### Start of the batch
 
 It is enforced by the ZKPs, that the state of the bootloader is equivalent to the state of a contract transaction with empty calldata. The only difference is that it starts with all the possible memory pre-allocated (to avoid costs for memory expansion).
 
@@ -256,7 +256,7 @@ For additional efficiency (and our convenience), the bootloader receives its par
 
 For instance, for each transaction, we check that it is [properly ABI-encoded](../../system-contracts/bootloader/bootloader.yul#L3278) and that the transactions [go exactly one after another](../../system-contracts/bootloader/bootloader.yul#L3974). We also ensure that transactions do not exceed the limits of the memory space allowed for transactions.
 
-## Transaction types & their validation
+### Transaction types & their validation
 
 While the main transaction format is the internal `Transaction` [format](../../system-contracts/contracts/libraries/TransactionHelper.sol#L25), it is a struct that is used to represent various kinds of transactions types. It contains a lot of `reserved` fields that could be used depending in the future types of transactions without need for AA to change the interfaces of their contracts.
 
@@ -276,11 +276,11 @@ You can also read more on L1->L2 transactions and upgrade transacitons [here](./
 
 However, as already stated, the bootloader’s memory is not deterministic and the operator is free to put anything it wants there. For all of the transaction types above the restrictions are imposed in the following ([method](../../system-contracts/bootloader/bootloader.yul#L3048)), which is called before starting processing the transaction.
 
-## Structure of the bootloader’s memory
+### Structure of the bootloader’s memory
 
 The bootloader expects the following structure of the memory (here by word we denote 32-bytes, the same machine word as on EVM):
 
-### **Batch information**
+#### **Batch information**
 
 The first 8 words are reserved for the batch information provided by the operator.
 
@@ -295,7 +295,7 @@ The first 8 words are reserved for the batch information provided by the operato
 
 The batch information slots [are used at the beginning of the batch](../../system-contracts/bootloader/bootloader.yul#L3858). Once read, these slots can be used for temporary data.
 
-### **Temporary data for debug & transaction processing purposes**
+#### **Temporary data for debug & transaction processing purposes**
 
 - `[8..39]` – reserved slots for debugging purposes
 - `[40..72]` – slots for holding the paymaster context data for the current transaction. The role of the paymaster context is similar to the [EIP4337](https://eips.ethereum.org/EIPS/eip-4337)’s one. You can read more about it in the account abstraction documentation.
@@ -311,7 +311,7 @@ The batch information slots [are used at the beginning of the batch](../../syste
   - The calldata to the bytecode compressor (without the selector).
 - `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](./Handling%20L1→L2%20ops%20on%20zkSync.md).
 
-### L1Messenger Pubdata
+#### L1Messenger Pubdata
 
 - `[266757..1626756]` – slots where the final batch pubdata is supplied to be verified by the [L2DAValidator](../settlement_contracts/data_availability/custom_da.md).
 
@@ -324,7 +324,7 @@ One of "worst case" scenarios for the number of state diffs in a batch is when 7
 In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
 operator to ensure that it can form the correct calldata for the L1Messenger.
 
-### **Transaction’s meta descriptions**
+#### **Transaction’s meta descriptions**
 
 - `[1626756..1646756]` words — 20000 slots for 10000 transaction’s meta descriptions (their structure is explained below).
 
@@ -346,13 +346,13 @@ struct BootloaderTxDescription {
 }
 ```
 
-### **Reserved slots for the calldata for the paymaster’s postOp operation**
+#### **Reserved slots for the calldata for the paymaster’s postOp operation**
 
 - `[1646756..1646795]` words — 40 slots which could be used for encoding the calls for postOp methods of the paymaster.
 
 To avoid additional copying of transactions for calls for the account abstraction, we reserve some of the slots which could be then used to form the calldata for the `postOp` call for the account abstraction without having to copy the entire transaction’s data.
 
-### **The actual transaction’s descriptions**
+#### **The actual transaction’s descriptions**
 
 - `[1646796..1967599]`
 
@@ -362,25 +362,25 @@ Starting from the 487312 word, the actual descriptions of the transactions start
 - They are located without any gaps in memory (the first transaction starts at word 653 and each transaction goes right after the next one).
 - The contents of the currently processed transaction (and the ones that will be processed later on are untouched). Note, that we do allow overriding data from the already processed transactions as it helps to preserve efficiency by not having to copy the contents of the `Transaction` each time we need to encode a call to the account.
 
-### **VM hook pointers**
+#### **VM hook pointers**
 
 - `[1967600..1967602]`
 
 These are memory slots that are used purely for debugging purposes (when the VM writes to these slots, the server side can catch these calls and give important insight information for debugging issues).
 
-### **Result ptr pointer**
+#### **Result ptr pointer**
 
 - `[1967602..1977602]`
 
 These are memory slots that are used to track the success status of a transaction. If the transaction with number `i` succeeded, the slot `937499 - 10000 + i` will be marked as 1 and 0 otherwise.
 
-## General flow of the bootloader’s execution
+### General flow of the bootloader’s execution
 
 1. At the start of the batch it [reads the initial batch information](../..å/system-contracts/bootloader/bootloader.yul#L3858) and [sends the information](../../system-contracts/bootloader/bootloader.yul#L3912) about the current batch to the SystemContext system contract.
 2. It goes through each of [transaction’s descriptions](../../system-contracts/bootloader/bootloader.yul#L3954) and checks whether the `execute` field is set. If not, it ends processing of the transactions and ends execution of the batch. If the execute field is non-zero, the transaction will be executed and it goes to step 3.
 3. Based on the transaction’s type it decides whether the transaction is an L1 or L2 transaction and processes them accordingly. More on the processing of the L1 transactions can be read [here](#l1-l2-transactions). More on L2 transactions can be read [here](#l2-transactions).
 
-## L2 transactions
+### L2 transactions
 
 On zkSync, every address is a contract. Users can start transactions from their EOA accounts, because every address that does not have any contract deployed on it implicitly contains the code defined in the [DefaultAccount.sol](../../system-contracts/contracts/DefaultAccount.sol) file. Whenever anyone calls a contract that is not in kernel space (i.e. the address is ≥ 2^16) and does not have any contract code deployed on it, the code for `DefaultAccount` will be used as the contract’s code.
 
@@ -405,7 +405,7 @@ We process the L2 transactions according to our account abstraction protocol: [h
 
 1. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1211) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
 
-## L1->L2 transactions
+### L1->L2 transactions
 
 L1->L2 transactions are transactions that were initiated on L1. We assume that `from` has already authorized the L1→L2 transactions. It also has its L1 pubdata price as well as ergsPrice set on L1.
 
@@ -420,7 +420,7 @@ There are two kinds of L1->L2 transactions:
 
 You can read more about differences between those in the corresponding [document](./Handling%20L1%E2%86%92L2%20ops%20on%20zkSync.md).
 
-## End of the batch
+### End of the batch
 
 At the end of the batch we set `tx.origin` and `tx.gasprice` context variables to zero to save L1 gas on calldata and send the entire bootloader balance to the operator, effectively sending fees to him.
 
@@ -430,13 +430,13 @@ After that, we publish the hash as well as the number of priority operations in 
 
 Then, we call the L1Messenger system contract for it to compose the pubdata to be published on L1. You can read more about the pubdata processing [here](./Handling%20pubdata.md).
 
-# System contracts
+## System contracts
 
 Most of the details on the implementation and the requirements for the execution of system contracts can be found in the doc-comments of their respective code bases. This chapter serves only as a high-level overview of such contracts.
 
 All the codes of system contracts (including `DefaultAccount`s) are part of the protocol and can only be change via a system upgrade through L1.
 
-## SystemContext
+### SystemContext
 
 This contract is used to support various system parameters not included in the VM by default, i.e. `chainId`, `origin`, `ergsPrice`, `blockErgsLimit`, `coinbase`, `difficulty`, `baseFee`, `blockhash`, `block.number`, `block.timestamp.`
 
@@ -444,21 +444,21 @@ It is important to note that the constructor is **not** run for this contract up
 
 This contract is also responsible for ensuring validity and consistency of batches, L2 blocks. The implementation itself is rather straightforward, but to better understand this contract, please take a look at the [page](./Batches%20&%20L2%20blocks%20on%20zkSync.md) about the block processing on zkSync.
 
-## AccountCodeStorage
+### AccountCodeStorage
 
 The code hashes of accounts are stored inside the storage of this contract. Whenever a VM calls a contract with address `address` it retrieves the value under storage slot `address` of this system contract, if this value is non-zero, it uses this as the code hash of the account.
 
 Whenever a contract is called, the VM asks the operator to provide the preimage for the codehash of the account. That is why data availability of the code hashes is paramount.
 
-### Constructing vs Non-constructing code hash
+#### Constructing vs Non-constructing code hash
 
 In order to prevent contracts from being able to call a contract during its construction, we set the marker (i.e. second byte of the bytecode hash of the account) as `1`. This way, the VM will ensure that whenever a contract is called without the `isConstructor` flag, the bytecode of the default account (i.e. EOA) will be substituted instead of the original bytecode.
 
-## BootloaderUtilities
+### BootloaderUtilities
 
 This contract contains some of the methods which are needed purely for the bootloader functionality but were moved out from the bootloader itself for the convenience of not writing this logic in Yul.
 
-## DefaultAccount
+### DefaultAccount
 
 Whenever a contract that does **not** both:
 
@@ -467,7 +467,7 @@ Whenever a contract that does **not** both:
 
 The code of the default account is used. The main purpose of this contract is to provide EOA-like experience for both wallet users and contracts that call it, i.e. it should not be distinguishable (apart of spent gas) from EOA accounts on Ethereum.
 
-## Ecrecover
+### Ecrecover
 
 The implementation of the ecrecover precompile. It is expected to be used frequently, so written in pure yul with a custom memory layout.
 
@@ -480,13 +480,13 @@ It also validates the input by the same rules as the EVM precompile:
 
 After that, it makes a precompile call and returns empty bytes if the call failed, and the recovered address otherwise.
 
-## Empty contracts
+### Empty contracts
 
 Some of the contracts are relied upon to have EOA-like behaviour, i.e. they can be always called and get the success value in return. An example of such address is 0 address. We also require the bootloader to be callable so that the users could transfer ETH to it.
 
 For these contracts, we insert the `EmptyContract` code upon genesis. It is basically a noop code, which does nothing and returns `success=1`.
 
-## SHA256 & Keccak256
+### SHA256 & Keccak256
 
 Note that, unlike Ethereum, keccak256 is a precompile (*not an opcode*) on zkSync.
 
@@ -494,11 +494,11 @@ These system contracts act as wrappers for their respective crypto precompile im
 
 It's important to note that the crypto part of the `sha256` precompile expects to work with padded data. This means that a bug in applying padding may lead to an unprovable transaction.
 
-## EcAdd & EcMul
+### EcAdd & EcMul
 
 These precompiles simulate the behaviour of the EVM's EcAdd and EcMul precompiles and are fully implemented in Yul without circuit counterparts. You can read more about them [here](./Elliptic%20curve%20precompiles.md).
 
-## L2BaseToken & MsgValueSimulator
+### L2BaseToken & MsgValueSimulator
 
 Unlike Ethereum, zkEVM does not have any notion of any special native token. That’s why we have to simulate operations with the native token (in which fees are charged) via two contracts: `L2BaseToken` & `MsgValueSimulator`.
 
@@ -512,7 +512,7 @@ Whenever anyone wants to do a non-zero value call, they need to call `MsgValueSi
 
 More information on the extraAbiParams can be read [here](#flags-for-calls).
 
-### Support for `.send/.transfer`
+#### Support for `.send/.transfer`
 
 On Ethereum, whenever a call with non-zero value is done, some additional gas is charged from the caller's frame and in return a `2300` gas stipend is given out to the callee frame. This stipend is usually enough to emit a small event, but it is enforced that it is not possible to change storage within these `2300` gas. This also means that in practice some users might opt to do `call` with 0 gas provided, relying on the `2300` stipend to be passed to the callee. This is the case for `.call/.transfer`.  
 
@@ -535,7 +535,7 @@ The system does not guarantee the following:
 
 As a conclusion, using `.send/.transfer` should be generally avoided, but when avoiding is not possible it should be used with small callees, e.g. EOAs, which implement [DefaultAccount](../../system-contracts/contracts/DefaultAccount.sol).
 
-## KnownCodeStorage
+### KnownCodeStorage
 
 This contract is used to store whether a certain code hash is “known”, i.e. can be used to deploy contracts. On zkSync, the L2 stores the contract’s code *hashes* and not the codes themselves. Therefore, it must be part of the protocol to ensure that no contract with unknown bytecode (i.e. hash with an unknown preimage) is ever deployed.
 
@@ -548,13 +548,13 @@ It is the responsibility of the [ContractDeployer](#contractdeployer--immutables
 
 The KnownCodesStorage contract is also responsible for ensuring that all the “known” bytecode hashes are also [valid](#bytecode-validity).
 
-## ContractDeployer & ImmutableSimulator
+### ContractDeployer & ImmutableSimulator
 
 `ContractDeployer` is a system contract responsible for deploying contracts on zkSync. It is better to understand how it works in the context of how the contract deployment works on zkSync. Unlike Ethereum, where `create`/`create2` are opcodes, on zkSync these are implemented by the compiler via calls to the ContractDeployer system contract.
 
 For additional security, we also distinguish the deployment of normal contracts and accounts. That’s why the main methods that will be used by the user are `create`, `create2`, `createAccount`, `create2Account`, which simulate the CREATE-like and CREATE2-like behavior for deploying normal and account contracts respectively.
 
-### **Address derivation**
+#### **Address derivation**
 
 Each rollup that supports L1→L2 communications needs to make sure that the addresses of contracts on L1 and L2 do not overlap during such communication (otherwise it would be possible that some evil proxy on L1 could mutate the state of the L2 contract). Generally, rollups solve this issue in two ways:
 
@@ -565,11 +565,11 @@ You can see the rules for our address derivation in `getNewAddressCreate2`/ `get
 
 Note, that we still add a certain constant to the addresses during L1→L2 communication in order to allow ourselves some way to support EVM bytecodes in the future.
 
-### **Deployment nonce**
+#### **Deployment nonce**
 
 On Ethereum, the same nonce is used for CREATE for accounts and EOA wallets. On zkSync this is not the case, we use a separate nonce called “deploymentNonce” to track the nonces for accounts. This was done mostly for consistency with custom accounts and for having multicalls feature in the future.
 
-### **General process of deployment**
+#### **General process of deployment**
 
 - After incrementing the deployment nonce, the contract deployer must ensure that the bytecode that is being deployed is available.
 - After that, it puts the bytecode hash with a [special constructing marker](#constructing-vs-non-constructing-code-hash) as code for the address of the to-be-deployed contract.
@@ -580,7 +580,7 @@ On Ethereum, the same nonce is used for CREATE for accounts and EOA wallets. On 
 
 Note how it is different from the EVM approach: on EVM when the contract is deployed, it executes the initCode and returns the deployedCode. On zkSync, contracts only have the deployed code and can set immutables as storage variables returned by the constructor.
 
-### **Constructor**
+#### **Constructor**
 
 On Ethereum, the constructor is only part of the initCode that gets executed during the deployment of the contract and returns the deployment code of the contract. On zkSync, there is no separation between deployed code and constructor code. The constructor is always a part of the deployment code of the contract. In order to protect it from being called, the compiler-generated contracts invoke constructor only if the `isConstructor` flag provided (it is only available for the system contracts). You can read more about flags [here](#flags-for-calls).
 
@@ -595,24 +595,24 @@ struct ImmutableData {
 
 basically denoting an array of immutables passed to the contract.
 
-### **Immutables**
+#### **Immutables**
 
 Immutables are stored in the `ImmutableSimulator` system contract. The way how `index` of each immutable is defined is part of the compiler specification. This contract treats it simply as mapping from index to value for each particular address.
 
 Whenever a contract needs to access a value of some immutable, they call the `ImmutableSimulator.getImmutable(getCodeAddress(), index)`. Note that on zkSync it is possible to get the current execution address (you can read more about `getCodeAddress()` [here](#zksync-specific-opcodes).
 
-### **Return value of the deployment methods**
+#### **Return value of the deployment methods**
 
 If the call succeeded, the address of the deployed contract is returned. If the deploy fails, the error bubbles up.
 
-## DefaultAccount
+### DefaultAccount
 
 The implementation of the default account abstraction. This is the code that is used by default for all addresses that are not in kernel space and have no contract deployed on them. This address:
 
 - Contains minimal implementation of our account abstraction protocol. Note that it supports the [built-in paymaster flows](https://docs.zksync.io/build/developer-reference/account-abstraction/paymasters).
 - When anyone (except bootloader) calls it, it behaves in the same way as a call to an EOA, i.e. it always returns `success = 1, returndatasize = 0` for calls from anyone except for the bootloader.
 
-## L1Messenger
+### L1Messenger
 
 A contract used for sending arbitrary length L2→L1 messages from zkSync to L1. While zkSync natively supports a rather limited number of L1→L2 logs, which can transfer only roughly 64 bytes of data a time, we allowed sending nearly-arbitrary length L2→L1 messages with the following trick:
 
@@ -620,7 +620,7 @@ The L1 messenger receives a message, hashes it and sends only its hash as well a
 
 Note, that L1Messenger is calls the L2DAValidator and plays an important role in facilitating the [DA validation protocol](../settlement_contracts/data_availability/custom_da.md).
 
-## NonceHolder
+### NonceHolder
 
 Serves as storage for nonces for our accounts. Besides making it easier for operator to order transactions (i.e. by reading the current nonces of account), it also serves a separate purpose: making sure that the pair (address, nonce) is always unique.
 
@@ -633,13 +633,13 @@ Note that nonces do not necessarily have to be monotonic (this is needed to supp
 
 The accounts upon creation can also provide which type of nonce ordering do they want: Sequential (i.e. it should be expected that the nonces grow one by one, just like EOA) or Arbitrary, the nonces may have any values. This ordering is not enforced in any way by system contracts, but it is more of a suggestion to the operator on how it should order the transactions in the mempool.
 
-## EventWriter
+### EventWriter
 
 A system contract responsible for emitting events.
 
 It accepts in its 0-th extra abi data param the number of topics. In the rest of the extraAbiParams he accepts topics for the event to emit. Note, that in reality the event the first topic of the event contains the address of the account. Generally, the users should not interact with this contract directly, but only through Solidity syntax of `emit`-ing new events.
 
-## Compressor
+### Compressor
 
 One of the most expensive resource for a rollup is data availability, so in order to reduce costs for the users we compress the published pubdata in several ways:
 
@@ -653,13 +653,13 @@ The contract provides two methods:
 
 You can read more about how custom DA is handled [here](../settlement_contracts/data_availability/custom_da.md).
 
-## Pubdata Chunk Publisher
+### Pubdata Chunk Publisher
 
 This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](./Rollup%20DA.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes as the circuits will require that the chunk is of exact size.
 
 This contract can be utilized by L2DAValidators, e.g. [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol) uses it to compress the pubdata into blobs.
 
-## CodeOracle
+### CodeOracle
 
 It is a contract that accepts the versioned hash of a bytecode and returns the preimage of it. It is similar to the `extcodecopy` functionality on Ethereum.
 
@@ -672,17 +672,17 @@ Note, that the decommitment process does not only happen using the `decommit` op
 
 3. The `decommit` opcode returns to the slice of the decommitted bytecode. Note, that the returned pointer always has length of 2^21 bytes, regardless of the length of the actual bytecode. So it is the job of the `CodeOracle` system contract to shrink the length of the returned data.
 
-## P256Verify
+### P256Verify
 
 This contract exerts the same behavior as the P256Verify precompile from [RIP-7212](https://github.com/ethereum/RIPs/blob/master/RIPS/rip-7212.md). Note, that since Era has different gas schedule, we do not comply with the gas costs, but otherwise the interface is indentical.
 
-## GasBoundCaller
+### GasBoundCaller
 
 This is not a system contract, but it will be predeployed on a fixed user space address. This contract allows users to set an upper bound of how much pubdata can a subcall take, regardless of the gas per pubdata. More on how pubdata works on zkSync can be read [here](./zkSync%20fee%20model.md).
 
 Note, that it is a deliberate decision not to deploy this contract in the kernel space, since it can relay calls to any contracts and so may break the assumption that all system contracts can be trusted.
 
-## ComplexUpgrader
+### ComplexUpgrader
 
 Usually an upgrade is performed by calling the `forceDeployOnAddresses` function of ContractDeployer out of the name of the `FORCE_DEPLOYER` constant address. However some upgrades may require more complex iteractions, e.g. query something from a contract to determine which calls to make etc.
 
@@ -690,19 +690,19 @@ For cases like this `ComplexUpgrader` contract has been created. The assumption 
 
 > Note, that while `ComplexUpgrader` existed even in the previous upgrade, it lacked `forceDeployAndUpgrade` function. This caused some serious limitations. More on how the gateway upgrade process will look like can be read [here](../upgrade_history/gateway_upgrade/upgrade_process.md).
 
-# Predeployed contracts
+### Predeployed contracts
 
 There are some contracts need to predeployed, but having kernel space rights is not desirable for them. Such contracts are usuall predeployed at sequential addresses starting from `2^16`.
 
-## Create2Factory
+### Create2Factory
 
 Just a built-in Create2Factory. It allows to deterministically deploy contracts to the samme address on multiple chains.
 
-## L2GenesisUpgrade
+### L2GenesisUpgrade
 
 A contract that is responsible for facilitating initialization of a newly created chain. This is part of a [chain creation flow](../chain_management/chain_genesis.md).
 
-## Bridging-related contracts
+### Bridging-related contracts
 
 `L2Bridgehub`, `L2AssetRouter`, `L2NativeTokenVault`, as well as `L2MessageRoot`.
 
@@ -710,19 +710,19 @@ These contracts are used to facilitate cross-chain communication as well value b
 
 Note, that [L2AssetRouter](../../l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol) and [L2NativeTokenVault](../../l1-contracts/contracts/bridge/ntv/L2NativeTokenVault.sol) have unique code, the L2Bridgehub and L2MessageRoot share the same source code with their L1 precompiles, i.e. the L2Bridgehub has [this](../../l1-contracts/contracts/bridgehub/Bridgehub.sol) code and L2MessageRoot has [this](../../l1-contracts/contracts/bridgehub/MessageRoot.sol) code.
 
-## SloadContract
+### SloadContract
 
 During the L2GatewayUpgrade, the system contracts will need to read the storage of some other contracts, despite those lacking getters. The how it is implemented can be read in the `forcedSload` function of the [SystemContractHelper](../../system-contracts/contracts/libraries/SystemContractHelper.sol) contract.
 
 While it is only used for the upgrade, it was decided to leave it as a predeployed contract for future use-cases as well.
 
-## L2WrappedBaseTokenImplementation
+### L2WrappedBaseTokenImplementation
 
 While bridging wrapped base tokens (e.g. WETH) is not yet supported. The address of it is enshrined within the native token vault (both the L1 and L2 one). For consistency with other networks, our WETH token is deployed as a TransparentUpgradeableProxy. To have the deployment process easier, we predeploy the implementation.
 
-# Known issues to be resolved
+## Known issues to be resolved
 
 The protocol, while conceptually complete, contains some known issues which will be resolved in the short to middle term.
 
-- Fee modeling is yet to be improved. More on it in the [document](./zkSync%20fee%20model.md) on the fee model.
+- Fee modeling is yet to be improved. More on it in the [document](./zksync_fee_model.md) on the fee model.
 - We may add some kind of default implementation for the contracts in the kernel space (i.e. if called, they wouldn’t revert but behave like an EOA).

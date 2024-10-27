@@ -156,25 +156,3 @@ Definition:
     2. creation is probably not needed - as the contract was already there in a first place.
     3. same as above - but the state is ‘re-initialized’
 4. Same as above - but on chain ‘Z’
-
-### What can go wrong
-
-**Check 1 - protocol version**
-
-- chain is on the older protocol version before the migration start
-- resolution: don’t allow the migration, tell protocol to upgrade itself first.
-
-**Check 3a — protocol version on destination chain**
-
-- destination chain CTM is on the OLDER version than the payload
-  - resolution: fail the transfer - seems that CTMs were not upgraded.
-- destination chain CTM is on the NEWER version that then payload
-  - For simplicity - we could fail the transfer here too.
-
-**Check 4a — protocol version on the source chain in case of transfer failure**
-
-- source IZKChain is on the ‘older’ protocol version than the payload
-  - in theory - impossible, as this means that the IZKChain protocol version was ‘reverted’.
-- source IZKChain is on the ‘newer’ protocol version than the payload
-  - This is the **main** worst case scenario - as this means that the IZKChain was updated (via ‘inactive’ update) while the protocol transfer was ongoing.
-  - This is the ‘Stuck state’ case described in the paragraph above.

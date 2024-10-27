@@ -61,15 +61,12 @@ Most of the params are self-explanatory & replicate the logic of zkSync Era. The
 
 Here is a quick guide on how this transaction is routed through the bridgehub.
 
-1. The bridgehub retrieves the `baseTokenAssetId`  of the chain with the corresponding `chainId` and calls `L1AssetRouter.bridgehubDepositBaseToken` method. The `L1AssetRouter` will then use standard token depositing mechanism to burn/escrow the respective amount of the `baseTokenAssetId`. You can read more about it in [the asset router doc](../asset_router/Overview.md).
-
-This step ensures that the baseToken will be backed 1-1 on L1.
+1. The bridgehub retrieves the `baseTokenAssetId`  of the chain with the corresponding `chainId` and calls `L1AssetRouter.bridgehubDepositBaseToken` method. The `L1AssetRouter` will then use standard token depositing mechanism to burn/escrow the respective amount of the `baseTokenAssetId`. You can read more about it in [the asset router doc](../asset_router/Overview.md). This step ensures that the baseToken will be backed 1-1 on L1.
 
 2. After that, it just routes the corresponding call to the ZKChain with the corresponding `chainId` . It is now the responsibility of the ZKChain to validate that the transaction is correct and can be accepted by it. This validation includes, but not limited to:
-
-- The fact that the user paid enough funds for the transaction (basically `request.l2GasLimit * derivedL2GasPrice(...) + request.l2Value >= request.mintValue`.
-- The fact the transaction is always executable (the `request.l2GasLimit`  is not high enough).
-- etc.
+    - The fact that the user paid enough funds for the transaction (basically `request.l2GasLimit * derivedL2GasPrice(...) + request.l2Value >= request.mintValue`.
+    - The fact the transaction is always executable (the `request.l2GasLimit`  is not high enough).
+    - etc.
 
 3. After the ZKChain validates the tx, it includes it into its priority queue. Once the operator executes this transaction on L2, the `mintValue` of the baseToken will be minted on L2. The `derivedL2GasPrice(...) * gasUsed` will be given to the operator’s balance. The other funds can be routed either of the following way:
 
@@ -134,7 +131,7 @@ The first few fields are the same as for the simple L1→L2 transaction case. Ho
 
 The function will do the following:
 
-**L1**
+#### L1
 
 1. It will deposit the `request.mintValue`  of the ZKChain’s base token the same way as during a simple L1→L2 transaction. These funds will be used for funding the `l2Value`  and the fee to the operator.
 2. It will call the `secondBridgeAddress` (`L1AssetRouter`) once again and this time it will deposit the funds to the `L1AssetRouter`, but this time it will be deposit not to pay the fees, but rather for the sake of bridging the desired token.
@@ -143,7 +140,7 @@ This call will return the parameters to call the l2 contract with (the address o
 3. After the BridgeHub will call the ZKChain to add the corresponding L1→L2 transaction to the priority queue.
 4. The BridgeHub will call the `SharedBridge` once again so that it can remember the hash of the corresponding deposit transaction. [This is needed in case the deposit fails](#claiming-failed-deposits).
 
-**L2**
+#### L2
 
 1. After some time, the corresponding L1→L2 is created.
 2. The L2AssetRouter will receive the message and re-route it to the asset handler of the bridged token. To read more about how it works, check out the [asset router documentation](../asset_router/Overview.md).

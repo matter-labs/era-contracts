@@ -65,7 +65,7 @@ Each single ZK Chain has a set of the following contracts that, while not belong
 
 To reuse as much code as possible from L1 and also to allow easier initialization, most of these contracts are not initialized as just part of the genesis storage root. Instead, the data for their initialization is part of the original diamondcut for the chain. In the same initial upgrade transaction when the chainId is initialized, these contracts are force-deployed and initialized also. An important part in it plays the new `L2GenesisUpgrade` contract, which is pre-deployed in a user-space contract, but it is delegate-called by the `ComplexUpgrader` system contract (already exists as part of genesis and existed before this upgrade).
 
-# Additional limitations for the current version
+## Additional limitations for the current version
 
 In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there.
 

@@ -1,5 +1,3 @@
-# TODO
-
 # Upgrade process document
 
 [back to readme](../README.md)

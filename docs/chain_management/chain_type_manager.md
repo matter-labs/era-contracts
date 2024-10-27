@@ -1,4 +1,4 @@
-## Chain Type Manager (CTM)
+# Chain Type Manager (CTM)
 
 [back to readme](../README.md)
 
@@ -25,7 +25,7 @@ In the long term vision STs deployment will be permissionless, however CTM will 
 
 For now, only one CTM will be supported — the one that deploys instances of zkSync Era, possibly using other DA layers. To read more about different DA layers, check out [this document](../settlement_contracts/data_availability/custom_da.md).
 
-The exact process of deploying & registering a ST will be described in [sections below](#creating-new-chains-with-bridgehub). Overall, each ST in the current release will have the following parameters:
+The exact process of deploying & registering a ST can be [read here](./chain_genesis.md). Overall, each ST in the current release will have the following parameters:
 
 | ST parameter | Updatability | Comment |
 | --- | --- | --- |
@@ -49,10 +49,9 @@ In the current release, each chain will be an instance of zkSync Era and so the 
 
 1. Firstly, the governance of the CTM will publish the server (including sequencer, prover, etc) that support the new version . This is done offchain. Enough time should be given to various zkStack devs to update their version.
 2. The governance of the CTM will publish the upgrade onchain by automatically executing the following three transactions:
-
-- `setChainCreationParams` ⇒ to ensure that new chains will be created with the version
-- `setValidatorTimelock` (if needed) ⇒ to ensure that the new chains will use the new validator timelock right-away
-- `setNewVersionUpgrade` ⇒ to save the upgrade information that each ST will need to follow to conduct the upgrade on their side.
+    - `setChainCreationParams` ⇒ to ensure that new chains will be created with the version
+    - `setValidatorTimelock` (if needed) ⇒ to ensure that the new chains will use the new validator timelock right-away
+    - `setNewVersionUpgrade` ⇒ to save the upgrade information that each ST will need to follow to conduct the upgrade on their side.
 
 3. After that, each ChainAdmin can upgrade to the new version in suitable time for them.
 
