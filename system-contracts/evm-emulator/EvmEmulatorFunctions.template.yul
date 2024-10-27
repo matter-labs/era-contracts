@@ -301,22 +301,28 @@ function isAddrEmpty(addr) -> isEmpty {
 
 // returns minNonce + 2^128 * deployment nonce.
 function getRawNonce(addr) -> nonce {
-    // selector for function getRawNonce(address _address)
+    // selector for function getRawNonce(address addr)
     mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
     nonce := fetchFromSystemContract(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
 }
 
-function getRawCodeHash(account) -> hash {
+function getRawCodeHash(addr) -> hash {
     mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
-    mstore(4, account)
+    mstore(4, addr)
     hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 
-function isEvmContract(_addr) -> isEVM {
-    // function isAccountEVM(address _addr) external view returns (bool);
+function getEvmExtcodehash(addr) -> evmCodeHash {
+    mstore(0, 0x54A3314700000000000000000000000000000000000000000000000000000000)
+    mstore(4, addr)
+    evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
+}
+
+function isEvmContract(addr) -> isEVM {
+    // function isAccountEVM(address addr) external view returns (bool);
     mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-    mstore(4, _addr)
+    mstore(4, addr)
     isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 

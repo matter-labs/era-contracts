@@ -514,7 +514,15 @@ for { } true { } {
             stackHead := 0
             continue
         }
-        stackHead := extcodehash(addr)
+
+        switch isEvmContract(addr)
+        case 0 {
+            stackHead := extcodehash(addr)
+        }
+        default {
+            stackHead := getEvmExtcodehash(addr)
+        }
+        
     }
     case 0x40 { // OP_BLOCKHASH
         evmGasLeft := chargeGas(evmGasLeft, 20)
