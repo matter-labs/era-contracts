@@ -1,3 +1,5 @@
+# Gateway upgrade changes
+
 ## Introduction & prerequisites
 
 This document assumes that the reader has general knowledge of how ZKsync Era works and how our ecosystem used to be like at the moment of shared bridge in general. 
@@ -90,3 +92,7 @@ In order to achieve CAB, we separated the liquidity managing logic from the Shar
     - This means the legacy finalizeDeposit with tokenAddress which calls the new finalizeDeposit with assetId.
     - On the other hand, new assets will use the new finalizeDeposit directly
 - The originChainId will be tracked for each assetId in the NTVs. This will be the chain where the token is originally native to. This is needed to accurately track chainBalance (especially for l2 native tokens bridged to other chains via L1), and to verify the assetId is indeed an NTV asset id (i.e. has the L2_NATIVE_TOKEN_VAULT_ADDR as deployment tracker).
+
+## Upgrade process in detail
+
+You can read more about the upgrade process itself [here](./upgrade_process.md).

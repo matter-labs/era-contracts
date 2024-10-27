@@ -52,7 +52,6 @@ So the flow for deploying their own ST for users will be the following:
 
 After that, the ST is ready to be used. Note, that the admin of the newly created chain (this will be the organization that will manage this chain from now on) will have to conduct certain configurations before the chain can be used securely (FIXME: link).
 
-# todo check below
 ## Built-in contracts and their initialization
 
 Each single ZK Chain has a set of the following contracts that, while not belong to kernel space, are built-in and provide important functionality:
@@ -62,7 +61,7 @@ Each single ZK Chain has a set of the following contracts that, while not belong
 - L2NativeTokenVault. The Native token vault on L2.
 - MessageRoot (the source code is identical to the L1 one). Similar to bridgehub, it facilitates cross-chain communication, but is practically unused on all chains except for L1/GW.
 
-To reuse as much code as possible from L1 and also to allow easier initialization, most of these contracts are not initialized as just part of the genesis storage root. Instead, the data for their initialization is part of the original diamondcut for the chain. In the same initial upgrade transaction when the chainId is initialized, these contracts are force-deployed and initialized also. An important part in it plays the new `L2Genesis` contract, which is pre-deployed in a user-space contract, but it is delegated to the `ComplexUpgrader` system contract (already exists as part of genesis and existed before this upgrade).
+To reuse as much code as possible from L1 and also to allow easier initialization, most of these contracts are not initialized as just part of the genesis storage root. Instead, the data for their initialization is part of the original diamondcut for the chain. In the same initial upgrade transaction when the chainId is initialized, these contracts are force-deployed and initialized also. An important part in it plays the new `L2GenesisUpgrade` contract, which is pre-deployed in a user-space contract, but it is delegate-called by the `ComplexUpgrader` system contract (already exists as part of genesis and existed before this upgrade).
 
 # Additional limitations for the current version
 
