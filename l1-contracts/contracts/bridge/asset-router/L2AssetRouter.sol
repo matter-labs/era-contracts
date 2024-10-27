@@ -143,7 +143,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehub {
+    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyInteropCenter {
         // _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -156,7 +156,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         external
         payable
         override(AssetRouterBase, IAssetRouterBase)
-        onlyBridgehub
+        onlyInteropCenter
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
         return _bridgehubDeposit(_chainId, _originalCaller, _value, _data, L2_NATIVE_TOKEN_VAULT_ADDR);
@@ -183,7 +183,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         //     });
     }
 
-    function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyBridgehub {
+    function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyInteropCenter {
         // revert L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
     }
 

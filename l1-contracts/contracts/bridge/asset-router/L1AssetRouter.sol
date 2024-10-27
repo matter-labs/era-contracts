@@ -70,12 +70,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-    modifier onlyBridgehubOrEra(uint256 _chainId) {
-        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
+    // modifier onlyBridgehubOrEra(uint256 _chainId) {
+    //     if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
+    //         revert Unauthorized(msg.sender);
+    //     }
+    //     _;
+    // }
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
@@ -212,7 +212,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyInteropCenterOrEra(_chainId) whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
