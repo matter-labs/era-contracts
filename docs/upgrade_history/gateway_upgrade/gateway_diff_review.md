@@ -87,10 +87,10 @@ In order to achieve CAB, we separated the liquidity managing logic from the Shar
 
 - We have the L2SharedBridgeLegacy on chains that are live before the upgrade. This contract will keep on working, and where it exists it will also be used to:
   - deploy bridged tokens. This is so that the l2TokenAddress keeps working on the L1, and so that we have a predictable address for these tokens.
-  - send messages to L1. On the L1 finalizeWithdrawal does not specify the l2Sender. Legacy withdrawals will use the legacy bridge as their sender, while new withdrawals would use the L2_ASSET_ROUTER_ADDR. In the future we will add the sender to the L1 finalizeWithdrawal interface. Until the current method is depracated we use the l2SharedBridgeAddress even for new withdrawals on legacy chains.
+  - send messages to L1. On the L1 finalizeWithdrawal does not specify the l2Sender. Legacy withdrawals will use the legacy bridge as their sender, while new withdrawals would use the L2_ASSET_ROUTER_ADDR. In the future we will add the sender to the L1 finalizeWithdrawal interface. Until the current method is deprecated we use the l2SharedBridgeAddress even for new withdrawals on legacy chains.
     This also means that on the L1 side we set the L2AR address when calling the function via the legacy interface even if it is a baseToken withdrawal. Later when we learn if it baseToken or not, we override the value.
 - We have the finalizeWithdrawal function on L1 AR, which uses the finalizeDeposit in the background.
-- L1→L2 deposits need to use the legacy encoding for SDK compatiblity.
+- L1→L2 deposits need to use the legacy encoding for SDK compatibility.
   - This means the legacy finalizeDeposit with tokenAddress which calls the new finalizeDeposit with assetId.
   - On the other hand, new assets will use the new finalizeDeposit directly
 - The originChainId will be tracked for each assetId in the NTVs. This will be the chain where the token is originally native to. This is needed to accurately track chainBalance (especially for l2 native tokens bridged to other chains via L1), and to verify the assetId is indeed an NTV asset id (i.e. has the L2_NATIVE_TOKEN_VAULT_ADDR as deployment tracker).

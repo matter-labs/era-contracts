@@ -25,7 +25,7 @@ These return values for L2 blocks.
 
 ## Blocks’ processing and consistency checks
 
-Our `SystemContext` contract allows to get information about batches and L2 blocks. Some of the information is hard to calculate onchain. For instace, time. The timing information (for both batches and L2 blocks) are provided by the operator. In order to check that the operator provided some realistic values, certain checks are done on L1. Generally though, we try to check as much as we can on L2.
+Our `SystemContext` contract allows to get information about batches and L2 blocks. Some of the information is hard to calculate onchain. For instance, time. The timing information (for both batches and L2 blocks) are provided by the operator. In order to check that the operator provided some realistic values, certain checks are done on L1. Generally though, we try to check as much as we can on L2.
 
 ### Initializing L1 batch
 

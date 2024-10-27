@@ -38,11 +38,11 @@ The structure has the following recursive format:
 
 In other words, we get the recursive structure, where for leaves of it, i.e. chains that do not aggregate any other chains, have empty `AggregatedRoot`.
 
-## Appending new batch root leafs
+## Appending new batch root leaves
 
-At the execution stage of every batch, the ZK Chain would call the `MessageRoot.addChainBatchRoot` function, while providing the `SettledRootOfBatch` for the chain. Then, the `BatchRootLeaf` will be calculated and appended to the incremental merkle tree with which the `ChainIdRoot` & `ChainIdLeaf` is calculated, which will be updated in the merkle tree of `ChainIdLeafs`.
+At the execution stage of every batch, the ZK Chain would call the `MessageRoot.addChainBatchRoot` function, while providing the `SettledRootOfBatch` for the chain. Then, the `BatchRootLeaf` will be calculated and appended to the incremental merkle tree with which the `ChainIdRoot` & `ChainIdLeaf` is calculated, which will be updated in the merkle tree of `ChainIdLeaf`s.
 
-At the end of the batch, the L1Messenger system contract would query the MessageRoot contract for the total aggregated root, i.e. the root of all `ChainIdLeafs` . Calculate the settled root `settledMessageRoot = keccak256(LocalRoot, AggregatedRoot)` and propagate it to L1.
+At the end of the batch, the L1Messenger system contract would query the MessageRoot contract for the total aggregated root, i.e. the root of all `ChainIdLeaf`s . Calculate the settled root `settledMessageRoot = keccak256(LocalRoot, AggregatedRoot)` and propagate it to L1.
 
 Only the final aggregated root will be stored on L1.
 
@@ -166,7 +166,7 @@ We want to maintain the security invariant that users can always withdraw their 
 
 Firstly, unless the chain settles on L1, this requires a trusted settlement layer. That is, not trusted operator of the gateway, but it works properly, i.e. appends messages correctly, publishes the data that it promises to publish, etc. This is already the case for the Gateway as it is a ZK rollup fork of Era, and while the operator may censor transactions, it can not lie and is always forced to publish all state diffs.
 
-Secondly, we guarantee that all the stored `ChainIdLeafs` are published on L1, even for Validiums. Publishing a single 32 byte value per relatively big Gateway batch has little price for Validiums, but it ensures that the settlement root of the gateway can always be constructed. And, assuming that the preimage for the chain root could be constructed, this gives an ability to ability to recover the proof for any L3→L1 coming from a rollup.
+Secondly, we guarantee that all the stored `ChainIdLeaf`s are published on L1, even for Validiums. Publishing a single 32 byte value per relatively big Gateway batch has little price for Validiums, but it ensures that the settlement root of the gateway can always be constructed. And, assuming that the preimage for the chain root could be constructed, this gives an ability to ability to recover the proof for any L3→L1 coming from a rollup.
 
 But how can one reconstruct the total chain tree for a particular rollup chain? A rollup would relay all of its pubdata to L1, meaning that by observing L1, the observer would know all the L3→L1 logs that happened in a particular batch. It means that for each batch it can restore the `LocalRoot` (in case the `AggregatedRoot` is non-zero, it could be read from e.g. the storage which is available via the standard state diffs). This allows to calculate the `BatchRootLeaf` for the chain. The only thing missing is understanding which batches were finalized on gateway in order to construct the merkle path to the `ChainRootLeaf`.
 
@@ -178,7 +178,7 @@ In order to ease the server migration, we support legacy format of L2→L1 logs 
 
 To differentiate between legacy format and the one, the following approach is used;
 
-- Except for the first 3 bytes the first word in the new format contains 0s, which is unlikely in the old format, where leafs are hashed.
+- Except for the first 3 bytes the first word in the new format contains 0s, which is unlikely in the old format, where leaves are hashed.
 - I.e. if the last 29 bytes are zeroes, then it is assumed to be the new format and vice versa.
 
 In the next release the old format will be removed.

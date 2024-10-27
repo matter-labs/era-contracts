@@ -20,7 +20,7 @@ The second parameter is very powerful and flexible enough to move majority of up
 Upgrade information is composed in the form of a [DiamondCutData](../../l1-contracts/contracts/state-transition/libraries/Diamond.sol#L75) struct. During the upgrade, the chain's DiamondProxy will delegateCall the `initAddress` with the provided `initCalldata`, while the facets that the `DiamondProxy` will be changed according to the `facetCuts`. This scheme is very powerful and it allows to change anything in the contract. However, we typically have a very specific set of changes that we need to do. To facilitate these, two contracts have been created:
 
 1. [BaseZkSyncUpgrade](../../l1-contracts/contracts/upgrades/BaseZkSyncUpgrade.sol) - Generic template with function that can be useful for upgrades
-2. [DefaultUpgrade](../../l1-contracts/contracts/upgrades/DefaultUpgrade.sol) - Default implementation of the `BaseZkSyncUpgrade`, contract that is most often planned to be used as diamond intialization when doing upgrades.
+2. [DefaultUpgrade](../../l1-contracts/contracts/upgrades/DefaultUpgrade.sol) - Default implementation of the `BaseZkSyncUpgrade`, contract that is most often planned to be used as diamond initialization when doing upgrades.
 
 > Note, that the Gateway upgrade will be more complex than the usual ones and so a similar, but separate [process](../upgrade_history/gateway_upgrade/upgrade_process.md) will be used for it. It will also use its own custom implementation of the `BaseZkSyncUpgrade`: [GatewayUpgrade](../../l1-contracts/contracts/upgrades/GatewayUpgrade.sol).
 

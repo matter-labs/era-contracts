@@ -125,7 +125,7 @@ As usual, the ChainAdmin should call `upgradeChainFromVersion`. What is unusual 
 - The new DA validation mechanism is there and so the ChainAdmin should set the new DA validator pair.
 - If a chain should be a permanent rollup, the ChainAdmin should call the `makePermanentRollup()` function.
 
-It is preferrable that all the steps above are executed in a multicall for greater convenience, though it is not mandatory.
+It is preferable that all the steps above are executed in a multicall for greater convenience, though it is not mandatory.
 
 This upgrade adds a lot of new chain parameters and so these [should be managed carefully](../../chain_management/admin_role.md).
 

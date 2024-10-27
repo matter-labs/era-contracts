@@ -103,7 +103,7 @@ The Mailbox facet also facilitates L1<>L3 communications for those chains that s
 
 ### ExecutorFacet
 
-A contract that accepts L2 batches, enforces data availability via DA validators and checks the validity of zk-proofs. You can read more about DA validators [in this docuemnt](../settlement_contracts/data_availability/custom_da.md).
+A contract that accepts L2 batches, enforces data availability via DA validators and checks the validity of zk-proofs. You can read more about DA validators [in this document](../settlement_contracts/data_availability/custom_da.md).
 
 The state transition is divided into three stages:
 
@@ -153,7 +153,7 @@ Implementation detail - function returns a magic value just like it is designed 
 
 ## ValidatorTimelock
 
-An intermediate smart contract between the validator EOA account and the ZK chain diamon contract. Its primary purpose is
+An intermediate smart contract between the validator EOA account and the ZK chain diamond contract. Its primary purpose is
 to provide a trustless means of delaying batch execution without modifying the main zkSync contract. zkSync actively
 monitors the chain activity and reacts to any suspicious activity by freezing the chain. This allows time for
 investigation and mitigation before resuming normal operations.

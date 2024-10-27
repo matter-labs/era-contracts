@@ -12,7 +12,7 @@ The system does not restrict in any way how the admin of the chain should be imp
 
 The general guideline is that an admin of a ZK chain should be _at least_ a well-distributed multisig. Having it as an EOA is definitely a bad idea since having this address stolen can lead to [chain being permanently frozen](#setting-da-layer).
 
-Additional measures may be taken [to self-restrict](#proposed-modular-chainadmin-implementation) the ChainAdmin to ensure that some operations can be only done in safe fasion.
+Additional measures may be taken [to self-restrict](#proposed-modular-chainadmin-implementation) the ChainAdmin to ensure that some operations can be only done in safe fashion.
 
 Generally all the functionality of chain admin should be treated with maximal security and caution, and having hotkey separate roles in rare circuimstances, e.g. to call `setTokenMultiplier` in case of an ERC-20 based chain.
 
@@ -30,7 +30,7 @@ In case the malicious block has not been executed yet, it can be reverted.
 
 This is one of the most powerful settings that a chain can have: setting a custom DA layer. The dangers of doing this wrong are obvious: lack of proper data availability solution may lead to funds being frozen. (Note: that funds can never be _stolen_ due to ZKP checks of the VM execution).
 
-Sometimes, users may need assurances that a chain will never become frozen even under a malicious chain admin. A general though unstable approach is discussed [here](#proposed-modular-chainadmin-implementation), however this release comes with a solution specially taylored for rollups: the `isPermanentRollup` setting.
+Sometimes, users may need assurances that a chain will never become frozen even under a malicious chain admin. A general though unstable approach is discussed [here](#proposed-modular-chainadmin-implementation), however this release comes with a solution specially tailored for rollups: the `isPermanentRollup` setting.
 
 #### `isPermanentRollup` setting
 

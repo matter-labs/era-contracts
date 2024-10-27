@@ -22,7 +22,7 @@ The use of each system contract will be explained down below.
 
 ### Pre-deployed contracts
 
-Some of the contracts need to be predeployed at the genesis, but they do not need the kernel space rights. To give them minimal permissiones, we predeploy them at consequtive addressess that start right at the `2^16`. These will be described in the following sections.
+Some of the contracts need to be predeployed at the genesis, but they do not need the kernel space rights. To give them minimal permissiones, we predeploy them at consecutive addresses that start right at the `2^16`. These will be described in the following sections.
 
 ## zkEVM internals
 
@@ -272,7 +272,7 @@ The exact type of the transaction is marked by the `txType` field of the transac
 - `txType`: 254. It is a transaction type that is used for upgrading the L2 system. This is the only type of transaction is allowed to start a transaction out of the name of the contracts in kernel space.
 - `txType`: 255. It is a transaction that comes from L1. There are almost no restrictions explicitly imposed upon this type of transaction, since the bootloader at the end of its execution sends the rolling hash of the executed priority transactions. The L1 contract ensures that the hash did indeed match the [hashes of the priority transactions on L1](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L376).
 
-You can also read more on L1->L2 transactions and upgrade transacitons [here](./Handling%20L1→L2%20ops%20on%20zkSync.md).
+You can also read more on L1->L2 transactions and upgrade transactions [here](./Handling%20L1→L2%20ops%20on%20zkSync.md).
 
 However, as already stated, the bootloader’s memory is not deterministic and the operator is free to put anything it wants there. For all of the transaction types above the restrictions are imposed in the following ([method](../../system-contracts/bootloader/bootloader.yul#L3048)), which is called before starting processing the transaction.
 
@@ -307,7 +307,7 @@ The batch information slots [are used at the beginning of the batch](../../syste
 - `[30143..70146]` – slots for storing L2 block info for each transaction. You can read more on the difference L2 blocks and batches [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md).
 - `[70147..266754]` – slots used for compressed bytecodes each in the following format:
   - 32 bytecode hash
-  - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the `publishCompressedBytecode` function of the `BytecodeCompresor`)
+  - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the `publishCompressedBytecode` function of the `BytecodeCompressor`)
   - The calldata to the bytecode compressor (without the selector).
 - `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](./Handling%20L1→L2%20ops%20on%20zkSync.md).
 
@@ -337,7 +337,7 @@ For internal reasons related to possible future integrations of zero-knowledge p
 struct BootloaderTxDescription {
   // The offset by which the ABI-encoded transaction's data is stored
   uint256 txDataOffset;
-  // Auxilary data on the transaction's execution. In our internal versions
+  // Auxiliary data on the transaction's execution. In our internal versions
   // of the bootloader it may have some special meaning, but for the
   // bootloader used on the mainnet it has only one meaning: whether to execute
   // the transaction. If 0, no more transactions should be executed. If 1, then
@@ -518,7 +518,7 @@ On Ethereum, whenever a call with non-zero value is done, some additional gas is
 
 While using `.send/.transfer` is generally not recommended, as a step towards better EVM compatibility, since vm1.5.0 a _partial_ support of these functions is present with zkSync Era. It is the done via the following means:
 
-- Whenever a call is done to the `MsgValueSimulator` system contract, `27000` gas is deducted from the caller's frame and it passed to the `MsgValueSimulator` on top of whatever gas the user has originally provided. The number was chosen to cover for the execution of the transfering of the balances as well as other constant size operations by the `MsgValueSimulator`. Note, that since it will be the frame of `MsgValueSimulator` that will actually call the callee, the constant must also include the cost for decommitting the code of the callee. Decoding bytecode of any size would be prohibitevely expensive and so we support only callees of size up to `100000` bytes.
+- Whenever a call is done to the `MsgValueSimulator` system contract, `27000` gas is deducted from the caller's frame and it passed to the `MsgValueSimulator` on top of whatever gas the user has originally provided. The number was chosen to cover for the execution of the transferring of the balances as well as other constant size operations by the `MsgValueSimulator`. Note, that since it will be the frame of `MsgValueSimulator` that will actually call the callee, the constant must also include the cost for decommitting the code of the callee. Decoding bytecode of any size would be prohibitevely expensive and so we support only callees of size up to `100000` bytes.
 - `MsgValueSimulator` ensures that no more than `2300` out of the stipend above gets to the callee, ensuring the reentrancy protection invariant for these functions holds.
 
 Note, that unlike EVM any unused gas from such calls will be refunded.
@@ -668,13 +668,13 @@ It works the following way:
 1. It accepts a versioned hash and double checks that it is marked as “known”, i.e. the operator must know the preimage for such hash.
 2. After that, it uses the `decommit` opcode, which accepts the versioned hash and the number of ergs to spent, which is proportional to the length of the preimage. If the preimage has been decommitted before, the requested cost will be refunded to the user.
 
-   Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possilbe price and then it will be refunded in case the bytecode has been decommitted before.
+   Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possible price and then it will be refunded in case the bytecode has been decommitted before.
 
 3. The `decommit` opcode returns to the slice of the decommitted bytecode. Note, that the returned pointer always has length of 2^21 bytes, regardless of the length of the actual bytecode. So it is the job of the `CodeOracle` system contract to shrink the length of the returned data.
 
 ### P256Verify
 
-This contract exerts the same behavior as the P256Verify precompile from [RIP-7212](https://github.com/ethereum/RIPs/blob/master/RIPS/rip-7212.md). Note, that since Era has different gas schedule, we do not comply with the gas costs, but otherwise the interface is indentical.
+This contract exerts the same behavior as the P256Verify precompile from [RIP-7212](https://github.com/ethereum/RIPs/blob/master/RIPS/rip-7212.md). Note, that since Era has different gas schedule, we do not comply with the gas costs, but otherwise the interface is identical.
 
 ### GasBoundCaller
 
@@ -684,7 +684,7 @@ Note, that it is a deliberate decision not to deploy this contract in the kernel
 
 ### ComplexUpgrader
 
-Usually an upgrade is performed by calling the `forceDeployOnAddresses` function of ContractDeployer out of the name of the `FORCE_DEPLOYER` constant address. However some upgrades may require more complex iteractions, e.g. query something from a contract to determine which calls to make etc.
+Usually an upgrade is performed by calling the `forceDeployOnAddresses` function of ContractDeployer out of the name of the `FORCE_DEPLOYER` constant address. However some upgrades may require more complex interactions, e.g. query something from a contract to determine which calls to make etc.
 
 For cases like this `ComplexUpgrader` contract has been created. The assumption is that the implementation of the upgrade is predeployed and the `ComplexUpgrader` would delegatecall to it.
 
@@ -692,7 +692,7 @@ For cases like this `ComplexUpgrader` contract has been created. The assumption 
 
 ### Predeployed contracts
 
-There are some contracts need to predeployed, but having kernel space rights is not desirable for them. Such contracts are usuall predeployed at sequential addresses starting from `2^16`.
+There are some contracts need to predeployed, but having kernel space rights is not desirable for them. Such contracts are usuallypredeployed at sequential addresses starting from `2^16`.
 
 ### Create2Factory
 

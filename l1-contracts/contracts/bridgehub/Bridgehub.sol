@@ -380,7 +380,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _zkChain The address of the ZK chain's DiamondProxy contract.
     /// @param _checkMaxNumberOfZKChains Whether to check that the limit for the number
     /// of chains has not been crossed.
-    /// @dev Providing `_checkMaxNumberOfZKChains = false` may be preferrable in cases
+    /// @dev Providing `_checkMaxNumberOfZKChains = false` may be preferable in cases
     /// where we want to guarantee that a chain can be added. These include:
     /// - Migration of a chain from the mapping in the old CTM
     /// - Migration of a chain to a new settlement layer

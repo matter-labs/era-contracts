@@ -4,7 +4,7 @@
 
 ## Bridgehub as the main chain registry
 
-Bridgehub is the most important contract in the sysmte, that stores:
+Bridgehub is the most important contract in the system, that stores:
 
 - A mapping from chainId to chains address
 - A mapping from chainId to the CTM it belongs to.
@@ -25,13 +25,13 @@ The main entry for passing value between chains is the AssetRouter, it is respon
 
 For the purpose of this document, it is enough to treat the Asset Router as a blackbox that is responsible for processing escrowing funds on the source chain and minting them on the destination chain.
 
-> For those that are aware of the [previous zkSync architecture](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/L1%20ecosystem%20contracts.md), its role is similar to L1SharedBridge that we had before. Note, however, that it is a different contract with much enhanced functionality. Also, note that the L1SharedBridge will NOT be upgraded to the L1AssetRouter. For more detials about migration, please check out [the migration doc](../../upgrade-history/gateway_upgrade/gateway_diff_review.md).
+> For those that are aware of the [previous zkSync architecture](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/L1%20ecosystem%20contracts.md), its role is similar to L1SharedBridge that we had before. Note, however, that it is a different contract with much enhanced functionality. Also, note that the L1SharedBridge will NOT be upgraded to the L1AssetRouter. For more details about migration, please check out [the migration doc](../../upgrade-history/gateway_upgrade/gateway_diff_review.md).
 
 ### Handling base tokens
 
 On L2, _a base token_ (not to be consfused with a _native token_, i.e. an ERC20 token with a main contract on the chain) is the one that is used for `msg.value` and it is managed at `L2BaseToken` system contract. We need its logic to be strictly defined in `L2BaseToken`, since the base asset is expected to behave the exactly the same as ether on EVM. For now this token contract does not support base minting and burning of the asset, nor further customization.
 
-In other words, in the current release base assets can only be transfered through `msg.value`. They can also only be minted when they are backed 1-1 on L1.
+In other words, in the current release base assets can only be transferred through `msg.value`. They can also only be minted when they are backed 1-1 on L1.
 
 ## L1→L2 communication via `Bridgehub.requestL2TransactionDirect`
 
@@ -144,7 +144,7 @@ This call will return the parameters to call the l2 contract with (the address o
 1. After some time, the corresponding L1→L2 is created.
 2. The L2AssetRouter will receive the message and re-route it to the asset handler of the bridged token. To read more about how it works, check out the [asset router documentation](../asset_router/Overview.md).
 
-**_Diagram of a depositing ETH onto a chain with USDC as the baseToken. Note that some contract calls (like `USDC.transerFrom` are omitted for the sake of consiceness):_**
+**_Diagram of a depositing ETH onto a chain with USDC as the baseToken. Note that some contract calls (like `USDC.transferFrom` are omitted for the sake of consiceness):_**
 
 ![requestL2TransactionTwoBridges (SharedBridge) (1).png](./img/requestL2TransactionTwoBridges_depositEthToUSDC.png)
 

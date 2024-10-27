@@ -47,7 +47,7 @@ When committing the batch, the operator will provide the preimage of the fields 
 
 The first byte of the `l1DaInput` denotes which way of pubdata publishing was used: Calldata or Blobs.
 
-In case it is Calldata it will be just checked that the provided calldata matches the hash of the `_totalPubdata` that was sent by the L2 counterpart. Note, that Calldata may still contain the blob information as we typically start generating proves before we know which way of calldata will be used. Note, that in case the Calldata is used for DA, we do not verify the `blobCommitments` as the presense of the correct pubdata has been verifed already.
+In case it is Calldata it will be just checked that the provided calldata matches the hash of the `_totalPubdata` that was sent by the L2 counterpart. Note, that Calldata may still contain the blob information as we typically start generating proves before we know which way of calldata will be used. Note, that in case the Calldata is used for DA, we do not verify the `blobCommitments` as the presence of the correct pubdata has been verified already.
 
 In case it is blobs, we need to construct the `blobCommitment`s correctly for each of the blob of data.
 
