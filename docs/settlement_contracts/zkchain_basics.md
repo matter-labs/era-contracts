@@ -1,4 +1,5 @@
 # L1 smart contract of an individual chain
+
 [back to readme](../README.md)
 
 ## Diamond (also mentioned as State Transition contract)
@@ -20,7 +21,7 @@ even an upgrade system is a separate facet that can be replaced.
 
 One of the differences from the reference implementation is access freezability. Each of the facets has an associated
 parameter that indicates if it is possible to freeze access to the facet. Privileged actors can freeze the **diamond**
-(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or admin 
+(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or admin
 unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade system and then
 the diamond will be frozen forever.
 
@@ -36,12 +37,13 @@ This contract must never be frozen.
 
 This facet responsible for the configuration setup and upgradabity, handling tasks such as:
 
-* Privileged Address Management: Updating key roles, including the governor and validators.
-* System Parameter Configuration: Adjusting critical system settings, such as the L2 bootloader bytecode hash, verifier address, verifier parameters, fee configurations.
-* Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
+- Privileged Address Management: Updating key roles, including the governor and validators.
+- System Parameter Configuration: Adjusting critical system settings, such as the L2 bootloader bytecode hash, verifier address, verifier parameters, fee configurations.
+- Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
 
 Control over the AdminFacet is divided between two main entities:
-- CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to the [Hyperchain section](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/L1%20ecosystem%20contracts.md#st--stm). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below). 
+
+- CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to [this document](../chain_management/chain_type_manager.md). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below).
 - Chain Admin - Multisig smart contract managed by each individual chain that can perform non-critical changes to the system such as granting validator permissions.
 
 ### MailboxFacet
@@ -51,9 +53,9 @@ The facet that handles L2 <-> L1 communication, an overview for which can be fou
 
 The Mailbox performs three functions:
 
-* L1 ↔ L2 Communication: Enables data and transaction requests to be sent from L1 to L2 and vice versa, supporting the implementation of multi-layer protocols.
-* Bridging Native Tokens: Allows the bridging of either ether or ERC20 tokens to L2, enabling users to use these assets within the L2 ecosystem.
-* Censorship Resistance Mechanism: Currently in the research stage.
+- L1 ↔ L2 Communication: Enables data and transaction requests to be sent from L1 to L2 and vice versa, supporting the implementation of multi-layer protocols.
+- Bridging Native Tokens: Allows the bridging of either ether or ERC20 tokens to L2, enabling users to use these assets within the L2 ecosystem.
+- Censorship Resistance Mechanism: Currently in the research stage.
 
 L1 -> L2 communication is implemented as requesting an L2 transaction on L1 and executing it on L2. This means a user
 can call the function on the L1 contract to save the data about the transaction in some queue. Later on, a validator can
@@ -79,7 +81,6 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
     l2Address = address(uint160(l1Address) + offset);
   }
 }
-
 ```
 
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
@@ -98,11 +99,11 @@ More about L1->L2 operations can be found [here](./Handling%20L1→L2%20ops%20on
 L2 -> L1 communication, in contrast to L1 -> L2 communication, is based only on transferring the information, and not on
 the transaction execution on L1. The full description of the mechanism for sending information from L2 to L1 can be found [here](./Standard%20pubdata%20format.md).
 
-The Mailbox facet also facilitates L1<>L3 communications for those chains that settle on top of Gateway. The user interfaces for those are identical to the L1<>L2 communication described above. To learn more about L1<>L3 communication works, check out this document (FIXME: link) 
+The Mailbox facet also facilitates L1<>L3 communications for those chains that settle on top of Gateway. The user interfaces for those are identical to the L1<>L2 communication described above. To learn more about L1<>L3 communication works, check out [this document](../gateway/messaging_via_gateway.md) and [this one](../gateway/nested_l3_l1_messaging.md).
 
 ### ExecutorFacet
 
-A contract that accepts L2 batches, enforces data availability via DA validators and checks the validity of zk-proofs. You can read more about DA validators in this docuemnt (FIXME :link).
+A contract that accepts L2 batches, enforces data availability via DA validators and checks the validity of zk-proofs. You can read more about DA validators [in this docuemnt](../settlement_contracts/data_availability/custom_da.md).
 
 The state transition is divided into three stages:
 
@@ -111,16 +112,17 @@ The state transition is divided into three stages:
 - `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
 
 Each L2 -> L1 system log will have a key that is part of the following:
+
 ```solidity
 enum SystemLogKey {
-    L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    CHAINED_PRIORITY_TXN_HASH_KEY,
-    NUMBER_OF_LAYER_1_TXS_KEY,
-    PREV_BATCH_HASH_KEY,
-    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+  L2_TO_L1_LOGS_TREE_ROOT_KEY,
+  PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+  CHAINED_PRIORITY_TXN_HASH_KEY,
+  NUMBER_OF_LAYER_1_TXS_KEY,
+  PREV_BATCH_HASH_KEY,
+  L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+  EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 ```
 
@@ -129,16 +131,16 @@ When a batch is committed, we process L2 -> L1 system logs. Here are the invaria
 - In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
 - There will be a single log for each key that is contained within `SystemLogKey`
 - Three logs from the `L2_TO_L1_MESSENGER` with keys:
- - `L2_TO_L1_LOGS_TREE_ROOT_KEY`
- - `L2_DA_VALIDATOR_OUTPUT_HASH_KEY`
- - `USED_L2_DA_VALIDATOR_ADDRESS_KEY`
+- `L2_TO_L1_LOGS_TREE_ROOT_KEY`
+- `L2_DA_VALIDATOR_OUTPUT_HASH_KEY`
+- `USED_L2_DA_VALIDATOR_ADDRESS_KEY`
 - Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
   - `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
   - `PREV_BATCH_HASH_KEY`
 - Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
   - `CHAINED_PRIORITY_TXN_HASH_KEY`
   - `NUMBER_OF_LAYER_1_TXS_KEY`
-  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY` 
+  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY`
 - None logs from other addresses (may be changed in the future).
 
 ### DiamondInit
@@ -166,6 +168,6 @@ When the validator calls `commitBatches`, the same calldata will be propagated t
 the time these batches are committed by the validator to enforce a delay between committing and execution of batches. Then, the
 validator can prove the already committed batches regardless of the mentioned timestamp, and again the same calldata (related
 to the `proveBatches` function) will be propagated to the zkSync contract. After the `delay` is elapsed, the validator
-is allowed to call `executeBatches` to propagate the same calldata to zkSync contract. 
+is allowed to call `executeBatches` to propagate the same calldata to zkSync contract.
 
 The owner of the ValidatorTimelock contract is the decentralized governance. Note, that all the chains share the same ValidatorTimelock for simplicity.

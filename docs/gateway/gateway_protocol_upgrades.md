@@ -1,13 +1,14 @@
 # Gateway protocol versioning and upgradability
+
 [back to readme](../README.md)
 
-One of the hardest part about gateway (GW) is how do we synchronize interaction between L1 and L2 parts that can potentially have different versions of contracts. This synchronization should be compatible with any future CTM that may be present on the gateway. 
+One of the hardest part about gateway (GW) is how do we synchronize interaction between L1 and L2 parts that can potentially have different versions of contracts. This synchronization should be compatible with any future CTM that may be present on the gateway.
 
-Here we describe various scenarios of standard/emergency upgrades and how will those play out in the gateway setup. 
+Here we describe various scenarios of standard/emergency upgrades and how will those play out in the gateway setup.
 
 ## General idea
 
-We do not enshrine any particular approach on the protocol level of the GW. The following is the approach used by the standard Era CTM, which also manages GW. 
+We do not enshrine any particular approach on the protocol level of the GW. The following is the approach used by the standard Era CTM, which also manages GW.
 
 Upgrades will be split into two parts:
 
@@ -18,7 +19,7 @@ In other words:
 
 `active upgrade = inactive upgrade + bootloader changes + setting upgrade tx`
 
-The other difference is that while “active chain upgrades” are usually always needed to be forced in order to ensure that contracts/protocol are up to date, the “inactive chain upgrades” typically involve changes in the facets’ bytecode and will only be needed before migration is complete to ensure that contracts are compatible.  
+The other difference is that while “active chain upgrades” are usually always needed to be forced in order to ensure that contracts/protocol are up to date, the “inactive chain upgrades” typically involve changes in the facets’ bytecode and will only be needed before migration is complete to ensure that contracts are compatible.
 
 To reduce the boilerplate / make management of the upgrades easier, the abstraction will be basically implemented at the upgrade implementation level, that will check `if block.chainid == s.settlementLayer { ... perform active upgrade stuff } else { ... perform inactive upgrade stuff, typically nothing m}.`
 
@@ -32,8 +33,7 @@ When a chain starts its migration to a new settlement layer (regardless of wheth
 2. The `s.settlementLayer` will be set for the chain. Now the chain becomes inactive and it can only take “inactive” upgrades.
 3. When migration finishes, it will be double checked that the `protocolVersion` is the same as the one in the target chains’ CTM.
 
-If the chain has already been deployed there, it will be checked that the `protocolVersion` of the deployed contracts there is the same as the one of the chain that is being moved. 
-4. All “inactive” instances of a chain can receive “inactive” upgrades of a chain. The single “active” instance of a chain (the one on the settlement layer) can receive only active upgrades.
+If the chain has already been deployed there, it will be checked that the `protocolVersion` of the deployed contracts there is the same as the one of the chain that is being moved. 4. All “inactive” instances of a chain can receive “inactive” upgrades of a chain. The single “active” instance of a chain (the one on the settlement layer) can receive only active upgrades.
 
 In case step (3) fails (or for any other reason the chain fails), the migration recovery process should be available. (`L1AssetRouter.bridgeRecoverFailedTransfer` method). Recovering a chain id basically just changing its `settlementLayerId` to the current block.chainid. It will be double checked that the chain has not conducted any inactive upgrades in the meantime, i.e. the `protocolVersion` of the chain is the same as the one when the chain started its migration.
 
@@ -47,11 +47,13 @@ The only unrecoverable state that a chain can achieve is:
 - While the migration has happening an “inactive” upgrade has been conducted.
 - Now recovery of the chain is not possible as the “protocol version” check will fail.
 
-This is considered to be a rare event, but it will be strongly recommended that before conducting any inactive upgrades the migration transaction should be finalized. (TODO: we could actively force it, but it is a separate feature, i.e. require confirmation of a successful migration before any upgrades on a migrated chain could be done).
+This is considered to be a rare event, but it will be strongly recommended that before conducting any inactive upgrades the migration transaction should be finalized.
+
+In the future, we could actively force it, i.e. require confirmation of a successful migration before any upgrades on a migrated chain could be done.
 
 ## Safety guards for GW→L1 migrations
 
-Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the step (3) from the above fails for some reason (e.g. a new protocol version id is available on the CTM), then the chain is basically lost. 
+Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the step (3) from the above fails for some reason (e.g. a new protocol version id is available on the CTM), then the chain is basically lost.
 
 ### Protocol version safety guards
 
@@ -59,16 +61,17 @@ Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the s
 - Assuming that no new protocol versions are published to CTM during the migration, the migration must succeed, since both CTM on GW and on L1 will have the same version and so the checks will work fine.
 - The finalization of any chain withdrawal is permissionless and so in the short term the team could help finalize the outstanding migrations to prevent funds loss.
 
-> The approach above is somewhat tricky as it requires careful coordination with the governance to ensure that at the time of when the new protocol version is published to CTM, there are no outstanding migrations. 
+> The approach above is somewhat tricky as it requires careful coordination with the governance to ensure that at the time of when the new protocol version is published to CTM, there are no outstanding migrations.
 
 In the future we will either make it more robust or add a recovery mechanism for failed GW → L1 migrations.
-> 
+
+>
 
 ### Batch number safety guards
 
-Another potential place that may lead for a chain to not be migratable to L1 is if the number of outstanding batches is very high, which can lead to migration to cost too much gas and being not executable no L1. 
+Another potential place that may lead for a chain to not be migratable to L1 is if the number of outstanding batches is very high, which can lead to migration to cost too much gas and being not executable no L1.
 
-To prevent that, it is required for chains that migrate from GW that all their batches are executed. This ensures that the number of batches’ hashes to be copied on L1 is constant (i.e. just 1 last batch). 
+To prevent that, it is required for chains that migrate from GW that all their batches are executed. This ensures that the number of batches’ hashes to be copied on L1 is constant (i.e. just 1 last batch).
 
 ## Motivation
 
@@ -77,7 +80,7 @@ The job of this proposal is to reduce the number of potential states in which th
 - Need to be able to migrate to a chain that has contracts from a different protocol version
 - Need to be able for CTM to support migration of chains with different versions. Only `bridgeRecoverFailedTransfer` has to be supported for all the versions, but its logic is very trivial.
 
-The reason why we can not conduct “active” upgrades everywhere on both L1 and L2 part is that for the settlement layer we need to write the new protocol upgrade tx, while NOT allowing to override it. On other hand, for the “inactive” chain contracts, we need to ignore the upgrade transaction. 
+The reason why we can not conduct “active” upgrades everywhere on both L1 and L2 part is that for the settlement layer we need to write the new protocol upgrade tx, while NOT allowing to override it. On other hand, for the “inactive” chain contracts, we need to ignore the upgrade transaction.
 
 ## Forcing “active chain upgrade”
 
@@ -87,7 +90,7 @@ The admin of the CTM (GW) will call the CTM (GW) with the new protocol version�
 
 ### Case of malicious Gateway operator
 
-In the future, malicious Gateway operator may try to exploit a known vulnerability in an CTM. 
+In the future, malicious Gateway operator may try to exploit a known vulnerability in an CTM.
 
 The recommended approach here is the following:
 
@@ -96,10 +99,11 @@ The recommended approach here is the following:
 
 > The approach above basically states that “if operator is censoring, we’ll be able to use standard censorship-resistance mechanism of a chain to bypass it”. The freezing part is just a way to not tell to the world the issue before all chains are safe from exploits.
 
-It is the responsibility of the CTM to ensure that all the supported settlement layers are trusted enough to uphold to the above protocol. Using any sort of Validiums will be especially discouraged, since in theory those could get frozen forever without any true censorship resistance mechanisms. 
+It is the responsibility of the CTM to ensure that all the supported settlement layers are trusted enough to uphold to the above protocol. Using any sort of Validiums will be especially discouraged, since in theory those could get frozen forever without any true censorship resistance mechanisms.
 
 Also, note that the freezing period should be long enough to ensure that censorship resistance mechanisms have enough time to kick in
-> 
+
+>
 
 ## Forcing “inactive chain upgrade”
 
@@ -112,9 +116,9 @@ In case such situation does happen however, the current plan is just to:
 
 ## Backwards compatibility
 
-With this proposal the protocol version on the L1 part and on the settlement layer part is completely out of sync. This means that all new mailboxes need to support both accepting and sending all versions of relayed (L1 → GW → L2) transactions.   
+With this proposal the protocol version on the L1 part and on the settlement layer part is completely out of sync. This means that all new mailboxes need to support both accepting and sending all versions of relayed (L1 → GW → L2) transactions.
 
-For now, this is considered okay. In the future, some stricter versioning could apply. 
+For now, this is considered okay. In the future, some stricter versioning could apply.
 
 ## Notes
 
@@ -130,50 +134,26 @@ Definition:
 
 1. check that `ZKChain(X).protocol_version == CTM(X).protocol_version` on chain Y.
 2. Start ‘burn’ process (on chain Y)
-    1. collect `‘payload’`  from `ZKChain(X)` and `CTM(X)` and `protocol_version` on chain Y.
-    2. set `ZKChain(X).settlement_layer` to `address(ZKChain(Z))`  on chain Y.
+   1. collect `‘payload’` from `ZKChain(X)` and `CTM(X)` and `protocol_version` on chain Y.
+   2. set `ZKChain(X).settlement_layer` to `address(ZKChain(Z))` on chain Y.
 3. Start ‘mint’ process (on chain Z)
-    1. check that `CTM(X).protocol_version == payload.protocol_version`
-    2. Create new `ZKChain(X)` on chain Z and register in the local bridgehub & CTM.
-    3. pass `payload` to `ZKChain(X)` and `CTM(X)` to initialize the state.
+   1. check that `CTM(X).protocol_version == payload.protocol_version`
+   2. Create new `ZKChain(X)` on chain Z and register in the local bridgehub & CTM.
+   3. pass `payload` to `ZKChain(X)` and `CTM(X)` to initialize the state.
 4. If ‘mint’ fails - recover (on chain Y)
-    1. check that `ZKChain(X).protocol_version == payload.protocol_version`
-        1. important, here we’re actually looking at the ‘HYPERCHAIN’ protocol version and not necessarily CTM protocol version.
-    2. set `ZKChain(X).settlement_layer` to `0`  on chain Y.
-    3. pass `payload` to `IZKChain(X)` and `CTM(X)` to initialize the state.
+   1. check that `ZKChain(X).protocol_version == payload.protocol_version`
+      1. important, here we’re actually looking at the ‘HYPERCHAIN’ protocol version and not necessarily CTM protocol version.
+   2. set `ZKChain(X).settlement_layer` to `0` on chain Y.
+   3. pass `payload` to `IZKChain(X)` and `CTM(X)` to initialize the state.
 
-### ‘Reverse’ chain migration - moving chain X ‘back’ from Z to Y.
+### ‘Reverse’ chain migration - moving chain X ‘back’ from Z to Y
 
- (moving back from gateway to L1).
+(moving back from gateway to L1).
 
 1. Same as above (check protocol version - but on chain Z)
 2. Same as above (start burn process - but on chain Z)
-    1. same as above
-    2. TODO: should we ‘remove’ the IZKChain from Z completely? (’parent’ chain Y doesn’t really have an address on Z). 
 3. Same as above (start ‘mint’ - but on chain Y)
-    1. same as above
-    2. creation is probably not needed - as the contract was already there in a first place.
-    3. same as above - but the state is ‘re-initialized’
+   1. same as above
+   2. creation is probably not needed - as the contract was already there in a first place.
+   3. same as above - but the state is ‘re-initialized’
 4. Same as above - but on chain ‘Z’
-
-### What can go wrong:
-
-**Check 1 - protocol version**
-
-- chain is on the older protocol version before the migration start
-- resolution: don’t allow the migration, tell protocol to upgrade itself first.
-
-**Check 3a — protocol version on destination chain**
-
-- destination chain CTM is on the OLDER version than the payload
-    - resolution: fail the transfer - seems that CTMs were not upgraded.
-- destination chain CTM is on the NEWER version that then payload
-    - For simplicity - we could fail the transfer here too.
-
-**Check 4a — protocol version on the source chain in case of transfer failure**
-
-- source IZKChain is on the ‘older’ protocol version than the payload
-    - in theory - impossible, as this means that the IZKChain protocol version was ‘reverted’.
-- source IZKChain is on the ‘newer’ protocol version than the payload
-    - This is the **main** worst case scenario - as this means that the IZKChain was updated (via ‘inactive’ update) while the protocol transfer was ongoing.
-    - This is the ‘Stuck state’ case described in the paragraph above.

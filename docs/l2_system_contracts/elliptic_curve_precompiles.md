@@ -1,4 +1,5 @@
 # Elliptic curve precompiles
+
 [back to readme](../README.md)
 
 Precompiled contracts for elliptic curve operations are required in order to perform zkSNARK verification.
@@ -24,7 +25,7 @@ The BN254 (also known as alt-BN128) is an elliptic curve defined by the equation
 
 The arithmetic is carried out with the field elements encoded in the Montgomery form. This is done not only because operating in the Montgomery form speeds up the computation but also because the native modular multiplication, which is carried out by Yul's `mulmod` opcode, is very inefficient.
 
-Instructions set on zkSync and EVM are different, so the performance of the same Yul/Solidity code can be efficient on EVM, but not on zkEVM and opposite. 
+Instructions set on zkSync and EVM are different, so the performance of the same Yul/Solidity code can be efficient on EVM, but not on zkEVM and opposite.
 
 One such very inefficient command is `mulmod`. On EVM there is a native opcode that makes modulo multiplication and it costs only 8 gas, which compared to the other opcodes costs is only 2-3 times more expensive. On zkEVM we don’t have native `mulmod` opcode, instead, the compiler does full-with multiplication (e.g. it multiplies two `uint256`s and gets as a result an `uint512`). Then the compiler performs long division for reduction (but only the remainder is kept), in the generic form it is an expensive operation and costs many opcode executions, which can’t be compared to the cost of one opcode execution. The worst thing is that `mulmod` is used a lot for the modulo inversion, so optimizing this one opcode gives a huge benefit to the precompiles.
 
@@ -44,14 +45,13 @@ The exponentiation was carried out using the square and multiply algorithm, whic
 
 ## Montgomery Form
 
-Let’s take a number `R`, such that `gcd(N, R) == 1` and `R` is a number by which we can efficiently divide and take module over it (for example power of two or better machine word, aka 2^256). Then transform every number to the form of `x * R mod N` / `y * R mod N` and then we get efficient modulo addition and multiplication. The only thing is that before working with numbers we need to transform them to the form from `x mod N`  to the `x * R mod N` and after performing operations transform the form back.
+Let’s take a number `R`, such that `gcd(N, R) == 1` and `R` is a number by which we can efficiently divide and take module over it (for example power of two or better machine word, aka 2^256). Then transform every number to the form of `x * R mod N` / `y * R mod N` and then we get efficient modulo addition and multiplication. The only thing is that before working with numbers we need to transform them to the form from `x mod N` to the `x * R mod N` and after performing operations transform the form back.
 
-For the latter, we will assume that `N` is the module that we use in computations, and `R` is $2^{256}$, since we can efficiently divide and take module over this number and it practically satisfies the property of `gcd(N, R) == 1`. 
+For the latter, we will assume that `N` is the module that we use in computations, and `R` is $2^{256}$, since we can efficiently divide and take module over this number and it practically satisfies the property of `gcd(N, R) == 1`.
 
 ### Montgomery Reduction Algorithm (REDC)
 
-> Reference: https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm
-> 
+> Reference: <https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm>
 
 ```solidity
 /// @notice Implementation of the Montgomery reduction algorithm (a.k.a. REDC).
@@ -162,13 +162,13 @@ To compute $2P$ (or $P+P$), there are three cases:
 
 - If $P = O$, then $2P = O$.
 - Else $P = (x, y)$
-    - If $y = 0$, then $2P = O$.
-    - Else $y≠0$, then
-        
-        $$
-        \begin{gather*} \lambda = \frac{3x_{p}^{2} + a}{2y_{p}} \\ x_{r} = \lambda^{2} - 2x_{p} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
-        $$
-        
+
+  - If $y = 0$, then $2P = O$.
+  - Else $y≠0$, then
+
+    $$
+    \begin{gather*} \lambda = \frac{3x_{p}^{2} + a}{2y_{p}} \\ x_{r} = \lambda^{2} - 2x_{p} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
+    $$
 
 The complicated case involves approximately 6 multiplications, 4 additions/subtractions, and 1 division. There could also be 4 multiplications, 6 additions/subtractions, and 1 division, and if you want you could trade a multiplication with 2 more additions.
 
@@ -179,15 +179,15 @@ To compute $P + Q$ where $P \neq Q$, there are four cases:
 - If $P = 0$ and $Q \neq 0$, then $P + Q = Q$.
 - If $Q = 0$ and $P \neq 0$, then $P + Q = P$.
 - Else $P = (x_{p},\ y_{p})$ and$Q = (x_{q},\ y_{q})$
-    - If $x_{p} = x_{q}$ (and necessarily $y_{p} \neq y_{q}$), then $P + Q = O$.
-    - Else $x_{p} \neq x_{q}$, then
-        
-        $$
-        \begin{gather*} \lambda = \frac{y_{2} - y_{1}}{x_{2} - x_{1}} \\ x_{r} = \lambda^{2} - x_{p} - x_{q} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
-        $$
-        
-        and $P + Q = R = (x_{r},\ y_{r})$.
-        
+
+  - If $x_{p} = x_{q}$ (and necessarily $y_{p} \neq y_{q}$), then $P + Q = O$.
+  - Else $x_{p} \neq x_{q}$, then
+
+    $$
+    \begin{gather*} \lambda = \frac{y_{2} - y_{1}}{x_{2} - x_{1}} \\ x_{r} = \lambda^{2} - x_{p} - x_{q} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
+    $$
+
+    and $P + Q = R = (x_{r},\ y_{r})$.
 
 The complicated case involves approximately 2 multiplications, 6 additions/subtractions, and 1 division.
 

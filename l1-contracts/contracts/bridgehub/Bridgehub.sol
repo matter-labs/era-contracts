@@ -26,7 +26,7 @@ import {NoCTMForAssetId, MigrationPaused, AssetIdAlreadyRegistered, CTMNotRegist
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1<->L2 communication,
+/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
@@ -45,7 +45,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
-    /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
+    /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     address public assetRouter;
 
     /// @notice ChainTypeManagers that are registered, and ZKchains that use these CTMs can use this bridgehub as settlement layer.
@@ -104,13 +104,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    modifier onlyChainCTM(uint256 _chainId) {
-        if (msg.sender != chainTypeManager[_chainId]) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -252,12 +245,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (chainAddress == address(0)) {
             revert ChainNotPresentInCTM();
         }
-        _registerNewZKChain(_chainId, chainAddress);
+        _registerNewZKChain(_chainId, chainAddress, false);
     }
 
     //// Registry
 
-    /// @notice State Transition can be any contract with the appropriate interface/functionality
+    /// @notice Chain Type Manager can be any contract with the appropriate interface/functionality
     /// @param _chainTypeManager the state transition manager address to be added
     function addChainTypeManager(address _chainTypeManager) external onlyOwner {
         if (_chainTypeManager == address(0)) {
@@ -271,8 +264,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit ChainTypeManagerAdded(_chainTypeManager);
     }
 
-    /// @notice State Transition can be any contract with the appropriate interface/functionality
-    /// @notice this stops new Chains from using the STF, old chains are not affected
+    /// @notice Chain Type Manager can be any contract with the appropriate interface/functionality
+    /// @notice this stops new Chains from using the CTM, old chains are not affected
     /// @param _chainTypeManager the state transition manager address to be removed
     function removeChainTypeManager(address _chainTypeManager) external onlyOwner {
         if (_chainTypeManager == address(0)) {
@@ -311,7 +304,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Used to set the assetAddress for a given assetInfo.
     /// @param _additionalData the additional data to identify the asset
     /// @param _assetAddress the asset handler address
-    function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external {
+    function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external {
         // It is a simplified version of the logic used by the AssetRouter to manage asset handlers.
         // CTM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, l1CtmDeployer, ctmAddress))`.
         // And the l1CtmDeployer is considered the deployment tracker for the CTM asset.
@@ -332,10 +325,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert CTMNotRegistered();
         }
 
-        bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
-        ctmAssetIdToAddress[assetInfo] = _assetAddress;
-        ctmAssetIdFromAddress[_assetAddress] = assetInfo;
-        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
+        bytes32 ctmAssetId = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
+        ctmAssetIdToAddress[ctmAssetId] = _assetAddress;
+        ctmAssetIdFromAddress[_assetAddress] = ctmAssetId;
+        emit AssetRegistered(ctmAssetId, _assetAddress, _additionalData, msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -375,18 +368,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _initData: _initData,
             _factoryDeps: _factoryDeps
         });
-        _registerNewZKChain(_chainId, chainAddress);
+        _registerNewZKChain(_chainId, chainAddress, true);
         messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
     }
 
-    /// @dev This internal function is used to register a new zkChain in the system.
-    function _registerNewZKChain(uint256 _chainId, address _zkChain) internal {
+    /// @notice This internal function is used to register a new zkChain in the system.
+    /// @param _chainId The chain ID of the ZK chain
+    /// @param _zkChain The address of the ZK chain's DiamondProxy contract.
+    /// @param _checkMaxNumberOfZKChains Whether to check that the limit for the number
+    /// of chains has not been crossed.
+    /// @dev Providing `_checkMaxNumberOfZKChains = false` may be preferrable in cases
+    /// where we want to guarantee that a chain can be added. These include:
+    /// - Migration of a chain from the mapping in the old CTM
+    /// - Migration of a chain to a new settlement layer
+    function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
-        if (zkChainMap.length() > MAX_NUMBER_OF_ZK_CHAINS) {
+        if (_checkMaxNumberOfZKChains && zkChainMap.length() > MAX_NUMBER_OF_ZK_CHAINS) {
             revert ZKChainLimitReached();
         }
     }
@@ -447,7 +448,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// this assumes that either ether is the base token or
     /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
+    /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
@@ -771,7 +772,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             if (zkChain == address(0)) {
                 revert ChainIdNotRegistered(bridgehubData.chainId);
             }
-            _registerNewZKChain(bridgehubData.chainId, zkChain);
+            // We want to allow any chain to be migrated,
+            _registerNewZKChain(bridgehubData.chainId, zkChain, false);
             messageRoot.addNewChain(bridgehubData.chainId);
         }
 
@@ -839,7 +841,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
         settlementLayer[_chainId] = block.chainid;
 
-        _registerNewZKChain(_chainId, _zkChain);
+        _registerNewZKChain(_chainId, _zkChain, true);
         messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, ctm, chainAdmin);

@@ -1,4 +1,5 @@
 # Overview
+
 [back to readme](./README.md)
 
 Ethereum's future is rollup-centric. This means breaking with the current paradigm of isolated EVM chains to infrastructure that is focused on an ecosystem of interconnected zkEVMs/zkVMs, (which we name ZK chain). This ecosystem will be grounded on Ethereum, requiring the appropriate L1 smart contracts. Here we outline our ZK Stack approach for these contracts, their interfaces, the needed changes to the existing architecture, as well as future features to be implemented.
@@ -14,7 +15,6 @@ We want to create a system where:
 - ZK chains should be launched permissionlessly within the ecosystem.
 - Interop is seamless and enables unified liquidity for assets across the ecosystem.
 - Multi-chain smart contracts need to be easy to develop, which means easy access to traditional bridges, and other supporting architecture.
-
 
 ZKsync Era is a permissionless general-purpose ZK rollup. Similar to many L1 blockchains and sidechains it enables
 deployment and interaction with Turing-complete smart contracts.

@@ -1,9 +1,10 @@
 # Messaging via Gateway
+
 [back to readme](../README.md)
 
 ## Deeper dive into MessageRoot contract and how L3→L1 communication works
 
-Before, when were just settling on L1, a chain’s message root was just the merkle tree of L2→L1 logs that were sent within this batch. However, this new model will have to be amended to be able to perform messages to  L1 coming from an L3 that settles on top of Gateway.
+Before, when were just settling on L1, a chain’s message root was just the merkle tree of L2→L1 logs that were sent within this batch. However, this new model will have to be amended to be able to perform messages to L1 coming from an L3 that settles on top of Gateway.
 
 The description of how L3→L1 messages are aggregated in the MessageRoots and proved on L1 can be read in the [nested l3 l1 messaging](./nested_l3_l1_messaging.md) section.
 
@@ -11,9 +12,7 @@ The description of how L3→L1 messages are aggregated in the MessageRoots and p
 
 As a recap, here is how messaging works for chains that settle on L1:
 
-
 ![Direct L1->L2 messaging](./img/l1_l2_messaging.png)
-
 
 - The user calls the bridgehub, which routes the message to the chain.
 - The operator eventually sees the transaction via an event on L1 and it will process it on L2.
@@ -47,5 +46,5 @@ To simplify things, for now, we provide the L1→GW with a large amount of gas (
 - Creating a large transaction on L1 that would cause the L1→GW part to fail is not possible due to high L1 gas costs that would be required to create such a tx.
 
 Both of the assumptions above will be removed in subsequent releases, but for now this is how things are.
-> 
 
+>

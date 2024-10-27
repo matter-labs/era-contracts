@@ -1,4 +1,5 @@
 # Glossary
+
 [back to readme](./README.md)
 
 - **Governor** - a privileged address that controls the upgradability of the network and sets other privileged

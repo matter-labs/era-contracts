@@ -33,14 +33,17 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
+    /// @notice The address of this contract.
+    /// @dev needed as this address is delegateCalled, and we delegateCall it again.
     address public immutable THIS_ADDRESS;
 
     constructor() {
         THIS_ADDRESS = address(this);
     }
 
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
+    /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         GatewayUpgradeEncodedInput memory encodedInput = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
@@ -72,9 +75,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         );
 
         // slither-disable-next-line controlled-delegatecall
-        (bool success, ) = THIS_ADDRESS.delegatecall(
-            abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
-        );
+        (bool success, ) = THIS_ADDRESS.delegatecall(abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade));
         if (!success) {
             revert GatewayUpgradeFailed();
         }
@@ -82,6 +83,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     }
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
+    /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
         super.upgrade(_proposedUpgrade);
     }

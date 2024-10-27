@@ -1,31 +1,35 @@
 # Rollup DA
+
 [back to readme](../../README.md)
 
 FIXME: run a spellchecker
 
-# EIP4844 support
+## Prerequisites
+
+Before reading this document, it is better to understand how [custom DA](./custom_da.md) in general works.
+
+## EIP4844 support
 
 EIP-4844, commonly known as Proto-Danksharding, is an upgrade to the ethereum protocol that introduces a new data availability solution embedded in layer 1. More information about it can be found [here](https://ethereum.org/en/roadmap/danksharding/).
 
 To facilitate EIP4844 blob support, our circuits allow providing two arrays in our public input to the circuit:
 
-- `blobCommitments` -- this is the commitment that helps to check the correctness of the blob content. The formula on how it is computed will be explained below in the document (FIXME: link).
-- `blobHash`  -- the `keccak256` hash of the inner contents of the blob.
+- `blobCommitments` -- this is the commitment that helps to check the correctness of the blob content. The formula on how it is computed will be explained below in the document.
+- `blobHash` -- the `keccak256` hash of the inner contents of the blob.
 
 Note, that our circuits require that each blob contains exactly `4096 * 31` bytes. The maximal number of blobs that are supported by our proving system is 16, but the system contracts support only 6 blobs at most for now.
 
-When committing a batch, the L1DAValidator (FIXME: link to the description of pubdata processing) is called with the data provided by the operator and it should return the two arrays described above. These arrays be put inside the batch commitment and then the correctness of the commitments will be verified at the proving stage.
+When committing a batch, the L1DAValidator is called with the data provided by the operator and it should return the two arrays described above. These arrays be put inside the batch commitment and then the correctness of the commitments will be verified at the proving stage.
 
-Note, that the `Executor.sol` (and the contract itself) is not responsible for checking that the provided `blobHash` and `blobCommitments` in any way correspond to the pubdata inside the batch as it is the job of the DA Validator pair (FIXME: link).
+Note, that the `Executor.sol` (and the contract itself) is not responsible for checking that the provided `blobHash` and `blobCommitments` in any way correspond to the pubdata inside the batch as it is the job of the DA Validator pair.
 
-# Publishing pubdata to L1
+## Publishing pubdata to L1
 
 Let's see an example of how the approach above works in rollup DA validators.
 
-## RollupL2DAValidator
+### RollupL2DAValidator
 
 ![RollupL2DAValidator.png](./L1%20smart%20contracts/Rollup_DA.png)
-
 
 `RollupL2DAValidator` accepts the preimages for the data to publishes as well as their compressed format. After verifying the compression, it forms the `_totalPubdata` bytes array, which represents the entire blob of data that should be published to L1.
 
@@ -37,7 +41,7 @@ To give the flexibility of checking different DA, we send the following data to 
 - The hash of the `_totalPubdata`. In case the size of pubdata is small, it will allow the operator also use just standard Ethereum calldata for the DA.
 - Send the `blobHash` array.
 
-## RollupL1DAValidator
+### RollupL1DAValidator
 
 When committing the batch, the operator will provide the preimage of the fields that the RollupL2DAValidator has sent before, and also some `l1DaInput` along with it. This `l1DaInput` will be used to prove that the pubdata was indeed provided in this batch.
 
@@ -71,6 +75,6 @@ assert uint256(res[32:]) == BLS_MODULUS
 
 The final `blobCommitment` is calculated as the hash between the `blobVersionedHash`, `opening point` and the `claimed value`. The zero knowledge circuits will verify that the opening point and the claimed value were calculated correctly and correspond to the data that was hashed under the `blobHash`.
 
-# Structure of the pubdata
+## Structure of the pubdata
 
 Rollups maintain the same structure of pubdata and apply the same rules for compresison as those that were used in the previous versions of the system. These can be read [here](./Handling%20pubdata.md).

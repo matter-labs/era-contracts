@@ -2,9 +2,6 @@
 
 pragma solidity ^0.8.21;
 
-// 0xe4efb466
-error NotNTV();
-
 // 0x6d963f88
 error EthTransferFailed();
 

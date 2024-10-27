@@ -1,7 +1,8 @@
 # Creating new chains with BridgeHub
+
 [back to readme](../README.md)
 
-The main contract of the whole hyperchain ecosystem is called *`BridgeHub`*. It contains:
+The main contract of the whole hyperchain ecosystem is called _`BridgeHub`_. It contains:
 
 - the registry from chainId to CTMs that is responsible for that chainId
 - the base token for each chainId.
@@ -36,7 +37,7 @@ function createNewChain(
 ) external
 ```
 
-BridgeHub will check that the CTM as well as the base token are whitelisted and route the call to the State 
+BridgeHub will check that the CTM as well as the base token are whitelisted and route the call to the State
 
 ![newChain (2).png](./img/create_new_chain.png)
 
@@ -44,14 +45,14 @@ BridgeHub will check that the CTM as well as the base token are whitelisted and 
 
 In the future, ST creation will be permissionless. A securely random `chainId` will be generated for each chain to be registered. However, generating 32-byte chainId is not feasible with the current SDK expectations on EVM and so for now chainId is of type `uint48`. And so it has to be chosen by the admin of `BridgeHub`. Also, for the current release we would want to avoid chains being able to choose their own initialization parameter to prevent possible malicious input.
 
-For this reason, there will be an entity called `admin` which is basically a hot key managed by us and it will be used to deploy new STs. 
+For this reason, there will be an entity called `admin` which is basically a hot key managed by us and it will be used to deploy new STs.
 
 So the flow for deploying their own ST for users will be the following:
 
-1. Users tell us that they want to deploy a ST with certain governance, CTM (we’ll likely allow only one for now), and baseToken. 
+1. Users tell us that they want to deploy a ST with certain governance, CTM (we’ll likely allow only one for now), and baseToken.
 2. Our server will generate a chainId not reserved by any other major chain and the `admin` will call the `BridgeHub.createNewChain` . This will call the `CTM.createNewChain` that will deploy the instance of the rollup as well as initialize the first transaction there — the system upgrade transaction needed to set the chainId on L2.
 
-After that, the ST is ready to be used. Note, that the admin of the newly created chain (this will be the organization that will manage this chain from now on) will have to conduct certain configurations before the chain can be used securely (FIXME: link).
+After that, the ST is ready to be used. Note, that the admin of the newly created chain (this will be the organization that will manage this chain from now on) will have to conduct certain configurations before the chain [can be used securely](../chain_management/admin_role.md).
 
 ## Built-in contracts and their initialization
 
@@ -64,8 +65,8 @@ Each single ZK Chain has a set of the following contracts that, while not belong
 
 To reuse as much code as possible from L1 and also to allow easier initialization, most of these contracts are not initialized as just part of the genesis storage root. Instead, the data for their initialization is part of the original diamondcut for the chain. In the same initial upgrade transaction when the chainId is initialized, these contracts are force-deployed and initialized also. An important part in it plays the new `L2GenesisUpgrade` contract, which is pre-deployed in a user-space contract, but it is delegate-called by the `ComplexUpgrader` system contract (already exists as part of genesis and existed before this upgrade).
 
-# Additional limitations for the current version
+## Additional limitations for the current version
 
-In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
+In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there.
 
 Also, since in the current release, there will be little benefits from shared liquidity, i.e. the there will be no direct ZKChain<>ZKChain transfers supported, as a measure of additional security we’ll also keep track of balances for each individual ZKChain and will not allow it to withdraw more than it has deposited into the system.

@@ -176,7 +176,7 @@ contract GatewayCTMDeployer {
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts);
 
-        ValidatorTimelock timelock = new ValidatorTimelock{salt: salt}(address(this), 0, eraChainId);
+        ValidatorTimelock timelock = new ValidatorTimelock{salt: salt}(address(this), 0);
         contracts.stateTransition.validatorTimelock = address(timelock);
 
         _deployCTM(salt, _config, contracts);

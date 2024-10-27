@@ -11,8 +11,14 @@ import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
-/// @notice The contract that can be used for deterministic contract deployment.
+/// @notice The l2 component of the genesis upgrade.
 contract L2GenesisUpgrade is IL2GenesisUpgrade {
+    /// @notice The function that is delegateCalled from the complex upgrader.
+    /// @dev It is used to set the chainId and to deploy the force deployments.
+    /// @param _chainId the chain id
+    /// @param _ctmDeployer the address of the ctm deployer
+    /// @param _fixedForceDeploymentsData the force deployments data
+    /// @param _additionalForceDeploymentsData the additional force deployments data
     function genesisUpgrade(
         uint256 _chainId,
         address _ctmDeployer,

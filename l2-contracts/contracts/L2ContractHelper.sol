@@ -55,6 +55,12 @@ interface IContractDeployer {
     /// @param _input the calldata to be sent to the constructor of the new contract
     function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
 
+    /// @notice Calculates the address of a create2 contract deployment
+    /// @param _sender The address of the sender.
+    /// @param _bytecodeHash The bytecode hash of the new contract to be deployed.
+    /// @param _salt a unique value to create the deterministic address of the new contract
+    /// @param _input the calldata to be sent to the constructor of the new contract
+    /// @return newAddress The derived address of the account.
     function getNewAddressCreate2(
         address _sender,
         bytes32 _bytecodeHash,
@@ -82,6 +88,11 @@ interface IBaseToken {
  * the compression of the state diffs and bytecodes.
  */
 interface ICompressor {
+    /// @notice Verifies that the compression of state diffs has been done correctly for the {_stateDiffs} param.
+    /// @param _numberOfStateDiffs The number of state diffs being checked.
+    /// @param _enumerationIndexSize Number of bytes used to represent an enumeration index for repeated writes.
+    /// @param _stateDiffs Encoded full state diff structs. See the first dev comment below for encoding.
+    /// @param _compressedStateDiffs The compressed state diffs
     function verifyCompressedStateDiffs(
         uint256 _numberOfStateDiffs,
         uint256 _enumerationIndexSize,

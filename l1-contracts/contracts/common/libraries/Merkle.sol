@@ -12,6 +12,7 @@ library Merkle {
 
     /// @dev Calculate Merkle root by the provided Merkle proof.
     /// NOTE: When using this function, check that the _path length is equal to the tree height to prevent shorter/longer paths attack
+    /// however, for chains settling on GW the proof includes the GW proof, so the path increases. See Mailbox for more details.
     /// @param _path Merkle path from the leaf to the root
     /// @param _index Leaf index in the tree
     /// @param _itemHash Hash of leaf content
