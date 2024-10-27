@@ -119,6 +119,8 @@ error InsufficientChainBalance();
 error InvalidCaller(address);
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x0af806e0
+error InvalidHash();
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0xd8e9405c
