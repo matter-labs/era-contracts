@@ -31,12 +31,12 @@ The exact process of deploying & registering a ST will be described in [sections
 | chainId | Permanent | Permanent identifier of the ST. Due to wallet support reasons, for now chainId has to be small (48 bits). This is one of the reasons why for now we’ll deploy STs manually, to prevent STs from having the same chainId as some another popular chain.  In the future it will be trustlessly assigned as a random 32-byte value.|
 | baseTokenAssetId | Permanent | Each ST can have their own custom base token (i.e. token used for paying the fees). It is set once during creation and can never be changed. Note, that we refer to and "asset id" here instead of an L1 address. To read more about what is assetId and how it works check out the document for [asset router](../bridging/asset_router/Overview.md) |
 | chainTypeManager | Permanent | The CTM that deployed the ST. In principle, it could be possible to migrate between CTMs (assuming both CTMs support that). However, in practice it may be very hard and as of now such functionality is not supported. |
-| admin | By admin of ST | The admin of the ST. It has some limited powers to govern the chain. To read more about which powers are available to a chain admin and which precautions should be taken, check out this document (FIXME: link to document about admin precauotions) |
+| admin | By admin of ST | The admin of the ST. It has some limited powers to govern the chain. To read more about which powers are available to a chain admin and which precautions should be taken, check [out this document](../chain_management/admin_role.md) |
 | validatorTimelock | CTM | For now, we want all the chains to use the same 21h timelock period before their batches are finalized. Only CTM can update the address that can submit state transitions to the rollup (that is, the validatorTimelock).  |
 | validatorTimelock.validator | By admin of ST | The admin of ST can choose who can submit new batches to the ValidatorTimelock.  |
 |  priorityTx FeeParams | By admin of ST | The admin of a ZK chain can amend the priority transaction fee params. |
 |  transactionFilterer | By admin of ST | A chain may put an additional filter to the incoming L1->L2 transactions. This may be needed by a permissioned chain (e.g. a Validium bank-lile corporate chain). |
-|  DA validation / permanent rollup status | By admin of ST | A chain can decide which DA layer to use. You check out more about safe DA management here (FIXME: link to admin doc) |
+|  DA validation / permanent rollup status | By admin of ST | A chain can decide which DA layer to use. You check out more about [safe DA management here](./admin_role.md)  |
 | executing upgrades | By admin of ST | While exclusively CTM governance can set the content of the upgrade, STs will typically be able to choose suitable time for them to actually execute it. In the current release, STs will have to follow our upgrades. |
 | settlement layer | By admin of ST | The admin of the chain can enact migrations to other settlement layers. |
 
@@ -59,7 +59,7 @@ In the current release, each chain will be an instance of zkSync Era and so the 
 
 ### Emergency upgrade
 
-In case of an emergency, the [security council](https://blog.zknation.io/introducing-zk-nation/) has the ability to freeze the ecosystem and conduct an emergency upgrade (FIXME: link to governance doc).
+In case of an emergency, the [security council](https://blog.zknation.io/introducing-zk-nation/) has the ability to freeze the ecosystem and conduct an emergency upgrade.
 
 In case we are aware that some of the committed batches on an ST are dangerous to be executed, the CTM can call `revertBatches` on that ST. For faster reaction, the admin of the ChainTypeManager has the ability to do so without waiting for govenrnace approval that may take a lot of time. This action does not lead to funds being lost, so it is considered suitable for the partially trusted role of the admin of the ChainTypeManager.
 

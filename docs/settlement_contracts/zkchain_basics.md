@@ -41,7 +41,7 @@ This facet responsible for the configuration setup and upgradabity, handling tas
 * Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
 
 Control over the AdminFacet is divided between two main entities:
-- CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to the [Hyperchain section](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/L1%20ecosystem%20contracts.md#st--stm). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below). 
+- CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to [this document](../chain_management/chain_type_manager.md). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below). 
 - Chain Admin - Multisig smart contract managed by each individual chain that can perform non-critical changes to the system such as granting validator permissions.
 
 ### MailboxFacet
@@ -98,11 +98,11 @@ More about L1->L2 operations can be found [here](./Handling%20L1→L2%20ops%20on
 L2 -> L1 communication, in contrast to L1 -> L2 communication, is based only on transferring the information, and not on
 the transaction execution on L1. The full description of the mechanism for sending information from L2 to L1 can be found [here](./Standard%20pubdata%20format.md).
 
-The Mailbox facet also facilitates L1<>L3 communications for those chains that settle on top of Gateway. The user interfaces for those are identical to the L1<>L2 communication described above. To learn more about L1<>L3 communication works, check out this document (FIXME: link) 
+The Mailbox facet also facilitates L1<>L3 communications for those chains that settle on top of Gateway. The user interfaces for those are identical to the L1<>L2 communication described above. To learn more about L1<>L3 communication works, check out [this document](../gateway/messaging_via_gateway.md) and [this one](../gateway/nested_l3_l1_messaging.md).
 
 ### ExecutorFacet
 
-A contract that accepts L2 batches, enforces data availability via DA validators and checks the validity of zk-proofs. You can read more about DA validators in this docuemnt (FIXME :link).
+A contract that accepts L2 batches, enforces data availability via DA validators and checks the validity of zk-proofs. You can read more about DA validators [in this docuemnt](../settlement_contracts/data_availability/custom_da.md).
 
 The state transition is divided into three stages:
 

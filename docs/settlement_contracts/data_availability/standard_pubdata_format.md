@@ -1,9 +1,9 @@
 # Standard pubdata format
 [back to readme](../../README.md)
 
-While with the introduction of custom DA validators (FIXME LINK), any pubdata logic could be applied for each chain (including calldata-based pubdata), ZK chains are generally optimized for using state-diffs based rollup model.
+While with the introduction of [custom DA validators](./custom_da.md), any pubdata logic could be applied for each chain (including calldata-based pubdata), ZK chains are generally optimized for using state-diffs based rollup model.
 
-This document will describe how the standard pubdata format looks like. This is the format that is enforced for permanent rollup chains (FIXME: link to permanent rollup description). 
+This document will describe how the standard pubdata format looks like. This is the format that is enforced for [permanent rollup chains](../../chain_management/admin_role.md#ispermanentrollup-setting). 
 
 Pubdata in zkSync can be divided up into 4 different categories:
 
@@ -63,13 +63,13 @@ The L1Messenger contract will maintain a rolling hash of all the L2ToL1 logs `ch
 
 Note, that the user is charged for necessary future the computation that will be needed to calculate the final merkle root. It is roughly 4x higher than the cost to calculate the hash of the leaf, since the eventual tree might have be 4x times the number nodes. In any case, this will likely be a relatively negligible part compared to the cost of the pubdata.
 
-At the end of the execution, the bootloader will [provide](../../system-contracts/bootloader/bootloader.yul#L2621) (FIXME: check link) a list of all the L2ToL1 logs (this will be provided by the operator in the memory of the bootloader). The L1Messenger checks that the rolling hash from the provided logs is the same as in the `chainedLogsHash` and calculate the merkle tree of the provided messages. Right now, we always build the Merkle tree of size `16384`, but we charge the user as if the tree was built dynamically based on the number of leaves in there. The implementation of the dynamic tree has been postponed until the later upgrades.
+At the end of the execution, the bootloader will [provide](../../../system-contracts/bootloader/bootloader.yul#L2676) a list of all the L2ToL1 logs (this will be provided by the operator in the memory of the bootloader). The L1Messenger checks that the rolling hash from the provided logs is the same as in the `chainedLogsHash` and calculate the merkle tree of the provided messages. Right now, we always build the Merkle tree of size `16384`, but we charge the user as if the tree was built dynamically based on the number of leaves in there. The implementation of the dynamic tree has been postponed until the later upgrades.
 
 > Note, that unlike most other parts of pubdata, the user L2->L1 must always be validated by the trusted `L1Messenger` system contract. If we moved this responsibility to L2DAValidator it would be possible that a malicious operator provided incorrect data and forged transactions out of names of certain users. 
 
 ### Long L2→L1 messages & bytecodes
 
-If the user wants to send an L2→L1 message, its preimage is [appended](../../system-contracts/contracts/L1Messenger.sol#L122) to the message’s rolling hash too `chainedMessagesHash = keccak256(chainedMessagesHash, keccak256(message))`.
+If the user wants to send an L2→L1 message, its preimage is [appended](../../../system-contracts/contracts/L1Messenger.sol#L126) to the message’s rolling hash too `chainedMessagesHash = keccak256(chainedMessagesHash, keccak256(message))`.
 
 A very similar approach for bytecodes is used, where their rolling hash is calculated and then the preimages are provided at the end of the batch to form the full pubdata for the batch.
 
@@ -87,13 +87,13 @@ The only places where the built-in L2→L1 messaging should continue to be used:
 
 ### Obtaining `txNumberInBlock`
 
-To have the same log format, the `txNumberInBlock` must be obtained. While it is internally counted in the VM, there is currently no opcode to retrieve this number. We will have a public variable `txNumberInBlock` in the `SystemContext`, which will be incremented with each new transaction and retrieve this variable from there. It is [zeroed out](https://github.com/code-423n4/2024-03-zksync/blob/7e85e0a997fee7a6d75cadd03d3233830512c2d2/code/system-contracts/contracts/SystemContext.sol#L486) at the end of the batch.
+To have the same log format, the `txNumberInBlock` must be obtained. While it is internally counted in the VM, there is currently no opcode to retrieve this number. We will have a public variable `txNumberInBlock` in the `SystemContext`, which will be incremented with each new transaction and retrieve this variable from there. It is [zeroed out](../../../system-contracts/contracts/SystemContext.sol#L515) at the end of the batch.
 
 ## Bootloader implementation
 
 The bootloader has a memory segment dedicated to the ABI-encoded data of the L1ToL2Messenger to perform the `publishPubdataAndClearState` call.
 
-At the end of the execution of the batch, the operator should provide the corresponding data into the bootloader memory, i.e user L2→L1 logs, long messages, bytecodes, etc. After that, the [call](../../system-contracts/bootloader/bootloader.yul#L2635) is performed to the `L1Messenger` system contract, that would call the L2DAValidator that should check the adherence of the pubdata to the specified format.
+At the end of the execution of the batch, the operator should provide the corresponding data into the bootloader memory, i.e user L2→L1 logs, long messages, bytecodes, etc. After that, the [call](../../../system-contracts/bootloader/bootloader.yul#L2676) is performed to the `L1Messenger` system contract, that would call the L2DAValidator that should check the adherence of the pubdata to the specified format.
 
 # Bytecode Publishing
 
@@ -105,7 +105,7 @@ Uncompressed bytecodes are included within the `totalPubdata` bytes and have the
 
 ## Compressed Bytecode Publishing
 
-Unlike uncompressed bytecode which are published as part of `factoryDeps`, compressed bytecodes are published as long l2 → l1 messages which can be seen [here](../../system-contracts/contracts/Compressor.sol#L73).
+Unlike uncompressed bytecode which are published as part of `factoryDeps`, compressed bytecodes are published as long l2 → l1 messages which can be seen [here](../../../system-contracts/contracts/Compressor.sol#L78).
 
 ### Bytecode Compression Algorithm — Server Side
 

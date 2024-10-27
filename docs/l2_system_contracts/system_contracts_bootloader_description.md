@@ -21,7 +21,7 @@ The use of each system contract will be explained down below.
 
 ### Pre-deployed contracts
 
-Some of the contracts need to be predeployed at the genesis, but they do not need the kernel space rights. To give them minimal permissiones, we predeploy them at consequtive addressess that start right at the `2^16`. These will be described in the following sections (FIXME).
+Some of the contracts need to be predeployed at the genesis, but they do not need the kernel space rights. To give them minimal permissiones, we predeploy them at consequtive addressess that start right at the `2^16`. These will be described in the following sections.
 
 # zkEVM internals
 

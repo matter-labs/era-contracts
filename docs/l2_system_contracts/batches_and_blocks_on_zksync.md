@@ -28,19 +28,15 @@ Our `SystemContext` contract allows to get information about batches and L2 bloc
 
 ## Initializing L1 batch
 
-FIXME: correct bootloader code link
+At the start of the batch, the operator [provides](../../system-contracts/bootloader/bootloader.yul#L3935) the timestamp of the batch, its number and the hash of the previous batch. The root hash of the Merkle tree serves as the root hash of the batch.
 
-At the start of the batch, the operator [provides](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/bootloader/bootloader.yul#L3867) the timestamp of the batch, its number and the hash of the previous batch. The root hash of the Merkle tree serves as the root hash of the batch.
-
-The SystemContext can immediately check whether the provided number is the correct batch number. It also immediately sends the previous batch hash to L1, where it will be checked during the commit operation. Also, some general consistency checks are performed. This logic can be found [here](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/contracts/SystemContext.sol#L466).
+The SystemContext can immediately check whether the provided number is the correct batch number. It also immediately sends the previous batch hash to L1, where it will be checked during the commit operation. Also, some general consistency checks are performed. This logic can be found [here](../../system-contracts/contracts/SystemContext.sol#L469).
 
 ## L2 blocks processing and consistency checks
 
 ### `setL2Block`
 
-FIXME: fix link 
-
-Before each transaction, we call `setL2Block` [method](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/bootloader/bootloader.yul#L2825). There we will provide some data about the L2 block that the transaction belongs to:
+Before each transaction, we call `setL2Block` [method](../../system-contracts/bootloader/bootloader.yul#L2884). There we will provide some data about the L2 block that the transaction belongs to:
 
 - `_l2BlockNumber` The number of the new L2 block.
 - `_l2BlockTimestamp` The timestamp of the new L2 block.
@@ -50,7 +46,7 @@ Before each transaction, we call `setL2Block` [method](https://github.com/code-4
 
 If two transactions belong to the same L2 block, only the first one may have non-zero `_maxVirtualBlocksToCreate`. The rest of the data must be same.
 
-The `setL2Block` [performs](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/contracts/SystemContext.sol#L341) a lot of similar consistency checks to the ones for the L1 batch.
+The `setL2Block` [performs](../../system-contracts/contracts/SystemContext.sol#L355) a lot of similar consistency checks to the ones for the L1 batch.
 
 ### L2 blockhash calculation and storage
 
