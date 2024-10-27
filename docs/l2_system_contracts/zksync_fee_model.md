@@ -302,8 +302,8 @@ The `executeBatches` operation on L1 is executed in `O(N)` where N is the number
   - L1 Execute Batches
     - The execute batches transaction processes L2 -> L1 messages and marks executed priority operations as such. Multiple L1 batches can be included in a single execute transaction.
   - L1 Finalize Withdrawals
-    - While not strictly part of the L1 fees, the cost to finalize L2 → L1 withdrawals are covered by Matter Labs. The finalize withdrawals transaction processes user token withdrawals from  Era to Ethereum. Multiple L2 withdrawal transactions are included in each finalize withdrawal transaction.
+    - While not strictly part of the L1 fees, the cost to finalize L2 → L1 withdrawals are covered by Matter Labs. The finalize withdrawals transaction processes user token withdrawals from ZKsync Era to Ethereum. Multiple L2 withdrawal transactions are included in each finalize withdrawal transaction.
 - On-Chain L2 Revenue
   - L2 Transaction Fee
-    - This fee is what the user pays to complete a transaction on  Era. It is calculated as `gasLimit x baseFeePerGas - refundedGas x baseFeePerGas`, or more simply, `gasUsed x baseFeePerGas`.
+    - This fee is what the user pays to complete a transaction on ZKsync Era. It is calculated as `gasLimit x baseFeePerGas - refundedGas x baseFeePerGas`, or more simply, `gasUsed x baseFeePerGas`.
 - Profit = L2 Revenue - L1 Costs - Off-Chain Infrastructure Costs
