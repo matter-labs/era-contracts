@@ -41,6 +41,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
 
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
+    /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         GatewayUpgradeEncodedInput memory encodedInput = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
@@ -82,6 +83,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     }
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
+    /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
         super.upgrade(_proposedUpgrade);
     }
