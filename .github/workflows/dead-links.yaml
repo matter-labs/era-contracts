@@ -10,11 +10,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install Lychee
+      
+      - name: Install Rust and Lychee
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lychee
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          ~/.cargo/bin/cargo install lychee
 
       - name: Find and check markdown files
         run: |
