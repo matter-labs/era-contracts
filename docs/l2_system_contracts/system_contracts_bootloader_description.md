@@ -37,7 +37,7 @@ On EVM, during transaction execution, the following memory areas are available:
 - `returndata` the immutable slice returned by the latest call to another contract.
 - `stack` where the local variables are stored.
 
-Unlike EVM, which is stack machine, zkEVM has 16 registers. Instead of receiving input from `calldata`, zkEVM starts by receiving a _pointer_ in its first register *(*basically a packed struct with 4 elements: the memory page id, start and length of the slice to which it points to*)* to the calldata page of the parent. Similarly, a transaction can receive some other additional data within its registers at the start of the program: whether the transaction should invoke the constructor ([more about deployments here](#contractdeployer--immutablesimulator)), whether the transaction has `isSystem` flag, etc. The meaning of each of these flags will be expanded further in this section.
+Unlike EVM, which is stack machine, zkEVM has 16 registers. Instead of receiving input from `calldata`, zkEVM starts by receiving a _pointer_ in its first register (_basically a packed struct with 4 elements: the memory page id, start and length of the slice to which it points to_) to the calldata page of the parent. Similarly, a transaction can receive some other additional data within its registers at the start of the program: whether the transaction should invoke the constructor ([more about deployments here](#contractdeployer--immutablesimulator)), whether the transaction has `isSystem` flag, etc. The meaning of each of these flags will be expanded further in this section.
 
 _Pointers_ are separate type in the VM. It is only possible to:
 
