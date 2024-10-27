@@ -144,5 +144,6 @@ enum BytecodeError {
     NumberOfWords,
     Length,
     WordsMustBeOdd,
-    DictionaryLength
+    DictionaryLength,
+    EvmBytecodeLength
 }

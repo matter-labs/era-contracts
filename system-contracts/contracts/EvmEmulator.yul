@@ -294,8 +294,20 @@ object "EvmEmulator" {
             isStatic := iszero(iszero(and(isStatic, 0x04)))
         }
         
+        function fetchFromSystemContract(to, argSize) -> res {
+            let success := staticcall(gas(), to, 0, argSize, 0, 0)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        
+            returndatacopy(0, 0, 32)
+            res := mload(0) 
+        }
+        
         function isAddrEmpty(addr) -> isEmpty {
-            isEmpty := 0
+            // We treat constructing EraVM contracts as non-existing
             if iszero(extcodesize(addr)) { // YUL doesn't have short-circuit evaluation
                 if iszero(balance(addr)) {
                     if iszero(getRawNonce(addr)) {
@@ -305,33 +317,25 @@ object "EvmEmulator" {
             }
         }
         
+        // returns minNonce + 2^128 * deployment nonce.
         function getRawNonce(addr) -> nonce {
+            // selector for function getRawNonce(address _address)
             mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
-        
-            let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 0)
-        
-            if iszero(result) {
-                revert(0, 0)
-            }
-        
-            returndatacopy(0, 0, 32)
-            nonce := mload(0)
+            nonce := fetchFromSystemContract(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
         }
         
         function _getRawCodeHash(account) -> hash {
             mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
             mstore(4, account)
+            hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
+        }
         
-            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        
-            returndatacopy(0, 0, 32)
-            hash := mload(0)
+        function _isEVM(_addr) -> isEVM {
+            // function isAccountEVM(address _addr) external view returns (bool);
+            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
+            mstore(4, _addr)
+            isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
         }
         
         // Basically performs an extcodecopy, while returning the length of the bytecode.
@@ -344,17 +348,8 @@ object "EvmEmulator" {
             let codeHash := _getRawCodeHash(addr)
         
             mstore(0, codeHash)
-        
-            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        
-            // The first word is the true length of the bytecode
-            returndatacopy(0, 0, 32)
-            codeLen := mload(0)
+            // The first word of returndata is the true length of the bytecode
+            codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
         
             if gt(_len, codeLen) {
                 _len := codeLen
@@ -437,10 +432,7 @@ object "EvmEmulator" {
             }
         }
         
-        function performSystemCall(
-            to,
-            dataLength,
-        ) {
+        function performSystemCall(to, dataLength) {
             let success := performSystemCallRevertable(to, dataLength)
         
             if iszero(success) {
@@ -449,15 +441,12 @@ object "EvmEmulator" {
             }
         }
         
-        function performSystemCallRevertable(
-            to,
-            dataLength,
-        ) -> success {
+        function performSystemCallRevertable(to, dataLength) -> success {
             let farCallAbi := shl(248, 1) // system call
             // dataOffset is 0
             // dataStart is 0
             farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-            farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+            farCallAbi :=  or(farCallAbi, shl(192, gas()))
             // shardId is 0
             // forwardingMode is 0
             // not constructor call
@@ -465,35 +454,12 @@ object "EvmEmulator" {
             success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         }
         
-        function _isEVM(_addr) -> isEVM {
-            // function isAccountEVM(address _addr) external view returns (bool);
-            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-            mstore(4, _addr)
-        
-            let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        
-            returndatacopy(0, 0, 32)
-            isEVM := mload(0)
-        }
-        
-        function zkVmGasToEvmGas(_zkevmGas) -> calczkevmGas {
-            calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
-        }
-        
         function getEvmGasFromContext() -> evmGas {
-            let _gas := gas()
-            let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD()) // TODO CHECK GAS MECHANICS
+            // Caller must pass at least OVERHEAD() ergs
+            let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
         
-            switch lt(_gas, requiredGas)
-            case 1 {
-                evmGas := 0
-            }
-            default {
+            let _gas := gas()
+            if gt(_gas, requiredGas) {
                 evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
             }
         }
@@ -847,11 +813,11 @@ object "EvmEmulator" {
             switch _isEVM(addr)
             case 0 {
                 // zkEVM native
-                let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
                 let zkEvmGasBefore := gas()
                 success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
-                let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+                let gasUsed := calcUsedEvmGasByZkVmCall(zkEvmGasBefore)
         
                 if gt(gasToPass, gasUsed) {
                     frameGasLeft := sub(gasToPass, gasUsed) // TODO check
@@ -871,11 +837,11 @@ object "EvmEmulator" {
             switch _isEVM(addr)
             case 0 {
                 // zkEVM native
-                let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
                 let zkEvmGasBefore := gas()
                 success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
-                let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+                let gasUsed := calcUsedEvmGasByZkVmCall(zkEvmGasBefore)
         
                 if gt(gasToPass, gasUsed) {
                     frameGasLeft := sub(gasToPass, gasUsed) // TODO check
@@ -888,17 +854,29 @@ object "EvmEmulator" {
             }
         }
         
-        function _getZkEVMGasForCall(_evmGas, addr) -> zkevmGas {
-            // TODO CHECK COSTS CALCULATION
-            zkevmGas := mul(_evmGas, GAS_DIVISOR())
+        function calcUsedEvmGasByZkVmCall(zkEvmGasBefore) -> evmGasUsed {
+            let zkevmGasUsed := sub(zkEvmGasBefore, gas()) // caller should guarantee correctness
+            // should not overflow, VM can't pass more than u32 of gas
+            evmGasUsed := div(add(zkevmGasUsed, sub(GAS_DIVISOR(), 1)), GAS_DIVISOR()) // rounding up
+        }
+        
+        function calcZkVmGasForCall(evmGasToPass, addr) -> zkevmGas {
+            zkevmGas := mul(evmGasToPass, GAS_DIVISOR())
+        
+            // charge for contract decommitment
             let byteSize := extcodesize(addr)
-            let should_ceil := mod(byteSize, 32)
-            if gt(should_ceil, 0) {
-                byteSize := add(byteSize, sub(32, should_ceil))
+            let decommitGasCost := mul(
+                div(add(byteSize, 31), 32), // rounding up
+                DECOMMIT_COST_PER_WORD()
+            )
+        
+            if gt(decommitGasCost, zkevmGas) {
+                zkevmGas := 0
             }
-            let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
+        
             zkevmGas := sub(zkevmGas, decommitGasCost)
-            if gt(zkevmGas, UINT32_MAX()) {
+        
+            if gt(zkevmGas, UINT32_MAX()) { // Should never happen
                 zkevmGas := UINT32_MAX()
             }
         }
@@ -979,15 +957,11 @@ object "EvmEmulator" {
         
         function _saveReturndataAfterZkEVMCall() {
             loadReturndataIntoActivePtr()
-            let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-        
-            mstore(lastRtSzOffset, returndatasize())
+            mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
         }
         
         function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
-            let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
             let rtsz := returndatasize()
-        
             loadReturndataIntoActivePtr()
         
             // if (rtsz > 31)
@@ -1007,7 +981,7 @@ object "EvmEmulator" {
                         case 0 { returndatacopy(_outputOffset, 32, _outputLen) }
                         default { returndatacopy(_outputOffset, 32, sub(rtsz, 32)) }
         
-                    mstore(lastRtSzOffset, sub(rtsz, 32))
+                    mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
         
                     // Skip the returnData
                     ptrAddIntoActive(32)
@@ -1015,11 +989,9 @@ object "EvmEmulator" {
         }
         
         function _eraseReturndataPointer() {
-            let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-        
             let activePtrSize := getActivePtrDataSize()
             ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
-            mstore(lastRtSzOffset, 0)
+            mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
         }
         
         ////////////////////////////////////////////////////////////////
@@ -1157,16 +1129,12 @@ object "EvmEmulator" {
             }
         }
         
-        function performSystemCallForCreate(
-            value,
-            bytecodeStart,
-            bytecodeLen,
-        ) -> success {
+        function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
             let farCallAbi := shl(248, 1) // system call
             // dataOffset is 0
             farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
             farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-            farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+            farCallAbi :=  or(farCallAbi, shl(192, gas()))
             // shardId is 0
             // forwardingMode is 0
             // not constructor call (ContractDeployer will call constructor)
@@ -1182,16 +1150,7 @@ object "EvmEmulator" {
         
         function _fetchConstructorReturnGas() -> gasLeft {
             mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
-        
-            let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
-        
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        
-            returndatacopy(0, 0, 32)
-            gasLeft := mload(0)
+            gasLeft := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 4)
         }
         
         ////////////////////////////////////////////////////////////////
@@ -3311,8 +3270,20 @@ object "EvmEmulator" {
                 isStatic := iszero(iszero(and(isStatic, 0x04)))
             }
             
+            function fetchFromSystemContract(to, argSize) -> res {
+                let success := staticcall(gas(), to, 0, argSize, 0, 0)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            
+                returndatacopy(0, 0, 32)
+                res := mload(0) 
+            }
+            
             function isAddrEmpty(addr) -> isEmpty {
-                isEmpty := 0
+                // We treat constructing EraVM contracts as non-existing
                 if iszero(extcodesize(addr)) { // YUL doesn't have short-circuit evaluation
                     if iszero(balance(addr)) {
                         if iszero(getRawNonce(addr)) {
@@ -3322,33 +3293,25 @@ object "EvmEmulator" {
                 }
             }
             
+            // returns minNonce + 2^128 * deployment nonce.
             function getRawNonce(addr) -> nonce {
+                // selector for function getRawNonce(address _address)
                 mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
-            
-                let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 0)
-            
-                if iszero(result) {
-                    revert(0, 0)
-                }
-            
-                returndatacopy(0, 0, 32)
-                nonce := mload(0)
+                nonce := fetchFromSystemContract(NONCE_HOLDER_SYSTEM_CONTRACT(), 36)
             }
             
             function _getRawCodeHash(account) -> hash {
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, account)
+                hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
+            }
             
-                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            
-                returndatacopy(0, 0, 32)
-                hash := mload(0)
+            function _isEVM(_addr) -> isEVM {
+                // function isAccountEVM(address _addr) external view returns (bool);
+                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
+                mstore(4, _addr)
+                isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
             }
             
             // Basically performs an extcodecopy, while returning the length of the bytecode.
@@ -3361,17 +3324,8 @@ object "EvmEmulator" {
                 let codeHash := _getRawCodeHash(addr)
             
                 mstore(0, codeHash)
-            
-                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            
-                // The first word is the true length of the bytecode
-                returndatacopy(0, 0, 32)
-                codeLen := mload(0)
+                // The first word of returndata is the true length of the bytecode
+                codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
             
                 if gt(_len, codeLen) {
                     _len := codeLen
@@ -3454,10 +3408,7 @@ object "EvmEmulator" {
                 }
             }
             
-            function performSystemCall(
-                to,
-                dataLength,
-            ) {
+            function performSystemCall(to, dataLength) {
                 let success := performSystemCallRevertable(to, dataLength)
             
                 if iszero(success) {
@@ -3466,15 +3417,12 @@ object "EvmEmulator" {
                 }
             }
             
-            function performSystemCallRevertable(
-                to,
-                dataLength,
-            ) -> success {
+            function performSystemCallRevertable(to, dataLength) -> success {
                 let farCallAbi := shl(248, 1) // system call
                 // dataOffset is 0
                 // dataStart is 0
                 farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-                farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+                farCallAbi :=  or(farCallAbi, shl(192, gas()))
                 // shardId is 0
                 // forwardingMode is 0
                 // not constructor call
@@ -3482,35 +3430,12 @@ object "EvmEmulator" {
                 success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             }
             
-            function _isEVM(_addr) -> isEVM {
-                // function isAccountEVM(address _addr) external view returns (bool);
-                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-                mstore(4, _addr)
-            
-                let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            
-                returndatacopy(0, 0, 32)
-                isEVM := mload(0)
-            }
-            
-            function zkVmGasToEvmGas(_zkevmGas) -> calczkevmGas {
-                calczkevmGas := div(_zkevmGas, GAS_DIVISOR()) // TODO round up
-            }
-            
             function getEvmGasFromContext() -> evmGas {
-                let _gas := gas()
-                let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD()) // TODO CHECK GAS MECHANICS
+                // Caller must pass at least OVERHEAD() ergs
+                let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
             
-                switch lt(_gas, requiredGas)
-                case 1 {
-                    evmGas := 0
-                }
-                default {
+                let _gas := gas()
+                if gt(_gas, requiredGas) {
                     evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
                 }
             }
@@ -3864,11 +3789,11 @@ object "EvmEmulator" {
                 switch _isEVM(addr)
                 case 0 {
                     // zkEVM native
-                    let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                    let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
                     let zkEvmGasBefore := gas()
                     success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
-                    let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+                    let gasUsed := calcUsedEvmGasByZkVmCall(zkEvmGasBefore)
             
                     if gt(gasToPass, gasUsed) {
                         frameGasLeft := sub(gasToPass, gasUsed) // TODO check
@@ -3888,11 +3813,11 @@ object "EvmEmulator" {
                 switch _isEVM(addr)
                 case 0 {
                     // zkEVM native
-                    let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+                    let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
                     let zkEvmGasBefore := gas()
                     success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
-                    let gasUsed := zkVmGasToEvmGas(sub(zkEvmGasBefore, gas()))
+                    let gasUsed := calcUsedEvmGasByZkVmCall(zkEvmGasBefore)
             
                     if gt(gasToPass, gasUsed) {
                         frameGasLeft := sub(gasToPass, gasUsed) // TODO check
@@ -3905,17 +3830,29 @@ object "EvmEmulator" {
                 }
             }
             
-            function _getZkEVMGasForCall(_evmGas, addr) -> zkevmGas {
-                // TODO CHECK COSTS CALCULATION
-                zkevmGas := mul(_evmGas, GAS_DIVISOR())
+            function calcUsedEvmGasByZkVmCall(zkEvmGasBefore) -> evmGasUsed {
+                let zkevmGasUsed := sub(zkEvmGasBefore, gas()) // caller should guarantee correctness
+                // should not overflow, VM can't pass more than u32 of gas
+                evmGasUsed := div(add(zkevmGasUsed, sub(GAS_DIVISOR(), 1)), GAS_DIVISOR()) // rounding up
+            }
+            
+            function calcZkVmGasForCall(evmGasToPass, addr) -> zkevmGas {
+                zkevmGas := mul(evmGasToPass, GAS_DIVISOR())
+            
+                // charge for contract decommitment
                 let byteSize := extcodesize(addr)
-                let should_ceil := mod(byteSize, 32)
-                if gt(should_ceil, 0) {
-                    byteSize := add(byteSize, sub(32, should_ceil))
+                let decommitGasCost := mul(
+                    div(add(byteSize, 31), 32), // rounding up
+                    DECOMMIT_COST_PER_WORD()
+                )
+            
+                if gt(decommitGasCost, zkevmGas) {
+                    zkevmGas := 0
                 }
-                let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
+            
                 zkevmGas := sub(zkevmGas, decommitGasCost)
-                if gt(zkevmGas, UINT32_MAX()) {
+            
+                if gt(zkevmGas, UINT32_MAX()) { // Should never happen
                     zkevmGas := UINT32_MAX()
                 }
             }
@@ -3996,15 +3933,11 @@ object "EvmEmulator" {
             
             function _saveReturndataAfterZkEVMCall() {
                 loadReturndataIntoActivePtr()
-                let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-            
-                mstore(lastRtSzOffset, returndatasize())
+                mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
             }
             
             function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
-                let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
                 let rtsz := returndatasize()
-            
                 loadReturndataIntoActivePtr()
             
                 // if (rtsz > 31)
@@ -4024,7 +3957,7 @@ object "EvmEmulator" {
                             case 0 { returndatacopy(_outputOffset, 32, _outputLen) }
                             default { returndatacopy(_outputOffset, 32, sub(rtsz, 32)) }
             
-                        mstore(lastRtSzOffset, sub(rtsz, 32))
+                        mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
             
                         // Skip the returnData
                         ptrAddIntoActive(32)
@@ -4032,11 +3965,9 @@ object "EvmEmulator" {
             }
             
             function _eraseReturndataPointer() {
-                let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-            
                 let activePtrSize := getActivePtrDataSize()
                 ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
-                mstore(lastRtSzOffset, 0)
+                mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
             }
             
             ////////////////////////////////////////////////////////////////
@@ -4174,16 +4105,12 @@ object "EvmEmulator" {
                 }
             }
             
-            function performSystemCallForCreate(
-                value,
-                bytecodeStart,
-                bytecodeLen,
-            ) -> success {
+            function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
                 let farCallAbi := shl(248, 1) // system call
                 // dataOffset is 0
                 farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
                 farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-                farCallAbi :=  or(farCallAbi, shl(192, gas())) // TODO overflow
+                farCallAbi :=  or(farCallAbi, shl(192, gas()))
                 // shardId is 0
                 // forwardingMode is 0
                 // not constructor call (ContractDeployer will call constructor)
@@ -4199,16 +4126,7 @@ object "EvmEmulator" {
             
             function _fetchConstructorReturnGas() -> gasLeft {
                 mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
-            
-                let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 0)
-            
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
-                }
-            
-                returndatacopy(0, 0, 32)
-                gasLeft := mload(0)
+                gasLeft := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 4)
             }
             
             ////////////////////////////////////////////////////////////////

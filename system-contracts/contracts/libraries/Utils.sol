@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import {EfficientCall} from "./EfficientCall.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
+import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG} from "../Constants.sol";
 
 /**
  * @author Matter Labs
@@ -45,18 +46,14 @@ library Utils {
     }
 
     function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
-        // TODO: use constants for that
-        return (uint8(_bytecodeHash[0]) == 2);
+        return (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG);
     }
 
     /// @return codeLength The bytecode length in bytes
     function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLength) {
-        // TODO: use constants for that
-
-        if (uint8(_bytecodeHash[0]) == 1) {
+        if (uint8(_bytecodeHash[0]) == ERA_VM_BYTECODE_FLAG) {
             codeLength = bytecodeLenInWords(_bytecodeHash) << 5; // _bytecodeHash * 32
-        } else if (uint8(_bytecodeHash[0]) == 2) {
-            // TODO: maybe rename the function
+        } else if (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG) {
             codeLength = bytecodeLenInWords(_bytecodeHash);
         } else {
             codeLength = 0;
@@ -130,8 +127,9 @@ library Utils {
     uint256 internal constant MAX_EVM_BYTECODE_LENGTH = (2 ** 16) - 1;
 
     function hashEVMBytecode(bytes memory _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
-        // solhint-disable gas-custom-errors
-        require(_bytecode.length <= MAX_EVM_BYTECODE_LENGTH, "po");
+        if (_bytecode.length > MAX_EVM_BYTECODE_LENGTH) {
+            revert MalformedBytecode(BytecodeError.EvmBytecodeLength);
+        }
 
         hashedEVMBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 

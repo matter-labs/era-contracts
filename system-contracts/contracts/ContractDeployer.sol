@@ -465,8 +465,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Deploy a certain bytecode on the address.
-    /// @param _gasToPass TODO
-    /// @param _sender TODO
+    /// @param _gasToPass The amount of gas to be passed in constructor
+    /// @param _sender The deployer address
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _aaVersion The version of the account abstraction protocol to use.
     /// @param _input The constructor calldata.
