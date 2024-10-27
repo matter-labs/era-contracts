@@ -59,7 +59,7 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
 
         tokenBeacon.transferOwnership(owner());
         bridgedTokenBeacon = IBeacon(address(tokenBeacon));
-        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), l2TokenProxyBytecodeHash);
+        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), L2_TOKEN_PROXY_BYTECODE_HASH);
     }
 
     function test() external pure {

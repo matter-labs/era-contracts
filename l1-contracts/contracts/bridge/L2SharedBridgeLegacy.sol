@@ -7,7 +7,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 
 import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 import {SystemContractsCaller} from "../common/libraries/SystemContractsCaller.sol";
 import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
@@ -175,7 +175,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     function deployBeaconProxy(bytes32 salt) external onlyNTV returns (address proxy) {
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
-            DEPLOYER_SYSTEM_CONTRACT,
+            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
             abi.encodeCall(
                 IContractDeployer.create2,

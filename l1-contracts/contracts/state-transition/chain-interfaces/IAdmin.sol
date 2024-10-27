@@ -136,8 +136,6 @@ interface IAdmin is IZKChainBase {
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
-    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
-
     event BridgeMint(address indexed _account, uint256 _amount);
 
     /// @dev Similar to IL1AssetHandler interface, used to send chains.

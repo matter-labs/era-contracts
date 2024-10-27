@@ -5,9 +5,7 @@ pragma solidity ^0.8.20;
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -70,7 +68,7 @@ library L2Utils {
      */
     function initSystemContracts(SystemContractsArgs memory _args) internal {
         bytes memory contractDeployerBytecode = readSystemContractsBytecode("ContractDeployer");
-        vm.etch(DEPLOYER_SYSTEM_CONTRACT, contractDeployerBytecode);
+        vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, contractDeployerBytecode);
         forceDeploySystemContracts(_args);
     }
 
@@ -213,7 +211,7 @@ library L2Utils {
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(deployments);
+        IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
     }
 
     function deployViaCreat2L2(

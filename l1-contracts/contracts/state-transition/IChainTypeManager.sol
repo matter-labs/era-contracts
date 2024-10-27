@@ -160,8 +160,6 @@ interface IChainTypeManager {
 
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
-    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
-
     function forwardedBridgeBurn(
         uint256 _chainId,
         bytes calldata _data

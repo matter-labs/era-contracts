@@ -73,7 +73,7 @@ contract GatewayCTMDeployerTest is Test {
         new TestnetVerifier();
         new Verifier();
 
-        new ValidatorTimelock(address(0), 0, 0);
+        new ValidatorTimelock(address(0), 0);
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
         try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}

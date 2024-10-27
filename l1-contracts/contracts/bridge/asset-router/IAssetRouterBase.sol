@@ -32,13 +32,6 @@ interface IAssetRouterBase {
         bytes bridgeMintCalldata
     );
 
-    event BridgehubWithdrawalInitiated(
-        uint256 chainId,
-        address indexed sender,
-        bytes32 indexed assetId,
-        bytes32 assetDataHash
-    );
-
     event AssetHandlerRegisteredInitial(
         bytes32 indexed assetId,
         address indexed assetHandlerAddress,
