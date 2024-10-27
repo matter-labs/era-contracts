@@ -35,10 +35,10 @@ This contract must never be frozen.
 
 ### AdminFacet
 
-This facet responsible for the configuration setup and upgradabity, handling tasks such as:
+This facet responsible for the configuration setup and upgradability, handling tasks such as:
 
 - Privileged Address Management: Updating key roles, including the governor and validators.
-- System Parameter Configuration: Adjusting critical system settings, such as the L2 bootloader bytecode hash, verifier address, verifier parameters, fee configurations.
+- System Parameter Configuration: Adjusting critical system settings, such as the L2 bootloader bytecode hash, verifier address, changing DA layer or fee configurations.
 - Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
 
 Control over the AdminFacet is divided between two main entities:
@@ -48,8 +48,7 @@ Control over the AdminFacet is divided between two main entities:
 
 ### MailboxFacet
 
-The facet that handles L2 <-> L1 communication, an overview for which can be found in
-[docs](https://docs.zksync.io/zk-stack/components/smart-contracts#mailboxfacet).
+The facet that handles L2 <-> L1 communication.
 
 The Mailbox performs three functions:
 
@@ -84,12 +83,12 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
 ```
 
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
-we simply reused the same L1 addresses as the L2 sender. In zkSync Era address derivation rule is different from the
-Ethereum, so cross-chain exploits are already impossible. However, zkSync Era may add full EVM support in the future, so
+we simply reused the same L1 addresses as the L2 sender. In ZKsync Era address derivation rule is different from the
+Ethereum, so cross-chain exploits are already impossible. However, ZKsync Era may add full EVM support in the future, so
 applying address aliasing leaves room for future EVM compatibility.
 
-The L1 -> L2 communication is also used for bridging **native tokens**. If native token is ether (the case for zkSync Era) - user should include a `msg.value` when initiating a
-transaction request on the L1 contract, if native token is an ERC20 then contract will spend users allowance. Before executing a transaction on L2, the specified address will be credited
+The L1 -> L2 communication is also used for bridging **base tokens**. If base token is ether (the case for ZKsync Era) - user should include a `msg.value` when initiating a
+transaction request on the L1 contract, if base token is an ERC20 then contract will spend users allowance. Before executing a transaction on L2, the specified address will be credited
 with the funds. To withdraw funds user should call `withdraw` function on the `L2BaseToken` system contracts. This will
 burn the funds on L2, allowing the user to reclaim them through the `finalizeWithdrawal` function on the
 `SharedBridge` (more in hyperchain section).
@@ -154,7 +153,7 @@ Implementation detail - function returns a magic value just like it is designed 
 ## ValidatorTimelock
 
 An intermediate smart contract between the validator EOA account and the ZK chain diamond contract. Its primary purpose is
-to provide a trustless means of delaying batch execution without modifying the main zkSync contract. zkSync actively
+to provide a trustless means of delaying batch execution without modifying the main ZKsync contract. ZKsync actively
 monitors the chain activity and reacts to any suspicious activity by freezing the chain. This allows time for
 investigation and mitigation before resuming normal operations.
 
@@ -163,11 +162,11 @@ the Alpha stage.
 
 This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`, which can be called only by the validator.
 
-When the validator calls `commitBatches`, the same calldata will be propagated to the zkSync contract (`DiamondProxy` through
+When the validator calls `commitBatches`, the same calldata will be propagated to the ZKsync contract (`DiamondProxy` through
 `call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these batches to track
 the time these batches are committed by the validator to enforce a delay between committing and execution of batches. Then, the
 validator can prove the already committed batches regardless of the mentioned timestamp, and again the same calldata (related
-to the `proveBatches` function) will be propagated to the zkSync contract. After the `delay` is elapsed, the validator
-is allowed to call `executeBatches` to propagate the same calldata to zkSync contract.
+to the `proveBatches` function) will be propagated to the ZKsync contract. After the `delay` is elapsed, the validator
+is allowed to call `executeBatches` to propagate the same calldata to ZKsync contract.
 
 The owner of the ValidatorTimelock contract is the decentralized governance. Note, that all the chains share the same ValidatorTimelock for simplicity.

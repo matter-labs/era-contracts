@@ -6,14 +6,14 @@ While with the introduction of [custom DA validators](./custom_da.md), any pubda
 
 This document will describe how the standard pubdata format looks like. This is the format that is enforced for [permanent rollup chains](../../chain_management/admin_role.md#ispermanentrollup-setting).
 
-Pubdata in zkSync can be divided up into 4 different categories:
+Pubdata in ZKsync can be divided up into 4 different categories:
 
 1. L2 to L1 Logs
 2. L2 to L1 Messages
 3. Smart Contract Bytecodes
 4. Storage writes
 
-Using data corresponding to these 4 facets, across all executed batches, we’re able to reconstruct the full state of L2. To restore the state we just need to filter all of the transactions to the L1 zkSync contract for only the `commitBatches` transactions where the proposed block has been referenced by a corresponding `executeBatches` call (the reason for this is that a committed or even proven block can be reverted but an executed one cannot). Once we have all the committed batches that have been executed, we then will pull the transaction input and the relevant fields, applying them in order to reconstruct the current state of L2.
+Using data corresponding to these 4 facets, across all executed batches, we’re able to reconstruct the full state of L2. To restore the state we just need to filter all of the transactions to the L1 ZKsync contract for only the `commitBatches` transactions where the proposed block has been referenced by a corresponding `executeBatches` call (the reason for this is that a committed or even proven block can be reverted but an executed one cannot). Once we have all the committed batches that have been executed, we then will pull the transaction input and the relevant fields, applying them in order to reconstruct the current state of L2.
 
 ## L2→L1 communication
 
@@ -60,7 +60,7 @@ To put it shortly, the proofs for L2→L1 log inclusion will continue having exa
 
 The L1Messenger contract will maintain a rolling hash of all the L2ToL1 logs `chainedLogsHash` as well as the rolling hashes of messages `chainedMessagesHash`. Whenever a contract wants to send an L2→L1 log, the following operation will be [applied](../../../system-contracts/contracts/L1Messenger.sol#L73):
 
-`chainedLogsHash = keccak256(chainedLogsHash, hashedLog)`. L2→L1 logs have the same 88-byte format as in the current version of zkSync.
+`chainedLogsHash = keccak256(chainedLogsHash, hashedLog)`. L2→L1 logs have the same 88-byte format as in the current version of ZKsync.
 
 Note, that the user is charged for necessary future the computation that will be needed to calculate the final merkle root. It is roughly 4x higher than the cost to calculate the hash of the leaf, since the eventual tree might have be 4x times the number nodes. In any case, this will likely be a relatively negligible part compared to the cost of the pubdata.
 
@@ -172,11 +172,11 @@ markAsPublished(hash(_bytecode))
 
 ## Storage diff publishing
 
-zkSync is a statediff-based rollup and so publishing the correct state diffs plays an integral role in ensuring data availability.
+ZKsync is a statediff-based rollup and so publishing the correct state diffs plays an integral role in ensuring data availability.
 
 ### Difference between initial and repeated writes
 
-zkSync publishes state changes that happened within the batch instead of transactions themselves. Meaning, that for instance some storage slot `S` under account `A` has changed to value `V`, we could publish a triple of `A,S,V`. Users by observing all the triples could restore the state of zkSync. However, note that our tree unlike Ethereum’s one is not account based (i.e. there is no first layer of depth 160 of the merkle tree corresponding to accounts and second layer of depth 256 of the merkle tree corresponding to users). Our tree is “flat”, i.e. a slot `S` under account `A` is just stored in the leaf number `H(S,A)`. Our tree is of depth 256 + 8 (the 256 is for these hashed account/key pairs and 8 is for potential shards in the future, we currently have only one shard and it is irrelevant for the rest of the document).
+ZKsync publishes state changes that happened within the batch instead of transactions themselves. Meaning, that for instance some storage slot `S` under account `A` has changed to value `V`, we could publish a triple of `A,S,V`. Users by observing all the triples could restore the state of ZKsync. However, note that our tree unlike Ethereum’s one is not account based (i.e. there is no first layer of depth 160 of the merkle tree corresponding to accounts and second layer of depth 256 of the merkle tree corresponding to users). Our tree is “flat”, i.e. a slot `S` under account `A` is just stored in the leaf number `H(S,A)`. Our tree is of depth 256 + 8 (the 256 is for these hashed account/key pairs and 8 is for potential shards in the future, we currently have only one shard and it is irrelevant for the rest of the document).
 
 We call this `H(S,A)` _derived key_, because it is derived from the address and the actual key in the storage of the account. Since our tree is flat, whenever a change happens, we can publish a pair `DK, V`, where `DK=H(S,A)`.
 

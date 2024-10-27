@@ -69,7 +69,7 @@ While fully reusing contracts on both L1 and L2 is not always possible, it was d
 
 In the currently deployed system, L1→L2 transactions are added as a part of a priority queue, i.e. all of them are stored 1-by-1 on L1 in a queue-like structure.
 
-Note, that the complexity of chain migrations in either of the directions depends on the size of the priority queue. However, the number of unprocessed priority transactions is potentially out of hands of both the operator of the chain and the chain admin as the users are free to add priority transactions in case there is no `transactionFilterer` contract, which is the case for any permissionless system, such as zkSync Era.
+Note, that the complexity of chain migrations in either of the directions depends on the size of the priority queue. However, the number of unprocessed priority transactions is potentially out of hands of both the operator of the chain and the chain admin as the users are free to add priority transactions in case there is no `transactionFilterer` contract, which is the case for any permissionless system, such as ZKsync Era.
 
 If someone tries to DDoS the priority queue, the chain can be blocked from migration. Even worse, for GW→L1 migrations, inability to finalize the migration can lead to a complete loss of chain.
 

@@ -36,7 +36,7 @@ Sometimes, users may need assurances that a chain will never become frozen even 
 
 Chain also exposes the `AdminFacet.makePermanentRollup` function. It will turn a chain into a permanent rollup, ensuring that DA validator pairs can be only set to values that are approved by decentralized governance to be used for rollups.
 
-This functionality is obviously dangerous in a sense that it is permanent and revokes the right of the chain to change its DA layer. On the other hand, it ensures perpetual safety for users. This is the option that zkSync Era plans to use.
+This functionality is obviously dangerous in a sense that it is permanent and revokes the right of the chain to change its DA layer. On the other hand, it ensures perpetual safety for users. This is the option that ZKsync Era plans to use.
 
 This setting is preserved even when migrating to [gateway](../gateway/overview.md). If this setting was set while chain is on top of Gateway, and it migrates back to L1, it will keep this status, i.e. it is fully irrevocable.
 
@@ -94,7 +94,7 @@ Overall **very special care** needs to be taken when selecting an admin for the 
 
 ## Proposed modular `ChainAdmin` implementation
 
-> **Warning**. The proposed implementation here will likely **not** be used by the Matter Labs team for zkSync Era due to the issues listed in the issues section. This code, however, is still in scope of the audit and may serve as a future basis of a more long term solution.
+> **Warning**. The proposed implementation here will likely **not** be used by the Matter Labs team for ZKsync Era due to the issues listed in the issues section. This code, however, is still in scope of the audit and may serve as a future basis of a more long term solution.
 
 In order to ensure that the architecture here flexible enough for future other chains to use, it uses a modular architecture to ensure that other chains could fit it to their needs. By default, this contract is not even `Ownable`, and anyone can execute transactions out of the name of it. In order to add new features such as restricting calling dangerous methods and access control, _restrictions_ should be added there. Each restriction is a contract that implements the `IRestriction` interface. The following restrictions have been implemented so far:
 

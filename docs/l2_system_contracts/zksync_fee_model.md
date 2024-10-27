@@ -1,4 +1,4 @@
-# zkSync fee model
+# ZKsync fee model
 
 [back to readme](../README.md)
 
@@ -8,15 +8,15 @@ On Ethereum, all the computational, as well as storage costs, are represented vi
 
 ## Main differences from EVM
 
-zkSync as well as other L2s have the issue that does not allow the adoption of the same model as the one for Ethereum so easily: the main reason is the requirement for publishing the pubdata on Ethereum. This means that prices for L2 transactions will depend on the volatile L1 gas prices and can not be simply hard coded.
+ZKsync as well as other L2s have the issue that does not allow the adoption of the same model as the one for Ethereum so easily: the main reason is the requirement for publishing the pubdata on Ethereum. This means that prices for L2 transactions will depend on the volatile L1 gas prices and can not be simply hard coded.
 
-Also, zkSync, being a zkRollup is required to prove every operation with zero-knowledge proofs. That comes with a few nuances.
+Also, ZKsync, being a zkRollup is required to prove every operation with zero-knowledge proofs. That comes with a few nuances.
 
 ### Different opcode pricing
 
 The operations tend to have different “complexity”/”pricing” in zero-knowledge proof terms than in standard CPU terms. For instance, `keccak256` which was optimized for CPU performance, will cost more to prove.
 
-That’s why you will find the prices for operations on zkSync a lot different from the ones on Ethereum.
+That’s why you will find the prices for operations on ZKsync a lot different from the ones on Ethereum.
 
 ### I/O pricing
 
@@ -48,11 +48,11 @@ Note that in the case of an honest operator, this approach offers a better UX, s
 
 #### Conclusion
 
-As a conclusion, zkSync Era supports a similar "cold"/"warm" mechanism to EVM, but for now, these are only enforced by the operator, i.e., the users of the applications should not rely on these. The execution is guaranteed to be correct as long as the user has enough gas to pay for the worst, i.e. "cold" scenario.
+As a conclusion, ZKsync Era supports a similar "cold"/"warm" mechanism to EVM, but for now, these are only enforced by the operator, i.e., the users of the applications should not rely on these. The execution is guaranteed to be correct as long as the user has enough gas to pay for the worst, i.e. "cold" scenario.
 
 ### Memory pricing
 
-zkSync Era has different memory pricing rules:
+ZKsync Era has different memory pricing rules:
 
 - Whenever a user contract is called, `2^12` bytes of memory are given out for free, before starting to charge users linearly according to its length.
 - Whenever a kernel space (i.e., a system) contract is called, `2^21` bytes of memory are given out for free, before starting to charge users linearly according to the length.
@@ -60,31 +60,31 @@ zkSync Era has different memory pricing rules:
 
 ### Different intrinsic costs
 
-Unlike Ethereum, where the intrinsic cost of transactions (`21000` gas) is used to cover the price of updating the balances of the users, the nonce and signature verification, on zkSync these prices are _not_ included in the intrinsic costs for transactions, due to the native support of account abstraction, meaning that each account type may have their own transaction cost. In theory, some may even use more zk-friendly signature schemes or other kinds of optimizations to allow cheaper transactions for their users.
+Unlike Ethereum, where the intrinsic cost of transactions (`21000` gas) is used to cover the price of updating the balances of the users, the nonce and signature verification, on ZKsync these prices are _not_ included in the intrinsic costs for transactions, due to the native support of account abstraction, meaning that each account type may have their own transaction cost. In theory, some may even use more zk-friendly signature schemes or other kinds of optimizations to allow cheaper transactions for their users.
 
-That being said, zkSync transactions do come with some small intrinsic costs, but they are mostly used to cover costs related to the processing of the transaction by the bootloader which can not be easily measured in code in real-time. These are measured via testing and are hard coded.
+That being said, ZKsync transactions do come with some small intrinsic costs, but they are mostly used to cover costs related to the processing of the transaction by the bootloader which can not be easily measured in code in real-time. These are measured via testing and are hard coded.
 
 ### Charging for pubdata
 
-An important cost factor for users is the pubdata. zkSync Era is a state diff-based rollup, meaning that the pubdata is published not for the transaction data, but for the state changes: modified storage slots, deployed bytecodes, L2->L1 messages. This allows for applications that modify the same storage slot multiple times such as oracles, to update the storage slots multiple times while maintaining a constant footprint on L1 pubdata. Correctly a state diff rollups requires a special solution to charging for pubdata. It is explored in the next section.
+An important cost factor for users is the pubdata. ZKsync Era is a state diff-based rollup, meaning that the pubdata is published not for the transaction data, but for the state changes: modified storage slots, deployed bytecodes, L2->L1 messages. This allows for applications that modify the same storage slot multiple times such as oracles, to update the storage slots multiple times while maintaining a constant footprint on L1 pubdata. Correctly a state diff rollups requires a special solution to charging for pubdata. It is explored in the next section.
 
 ## How L2 gas price works
 
 ### Batch overhead & limited resources of the batch
 
-To process the batch, the zkSync team has to pay for proving the batch, committing to it, etc. Processing a batch involves some operational costs as well. All of these values we call “Batch overhead”. It consists of two parts:
+To process the batch, the ZKsync team has to pay for proving the batch, committing to it, etc. Processing a batch involves some operational costs as well. All of these values we call “Batch overhead”. It consists of two parts:
 
 - The L2 requirements for proving the circuits (denoted in L2 gas).
 - The L1 requirements for the proof verification as well as general batch processing (denoted in L1 gas).
 
 We generally try to aggregate as many transactions as possible and each transaction pays for the batch overhead proportionally to how close the transaction brings the batch to being _sealed,_ i.e. closed and prepared for proof verification and submission on L1. A transaction gets closer to sealing a batch by using the batch’s _limited resources_.
 
-While on Ethereum, the main reason for the existence of a batch gas limit is to keep the system decentralized & load low, i.e. assuming the existence of the correct hardware, only time would be a requirement for a batch to adhere to. In the case of zkSync batches, there are some limited resources the batch should manage:
+While on Ethereum, the main reason for the existence of a batch gas limit is to keep the system decentralized & load low, i.e. assuming the existence of the correct hardware, only time would be a requirement for a batch to adhere to. In the case of ZKsync batches, there are some limited resources the batch should manage:
 
 - **Time.** The same as on Ethereum, the batch should generally not take too much time to be closed to provide better UX. To represent the time needed we use a batch gas limit, note that it is higher than the gas limit for a single transaction.
 - **Slots for transactions.** The bootloader has a limited number of slots for transactions, i.e. it can not take more than a certain transactions per batch.
 - **The memory of the bootloader.** The bootloader needs to store the transaction’s ABI encoding in its memory & this fills it up. In practical terms, it serves as a penalty for having transactions with large calldata/signatures in the case of custom accounts.
-- **Pubdata bytes.** To fully appreciate the gains from the storage diffs, i.e. the fact that changes in a single slot happening in the same batch need to be published only once, we need to publish all the batch’s public data only after the transaction has been processed. Right now, we publish all the data with the storage diffs as well as L2→L1 messages, etc in a single transaction at the end of the batch. Most nodes have a limit of 128kb per transaction, so this is the limit that each zkSync batch should adhere to.
+- **Pubdata bytes.** To fully appreciate the gains from the storage diffs, i.e. the fact that changes in a single slot happening in the same batch need to be published only once, we need to publish all the batch’s public data only after the transaction has been processed. Right now, we publish all the data with the storage diffs as well as L2→L1 messages, etc in a single transaction at the end of the batch. Most nodes have a limit of 128kb per transaction, so this is the limit that each ZKsync batch should adhere to.
 
 Each transaction spends the batch overhead proportionally to how closely it consumes the resources above.
 
@@ -145,7 +145,7 @@ To reiterate, the formulas above are used for L1→L2 transactions on L1 to prot
 
 This fee model also provides a very high degree of flexibility to the operator & so if we find out that we earn too much with a certain part, we could amend how the fair l2 gas price and fair pubdata price are generated and that’s it (there will be no further enforcements on the bootloader side).
 
-In the long run, the consensus will ensure the correctness of these values on the main zkSync Era (or maybe we’ll transition to a different system).
+In the long run, the consensus will ensure the correctness of these values on the main ZKsync Era (or maybe we’ll transition to a different system).
 
 #### Overhead for transaction slot and memory
 
@@ -175,7 +175,7 @@ Note, that the used constants for the fee model are probabilistic, i.e. we never
 
 #### Refunds for repeated writes
 
-zkSync Era is a state diff-based rollup, i.e. the pubdata is published not for transactions, but for storage changes. This means that whenever a user writes into a storage slot, it incurs a certain amount of pubdata. However, not all writes are equal:
+ZKsync Era is a state diff-based rollup, i.e. the pubdata is published not for transactions, but for storage changes. This means that whenever a user writes into a storage slot, it incurs a certain amount of pubdata. However, not all writes are equal:
 
 - If a slot has been already written to in one of the previous batches, the slot has received a short ID, which allows it to require less pubdata in the state diff.
 - Depending on the `value` written into a slot, various compression optimizations could be used and so we should reflect that too.
@@ -187,7 +187,7 @@ The important part here is that while such refunds are inlined (i.e. unlike the 
 
 ## How we charge for pubdata
 
-zkSync Era is a state diff-based rollup. It means that it is not possible to know how much pubdata a transaction will take before its execution. We _could_ charge for pubdata the following way: whenever a user does an operation that emits pubdata (writes to storage, publishes an L2->L1 message, etc.), we charge `pubdata_bytes_published * gas_per_pubdata` directly from the context of the execution.
+ZKsync Era is a state diff-based rollup. It means that it is not possible to know how much pubdata a transaction will take before its execution. We _could_ charge for pubdata the following way: whenever a user does an operation that emits pubdata (writes to storage, publishes an L2->L1 message, etc.), we charge `pubdata_bytes_published * gas_per_pubdata` directly from the context of the execution.
 
 However, such an approach has the following disadvantages:
 
@@ -280,7 +280,7 @@ In the future, we will guarantee the processability of subcalls of larger size b
 
 ### Limiting the `gas_per_pubdata`
 
-As already mentioned, the transactions on zkSync depend on volatile L1 gas costs to publish the pubdata for batch, verify proofs, etc. For this reason, zkSync-specific EIP712 transactions contain the `gas_per_pubdata_limit` field, denoting the maximum `gas_per_pubdata` that the operator can charge the user for a single byte of pubdata.
+As already mentioned, the transactions on ZKsync depend on volatile L1 gas costs to publish the pubdata for batch, verify proofs, etc. For this reason, ZKsync-specific EIP712 transactions contain the `gas_per_pubdata_limit` field, denoting the maximum `gas_per_pubdata` that the operator can charge the user for a single byte of pubdata.
 
 For Ethereum transactions (which do not contain this field), the block's `gas_per_pubdata` is used.
 
@@ -292,7 +292,7 @@ The fee model explained above, while fully functional, has some known issues. Th
 
 The `executeBatches` operation on L1 is executed in `O(N)` where N is the number of priority ops that we have in the batch. Each executed priority operation will be popped and so it incurs cost for storage modifications. As of now, we do not charge for it.
 
-## zkSync Era Fee Components (Revenue & Costs)
+## ZKsync Era Fee Components (Revenue & Costs)
 
 - On-Chain L1 Costs
   - L1 Commit Batches
@@ -302,8 +302,8 @@ The `executeBatches` operation on L1 is executed in `O(N)` where N is the number
   - L1 Execute Batches
     - The execute batches transaction processes L2 -> L1 messages and marks executed priority operations as such. Multiple L1 batches can be included in a single execute transaction.
   - L1 Finalize Withdrawals
-    - While not strictly part of the L1 fees, the cost to finalize L2 → L1 withdrawals are covered by Matter Labs. The finalize withdrawals transaction processes user token withdrawals from zkSync Era to Ethereum. Multiple L2 withdrawal transactions are included in each finalize withdrawal transaction.
+    - While not strictly part of the L1 fees, the cost to finalize L2 → L1 withdrawals are covered by Matter Labs. The finalize withdrawals transaction processes user token withdrawals from  Era to Ethereum. Multiple L2 withdrawal transactions are included in each finalize withdrawal transaction.
 - On-Chain L2 Revenue
   - L2 Transaction Fee
-    - This fee is what the user pays to complete a transaction on zkSync Era. It is calculated as `gasLimit x baseFeePerGas - refundedGas x baseFeePerGas`, or more simply, `gasUsed x baseFeePerGas`.
+    - This fee is what the user pays to complete a transaction on  Era. It is calculated as `gasLimit x baseFeePerGas - refundedGas x baseFeePerGas`, or more simply, `gasUsed x baseFeePerGas`.
 - Profit = L2 Revenue - L1 Costs - Off-Chain Infrastructure Costs
