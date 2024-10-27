@@ -13,7 +13,7 @@ Custom asset bridging is a new bridging model that allows to:
 #### New concepts
 
 - assetId => identifier to track bridged assets across chains. This is used to link messages to specific asset handlers in the AssetRouters.
-- AssetHandler => contract that manages liquidity (burns/mints, locks/unlocks, etc.) for specific token (or a set of them) on a chain. Every asset  
+- AssetHandler => contract that manages liquidity (burns/mints, locks/unlocks, etc.) for specific token (or a set of them) on a chain. Every asset
 - AssetDeploymentTracker => contract that manages the deployment of asset handlers across chains. This is the contract that registers these asset handlers in the AssetRouters.
 
 ### Normal flow

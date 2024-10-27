@@ -383,12 +383,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Providing `_checkMaxNumberOfZKChains = false` may be preferrable in cases
     /// where we want to guarantee that a chain can be added. These include:
     /// - Migration of a chain from the mapping in the old CTM
-    /// - Migration of a chain to a new settlement layer 
-    function _registerNewZKChain(
-        uint256 _chainId, 
-        address _zkChain,
-        bool _checkMaxNumberOfZKChains
-    ) internal {
+    /// - Migration of a chain to a new settlement layer
+    function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
         if (_checkMaxNumberOfZKChains && zkChainMap.length() > MAX_NUMBER_OF_ZK_CHAINS) {

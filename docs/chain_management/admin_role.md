@@ -10,7 +10,7 @@ In this document we will explore what are the abilities of the ChainAdmin, how d
 
 The system does not restrict in any way how the admin of the chain should be implemented. However special caution should be taken to keep it safe.
 
-The general guideline is that an admin of a ZK chain should be *at least* a well-distributed multisig. Having it as an EOA is definitely a bad idea since having this address stolen can lead to [chain being permanently frozen](#setting-da-layer).
+The general guideline is that an admin of a ZK chain should be _at least_ a well-distributed multisig. Having it as an EOA is definitely a bad idea since having this address stolen can lead to [chain being permanently frozen](#setting-da-layer).
 
 Additional measures may be taken [to self-restrict](#proposed-modular-chainadmin-implementation) the ChainAdmin to ensure that some operations can be only done in safe fasion.
 
@@ -28,7 +28,7 @@ In case the malicious block has not been executed yet, it can be reverted.
 
 ### Setting DA layer
 
-This is one of the most powerful settings that a chain can have: setting a custom DA layer. The dangers of doing this wrong are obvious: lack of proper data availability solution may lead to funds being frozen. (Note: that funds can never be *stolen* due to ZKP checks of the VM execution).
+This is one of the most powerful settings that a chain can have: setting a custom DA layer. The dangers of doing this wrong are obvious: lack of proper data availability solution may lead to funds being frozen. (Note: that funds can never be _stolen_ due to ZKP checks of the VM execution).
 
 Sometimes, users may need assurances that a chain will never become frozen even under a malicious chain admin. A general though unstable approach is discussed [here](#proposed-modular-chainadmin-implementation), however this release comes with a solution specially taylored for rollups: the `isPermanentRollup` setting.
 
@@ -96,7 +96,7 @@ Overall **very special care** needs to be taken when selecting an admin for the 
 
 > **Warning**. The proposed implementation here will likely **not** be used by the Matter Labs team for zkSync Era due to the issues listed in the issues section. This code, however, is still in scope of the audit and may serve as a future basis of a more long term solution.
 
-In order to ensure that the architecture here flexible enough for future other chains to use, it uses a modular architecture to ensure that other chains could fit it to their needs. By default, this contract is not even `Ownable`, and anyone can execute transactions out of the name of it. In order to add new features such as restricting calling dangerous methods and access control, *restrictions* should be added there. Each restriction is a contract that implements the `IRestriction` interface. The following restrictions have been implemented so far:
+In order to ensure that the architecture here flexible enough for future other chains to use, it uses a modular architecture to ensure that other chains could fit it to their needs. By default, this contract is not even `Ownable`, and anyone can execute transactions out of the name of it. In order to add new features such as restricting calling dangerous methods and access control, _restrictions_ should be added there. Each restriction is a contract that implements the `IRestriction` interface. The following restrictions have been implemented so far:
 
 - `AccessControlRestriction` that allows to specify which addresses can call which methods. In the case of Era, only the `DEFAULT_ADMIN_ROLE` will be able to call any methods. Other chains with non-ETH base token may need an account that would periodically call the L1 contract to update the ETH price there. They may create the `SET_TOKEN_MULTIPLIER_ROLE` role that is required to update the token price and give its rights to some hot private key.
 
@@ -112,4 +112,3 @@ The approach above does not only helps to protect the chain, but also provides c
 Due to specifics of [migration to another settlement layers](#migration-to-another-settlement-layer) (i.e. that migrations do not overwrite the admin), maintaining the same `PermanentRestriction` becomes hard in case a restriction has been added on top of the chain admin inside one chain, but not the other.
 
 While very flexible, this modular approach should still be polished enough before recommending it as a generic solution for everyone. However, the provided new [ChainAdmin](../../l1-contracts/contracts/governance/ChainAdmin.sol) can still be helpful for new chains as with the `AccessControlRestriction` it provides a ready-to-use framework for role-based managing of the chain. Using `PermanentRestriction` for now is discouraged however.
-

@@ -10,13 +10,13 @@ On standard Ethereum clients, the workflow for executing blocks is the following
 2. Gather the state changes (if the transaction has not reverted), apply them to the state.
 3. Go back to step (1) if the block gas limit has not been yet exceeded.
 
-However, having such flow on zkSync (i.e. processing transaction one-by-one) would be too inefficient, since we have to run the entire proving workflow for each individual transaction. That’s what we need the *bootloader* for: instead of running N transactions separately, we run the entire batch (set of blocks, more can be found [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md)) as a single program that accepts the array of transactions as well as some other batch metadata and processes them inside a single big “transaction”. The easiest way to think about bootloader is to think in terms of EntryPoint from EIP4337: it also accepts the array of transactions and facilitates the Account Abstraction protocol.
+However, having such flow on zkSync (i.e. processing transaction one-by-one) would be too inefficient, since we have to run the entire proving workflow for each individual transaction. That’s what we need the _bootloader_ for: instead of running N transactions separately, we run the entire batch (set of blocks, more can be found [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md)) as a single program that accepts the array of transactions as well as some other batch metadata and processes them inside a single big “transaction”. The easiest way to think about bootloader is to think in terms of EntryPoint from EIP4337: it also accepts the array of transactions and facilitates the Account Abstraction protocol.
 
 The hash of the code of the bootloader is stored on L1 and can only be changed as a part of a system upgrade. Note, that unlike system contracts, the bootloader’s code is not stored anywhere on L2. That’s why we may sometimes refer to the bootloader’s address as formal. It only exists for the sake of providing some value to `this` / `msg.sender`/etc. When someone calls the bootloader address (e.g. to pay fees) the EmptyContract’s code is actually invoked.
 
 ## System contracts
 
-While most of the primitive EVM opcodes can be supported out of the box (i.e. zero-value calls, addition/multiplication/memory/storage management, etc), some of the opcodes are not supported by the VM by default and they are implemented via “system contracts” — these contracts are located in a special *kernel space,* i.e. in the address space in range `[0..2^16-1]`, and they have some special privileges, which users’ contracts don’t have. These contracts are pre-deployed at the genesis and updating their code can be done only via system upgrade, managed from L1.
+While most of the primitive EVM opcodes can be supported out of the box (i.e. zero-value calls, addition/multiplication/memory/storage management, etc), some of the opcodes are not supported by the VM by default and they are implemented via “system contracts” — these contracts are located in a special _kernel space,_ i.e. in the address space in range `[0..2^16-1]`, and they have some special privileges, which users’ contracts don’t have. These contracts are pre-deployed at the genesis and updating their code can be done only via system upgrade, managed from L1.
 
 The use of each system contract will be explained down below.
 
@@ -37,9 +37,9 @@ On EVM, during transaction execution, the following memory areas are available:
 - `returndata` the immutable slice returned by the latest call to another contract.
 - `stack` where the local variables are stored.
 
-Unlike EVM, which is stack machine, zkEVM has 16 registers. Instead of receiving input from `calldata`, zkEVM starts by receiving a *pointer* in its first register *(*basically a packed struct with 4 elements: the memory page id, start and length of the slice to which it points to*)* to the calldata page of the parent. Similarly, a transaction can receive some other additional data within its registers at the start of the program: whether the transaction should invoke the constructor ([more about deployments here](#contractdeployer--immutablesimulator)), whether the transaction has `isSystem` flag, etc. The meaning of each of these flags will be expanded further in this section.
+Unlike EVM, which is stack machine, zkEVM has 16 registers. Instead of receiving input from `calldata`, zkEVM starts by receiving a _pointer_ in its first register *(*basically a packed struct with 4 elements: the memory page id, start and length of the slice to which it points to*)* to the calldata page of the parent. Similarly, a transaction can receive some other additional data within its registers at the start of the program: whether the transaction should invoke the constructor ([more about deployments here](#contractdeployer--immutablesimulator)), whether the transaction has `isSystem` flag, etc. The meaning of each of these flags will be expanded further in this section.
 
-*Pointers* are separate type in the VM. It is only possible to:
+_Pointers_ are separate type in the VM. It is only possible to:
 
 - Read some value within a pointer.
 - Shrink the pointer by reducing the slice to which pointer points to.
@@ -52,16 +52,16 @@ Unlike EVM, which is stack machine, zkEVM has 16 registers. Instead of receiving
 
 For each frame, the following memory areas are allocated:
 
-- *Heap* (plays the same role as `memory` on Ethereum).
-- *AuxHeap* (auxiliary heap). It has the same properties as Heap, but it is used for the compiler to encode calldata/copy the returndata from the calls to system contracts to not interfere with the standard Solidity memory alignment.
-- *Stack*. Unlike Ethereum, stack is not the primary place to get arguments for opcodes. The biggest difference between stack on zkEVM and EVM is that on zkSync stack can be accessed at any location (just like memory). While users do not pay for the growth of stack, the stack can be fully cleared at the end of the frame, so the overhead is minimal.
-- *Code*. The memory area from which the VM executes the code of the contract. The contract itself can not read the code page, it is only done implicitly by the VM.
+- _Heap_ (plays the same role as `memory` on Ethereum).
+- _AuxHeap_ (auxiliary heap). It has the same properties as Heap, but it is used for the compiler to encode calldata/copy the returndata from the calls to system contracts to not interfere with the standard Solidity memory alignment.
+- _Stack_. Unlike Ethereum, stack is not the primary place to get arguments for opcodes. The biggest difference between stack on zkEVM and EVM is that on zkSync stack can be accessed at any location (just like memory). While users do not pay for the growth of stack, the stack can be fully cleared at the end of the frame, so the overhead is minimal.
+- _Code_. The memory area from which the VM executes the code of the contract. The contract itself can not read the code page, it is only done implicitly by the VM.
 
 Also, as mentioned in the previous section, the contract receives the pointer to the calldata.
 
 #### Managing returndata & calldata
 
-Whenever a contract finishes its execution, the parent’s frame receives a *pointer* as `returndata`. This pointer may point to the child frame’s Heap/AuxHeap or it can even be the same `returndata` pointer that the child frame received from some of its child frames.
+Whenever a contract finishes its execution, the parent’s frame receives a _pointer_ as `returndata`. This pointer may point to the child frame’s Heap/AuxHeap or it can even be the same `returndata` pointer that the child frame received from some of its child frames.
 
 The same goes with the `calldata`. Whenever a contract starts its execution, it receives the pointer to the calldata. The parent frame can provide any valid pointer as the calldata, which means it can either be a pointer to the slice of parent’s frame memory (heap or auxHeap) or it can be some valid pointer that the parent frame has received before as calldata/returndata.
 
@@ -79,7 +79,7 @@ A ← B ← C
 
 There is no need to copy returned data if the B returns a slice of the returndata returned by C.
 
-Note, that you can *not* use the pointer that you received via calldata as returndata (i.e. return it at the end of the execution frame). Otherwise, it would be possible that returndata points to the memory slice of the active frame and allow editing the `returndata`. It means that in the examples above, C could not return a slice of its calldata without memory copying.
+Note, that you can _not_ use the pointer that you received via calldata as returndata (i.e. return it at the end of the execution frame). Otherwise, it would be possible that returndata points to the memory slice of the active frame and allow editing the `returndata`. It means that in the examples above, C could not return a slice of its calldata without memory copying.
 
 Note, that the rule above is implemented by the principle "it is not possible to return a slice of data with memory page id lower than the memory page id of the current heap", since a memory page with smaller id could only be created before the call. That's why a user contract can usually safely return a slice of previously returned returndata (since it is guaranteed to have a higher memory page id). However, system contracts have an exemption from the rule above. It is needed in particular to the correct functionality of the `CodeOracle` system contract. You can read more about it [here](#codeoracle). So the rule of thumb is that returndata from `CodeOracle` should never be passed along.
 
@@ -118,7 +118,7 @@ These opcodes are allowed only for contracts in kernel space (i.e. system contr
 - `increment_tx_counter` increments the counter of the transactions within the VM. The transaction counter used mostly for the VM’s internal tracking of events. Used only in bootloader after the end of each transaction.
 - `decommit` will return a pointer to a slice with the corresponding bytecode hash preimage. If this bytecode has been unpacked before, the memory page where it was unpacked will be reused. If it has never been unpacked before, it will be unpacked into the current heap.
 
-Note, that currently we do not have access to the `tx_counter` within VM (i.e. for now it is possible to increment it and it will be automatically used for logs such as `event`s as well as system logs produced by `to_l1`, but we can not read it). We need to read it to publish the *user* L2→L1 logs, so `increment_tx_counter` is always accompanied by the corresponding call to the [SystemContext](#systemcontext) contract.
+Note, that currently we do not have access to the `tx_counter` within VM (i.e. for now it is possible to increment it and it will be automatically used for logs such as `event`s as well as system logs produced by `to_l1`, but we can not read it). We need to read it to publish the _user_ L2→L1 logs, so `increment_tx_counter` is always accompanied by the corresponding call to the [SystemContext](#systemcontext) contract.
 
 More on the difference between system and user logs can be read [here](../settlement_contracts/data_availability/standard_pubdata_format.md).
 
@@ -127,8 +127,8 @@ More on the difference between system and user logs can be read [here](../settle
 Here are opcodes that can be generally accessed by any contract. Note that while the VM allows to access these methods, it does not mean that this is easy: the compiler might not have convenient support for some use-cases yet.
 
 - `near_call`. It is basically a “framed” jump to some location of the code of your contract. The difference between the `near_call` and ordinary jump are:
-    1. It is possible to provide an ergsLimit for it. Note, that unlike “`far_call`”s (i.e. calls between contracts) the 63/64 rule does not apply to them.
-    2. If the near call frame panics, all state changes made by it are reversed. Please note, that the memory changes will **not** be reverted.
+  1. It is possible to provide an ergsLimit for it. Note, that unlike “`far_call`”s (i.e. calls between contracts) the 63/64 rule does not apply to them.
+  2. If the near call frame panics, all state changes made by it are reversed. Please note, that the memory changes will **not** be reverted.
 - `getMeta`. Returns an u256 packed value of [ZkSyncMeta](../../system-contracts/contracts/libraries/SystemContractHelper.sol#L18) struct. Note that this is not tight packing. The struct is formed by the [following rust code](https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/definitions/abi/meta.rs#L4).
 - `getCodeAddress` — receives the address of the executed code. This is different from `this` , since in case of delegatecalls `this` is preserved, but `codeAddress` is not.
 
@@ -136,8 +136,8 @@ Here are opcodes that can be generally accessed by any contract. Note that while
 
 Besides the calldata, it is also possible to provide additional information to the callee when doing `call` , `mimic_call`, `delegate_call`. The called contract will receive the following information in its first 12 registers at the start of execution:
 
-- *r1* — the pointer to the calldata.
-- *r2* — the pointer with flags of the call. This is a mask, where each bit is set only if certain flags have been set to the call. Currently, two flags are supported: 0-th bit: `isConstructor` flag. This flag can only be set by system contracts and denotes whether the account should execute its constructor logic. Note, unlike Ethereum, there is no separation on constructor & deployment bytecode. More on that can be read [here](#contractdeployer--immutablesimulator). 1-st bit: `isSystem` flag. Whether the call intends a system contracts’ function. While most of the system contracts’ functions are relatively harmless, accessing some with calldata only may break the invariants of Ethereum, e.g. if the system contract uses `mimic_call`: no one expects that by calling a contract some operations may be done out of the name of the caller. This flag can be only set if the callee is in kernel space.
+- _r1_ — the pointer to the calldata.
+- _r2_ — the pointer with flags of the call. This is a mask, where each bit is set only if certain flags have been set to the call. Currently, two flags are supported: 0-th bit: `isConstructor` flag. This flag can only be set by system contracts and denotes whether the account should execute its constructor logic. Note, unlike Ethereum, there is no separation on constructor & deployment bytecode. More on that can be read [here](#contractdeployer--immutablesimulator). 1-st bit: `isSystem` flag. Whether the call intends a system contracts’ function. While most of the system contracts’ functions are relatively harmless, accessing some with calldata only may break the invariants of Ethereum, e.g. if the system contract uses `mimic_call`: no one expects that by calling a contract some operations may be done out of the name of the caller. This flag can be only set if the callee is in kernel space.
 - The rest r3..r12 registers are non-empty only if the `isSystem` flag is set. There may be arbitrary values passed, which we call `extraAbiParams`.
 
 The compiler implementation is that these flags are remembered by the contract and can be accessed later during execution via special [simulations](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/VM%20Section/How%20compiler%20works/instructions/extensions/overview.md).
@@ -158,10 +158,10 @@ Example:
 
 ```solidity
 function getCodeAddress() internal view returns (address addr) {
-    address callAddr = CODE_ADDRESS_CALL_ADDRESS;
-    assembly {
-        addr := staticcall(0, callAddr, 0, 0xFFFF, 0, 0)
-    }
+  address callAddr = CODE_ADDRESS_CALL_ADDRESS;
+  assembly {
+    addr := staticcall(0, callAddr, 0, 0xFFFF, 0, 0)
+  }
 }
 ```
 
@@ -181,9 +181,9 @@ The function should contain `ZKSYNC_NEAR_CALL` string in its name and accept at 
 
 Whenever a `near_call` panics, the `ZKSYNC_CATCH_NEAR_CALL` function is called.
 
-*Important note:* the compiler behaves in a way that if there is a `revert` in the bootloader, the `ZKSYNC_CATCH_NEAR_CALL` is not called and the parent frame is reverted as well. The only way to revert only the `near_call` frame is to trigger VM’s *panic* (it can be triggered with either invalid opcode or out of gas error).
+_Important note:_ the compiler behaves in a way that if there is a `revert` in the bootloader, the `ZKSYNC_CATCH_NEAR_CALL` is not called and the parent frame is reverted as well. The only way to revert only the `near_call` frame is to trigger VM’s _panic_ (it can be triggered with either invalid opcode or out of gas error).
 
-*Important note 2:* The 63/64 rule does not apply to `near_call`. Also, if 0 gas is provided to the near call, then actually all of the available gas will go to it.
+_Important note 2:_ The 63/64 rule does not apply to `near_call`. Also, if 0 gas is provided to the near call, then actually all of the available gas will go to it.
 
 #### Notes on security
 
@@ -246,13 +246,13 @@ Bootloader is the program that accepts an array of transactions and executes the
 
 ### Playground bootloader vs proved bootloader
 
-For convenience, we use the same implementation of the bootloader both in the mainnet batches and for emulating ethCalls or other testing activities. *Only* *proved* bootloader is ever used for batch-building and thus this document describes only it.
+For convenience, we use the same implementation of the bootloader both in the mainnet batches and for emulating ethCalls or other testing activities. _Only_ _proved_ bootloader is ever used for batch-building and thus this document describes only it.
 
 ### Start of the batch
 
 It is enforced by the ZKPs, that the state of the bootloader is equivalent to the state of a contract transaction with empty calldata. The only difference is that it starts with all the possible memory pre-allocated (to avoid costs for memory expansion).
 
-For additional efficiency (and our convenience), the bootloader receives its parameters inside its memory. This is the only point of non-determinism: the bootloader *starts with its memory pre-filled with any data the operator wants*. That’s why it is responsible for validating the correctness of it and it should never rely on the initial contents of the memory to be correct & valid.
+For additional efficiency (and our convenience), the bootloader receives its parameters inside its memory. This is the only point of non-determinism: the bootloader _starts with its memory pre-filled with any data the operator wants_. That’s why it is responsible for validating the correctness of it and it should never rely on the initial contents of the memory to be correct & valid.
 
 For instance, for each transaction, we check that it is [properly ABI-encoded](../../system-contracts/bootloader/bootloader.yul#L3278) and that the transactions [go exactly one after another](../../system-contracts/bootloader/bootloader.yul#L3974). We also ensure that transactions do not exceed the limits of the memory space allowed for transactions.
 
@@ -315,12 +315,12 @@ The batch information slots [are used at the beginning of the batch](../../syste
 
 - `[266757..1626756]` – slots where the final batch pubdata is supplied to be verified by the [L2DAValidator](../settlement_contracts/data_availability/custom_da.md).
 
-But briefly, this space is used for the calldata to the L1Messenger’s `publishPubdataAndClearState` function, which accepts the address of the L2DAValidator as well as the pubdata for it to check. The L2DAValidator is a contract that is responsible to ensure efficiency [when handling pubdata](../settlement_contracts/data_availability/custom_da.md). Typically, the calldata `L2DAValidator` would include uncompressed preimages for bytecodes, L2->L1 messages, L2->L1 logs, etc as their compressed counterparts. However, the exact implementation may vary across various ZK chains.  
+But briefly, this space is used for the calldata to the L1Messenger’s `publishPubdataAndClearState` function, which accepts the address of the L2DAValidator as well as the pubdata for it to check. The L2DAValidator is a contract that is responsible to ensure efficiency [when handling pubdata](../settlement_contracts/data_availability/custom_da.md). Typically, the calldata `L2DAValidator` would include uncompressed preimages for bytecodes, L2->L1 messages, L2->L1 logs, etc as their compressed counterparts. However, the exact implementation may vary across various ZK chains.
 
 Note, that while the realistic number of pubdata that can be published in a batch is ~780kb, the size of the calldata to L1Messenger may be a lot larger due to the fact that this method also accepts the original uncompressed state diff entries. These will not be published to L1, but will be used to verify the correctness of the compression.
 
 One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with roughly 43212000 bytes needed for calldata. 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
-  
+
 In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
 operator to ensure that it can form the correct calldata for the L1Messenger.
 
@@ -335,14 +335,14 @@ For internal reasons related to possible future integrations of zero-knowledge p
 
 ```solidity
 struct BootloaderTxDescription {
-    // The offset by which the ABI-encoded transaction's data is stored
-    uint256 txDataOffset;
-    // Auxilary data on the transaction's execution. In our internal versions
-    // of the bootloader it may have some special meaning, but for the
-    // bootloader used on the mainnet it has only one meaning: whether to execute
-    // the transaction. If 0, no more transactions should be executed. If 1, then
-    // we should execute this transaction and possibly try to execute the next one.
-    uint256 txExecutionMeta;
+  // The offset by which the ABI-encoded transaction's data is stored
+  uint256 txDataOffset;
+  // Auxilary data on the transaction's execution. In our internal versions
+  // of the bootloader it may have some special meaning, but for the
+  // bootloader used on the mainnet it has only one meaning: whether to execute
+  // the transaction. If 0, no more transactions should be executed. If 1, then
+  // we should execute this transaction and possibly try to execute the next one.
+  uint256 txExecutionMeta;
 }
 ```
 
@@ -392,15 +392,16 @@ We process the L2 transactions according to our account abstraction protocol: [h
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
 3. We [conduct the validation step](../../system-contracts/bootloader/bootloader.yul#L1278) of the AA protocol:
 
-    - We calculate the hash of the transaction.
-    - If enough gas has been provided, we near_call the validation function in the bootloader. It sets the tx.origin to the address of the bootloader, sets the ergsPrice. It also marks the factory dependencies provided by the transaction as marked and then invokes the validation method of the account and verifies the returned magic.
-    - Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L787) for any excess funds sent.
+   - We calculate the hash of the transaction.
+   - If enough gas has been provided, we near_call the validation function in the bootloader. It sets the tx.origin to the address of the bootloader, sets the ergsPrice. It also marks the factory dependencies provided by the transaction as marked and then invokes the validation method of the account and verifies the returned magic.
+   - Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L787) for any excess funds sent.
 
 4. [We perform the execution of the transaction](../../system-contracts/bootloader/bootloader.yul#L1343). Note, that if the sender is an EOA, tx.origin is set equal to the `from` the value of the transaction. During the execution of the transaction, the publishing of the compressed bytecodes happens: for each factory dependency if it has not been published yet and its hash is currently pointed to in the compressed bytecodes area of the bootloader, a call to the bytecode compressor is done. Also, at the end the call to the KnownCodeStorage is done to ensure all the bytecodes have indeed been published.
 5. We [refund](../../system-contracts/bootloader/bootloader.yul#L1553) the user for any excess funds he spent on the transaction:
-    - Firstly, the `postTransaction` operation is called to the paymaster.
-    - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zkSync%20fee%20model.md) of the fee model.
-    - The bootloader refunds the user.
+
+   - Firstly, the `postTransaction` operation is called to the paymaster.
+   - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zkSync%20fee%20model.md) of the fee model.
+   - The bootloader refunds the user.
 
 6. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1211) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
 
@@ -487,7 +488,7 @@ For these contracts, we insert the `EmptyContract` code upon genesis. It is basi
 
 ### SHA256 & Keccak256
 
-Note that, unlike Ethereum, keccak256 is a precompile (*not an opcode*) on zkSync.
+Note that, unlike Ethereum, keccak256 is a precompile (_not an opcode_) on zkSync.
 
 These system contracts act as wrappers for their respective crypto precompile implementations. They are expected to be used frequently, especially keccak256, since Solidity computes storage slots for mapping and dynamic arrays with its help. That's why we wrote contracts on pure yul with optimizing the short input case. In the past both `sha256` and `keccak256` performed padding within the smart contracts, this is no longer true with `sha256` performing padding in the smart contracts and `keccak256` in the zk-circuits. Hashing is then completed for both within the zk-circuits.
 
@@ -513,9 +514,9 @@ More information on the extraAbiParams can be read [here](#flags-for-calls).
 
 #### Support for `.send/.transfer`
 
-On Ethereum, whenever a call with non-zero value is done, some additional gas is charged from the caller's frame and in return a `2300` gas stipend is given out to the callee frame. This stipend is usually enough to emit a small event, but it is enforced that it is not possible to change storage within these `2300` gas. This also means that in practice some users might opt to do `call` with 0 gas provided, relying on the `2300` stipend to be passed to the callee. This is the case for `.call/.transfer`.  
+On Ethereum, whenever a call with non-zero value is done, some additional gas is charged from the caller's frame and in return a `2300` gas stipend is given out to the callee frame. This stipend is usually enough to emit a small event, but it is enforced that it is not possible to change storage within these `2300` gas. This also means that in practice some users might opt to do `call` with 0 gas provided, relying on the `2300` stipend to be passed to the callee. This is the case for `.call/.transfer`.
 
-While using `.send/.transfer` is generally not recommended, as a step towards better EVM compatibility, since vm1.5.0 a *partial* support of these functions is present with zkSync Era. It is the done via the following means:
+While using `.send/.transfer` is generally not recommended, as a step towards better EVM compatibility, since vm1.5.0 a _partial_ support of these functions is present with zkSync Era. It is the done via the following means:
 
 - Whenever a call is done to the `MsgValueSimulator` system contract, `27000` gas is deducted from the caller's frame and it passed to the `MsgValueSimulator` on top of whatever gas the user has originally provided. The number was chosen to cover for the execution of the transfering of the balances as well as other constant size operations by the `MsgValueSimulator`. Note, that since it will be the frame of `MsgValueSimulator` that will actually call the callee, the constant must also include the cost for decommitting the code of the callee. Decoding bytecode of any size would be prohibitevely expensive and so we support only callees of size up to `100000` bytes.
 - `MsgValueSimulator` ensures that no more than `2300` out of the stipend above gets to the callee, ensuring the reentrancy protection invariant for these functions holds.
@@ -536,7 +537,7 @@ As a conclusion, using `.send/.transfer` should be generally avoided, but when a
 
 ### KnownCodeStorage
 
-This contract is used to store whether a certain code hash is “known”, i.e. can be used to deploy contracts. On zkSync, the L2 stores the contract’s code *hashes* and not the codes themselves. Therefore, it must be part of the protocol to ensure that no contract with unknown bytecode (i.e. hash with an unknown preimage) is ever deployed.
+This contract is used to store whether a certain code hash is “known”, i.e. can be used to deploy contracts. On zkSync, the L2 stores the contract’s code _hashes_ and not the codes themselves. Therefore, it must be part of the protocol to ensure that no contract with unknown bytecode (i.e. hash with an unknown preimage) is ever deployed.
 
 The factory dependencies field provided by the user for each transaction contains the list of the contract’s bytecode hashes to be marked as known. We can not simply trust the operator to “know” these bytecodehashes as the operator might be malicious and hide the preimage. We ensure the availability of the bytecode in the following way:
 
@@ -587,8 +588,8 @@ After execution, the constructor must return an array of:
 
 ```solidity
 struct ImmutableData {
-    uint256 index;
-    bytes32 value;
+  uint256 index;
+  bytes32 value;
 }
 ```
 
@@ -667,7 +668,7 @@ It works the following way:
 1. It accepts a versioned hash and double checks that it is marked as “known”, i.e. the operator must know the preimage for such hash.
 2. After that, it uses the `decommit` opcode, which accepts the versioned hash and the number of ergs to spent, which is proportional to the length of the preimage. If the preimage has been decommitted before, the requested cost will be refunded to the user.
 
-    Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possilbe price and then it will be refunded in case the bytecode has been decommitted before.
+   Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possilbe price and then it will be refunded in case the bytecode has been decommitted before.
 
 3. The `decommit` opcode returns to the slice of the decommitted bytecode. Note, that the returned pointer always has length of 2^21 bytes, regardless of the length of the actual bytecode. So it is the job of the `CodeOracle` system contract to shrink the length of the returned data.
 

@@ -21,7 +21,7 @@ This section contains some of the important changes that happened since the shar
 Before, Bridgehub contained a mapping from `chainId => stateTransitionManager`. The further resolution of the mapping should happen at the CTM level.
 For more intuitive management of the chains, a new mapping `chainId => hyperchainAddress` was added. This is considered more intuitive since “bridgehub is the owner of all the chains” mentality is more applicable with this new design.
 
-The upside of the previous approach was potentially easier migration within the same CTM. However, in the end it was decided that the new approach is better.  
+The upside of the previous approach was potentially easier migration within the same CTM. However, in the end it was decided that the new approach is better.
 
 #### Migration
 
@@ -53,7 +53,7 @@ Note, that for the chains that contained the `L2SharedBridge` before the upgrade
 
 ### StateTransitionManager was renamed to ChainTypeManager
 
-CTM was renamed to CTM (ChainTypeManager). This was done to use more intuitive naming as the chains of the same “type” share the same CTM.  
+CTM was renamed to CTM (ChainTypeManager). This was done to use more intuitive naming as the chains of the same “type” share the same CTM.
 
 ### Hyperchains were renamed to ZK chains
 

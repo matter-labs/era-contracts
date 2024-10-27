@@ -15,7 +15,7 @@ EIP-4844, commonly known as Proto-Danksharding, is an upgrade to the ethereum pr
 To facilitate EIP4844 blob support, our circuits allow providing two arrays in our public input to the circuit:
 
 - `blobCommitments` -- this is the commitment that helps to check the correctness of the blob content. The formula on how it is computed will be explained below in the document.
-- `blobHash`  -- the `keccak256` hash of the inner contents of the blob.
+- `blobHash` -- the `keccak256` hash of the inner contents of the blob.
 
 Note, that our circuits require that each blob contains exactly `4096 * 31` bytes. The maximal number of blobs that are supported by our proving system is 16, but the system contracts support only 6 blobs at most for now.
 
@@ -30,7 +30,6 @@ Let's see an example of how the approach above works in rollup DA validators.
 ### RollupL2DAValidator
 
 ![RollupL2DAValidator.png](./L1%20smart%20contracts/Rollup_DA.png)
-
 
 `RollupL2DAValidator` accepts the preimages for the data to publishes as well as their compressed format. After verifying the compression, it forms the `_totalPubdata` bytes array, which represents the entire blob of data that should be published to L1.
 

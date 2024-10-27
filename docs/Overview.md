@@ -16,7 +16,6 @@ We want to create a system where:
 - Interop is seamless and enables unified liquidity for assets across the ecosystem.
 - Multi-chain smart contracts need to be easy to develop, which means easy access to traditional bridges, and other supporting architecture.
 
-
 ZKsync Era is a permissionless general-purpose ZK rollup. Similar to many L1 blockchains and sidechains it enables
 deployment and interaction with Turing-complete smart contracts.
 

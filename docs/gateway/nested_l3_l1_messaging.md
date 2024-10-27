@@ -14,6 +14,7 @@ This document assumes that the reader is already aware of what SyncLayer (or how
 “Multiple arrows” from `AggregatedRoot` to `chainIdRoot` and from each `chainIdRoot` to `batchRoot` are for illustrational purposes only.
 
 In fact, the tree above will be a binary merkle tree, where the `AggregatedRoot` will be the root of the tree of `chainIdRoot`, while `chainIdRoot` is the merkle root of a binary merkle tree of `batchRoot`.
+
 >
 
 For each chain that settles on L1, the root will have the following format:
@@ -39,7 +40,7 @@ In other words, we get the recursive structure, where for leaves of it, i.e. cha
 
 ## Appending new batch root leafs
 
-At the execution stage of every batch, the ZK Chain would call the `MessageRoot.addChainBatchRoot` function, while providing the  `SettledRootOfBatch` for the chain. Then, the `BatchRootLeaf` will be calculated and appended to the incremental merkle tree with which the  `ChainIdRoot` & `ChainIdLeaf` is calculated, which will be updated in the merkle tree of `ChainIdLeafs`.
+At the execution stage of every batch, the ZK Chain would call the `MessageRoot.addChainBatchRoot` function, while providing the `SettledRootOfBatch` for the chain. Then, the `BatchRootLeaf` will be calculated and appended to the incremental merkle tree with which the `ChainIdRoot` & `ChainIdLeaf` is calculated, which will be updated in the merkle tree of `ChainIdLeafs`.
 
 At the end of the batch, the L1Messenger system contract would query the MessageRoot contract for the total aggregated root, i.e. the root of all `ChainIdLeafs` . Calculate the settled root `settledMessageRoot = keccak256(LocalRoot, AggregatedRoot)` and propagate it to L1.
 
@@ -57,39 +58,37 @@ If the depth of recursion is larger than 1, then step (1) could be repeated mult
 Right now for proving logs the following interface is exposed on L1 side:
 
 ```solidity
-    struct L2Log {
-      uint8 l2ShardId;
-      bool isService;
-      uint16 txNumberInBatch;
-      address sender;
-      bytes32 key;
-      bytes32 value;
-  }
-  
-    
-    function proveL2LogInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Log calldata _log,
-        bytes32[] calldata _proof
-    ) external view override returns (bool) {
-        address hyperchain = getHyperchain(_chainId);
-        return IZkSyncHyperchain(hyperchain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
-    }
+struct L2Log {
+  uint8 l2ShardId;
+  bool isService;
+  uint16 txNumberInBatch;
+  address sender;
+  bytes32 key;
+  bytes32 value;
+}
+
+function proveL2LogInclusion(
+  uint256 _chainId,
+  uint256 _batchNumber,
+  uint256 _index,
+  L2Log calldata _log,
+  bytes32[] calldata _proof
+) external view override returns (bool) {
+  address hyperchain = getHyperchain(_chainId);
+  return IZkSyncHyperchain(hyperchain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+}
 ```
 
 Let’s define a new function:
 
 ```solidity
-     function proveL2LeafInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _mask,
-        bytes32 _leaf,
-        bytes32[] calldata _proof
-    ) external view override returns (bool) {
-    }
+function proveL2LeafInclusion(
+  uint256 _chainId,
+  uint256 _batchNumber,
+  uint256 _mask,
+  bytes32 _leaf,
+  bytes32[] calldata _proof
+) external view override returns (bool) {}
 ```
 
 This function will prove that a certain 32-byte leaf belongs to the tree. Note, that the fact that the `leaf` is 32-bytes long means that the function could work successfully for internal leaves also. To prevent this it will be the callers responsibility to ensure that the preimage of the leaf is larger than 32-bytes long and/or use other ways to ensuring that the function will be called securely.
@@ -112,10 +111,10 @@ If the chain is not a settlement layer of itself, we then need to calculate:
 
 - `BatchRootLeaf = keccak256(BATCH_LEAF_HASH_PADDING, SettledRootOfBatch, batch_number).`
 - Consume one element from the `_proofs` array to get the mask for the merkle path of the batch leaf in the chain id tree.
-- Consume `batchLeafProofLen` elements to construct the  `ChainIdRoot`
+- Consume `batchLeafProofLen` elements to construct the `ChainIdRoot`
 - After that, we calculate the `chainIdLeaf = keccak256(CHAIN_ID_LEAF_PADDING, chainIdRoot, chainId`
 
-Now, we have the *supposed* `chainIdRoot` for the chain inside its settlement layer. The only thing left to prove is that this root belonged to some batch of the settlement layer.
+Now, we have the _supposed_ `chainIdRoot` for the chain inside its settlement layer. The only thing left to prove is that this root belonged to some batch of the settlement layer.
 
 Then, the following happens:
 
@@ -131,7 +130,7 @@ Now, we can call the function to verify that the batch belonged to the settlemen
         chainIdLeaf,
         // Basically pass the rest of the `_proof` array
         extractSliceUntilEnd(_proof, ptr)
-    ); 
+    );
 ```
 
 The other slice of the `_proof` array is expected to have the same structure as before:
@@ -169,7 +168,7 @@ Firstly, unless the chain settles on L1, this requires a trusted settlement laye
 
 Secondly, we guarantee that all the stored `ChainIdLeafs` are published on L1, even for Validiums. Publishing a single 32 byte value per relatively big Gateway batch has little price for Validiums, but it ensures that the settlement root of the gateway can always be constructed. And, assuming that the preimage for the chain root could be constructed, this gives an ability to ability to recover the proof for any L3→L1 coming from a rollup.
 
-But how can one reconstruct the total chain tree for a particular rollup chain? A rollup would relay all of its pubdata to L1, meaning that by observing L1, the observer would know all the L3→L1 logs that happened in a particular batch. It means that for each batch it can restore the  `LocalRoot` (in case the `AggregatedRoot` is non-zero, it could be read from e.g. the storage which is available via the standard state diffs). This allows to calculate the `BatchRootLeaf` for the chain. The only thing missing is understanding which batches were finalized on gateway in order to construct the merkle path to the `ChainRootLeaf`.
+But how can one reconstruct the total chain tree for a particular rollup chain? A rollup would relay all of its pubdata to L1, meaning that by observing L1, the observer would know all the L3→L1 logs that happened in a particular batch. It means that for each batch it can restore the `LocalRoot` (in case the `AggregatedRoot` is non-zero, it could be read from e.g. the storage which is available via the standard state diffs). This allows to calculate the `BatchRootLeaf` for the chain. The only thing missing is understanding which batches were finalized on gateway in order to construct the merkle path to the `ChainRootLeaf`.
 
 To understand which SL was used by a batch for finalization, one could simply brute force over all settlement layers ever used to find out where the settledBatchRoot is stored.. This number is expected to be rather small.
 

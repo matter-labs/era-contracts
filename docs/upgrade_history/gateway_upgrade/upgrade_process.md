@@ -10,7 +10,7 @@ The previous version can be found [here](https://github.com/matter-labs/era-cont
 
 The documentation for the previous version can be found [here](https://github.com/code-423n4/2024-03-zksync).
 
-However, deep knowledge of the previous version should not be required for understanding. But this document *does* require understanding of the new system, so it should be the last document for you to read.
+However, deep knowledge of the previous version should not be required for understanding. But this document _does_ require understanding of the new system, so it should be the last document for you to read.
 
 ## Overall design motivation
 
@@ -48,7 +48,7 @@ PS: It may be possible that for more contracts, e.g. some of the proxies we coul
 
 ### L2SharedBridge and L2WETH migration
 
-In the current system (i.e. before the gateway upgrade), the trusted admin of the L1SharedBridge  is responsible for [setting the correct L2SharedBridge address for chains](https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/l1-contracts/contracts/bridge/L1SharedBridge.sol#L249) (note that the links points to the old code and not the one in the scope of the contest). This is done with no additional validation. The system is generally designed to protect chains in case when a malicious admin tries to attack a chain. There are two measures to do that:
+In the current system (i.e. before the gateway upgrade), the trusted admin of the L1SharedBridge is responsible for [setting the correct L2SharedBridge address for chains](https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/l1-contracts/contracts/bridge/L1SharedBridge.sol#L249) (note that the links points to the old code and not the one in the scope of the contest). This is done with no additional validation. The system is generally designed to protect chains in case when a malicious admin tries to attack a chain. There are two measures to do that:
 
 - The general assumption is that the L2 shared bridge is set for a chain as soon as possible. It is a realistic assumption, since without it no bridging of any funds except for the base token is possible. So if at an early stage the admin would put a malicious l2 shared bridge for a chain, it would lose its trust from the community and the chain should be discarded.
 - Admin can not retroactively change L2 shared bridge for any chains. So once the correct L2 shared bridge is set, there is no way a bad admin can harm the chain.
@@ -90,7 +90,7 @@ This upgrade the different approach is used to ensure safe and riskless preparat
 
 ### Things to sign by the governance
 
-The governance should sign all operations that will happen in all of the consecutive stages at this time.  There will be no other voting. Unless stated otherwise, all the governance operations in this document are listed as dependencies for one another, i.e. must be executed in strictly sequential order.
+The governance should sign all operations that will happen in all of the consecutive stages at this time. There will be no other voting. Unless stated otherwise, all the governance operations in this document are listed as dependencies for one another, i.e. must be executed in strictly sequential order.
 
 Note, that to support “Stage 3” it would also need to finalize all the details for Gateway, including its chain id, chain admin, etc.
 
@@ -98,7 +98,7 @@ Note, that to support “Stage 3” it would also need to finalize all the detai
 
 ### Txs by governance (in one multicall)
 
-1. The governance accepts ownership for all the contracts that used  `TransitionaryOwner`.
+1. The governance accepts ownership for all the contracts that used `TransitionaryOwner`.
 2. The governance publishes the new version by calling `function setNewVersionUpgrade`.
 3. The governance calls `setChainCreationParams` and sets temporary incorrect values there that use a contract that always reverts as the `genesisUpgrade`, ensuring that no new chains can be created until Stage 2.
 4. The governance should call the `GovernanceUpgradeTimer.startTimer()` to ensure that the timer for the upgrade starts.
@@ -139,13 +139,13 @@ If the above could be composed on L1 to still reuse the old list of `(address, b
 
 Due to the complexity of the actions above, it was decided to put all those into the [L2GatewayUpgrade](../../../system-contracts/contracts/L2GatewayUpgrade.sol) contract. It is supposed to be force-deployed with the constructor parameters containing the `ZKChainSpecificForceDeploymentsData` as well as `FixedForceDeploymentsData`. It will be forcedeployed to the ComplexUpgrader’s address to get the kernel space rights.
 
-So most of the system contracts will be deployed the old way (via force deployment), but for more complex thing the `L2GatewayUpgrade` will be temporarily put onto `ComplexUpgrader` address and initialize additional contracts inside the constructor. Then the correct will be put back there.  
+So most of the system contracts will be deployed the old way (via force deployment), but for more complex thing the `L2GatewayUpgrade` will be temporarily put onto `ComplexUpgrader` address and initialize additional contracts inside the constructor. Then the correct will be put back there.
 
 So entire flow can be summarized by the following:
 
 1. On L1, when `AdminFacet.upgradeChainFromVersion` is called by the Chain Admin, the contract delegatecalls to the [GatewayUpgrade](../../../l1-contracts/contracts/upgrades/GatewayUpgrade.sol) contract.
 2. The `GatewayUpgrade` gathers all the needed data to compose the `ZKChainSpecificForceDeploymentsData`, while the `FixedForceDeploymentsData` is part is hardcoded inside the upgrade transaction.
-3. The combined upgrade transaction consists of many forced deployments (basically tuples of `(address, bytecodeHash, constructorInput)`) and one of these that is responsible for the temporary  `L2GatewayUpgrade` gets its `constructorInput` set to contain the   `ZKChainSpecificForceDeploymentsData` / `FixedForceDeploymentsData`.
+3. The combined upgrade transaction consists of many forced deployments (basically tuples of `(address, bytecodeHash, constructorInput)`) and one of these that is responsible for the temporary `L2GatewayUpgrade` gets its `constructorInput` set to contain the `ZKChainSpecificForceDeploymentsData` / `FixedForceDeploymentsData`.
 4. When the upgrade is executed on L2, it iterates over the forced deployments, deploys most of the contracts and then executes the `L2GatewayUpgrade`.
 5. `L2GatewayUpgrade` will deploy the L2 Bridgehub, MessageRoot, L2NativeTokenVault, L2AssetRouters. It will also deploy l2WrappedBaseToken if missing. It will also upgrade the implementations the L2SharedBridge as well as the UpgradaeableBeacon for these tokens.
 

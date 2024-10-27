@@ -36,13 +36,13 @@ In other words, unlike EVM, the user should always have enough gas for the worst
 
 Unlike EVM, our storage does not couple accounts' balances, nonces, and bytecodes. Balance, nonce, and code hash are three separate storage variables that use standard storage "warm" and "cold" mechanisms. A different approach is used for accessing bytecodes though.
 
-We call the process of unpacking the bytecode as, *code decommitment*, since it is a process of transforming a commitment to code (i.e., the versioned code hash) into its preimage. Whenever a contract with a certain code hash is called, the following logic is executed:
+We call the process of unpacking the bytecode as, _code decommitment_, since it is a process of transforming a commitment to code (i.e., the versioned code hash) into its preimage. Whenever a contract with a certain code hash is called, the following logic is executed:
 
 1. The operator is asked whether this is the first time this bytecode has been decommitted.
 2. If the operator returns "yes", then the user is charged the full cost. Otherwise, the user does not pay for decommit.
 3. If needed, the code is decommitted to the code page.
 
-Unlike storage interactions, the correctness of this process is *partially* enforced by circuits, i.e., if step (3) is reached, i.e., the code is being decommitted, it will be proven that the operator responded correctly on step (1). However, if the program runs out of gas on step (2), the correctness of the first statement won't be proven. The reason for that is it is hard to prove in circuits at the time the decommitment is invoked whether it is indeed the first decommitment or not.
+Unlike storage interactions, the correctness of this process is _partially_ enforced by circuits, i.e., if step (3) is reached, i.e., the code is being decommitted, it will be proven that the operator responded correctly on step (1). However, if the program runs out of gas on step (2), the correctness of the first statement won't be proven. The reason for that is it is hard to prove in circuits at the time the decommitment is invoked whether it is indeed the first decommitment or not.
 
 Note that in the case of an honest operator, this approach offers a better UX, since there is no need to be precharged with the full cost beforehand. However, no program should rely on this fact.
 
@@ -56,11 +56,11 @@ zkSync Era has different memory pricing rules:
 
 - Whenever a user contract is called, `2^12` bytes of memory are given out for free, before starting to charge users linearly according to its length.
 - Whenever a kernel space (i.e., a system) contract is called, `2^21` bytes of memory are given out for free, before starting to charge users linearly according to the length.
-Note that, unlike EVM, we never use a quadratic component of the price for memory expansion.
+  Note that, unlike EVM, we never use a quadratic component of the price for memory expansion.
 
 ### Different intrinsic costs
 
-Unlike Ethereum, where the intrinsic cost of transactions (`21000` gas) is used to cover the price of updating the balances of the users, the nonce and signature verification, on zkSync these prices are *not* included in the intrinsic costs for transactions, due to the native support of account abstraction, meaning that each account type may have their own transaction cost. In theory, some may even use more zk-friendly signature schemes or other kinds of optimizations to allow cheaper transactions for their users.
+Unlike Ethereum, where the intrinsic cost of transactions (`21000` gas) is used to cover the price of updating the balances of the users, the nonce and signature verification, on zkSync these prices are _not_ included in the intrinsic costs for transactions, due to the native support of account abstraction, meaning that each account type may have their own transaction cost. In theory, some may even use more zk-friendly signature schemes or other kinds of optimizations to allow cheaper transactions for their users.
 
 That being said, zkSync transactions do come with some small intrinsic costs, but they are mostly used to cover costs related to the processing of the transaction by the bootloader which can not be easily measured in code in real-time. These are measured via testing and are hard coded.
 
@@ -77,7 +77,7 @@ To process the batch, the zkSync team has to pay for proving the batch, committi
 - The L2 requirements for proving the circuits (denoted in L2 gas).
 - The L1 requirements for the proof verification as well as general batch processing (denoted in L1 gas).
 
-We generally try to aggregate as many transactions as possible and each transaction pays for the batch overhead proportionally to how close the transaction brings the batch to being *sealed,* i.e. closed and prepared for proof verification and submission on L1. A transaction gets closer to sealing a batch by using the batch’s *limited resources*.
+We generally try to aggregate as many transactions as possible and each transaction pays for the batch overhead proportionally to how close the transaction brings the batch to being _sealed,_ i.e. closed and prepared for proof verification and submission on L1. A transaction gets closer to sealing a batch by using the batch’s _limited resources_.
 
 While on Ethereum, the main reason for the existence of a batch gas limit is to keep the system decentralized & load low, i.e. assuming the existence of the correct hardware, only time would be a requirement for a batch to adhere to. In the case of zkSync batches, there are some limited resources the batch should manage:
 
@@ -187,7 +187,7 @@ The important part here is that while such refunds are inlined (i.e. unlike the 
 
 ## How we charge for pubdata
 
-zkSync Era is a state diff-based rollup. It means that it is not possible to know how much pubdata a transaction will take before its execution. We *could* charge for pubdata the following way: whenever a user does an operation that emits pubdata (writes to storage, publishes an L2->L1 message, etc.), we charge `pubdata_bytes_published * gas_per_pubdata` directly from the context of the execution.
+zkSync Era is a state diff-based rollup. It means that it is not possible to know how much pubdata a transaction will take before its execution. We _could_ charge for pubdata the following way: whenever a user does an operation that emits pubdata (writes to storage, publishes an L2->L1 message, etc.), we charge `pubdata_bytes_published * gas_per_pubdata` directly from the context of the execution.
 
 However, such an approach has the following disadvantages:
 
@@ -195,7 +195,7 @@ However, such an approach has the following disadvantages:
 - It is prone to unneeded overhead. For instance, in the case of reentrancy locks, the user will still have to pay the initial price for marking the lock as used. The price will get refunded in the end, but it still worsens the UX.
 - If we want to impose any sort of limit on how much computation a transaction could take (let's call this limit `MAX_TX_GAS_LIMIT`), it would mean that no more than `MAX_TX_GAS_LIMIT / gas_per_pubdata` could be published in a transaction, making this limit either too small or forcing us to increase `baseFee` to prevent the number from growing too much.
 
-To avoid the issues above we need to somehow decouple the gas spent on pubdata from the gas spent on execution. While calldata-based rollups precharge for calldata, we cannot do it, since the exact state diffs are known only after the transaction is finished. We'll use the approach of *post-charging.* Basically, we'll keep a counter that tracks how much pubdata has been spent and charge the user for the calldata at the end of the transaction.
+To avoid the issues above we need to somehow decouple the gas spent on pubdata from the gas spent on execution. While calldata-based rollups precharge for calldata, we cannot do it, since the exact state diffs are known only after the transaction is finished. We'll use the approach of _post-charging._ Basically, we'll keep a counter that tracks how much pubdata has been spent and charge the user for the calldata at the end of the transaction.
 
 A problem with post-charging is that the user may spend all their gas within the transaction so we'll have no gas to charge for pubdata from. Note, however, that if the transaction is reverted, all the state changes that were related to it will be reverted too. That's why whenever we need to charge the user for pubdata, but it doesn't provide enough gas, the transaction will get reverted. The user will pay for the computation, but no state changes (and thus, pubdata) will be produced by the transaction.
 
@@ -203,7 +203,7 @@ So it will work the following way:
 
 1. Firstly, we fix the amount of pubdata published so far. Let's denote it as `basePubdataSpent`.
 2. We execute the validation of the transaction.
-3. We check whether `(getPubdataSpent() - basePubdataSpent) * gasPerPubdata <= gasLeftAfterValidation`. If it is not, then the transaction does not cover enough funds for itself, so it should be *rejected* (unlike revert, which means that the transaction is not even included in the block).
+3. We check whether `(getPubdataSpent() - basePubdataSpent) * gasPerPubdata <= gasLeftAfterValidation`. If it is not, then the transaction does not cover enough funds for itself, so it should be _rejected_ (unlike revert, which means that the transaction is not even included in the block).
 4. We execute the transaction itself.
 5. We do the same check as in (3), but now if the transaction does not have enough gas for pubdata, it is reverted, i.e., the user still pays the fee to cover the computation for its transaction.
 6. (optional, in case a paymaster is used). We repeat steps (4-5), but now for the `postTransaction` method of the paymaster.
@@ -243,9 +243,9 @@ uint256 lastProcessed;
 function processNWithdrawals(uint256 N) external nonReentrant {
   uint256 current = lastProcessed + 1;
   uint256 lastToProcess = current + N - 1;
-  
+
   while(current <= lastToProcess) {
-    // If the user provided some bad token that takes more than MAX_WITHDRAWAL_GAS  
+    // If the user provided some bad token that takes more than MAX_WITHDRAWAL_GAS
     // to transfer, it is the problem of the user and it will stall the queue, so
     // the `_success` value is ignored.
     Withdrawal storage currentQueue = queue[current];
@@ -264,17 +264,17 @@ The above assumptions work in the pre-charge model (calldata based rollups) or p
 
 If a user really needs to limit the amount of gas that the subcall takes, all the subcalls should be routed through a special contract, that will guarantee that the total cost of the subcall wont be larger than the gas provided (by reverting if needed).
 
-An implementation of this special contract can be seen [here](../../gas-bound-caller/contracts/GasBoundCaller.sol). Note, that this contract is *not* a system one and it will be deployed on some fixed, but not kernel space address.
+An implementation of this special contract can be seen [here](../../gas-bound-caller/contracts/GasBoundCaller.sol). Note, that this contract is _not_ a system one and it will be deployed on some fixed, but not kernel space address.
 
-#### 1. Case of when a malicious contract consumes a large, but processable amount of pubdata**
+#### 1. Case of when a malicious contract consumes a large, but processable amount of pubdata\*\*
 
 In this case, the topmost transaction will be able to sponsor such subcalls. When a transaction is processed, at most 80M gas is allowed to be passed to the execution. The rest can only be spent on pubdata during the post-charging.
 
-#### 2. Case of when a malicious contract consumes an unprocessable amount of pubdata**
+#### 2. Case of when a malicious contract consumes an unprocessable amount of pubdata\*\*
 
 In this case, the malicious callee published so much pubdata, that such a transaction can not be included into a batch. This effectively means that no matter how much money the topmost transaction willing to pay, the queue is stalled.
 
-The only way how it is combated is by setting some minimal amount of ergs that still have to be consumed with each emission of pubdata (basically to make sure that it is not possible to publish large chunks of pubdata while using negligible computation). Unfortunately, setting this minimal amount to cover the worst possible case (i.e. 80M ergs spent with maximally 100k of pubdata available, leading to 800 L2 gas / pubdata byte) would likely be too harsh and will negatively impact average UX. Overall, this *is* the way to go, however for now the only guarantee will be that a subcall of 1M gas is always processable, which will mean that at least 80 gas will have to be spent for each published pubdata byte. Even if higher than real L1 gas costs, it is reasonable even in the long run, since all the things that are published as pubdata are state-related and so they have to be well-priced for long-term storage.
+The only way how it is combated is by setting some minimal amount of ergs that still have to be consumed with each emission of pubdata (basically to make sure that it is not possible to publish large chunks of pubdata while using negligible computation). Unfortunately, setting this minimal amount to cover the worst possible case (i.e. 80M ergs spent with maximally 100k of pubdata available, leading to 800 L2 gas / pubdata byte) would likely be too harsh and will negatively impact average UX. Overall, this _is_ the way to go, however for now the only guarantee will be that a subcall of 1M gas is always processable, which will mean that at least 80 gas will have to be spent for each published pubdata byte. Even if higher than real L1 gas costs, it is reasonable even in the long run, since all the things that are published as pubdata are state-related and so they have to be well-priced for long-term storage.
 
 In the future, we will guarantee the processability of subcalls of larger size by increasing the number of pubdata that can be published per batch.
 
@@ -283,7 +283,6 @@ In the future, we will guarantee the processability of subcalls of larger size b
 As already mentioned, the transactions on zkSync depend on volatile L1 gas costs to publish the pubdata for batch, verify proofs, etc. For this reason, zkSync-specific EIP712 transactions contain the `gas_per_pubdata_limit` field, denoting the maximum `gas_per_pubdata` that the operator can charge the user for a single byte of pubdata.
 
 For Ethereum transactions (which do not contain this field), the block's `gas_per_pubdata` is used.
-
 
 ## Improvements in the upcoming releases
 

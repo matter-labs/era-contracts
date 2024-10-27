@@ -62,7 +62,7 @@ We can not support multiple upgrades in parallel, i.e. the next upgrade should s
 The upgrade transactions are processed just like with priority transactions, with only the following differences:
 
 - We can have only one upgrade transaction per batch & this transaction must be the first transaction in the batch.
-- The system contracts upgrade transaction is not appended to `priorityOperationsRollingHash` and doesn’t increment `numberOfPriorityTransactions`. Instead, its hash is calculated via a system L2→L1 log *before* it gets executed. Note, that it is an important property. More on it [below](#security-considerations).
+- The system contracts upgrade transaction is not appended to `priorityOperationsRollingHash` and doesn’t increment `numberOfPriorityTransactions`. Instead, its hash is calculated via a system L2→L1 log _before_ it gets executed. Note, that it is an important property. More on it [below](#security-considerations).
 
 ### Commit
 
@@ -84,7 +84,7 @@ Once batch with the upgrade transaction has been executed, we [delete](../../../
 
 Since the operator can put any data into the bootloader memory and for L1→L2 transactions the bootloader has to blindly trust it and rely on L1 contracts to validate it, it may be a very powerful tool for a malicious operator. Note, that while the governance mechanism is trusted, we try to limit our trust for the operator as much as possible, since in the future anyone would be able to become an operator.
 
-Some time ago, we *used to* have a system where the upgrades could be done via L1→L2 transactions, i.e. the implementation of the `DiamondProxy` upgrade would include a priority transaction (with `from` equal to for instance `FORCE_DEPLOYER`) with all the upgrade params.
+Some time ago, we _used to_ have a system where the upgrades could be done via L1→L2 transactions, i.e. the implementation of the `DiamondProxy` upgrade would include a priority transaction (with `from` equal to for instance `FORCE_DEPLOYER`) with all the upgrade params.
 
 In the current system though having such logic would be dangerous and would allow for the following attack:
 

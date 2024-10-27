@@ -6,13 +6,13 @@
 
 Currently bridging between different zk rollups requires the funds to pass through L1. This is slow & expensive.
 
-The vision of seamless internet of value requires transfers of value to be *both* seamless and trustless. This means that for instance different STs need to share the same L1 liquidity, i.e. a transfer of funds should never touch L1 in the process. However, it requires some sort of trust between two chains. If a malicious (or broken) rollup becomes a part of the shared liquidity pool it can steal all the funds.
+The vision of seamless internet of value requires transfers of value to be _both_ seamless and trustless. This means that for instance different STs need to share the same L1 liquidity, i.e. a transfer of funds should never touch L1 in the process. However, it requires some sort of trust between two chains. If a malicious (or broken) rollup becomes a part of the shared liquidity pool it can steal all the funds.
 
 However, can two instances of the same zk rollup trust each other? The answer is yes, because no new additions of rollups introduce new trust assumptions. Assuming there are no bugs in circuits, the system will work as intended.
 
-How can two rollups know that they are two different instances of the same system? We can create a factory of such contracts (and so we would know that each new rollup created by this instance is correct one). But just creating correct contracts is not enough. Ethereum changes, new bugs may be found in the original system & so an instance that does not keep itself up-to-date with the upgrades may exploit some bug from the past and jeopardize the entire system. Just deploying is not enough. We need to constantly make sure that all STs are up to date and maintain whatever other invariants are needed for these STs to trust each other.  
+How can two rollups know that they are two different instances of the same system? We can create a factory of such contracts (and so we would know that each new rollup created by this instance is correct one). But just creating correct contracts is not enough. Ethereum changes, new bugs may be found in the original system & so an instance that does not keep itself up-to-date with the upgrades may exploit some bug from the past and jeopardize the entire system. Just deploying is not enough. We need to constantly make sure that all STs are up to date and maintain whatever other invariants are needed for these STs to trust each other.
 
-Let’s define as *Chain Type Manager* (CTM) **as a contract that is responsible for the following:
+Let’s define as _Chain Type Manager_ (CTM) \*\*as a contract that is responsible for the following:
 
 - It serves as a factory to deploy STs (new ZK chains)
 - It is responsible for ensuring that all the STs deployed by it are up-to-date.
@@ -27,19 +27,19 @@ For now, only one CTM will be supported — the one that deploys instances of zk
 
 The exact process of deploying & registering a ST can be [read here](./chain_genesis.md). Overall, each ST in the current release will have the following parameters:
 
-| ST parameter | Updatability | Comment |
-| --- | --- | --- |
-| chainId | Permanent | Permanent identifier of the ST. Due to wallet support reasons, for now chainId has to be small (48 bits). This is one of the reasons why for now we’ll deploy STs manually, to prevent STs from having the same chainId as some another popular chain.  In the future it will be trustlessly assigned as a random 32-byte value.|
-| baseTokenAssetId | Permanent | Each ST can have their own custom base token (i.e. token used for paying the fees). It is set once during creation and can never be changed. Note, that we refer to and "asset id" here instead of an L1 address. To read more about what is assetId and how it works check out the document for [asset router](../bridging/asset_router/Overview.md) |
-| chainTypeManager | Permanent | The CTM that deployed the ST. In principle, it could be possible to migrate between CTMs (assuming both CTMs support that). However, in practice it may be very hard and as of now such functionality is not supported. |
-| admin | By admin of ST | The admin of the ST. It has some limited powers to govern the chain. To read more about which powers are available to a chain admin and which precautions should be taken, check [out this document](../chain_management/admin_role.md) |
-| validatorTimelock | CTM | For now, we want all the chains to use the same 21h timelock period before their batches are finalized. Only CTM can update the address that can submit state transitions to the rollup (that is, the validatorTimelock).  |
-| validatorTimelock.validator | By admin of ST | The admin of ST can choose who can submit new batches to the ValidatorTimelock.  |
-|  priorityTx FeeParams | By admin of ST | The admin of a ZK chain can amend the priority transaction fee params. |
-|  transactionFilterer | By admin of ST | A chain may put an additional filter to the incoming L1->L2 transactions. This may be needed by a permissioned chain (e.g. a Validium bank-lile corporate chain). |
-|  DA validation / permanent rollup status | By admin of ST | A chain can decide which DA layer to use. You check out more about [safe DA management here](./admin_role.md)  |
-| executing upgrades | By admin of ST | While exclusively CTM governance can set the content of the upgrade, STs will typically be able to choose suitable time for them to actually execute it. In the current release, STs will have to follow our upgrades. |
-| settlement layer | By admin of ST | The admin of the chain can enact migrations to other settlement layers. |
+| ST parameter                            | Updatability   | Comment                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| chainId                                 | Permanent      | Permanent identifier of the ST. Due to wallet support reasons, for now chainId has to be small (48 bits). This is one of the reasons why for now we’ll deploy STs manually, to prevent STs from having the same chainId as some another popular chain. In the future it will be trustlessly assigned as a random 32-byte value.                       |
+| baseTokenAssetId                        | Permanent      | Each ST can have their own custom base token (i.e. token used for paying the fees). It is set once during creation and can never be changed. Note, that we refer to and "asset id" here instead of an L1 address. To read more about what is assetId and how it works check out the document for [asset router](../bridging/asset_router/Overview.md) |
+| chainTypeManager                        | Permanent      | The CTM that deployed the ST. In principle, it could be possible to migrate between CTMs (assuming both CTMs support that). However, in practice it may be very hard and as of now such functionality is not supported.                                                                                                                               |
+| admin                                   | By admin of ST | The admin of the ST. It has some limited powers to govern the chain. To read more about which powers are available to a chain admin and which precautions should be taken, check [out this document](../chain_management/admin_role.md)                                                                                                               |
+| validatorTimelock                       | CTM            | For now, we want all the chains to use the same 21h timelock period before their batches are finalized. Only CTM can update the address that can submit state transitions to the rollup (that is, the validatorTimelock).                                                                                                                             |
+| validatorTimelock.validator             | By admin of ST | The admin of ST can choose who can submit new batches to the ValidatorTimelock.                                                                                                                                                                                                                                                                       |
+| priorityTx FeeParams                    | By admin of ST | The admin of a ZK chain can amend the priority transaction fee params.                                                                                                                                                                                                                                                                                |
+| transactionFilterer                     | By admin of ST | A chain may put an additional filter to the incoming L1->L2 transactions. This may be needed by a permissioned chain (e.g. a Validium bank-lile corporate chain).                                                                                                                                                                                     |
+| DA validation / permanent rollup status | By admin of ST | A chain can decide which DA layer to use. You check out more about [safe DA management here](./admin_role.md)                                                                                                                                                                                                                                         |
+| executing upgrades                      | By admin of ST | While exclusively CTM governance can set the content of the upgrade, STs will typically be able to choose suitable time for them to actually execute it. In the current release, STs will have to follow our upgrades.                                                                                                                                |
+| settlement layer                        | By admin of ST | The admin of the chain can enact migrations to other settlement layers.                                                                                                                                                                                                                                                                               |
 
 > Note, that if we take a look at the access control for the corresponding functions inside the [AdminFacet](../../l1-contracts/contracts/state-transition/chain-deps/facets/Admin.sol), the may see that a lot of methods from above that are marked as "By admin of ST" could be in theory amended by the ChainTypeManager. However, this sort of action requires approval from decentralized governance. Also, in case of an urgent high risk situation, the decentralized governance might force upgrade the contract via CTM.
 
@@ -49,9 +49,10 @@ In the current release, each chain will be an instance of zkSync Era and so the 
 
 1. Firstly, the governance of the CTM will publish the server (including sequencer, prover, etc) that support the new version . This is done offchain. Enough time should be given to various zkStack devs to update their version.
 2. The governance of the CTM will publish the upgrade onchain by automatically executing the following three transactions:
-    - `setChainCreationParams` ⇒ to ensure that new chains will be created with the version
-    - `setValidatorTimelock` (if needed) ⇒ to ensure that the new chains will use the new validator timelock right-away
-    - `setNewVersionUpgrade` ⇒ to save the upgrade information that each ST will need to follow to conduct the upgrade on their side.
+
+   - `setChainCreationParams` ⇒ to ensure that new chains will be created with the version
+   - `setValidatorTimelock` (if needed) ⇒ to ensure that the new chains will use the new validator timelock right-away
+   - `setNewVersionUpgrade` ⇒ to save the upgrade information that each ST will need to follow to conduct the upgrade on their side.
 
 3. After that, each ChainAdmin can upgrade to the new version in suitable time for them.
 

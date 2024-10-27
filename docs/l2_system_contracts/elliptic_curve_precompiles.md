@@ -45,14 +45,13 @@ The exponentiation was carried out using the square and multiply algorithm, whic
 
 ## Montgomery Form
 
-Let’s take a number `R`, such that `gcd(N, R) == 1` and `R` is a number by which we can efficiently divide and take module over it (for example power of two or better machine word, aka 2^256). Then transform every number to the form of `x * R mod N` / `y * R mod N` and then we get efficient modulo addition and multiplication. The only thing is that before working with numbers we need to transform them to the form from `x mod N`  to the `x * R mod N` and after performing operations transform the form back.
+Let’s take a number `R`, such that `gcd(N, R) == 1` and `R` is a number by which we can efficiently divide and take module over it (for example power of two or better machine word, aka 2^256). Then transform every number to the form of `x * R mod N` / `y * R mod N` and then we get efficient modulo addition and multiplication. The only thing is that before working with numbers we need to transform them to the form from `x mod N` to the `x * R mod N` and after performing operations transform the form back.
 
 For the latter, we will assume that `N` is the module that we use in computations, and `R` is $2^{256}$, since we can efficiently divide and take module over this number and it practically satisfies the property of `gcd(N, R) == 1`.
 
 ### Montgomery Reduction Algorithm (REDC)
 
 > Reference: <https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm>
->
 
 ```solidity
 /// @notice Implementation of the Montgomery reduction algorithm (a.k.a. REDC).
@@ -163,13 +162,13 @@ To compute $2P$ (or $P+P$), there are three cases:
 
 - If $P = O$, then $2P = O$.
 - Else $P = (x, y)$
+
   - If $y = 0$, then $2P = O$.
   - Else $y≠0$, then
 
     $$
     \begin{gather*} \lambda = \frac{3x_{p}^{2} + a}{2y_{p}} \\ x_{r} = \lambda^{2} - 2x_{p} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
     $$
-
 
 The complicated case involves approximately 6 multiplications, 4 additions/subtractions, and 1 division. There could also be 4 multiplications, 6 additions/subtractions, and 1 division, and if you want you could trade a multiplication with 2 more additions.
 
@@ -180,6 +179,7 @@ To compute $P + Q$ where $P \neq Q$, there are four cases:
 - If $P = 0$ and $Q \neq 0$, then $P + Q = Q$.
 - If $Q = 0$ and $P \neq 0$, then $P + Q = P$.
 - Else $P = (x_{p},\ y_{p})$ and$Q = (x_{q},\ y_{q})$
+
   - If $x_{p} = x_{q}$ (and necessarily $y_{p} \neq y_{q}$), then $P + Q = O$.
   - Else $x_{p} \neq x_{q}$, then
 
@@ -188,7 +188,6 @@ To compute $P + Q$ where $P \neq Q$, there are four cases:
     $$
 
     and $P + Q = R = (x_{r},\ y_{r})$.
-
 
 The complicated case involves approximately 2 multiplications, 6 additions/subtractions, and 1 division.
 

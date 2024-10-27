@@ -19,15 +19,15 @@ Using data corresponding to these 4 facets, across all executed batches, we’re
 
 We will implement the calculation of the Merkle root of the L2→L1 messages via a system contract as part of the `L1Messenger`. Basically, whenever a new log emitted by users that needs to be Merklized is created, the `L1Messenger` contract will append it to its rolling hash and then at the end of the batch, during the formation of the blob it will receive the original preimages from the operator, verify their consistency, and send those to the L2DAValidator to facilitate the DA protocol.
 
-We will now call the logs that are created by users and are Merklized *user* logs and the logs that are emitted by natively by VM *system* logs. Here is a short comparison table for better understanding:
+We will now call the logs that are created by users and are Merklized _user_ logs and the logs that are emitted by natively by VM _system_ logs. Here is a short comparison table for better understanding:
 
-| System logs | User logs |
-| --- | --- |
-| Emitted by VM via an opcode. | VM knows nothing about them. |
+| System logs                                                                                                     | User logs                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Emitted by VM via an opcode.                                                                                    | VM knows nothing about them.                                                                                                                                                                                                        |
 | Consistency and correctness is enforced by the verifier on L1 (i.e. their hash is part of the block commitment. | Consistency and correctness is enforced by the L1Messenger system contract. The correctness of the behavior of the L1Messenger is enforced implicitly by prover in a sense that it proves the correctness of the execution overall. |
-| We don’t calculate their Merkle root. | We calculate their Merkle root on the L1Messenger system contract. |
-| We have constant small number of those. | We can have as much as possible as long as the commitBatches function on L1 remains executable (it is the job of the operator to ensure that only such transactions are selected) |
-| In EIP4844 they will remain part of the calldata. | In EIP4844 they will become part of the blobs. |
+| We don’t calculate their Merkle root.                                                                           | We calculate their Merkle root on the L1Messenger system contract.                                                                                                                                                                  |
+| We have constant small number of those.                                                                         | We can have as much as possible as long as the commitBatches function on L1 remains executable (it is the job of the operator to ensure that only such transactions are selected)                                                   |
+| In EIP4844 they will remain part of the calldata.                                                               | In EIP4844 they will become part of the blobs.                                                                                                                                                                                      |
 
 ### Backwards-compatibility
 
@@ -35,12 +35,12 @@ Note, that to maintain a unified interface with the previous version of the prot
 
 ```solidity
 struct L2Log {
-    uint8 l2ShardId;
-    bool isService;
-    uint16 txNumberInBlock;
-    address sender;
-    bytes32 key;
-    bytes32 value;
+  uint8 l2ShardId;
+  bool isService;
+  uint16 txNumberInBlock;
+  address sender;
+  bytes32 key;
+  bytes32 value;
 }
 ```
 
@@ -116,7 +116,7 @@ Each 8 byte word from the chunked bytecode is assigned a 2 byte index (constrain
 
 For bytecode to be considered valid it must satisfy the following:
 
-1. Bytecode length must be less than 2097120 ((2^16 - 1) * 32) bytes.
+1. Bytecode length must be less than 2097120 ((2^16 - 1) \* 32) bytes.
 2. Bytecode length must be a multiple of 32.
 3. Number of 32-byte words cannot be even.
 
@@ -157,7 +157,7 @@ dictionary = _rawCompressedData[2:2 + length_of_dict * 8] # need to offset by by
 encoded_data = _rawCompressedData[2 + length_of_dict * 8:]
 
 assert(len(dictionary) % 8 == 0) # each element should be 8 bytes
-assert(num_entries(dictionary) <= 2^16) 
+assert(num_entries(dictionary) <= 2^16)
 assert(len(encoded_data) * 4 == len(_bytecode)) # given that each chunk is 8 bytes and each index is 2 bytes they should differ by a factor of 4
 
 for (index, dict_index) in list(enumerate(encoded_data)):
@@ -178,12 +178,12 @@ zkSync is a statediff-based rollup and so publishing the correct state diffs pla
 
 zkSync publishes state changes that happened within the batch instead of transactions themselves. Meaning, that for instance some storage slot `S` under account `A` has changed to value `V`, we could publish a triple of `A,S,V`. Users by observing all the triples could restore the state of zkSync. However, note that our tree unlike Ethereum’s one is not account based (i.e. there is no first layer of depth 160 of the merkle tree corresponding to accounts and second layer of depth 256 of the merkle tree corresponding to users). Our tree is “flat”, i.e. a slot `S` under account `A` is just stored in the leaf number `H(S,A)`. Our tree is of depth 256 + 8 (the 256 is for these hashed account/key pairs and 8 is for potential shards in the future, we currently have only one shard and it is irrelevant for the rest of the document).
 
-We call this `H(S,A)` *derived key*, because it is derived from the address and the actual key in the storage of the account. Since our tree is flat, whenever a change happens, we can publish a pair `DK, V`, where `DK=H(S,A)`.
+We call this `H(S,A)` _derived key_, because it is derived from the address and the actual key in the storage of the account. Since our tree is flat, whenever a change happens, we can publish a pair `DK, V`, where `DK=H(S,A)`.
 
 However, these is an optimization that could be done:
 
-- Whenever a change to a key is used for the first time, we publish a pair of `DK,V` and we assign some sequential id to this derived key. This is called an *initial write*. It happens for the first time and that’s why we must publish the full key.
-- If this storage slot is published in some of the subsequent batches, instead of publishing the whole `DK`, we can use the sequential id instead. This is called a *repeated write*.
+- Whenever a change to a key is used for the first time, we publish a pair of `DK,V` and we assign some sequential id to this derived key. This is called an _initial write_. It happens for the first time and that’s why we must publish the full key.
+- If this storage slot is published in some of the subsequent batches, instead of publishing the whole `DK`, we can use the sequential id instead. This is called a _repeated write_.
 
 For instance, if the slots `A`,`B` (I’ll use latin letters instead of 32-byte hashes for readability) changed their values to `12`,`13` accordingly, in the batch it happened they will be published in the following format:
 
@@ -195,13 +195,13 @@ Let’s say that in the next block, they changes their values to `13`,`14`. Then
 
 The id is permanently assigned to each storage key that was ever published. While in the description above it may not seem like a huge boost, however, each `DK` is 32 bytes long and id is at most 8 bytes long.
 
-We call this id *enumeration_index*.
+We call this id _enumeration_index_.
 
 Note, that the enumeration indexes are assigned in the order of sorted array of (address, key), i.e. they are internally sorted. The enumeration indexes are part of the state merkle tree, it is **crucial** that the initial writes are published in the correct order, so that anyone could restore the correct enum indexes for the storage slots. In addition, an enumeration index of `0` indicates that the storage write is an initial write.
 
 ### State diffs structure
 
-Firstly, let’s define what we mean by *state diffs*. A *state diff* is an element of the following structure.
+Firstly, let’s define what we mean by _state diffs_. A _state diff_ is an element of the following structure.
 
 [State diff structure](https://github.com/matter-labs/era-zkevm_test_harness/blob/3cd647aa57fc2e1180bab53f7a3b61ec47502a46/circuit_definitions/src/encodings/state_diff_record.rs#L8).
 
@@ -219,7 +219,7 @@ We will consider `stateDiffs` an array of such objects, sorted by (address, key)
 
 This is the internal structure that is used by the circuits to represent the state diffs. The most basic “compression” algorithm is the one described above:
 
-- For initial writes, write the pair of  (`derived_key`, `final_value`)
+- For initial writes, write the pair of (`derived_key`, `final_value`)
 - For repeated writes write the pair of (`enumeration_index`, `final_value`).
 
 Note, that values like `initial_value`, `address` and `key` are not used in the "simplified" algorithm above, but they will be helpful for the more advanced compression algorithms in the future. The [algorithm](#state-diff-compression-format) for Boojum already utilizes the difference between the `initial_value` and `final_value` for saving up on pubdata.
@@ -229,12 +229,12 @@ Note, that values like `initial_value`, `address` and `key` are not used in the 
 #### **L2**
 
 1. The operator provides both full `stateDiffs` (i.e. the array of the structs above) and the compressed state diffs (i.e. the array which contains the state diffs, compressed by the algorithm explained [below](#state-diff-compression-format)).
-2. The L2DAValidator must verify that the compressed version is consistent with the original stateDiffs and send the the *hash* of the original state diff to its L1 counterpart. It will also include the compressed state diffs into the totalPubdata to be published onto L1.
+2. The L2DAValidator must verify that the compressed version is consistent with the original stateDiffs and send the the _hash_ of the original state diff to its L1 counterpart. It will also include the compressed state diffs into the totalPubdata to be published onto L1.
 
 #### **L1**
 
 1. During committing the block, the standard DA protocol follows and the L1DAValidator is responsible to check that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./Rollup%20DA.md).
-2. The block commitment [includes](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) *the hash of the `stateDiffs`. Thus, during ZKP verification will fail if the provided stateDiff hash is not correct.
+2. The block commitment [includes](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) \*the hash of the `stateDiffs`. Thus, during ZKP verification will fail if the provided stateDiff hash is not correct.
 
 It is a secure construction because the proof can be verified only if both the execution was correct and the hash of the provided hash of the `stateDiffs` is correct. This means that the L2DAValidator indeed received the array of correct `stateDiffs` and, assuming the L2DAValidator is working correctly, double-checked that the compression is of the correct format, while L1 contracts on the commit stage double checked that the operator provided the preimage for the compressed state diffs.
 
@@ -272,15 +272,15 @@ The interface for committing batches is the following one:
 /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
 /// @param totalL2ToL1Pubdata Total pubdata committed to as part of bootloader run. Contents are: l2Tol1Logs <> l2Tol1Messages <> publishedBytecodes <> stateDiffs
 struct CommitBatchInfo {
-    uint64 batchNumber;
-    uint64 timestamp;
-    uint64 indexRepeatedStorageChanges;
-    bytes32 newStateRoot;
-    uint256 numberOfLayer1Txs;
-    bytes32 priorityOperationsHash;
-    bytes32 bootloaderHeapInitialContentsHash;
-    bytes32 eventsQueueStateHash;
-    bytes systemLogs;
-    bytes totalL2ToL1Pubdata;
+  uint64 batchNumber;
+  uint64 timestamp;
+  uint64 indexRepeatedStorageChanges;
+  bytes32 newStateRoot;
+  uint256 numberOfLayer1Txs;
+  bytes32 priorityOperationsHash;
+  bytes32 bootloaderHeapInitialContentsHash;
+  bytes32 eventsQueueStateHash;
+  bytes systemLogs;
+  bytes totalL2ToL1Pubdata;
 }
 ```

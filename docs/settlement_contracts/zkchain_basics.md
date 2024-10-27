@@ -37,14 +37,14 @@ This contract must never be frozen.
 
 This facet responsible for the configuration setup and upgradabity, handling tasks such as:
 
-* Privileged Address Management: Updating key roles, including the governor and validators.
-* System Parameter Configuration: Adjusting critical system settings, such as the L2 bootloader bytecode hash, verifier address, verifier parameters, fee configurations.
-* Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
+- Privileged Address Management: Updating key roles, including the governor and validators.
+- System Parameter Configuration: Adjusting critical system settings, such as the L2 bootloader bytecode hash, verifier address, verifier parameters, fee configurations.
+- Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
 
 Control over the AdminFacet is divided between two main entities:
 
-* CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to [this document](../chain_management/chain_type_manager.md). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below).
-* Chain Admin - Multisig smart contract managed by each individual chain that can perform non-critical changes to the system such as granting validator permissions.
+- CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to [this document](../chain_management/chain_type_manager.md). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below).
+- Chain Admin - Multisig smart contract managed by each individual chain that can perform non-critical changes to the system such as granting validator permissions.
 
 ### MailboxFacet
 
@@ -53,9 +53,9 @@ The facet that handles L2 <-> L1 communication, an overview for which can be fou
 
 The Mailbox performs three functions:
 
-* L1 ↔ L2 Communication: Enables data and transaction requests to be sent from L1 to L2 and vice versa, supporting the implementation of multi-layer protocols.
-* Bridging Native Tokens: Allows the bridging of either ether or ERC20 tokens to L2, enabling users to use these assets within the L2 ecosystem.
-* Censorship Resistance Mechanism: Currently in the research stage.
+- L1 ↔ L2 Communication: Enables data and transaction requests to be sent from L1 to L2 and vice versa, supporting the implementation of multi-layer protocols.
+- Bridging Native Tokens: Allows the bridging of either ether or ERC20 tokens to L2, enabling users to use these assets within the L2 ecosystem.
+- Censorship Resistance Mechanism: Currently in the research stage.
 
 L1 -> L2 communication is implemented as requesting an L2 transaction on L1 and executing it on L2. This means a user
 can call the function on the L1 contract to save the data about the transaction in some queue. Later on, a validator can
@@ -81,7 +81,6 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
     l2Address = address(uint160(l1Address) + offset);
   }
 }
-
 ```
 
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
@@ -108,41 +107,41 @@ A contract that accepts L2 batches, enforces data availability via DA validators
 
 The state transition is divided into three stages:
 
-* `commitBatches` - check L2 batch timestamp, process the L2 logs, save data for a batch, and prepare data for zk-proof.
-* `proveBatches` - validate zk-proof.
-* `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
+- `commitBatches` - check L2 batch timestamp, process the L2 logs, save data for a batch, and prepare data for zk-proof.
+- `proveBatches` - validate zk-proof.
+- `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
 
 Each L2 -> L1 system log will have a key that is part of the following:
 
 ```solidity
 enum SystemLogKey {
-    L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    CHAINED_PRIORITY_TXN_HASH_KEY,
-    NUMBER_OF_LAYER_1_TXS_KEY,
-    PREV_BATCH_HASH_KEY,
-    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+  L2_TO_L1_LOGS_TREE_ROOT_KEY,
+  PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+  CHAINED_PRIORITY_TXN_HASH_KEY,
+  NUMBER_OF_LAYER_1_TXS_KEY,
+  PREV_BATCH_HASH_KEY,
+  L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+  EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 ```
 
 When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:
 
-* In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
-* There will be a single log for each key that is contained within `SystemLogKey`
-* Three logs from the `L2_TO_L1_MESSENGER` with keys:
-* `L2_TO_L1_LOGS_TREE_ROOT_KEY`
-* `L2_DA_VALIDATOR_OUTPUT_HASH_KEY`
-* `USED_L2_DA_VALIDATOR_ADDRESS_KEY`
-* Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
-  * `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
-  * `PREV_BATCH_HASH_KEY`
-* Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
-  * `CHAINED_PRIORITY_TXN_HASH_KEY`
-  * `NUMBER_OF_LAYER_1_TXS_KEY`
-  * `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY`
-* None logs from other addresses (may be changed in the future).
+- In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
+- There will be a single log for each key that is contained within `SystemLogKey`
+- Three logs from the `L2_TO_L1_MESSENGER` with keys:
+- `L2_TO_L1_LOGS_TREE_ROOT_KEY`
+- `L2_DA_VALIDATOR_OUTPUT_HASH_KEY`
+- `USED_L2_DA_VALIDATOR_ADDRESS_KEY`
+- Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
+  - `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
+  - `PREV_BATCH_HASH_KEY`
+- Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
+  - `CHAINED_PRIORITY_TXN_HASH_KEY`
+  - `NUMBER_OF_LAYER_1_TXS_KEY`
+  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY`
+- None logs from other addresses (may be changed in the future).
 
 ### DiamondInit
 

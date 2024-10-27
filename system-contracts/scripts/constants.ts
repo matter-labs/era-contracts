@@ -229,7 +229,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010007",
     codeName: "L2WrappedBaseToken",
     lang: Language.Solidity,
-  }
+  },
 } as const;
 
 export const EIP712_TX_ID = 113;

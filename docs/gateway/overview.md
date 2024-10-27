@@ -10,7 +10,6 @@ Gateway is a proof aggregation layer, created to solve the following problems:
 In this release, Gateway is basically a fork of Era, that will be deployed within the same CTM as other ZK Chains. This allows us to reuse most of the existing code for Gateway.
 
 > In some places in code you can meet words such as “settlement layer” or the abbreviation “sl”. “Settlement layer” is a general term that describes a chain that other chains can settle to. Right now, the list of settlement layers is whitelisted and only Gateway will be allowed to be a settlement layer (along with L1).
->
 
 ## High level gateway architecture
 

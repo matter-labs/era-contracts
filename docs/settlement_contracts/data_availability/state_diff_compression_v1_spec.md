@@ -17,7 +17,7 @@ There is some room for optimization of the keys that are being written for the f
 
 ## Values
 
-Values are much easier to compress since they usually contain only zeroes. Also, we can leverage the nature of how those values are changed. For instance, if nonce has been increased only by 1, we do not need to write the entire 32-byte new value, we can just tell that the slot has been *increased* and then supply only the 1-byte value by which it was increased. This way instead of 32 bytes we need to publish only 2 bytes: first byte to denote which operation has been applied and the second by to denote the number by which the addition has been made.
+Values are much easier to compress since they usually contain only zeroes. Also, we can leverage the nature of how those values are changed. For instance, if nonce has been increased only by 1, we do not need to write the entire 32-byte new value, we can just tell that the slot has been _increased_ and then supply only the 1-byte value by which it was increased. This way instead of 32 bytes we need to publish only 2 bytes: first byte to denote which operation has been applied and the second by to denote the number by which the addition has been made.
 
 We have the following 4 types of changes: `Add`, `Sub,` `Transform`, `NoCompression` where:
 
@@ -86,4 +86,4 @@ There are two reasons for it:
 
 All this means that we are not allowed to change the order of “first writes” above, so indexes for them are directly recoverable from their order, and so we can not permute them. If we were to reorder keys without supplying the new enumeration indeces for them, the state would be unrecoverable. Always supplying the new enum index may add additional 5 bytes for each key, which might negate the compression benefits in a lot of cases. Even if the compression will still be beneficial, the added complexity may not be worth it.
 
-That being said, we *could* rearange those for *repeated* writes, but for now we stick to the same value compression format for simplicity.
+That being said, we _could_ rearange those for _repeated_ writes, but for now we stick to the same value compression format for simplicity.

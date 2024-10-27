@@ -19,7 +19,7 @@ In other words:
 
 `active upgrade = inactive upgrade + bootloader changes + setting upgrade tx`
 
-The other difference is that while “active chain upgrades” are usually always needed to be forced in order to ensure that contracts/protocol are up to date, the “inactive chain upgrades” typically involve changes in the facets’ bytecode and will only be needed before migration is complete to ensure that contracts are compatible.  
+The other difference is that while “active chain upgrades” are usually always needed to be forced in order to ensure that contracts/protocol are up to date, the “inactive chain upgrades” typically involve changes in the facets’ bytecode and will only be needed before migration is complete to ensure that contracts are compatible.
 
 To reduce the boilerplate / make management of the upgrades easier, the abstraction will be basically implemented at the upgrade implementation level, that will check `if block.chainid == s.settlementLayer { ... perform active upgrade stuff } else { ... perform inactive upgrade stuff, typically nothing m}.`
 
@@ -33,8 +33,7 @@ When a chain starts its migration to a new settlement layer (regardless of wheth
 2. The `s.settlementLayer` will be set for the chain. Now the chain becomes inactive and it can only take “inactive” upgrades.
 3. When migration finishes, it will be double checked that the `protocolVersion` is the same as the one in the target chains’ CTM.
 
-If the chain has already been deployed there, it will be checked that the `protocolVersion` of the deployed contracts there is the same as the one of the chain that is being moved.
-4. All “inactive” instances of a chain can receive “inactive” upgrades of a chain. The single “active” instance of a chain (the one on the settlement layer) can receive only active upgrades.
+If the chain has already been deployed there, it will be checked that the `protocolVersion` of the deployed contracts there is the same as the one of the chain that is being moved. 4. All “inactive” instances of a chain can receive “inactive” upgrades of a chain. The single “active” instance of a chain (the one on the settlement layer) can receive only active upgrades.
 
 In case step (3) fails (or for any other reason the chain fails), the migration recovery process should be available. (`L1AssetRouter.bridgeRecoverFailedTransfer` method). Recovering a chain id basically just changing its `settlementLayerId` to the current block.chainid. It will be double checked that the chain has not conducted any inactive upgrades in the meantime, i.e. the `protocolVersion` of the chain is the same as the one when the chain started its migration.
 
@@ -65,6 +64,7 @@ Migrations from GW to L1 do not have any chain recovery mechanism, i.e. if the s
 > The approach above is somewhat tricky as it requires careful coordination with the governance to ensure that at the time of when the new protocol version is published to CTM, there are no outstanding migrations.
 
 In the future we will either make it more robust or add a recovery mechanism for failed GW → L1 migrations.
+
 >
 
 ### Batch number safety guards
@@ -102,6 +102,7 @@ The recommended approach here is the following:
 It is the responsibility of the CTM to ensure that all the supported settlement layers are trusted enough to uphold to the above protocol. Using any sort of Validiums will be especially discouraged, since in theory those could get frozen forever without any true censorship resistance mechanisms.
 
 Also, note that the freezing period should be long enough to ensure that censorship resistance mechanisms have enough time to kick in
+
 >
 
 ## Forcing “inactive chain upgrade”
@@ -133,26 +134,26 @@ Definition:
 
 1. check that `ZKChain(X).protocol_version == CTM(X).protocol_version` on chain Y.
 2. Start ‘burn’ process (on chain Y)
-    1. collect `‘payload’`  from `ZKChain(X)` and `CTM(X)` and `protocol_version` on chain Y.
-    2. set `ZKChain(X).settlement_layer` to `address(ZKChain(Z))`  on chain Y.
+   1. collect `‘payload’` from `ZKChain(X)` and `CTM(X)` and `protocol_version` on chain Y.
+   2. set `ZKChain(X).settlement_layer` to `address(ZKChain(Z))` on chain Y.
 3. Start ‘mint’ process (on chain Z)
-    1. check that `CTM(X).protocol_version == payload.protocol_version`
-    2. Create new `ZKChain(X)` on chain Z and register in the local bridgehub & CTM.
-    3. pass `payload` to `ZKChain(X)` and `CTM(X)` to initialize the state.
+   1. check that `CTM(X).protocol_version == payload.protocol_version`
+   2. Create new `ZKChain(X)` on chain Z and register in the local bridgehub & CTM.
+   3. pass `payload` to `ZKChain(X)` and `CTM(X)` to initialize the state.
 4. If ‘mint’ fails - recover (on chain Y)
-    1. check that `ZKChain(X).protocol_version == payload.protocol_version`
-        1. important, here we’re actually looking at the ‘HYPERCHAIN’ protocol version and not necessarily CTM protocol version.
-    2. set `ZKChain(X).settlement_layer` to `0`  on chain Y.
-    3. pass `payload` to `IZKChain(X)` and `CTM(X)` to initialize the state.
+   1. check that `ZKChain(X).protocol_version == payload.protocol_version`
+      1. important, here we’re actually looking at the ‘HYPERCHAIN’ protocol version and not necessarily CTM protocol version.
+   2. set `ZKChain(X).settlement_layer` to `0` on chain Y.
+   3. pass `payload` to `IZKChain(X)` and `CTM(X)` to initialize the state.
 
 ### ‘Reverse’ chain migration - moving chain X ‘back’ from Z to Y
 
- (moving back from gateway to L1).
+(moving back from gateway to L1).
 
 1. Same as above (check protocol version - but on chain Z)
 2. Same as above (start burn process - but on chain Z)
 3. Same as above (start ‘mint’ - but on chain Y)
-    1. same as above
-    2. creation is probably not needed - as the contract was already there in a first place.
-    3. same as above - but the state is ‘re-initialized’
+   1. same as above
+   2. creation is probably not needed - as the contract was already there in a first place.
+   3. same as above - but the state is ‘re-initialized’
 4. Same as above - but on chain ‘Z’
