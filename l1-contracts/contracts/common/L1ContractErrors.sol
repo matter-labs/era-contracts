@@ -67,6 +67,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x59e1b0d2
+error ChainZeroAddress();
 // 0xf7a01e4d
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
@@ -314,6 +316,10 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
+// 0xff4bbdf1
+error NotAHyperchain(address chainAddress);
+// 0xa3decdf3
+error NotAnAdmin(address expected, address actual);
 // 0x64846fe4
 error NotARestriction(address addr);
 // 0xfa5cd00f

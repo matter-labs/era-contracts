@@ -9,7 +9,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {NotAllowed, NotEnoughGas, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {ChainZeroAddress, NotAllowed, NotAHyperchain, NotEnoughGas, NotAnAdmin, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -122,15 +122,19 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_tryCompareAdminOfAChainIsAddressZero() public {
-        assertFalse(isAddressAdmin(address(0), owner));
+        vm.expectRevert(abi.encodeWithSelector(ChainZeroAddress.selector));
+        permRestriction.tryCompareAdminOfAChain(address(0), owner);
     }
 
     function test_tryCompareAdminOfAChainNotAHyperchain() public {
-        assertFalse(isAddressAdmin(makeAddr("random"), owner));
+        address chain = makeAddr("random");
+        vm.expectRevert(abi.encodeWithSelector(NotAHyperchain.selector, chain));
+        permRestriction.tryCompareAdminOfAChain(chain, owner);
     }
 
     function test_tryCompareAdminOfAChainNotAnAdmin() public {
-        assertFalse(isAddressAdmin(hyperchain, owner));
+        vm.expectRevert(abi.encodeWithSelector(NotAnAdmin.selector, IZKChain(hyperchain).getAdmin(), owner));
+        permRestriction.tryCompareAdminOfAChain(hyperchain, owner);
     }
 
     function test_tryCompareAdminOfAChain() public {

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed} from "../common/L1ContractErrors.sol";
+import {CallNotAllowed, ChainZeroAddress, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAHyperchain, NotAnAdmin, NotAllowed} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -209,8 +209,18 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
     /// @param _chain The address of the chain.
     function _isAdminOfAChain(address _chain) internal view returns (bool) {
+        (bool success, ) = address(this).staticcall(abi.encodeCall(this.tryCompareAdminOfAChain, (_chain, msg.sender)));
+        return success;
+    }
+
+    /// @notice Tries to compare the admin of a chain with the potential admin.
+    /// @param _chain The address of the chain.
+    /// @param _potentialAdmin The address of the potential admin.
+    /// @dev This function reverts if the `_chain` is not a ZkSyncHyperchain or the `_potentialAdmin` is not the
+    /// admin of the chain.
+    function tryCompareAdminOfAChain(address _chain, address _potentialAdmin) external view {
         if (_chain == address(0)) {
-            return false;
+            revert ChainZeroAddress();
         }
 
         // Unfortunately there is no easy way to double check that indeed the `_chain` is a ZkSyncHyperchain.
@@ -223,29 +233,23 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         // incorrect `_chain` address.
         (bool success, bytes memory data) = _chain.staticcall(abi.encodeWithSelector(IGetters.getChainId.selector));
         if (!success || data.length < 32) {
-            revert();
+            revert NotAHyperchain(_chain);
         }
 
-        // Note, that we do use assembly here to ensure that the function does not panic in case of
-        // either incorrect `_chain` address or in case the returndata is too large
-        (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
-
-        if (!chainIdQuerySuccess) {
-            // It is not a hyperchain, so we can return `false` here.
-            return false;
-        }
+        // Can not fail
+        uint256 chainId = abi.decode(data, (uint256));
 
         // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
         // is compatible with the legacy ones.
         if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
-            // It is not a hyperchain, so we can return `false` here.
-            return false;
+            revert NotAHyperchain(_chain);
         }
 
-        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
+        // Now, the chain is known to be a hyperchain, so it should implement the corresponding interface
         address admin = IZKChain(_chain).getAdmin();
-
-        return admin == msg.sender;
+        if (admin != _potentialAdmin) {
+            revert NotAnAdmin(admin, _potentialAdmin);
+        }
     }
 
     /// @notice Tries to call `IGetters.getChainId()` function on the `_potentialChainAddress`.
