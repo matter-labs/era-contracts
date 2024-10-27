@@ -51,7 +51,7 @@ So the flow for deploying their own ST for users will be the following:
 1. Users tell us that they want to deploy a ST with certain governance, CTM (we’ll likely allow only one for now), and baseToken. 
 2. Our server will generate a chainId not reserved by any other major chain and the `admin` will call the `BridgeHub.createNewChain` . This will call the `CTM.createNewChain` that will deploy the instance of the rollup as well as initialize the first transaction there — the system upgrade transaction needed to set the chainId on L2.
 
-After that, the ST is ready to be used. Note, that the admin of the newly created chain (this will be the organization that will manage this chain from now on) will have to conduct certain configurations before the chain can be used securely (FIXME: link).
+After that, the ST is ready to be used. Note, that the admin of the newly created chain (this will be the organization that will manage this chain from now on) will have to conduct certain configurations before the chain [can be used securely](../chain_management/admin_role.md).
 
 ## Built-in contracts and their initialization
 

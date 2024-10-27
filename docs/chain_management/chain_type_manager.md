@@ -22,14 +22,14 @@ In the long term vision STs deployment will be permissionless, however CTM will 
 
 ## Configurability in the current release
 
-For now, only one CTM will be supported — the one that deploys instances of zkSync Era, possibly using other DA layers. To read more about different DA layers, check out this document (FIXME link).
+For now, only one CTM will be supported — the one that deploys instances of zkSync Era, possibly using other DA layers. To read more about different DA layers, check out [this document](../settlement_contracts/data_availability/custom_da.md).
 
 The exact process of deploying & registering a ST will be described in [sections below](#creating-new-chains-with-bridgehub). Overall, each ST in the current release will have the following parameters:
 
 | ST parameter | Updatability | Comment |
 | --- | --- | --- |
 | chainId | Permanent | Permanent identifier of the ST. Due to wallet support reasons, for now chainId has to be small (48 bits). This is one of the reasons why for now we’ll deploy STs manually, to prevent STs from having the same chainId as some another popular chain.  In the future it will be trustlessly assigned as a random 32-byte value.|
-| baseTokenAssetId | Permanent | Each ST can have their own custom base token (i.e. token used for paying the fees). It is set once during creation and can never be changed. Note, that we refer to and "asset id" here instead of an L1 address. To read more about what is assetId and how it works check out the document for custom asset bridging (FIXME: link) |
+| baseTokenAssetId | Permanent | Each ST can have their own custom base token (i.e. token used for paying the fees). It is set once during creation and can never be changed. Note, that we refer to and "asset id" here instead of an L1 address. To read more about what is assetId and how it works check out the document for [asset router](../bridging/asset_router/Overview.md) |
 | chainTypeManager | Permanent | The CTM that deployed the ST. In principle, it could be possible to migrate between CTMs (assuming both CTMs support that). However, in practice it may be very hard and as of now such functionality is not supported. |
 | admin | By admin of ST | The admin of the ST. It has some limited powers to govern the chain. To read more about which powers are available to a chain admin and which precautions should be taken, check out this document (FIXME: link to document about admin precauotions) |
 | validatorTimelock | CTM | For now, we want all the chains to use the same 21h timelock period before their batches are finalized. Only CTM can update the address that can submit state transitions to the rollup (that is, the validatorTimelock).  |
