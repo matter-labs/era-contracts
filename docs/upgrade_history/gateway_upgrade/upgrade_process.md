@@ -85,7 +85,7 @@ This upgrade the different approach is used to ensure safe and riskless preparat
 
 - The L1/L2 bytecodes are correct and the calldata is correct.
 - That the correct L2SharedBridge are populated in L1SharedBridge (note that it is a legacy contract from the current system that becomes L1Nullifer in the new upgrade) and that L2WrappedBaseTokenStore has been populated correctly.
-- [That the ownership is correctly transferred to governance.](https://github.com/matter-labs/era-contracts/blob/sb-port-docs-to-reorg/docs/upgrade_history/gateway_upgrade/upgrade_process.md#ensuring-governance-ownership)
+- [That the ownership is correctly transferred to governance.](#ensuring-governance-ownership)
 - That the bytecodes were published correctly to the `BytecodeSupplier` contract.
 
 ### Things to sign by the governance
