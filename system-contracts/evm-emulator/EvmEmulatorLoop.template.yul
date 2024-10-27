@@ -3,13 +3,12 @@ let sp := sub(STACK_OFFSET(), 32)
 // instruction pointer - index to next instruction. Not called pc because it's an
 // actual yul/evm instruction.
 let ip := add(BYTECODE_OFFSET(), 32)
-let opcode
 let stackHead
 
-let maxAcceptablePos := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 31)
+let bytecodeEndOffset := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 32)
 
 for { } true { } {
-    opcode := readIP(ip,maxAcceptablePos)
+    let opcode := readIP(ip, bytecodeEndOffset)
 
     switch opcode
     case 0x00 { // OP_STOP
@@ -716,7 +715,7 @@ for { } true { } {
         ip := add(add(BYTECODE_OFFSET(), 32), counter)
 
         // Check next opcode is JUMPDEST
-        let nextOpcode := readIP(ip,maxAcceptablePos)
+        let nextOpcode := readIP(ip, bytecodeEndOffset)
         if iszero(eq(nextOpcode, 0x5B)) {
             panic()
         }
@@ -742,7 +741,7 @@ for { } true { } {
         ip := add(add(BYTECODE_OFFSET(), 32), counter)
 
         // Check next opcode is JUMPDEST
-        let nextOpcode := readIP(ip, maxAcceptablePos)
+        let nextOpcode := readIP(ip, bytecodeEndOffset)
         if iszero(eq(nextOpcode, 0x5B)) {
             panic()
         }
@@ -831,7 +830,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 1)
+        let value := readBytes(ip, 1)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 1)
@@ -840,7 +839,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 2)
+        let value := readBytes(ip, 2)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 2)
@@ -849,7 +848,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 3)
+        let value := readBytes(ip, 3)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 3)
@@ -858,7 +857,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 4)
+        let value := readBytes(ip, 4)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 4)
@@ -867,7 +866,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 5)
+        let value := readBytes(ip, 5)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 5)
@@ -876,7 +875,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 6)
+        let value := readBytes(ip, 6)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 6)
@@ -885,7 +884,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 7)
+        let value := readBytes(ip, 7)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 7)
@@ -894,7 +893,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 8)
+        let value := readBytes(ip, 8)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 8)
@@ -903,7 +902,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 9)
+        let value := readBytes(ip, 9)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 9)
@@ -912,7 +911,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 10)
+        let value := readBytes(ip, 10)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 10)
@@ -921,7 +920,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 11)
+        let value := readBytes(ip, 11)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 11)
@@ -930,7 +929,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 12)
+        let value := readBytes(ip, 12)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 12)
@@ -939,7 +938,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 13)
+        let value := readBytes(ip, 13)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 13)
@@ -948,7 +947,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 14)
+        let value := readBytes(ip, 14)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 14)
@@ -957,7 +956,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 15)
+        let value := readBytes(ip, 15)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 15)
@@ -966,7 +965,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 16)
+        let value := readBytes(ip, 16)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 16)
@@ -975,7 +974,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 17)
+        let value := readBytes(ip, 17)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 17)
@@ -984,7 +983,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 18)
+        let value := readBytes(ip, 18)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 18)
@@ -993,7 +992,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 19)
+        let value := readBytes(ip, 19)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 19)
@@ -1002,7 +1001,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 20)
+        let value := readBytes(ip, 20)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 20)
@@ -1011,7 +1010,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 21)
+        let value := readBytes(ip, 21)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 21)
@@ -1020,7 +1019,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 22)
+        let value := readBytes(ip, 22)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 22)
@@ -1029,7 +1028,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 23)
+        let value := readBytes(ip, 23)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 23)
@@ -1038,7 +1037,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 24)
+        let value := readBytes(ip, 24)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 24)
@@ -1047,7 +1046,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 25)
+        let value := readBytes(ip, 25)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 25)
@@ -1056,7 +1055,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 26)
+        let value := readBytes(ip, 26)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 26)
@@ -1065,7 +1064,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 27)
+        let value := readBytes(ip, 27)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 27)
@@ -1074,7 +1073,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 28)
+        let value := readBytes(ip, 28)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 28)
@@ -1083,7 +1082,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 29)
+        let value := readBytes(ip, 29)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 29)
@@ -1092,7 +1091,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 30)
+        let value := readBytes(ip, 30)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 30)
@@ -1101,7 +1100,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 31)
+        let value := readBytes(ip, 31)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 31)
@@ -1110,7 +1109,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(ip, maxAcceptablePos, 32)
+        let value := readBytes(ip, 32)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 32)

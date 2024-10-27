@@ -20,6 +20,7 @@ object "EvmEmulator" {
             }
 
             mstore(bytecodeLengthOffset, size)
+            mstore(EMPTY_CODE_OFFSET(), 0)
             copyActivePtrData(bytecodeOffset, 0, size)
         }
 
