@@ -148,7 +148,8 @@ library DataEncoding {
         }
     }
 
-    /// @notice Encodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @notice Encodes the token data by combining chain id, and its metadata.
+    /// @dev Note that all the metadata of the token is expected to be ABI encoded.
     /// @param _chainId The id of the chain token is native to.
     /// @param _name The name of the token.
     /// @param _symbol The symbol of the token.
