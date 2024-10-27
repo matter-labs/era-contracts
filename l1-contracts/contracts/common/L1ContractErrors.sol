@@ -119,8 +119,6 @@ error InsufficientChainBalance();
 error InvalidCaller(address);
 // 0x4fbe5dba
 error InvalidDelay();
-// 0x0af806e0
-error InvalidHash();
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0xd8e9405c
@@ -316,6 +314,8 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
+// 0xff4bbdf1
+error NotAHyperchain(address chainAddress);
 // 0x64846fe4
 error NotARestriction(address addr);
 // 0xfa5cd00f
