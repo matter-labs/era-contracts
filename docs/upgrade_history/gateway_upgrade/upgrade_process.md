@@ -126,7 +126,7 @@ As usual, the ChainAdmin should call `upgradeChainFromVersion`. What is unusual 
 
 It is preferrable that all the steps above are executed in a multicall for greater convenience, though it is not mandatory.
 
-This upgrade a lot of new chain parameters and so these should be managed carefully. (FIXME: link)
+This upgrade adds a lot of new chain parameters and so these [should be managed carefully](../../chain_management/admin_role.md).
 
 ### Upgrade flow in contracts
 

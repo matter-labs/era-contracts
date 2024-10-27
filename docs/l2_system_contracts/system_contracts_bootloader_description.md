@@ -164,8 +164,6 @@ function getCodeAddress() internal view returns (address addr) {
 }
 ```
 
-(FIXME -- shall we update links for the compiler??).
-
 In the example above, the compiler will detect that the static call is done to the constant `CODE_ADDRESS_CALL_ADDRESS` and so it will replace it with the opcode for getting the code address of the current execution.
 
 Full list of opcode simulations can be found [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/VM%20Section/How%20compiler%20works/instructions/extensions/call.md).
@@ -298,41 +296,36 @@ The batch information slots [are used at the beginning of the batch](../../syste
 
 ### **Temporary data for debug & transaction processing purposes**
 
-FIXME: constants here need to be checked
-
 - `[8..39]` – reserved slots for debugging purposes
 - `[40..72]` – slots for holding the paymaster context data for the current transaction. The role of the paymaster context is similar to the [EIP4337](https://eips.ethereum.org/EIPS/eip-4337)’s one. You can read more about it in the account abstraction documentation.
 - `[73..74]` – slots for signed and explorer transaction hash of the currently processed L2 transaction.
-- `[75..110]` – 36 slots for the calldata for the KnownCodesContract call.
-- `[111..10110]` – 10000 slots for the refunds for the transactions.
-- `[10111..20110]` – 10000 slots for the overhead for batch for the transactions. This overhead is suggested by the operator, i.e. the bootloader will still double-check that the operator does not overcharge the user.
-- `[20111..30110]` – slots for the “trusted” gas limits by the operator. The user’s transaction will have at its disposal `min(MAX_TX_GAS(), trustedGasLimit)`, where `MAX_TX_GAS` is a constant guaranteed by the system. Currently, it is equal to 80 million gas. In the future, this feature will be removed. 
-- `[30111..70114]` – slots for storing L2 block info for each transaction. You can read more on the difference L2 blocks and batches [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md).
-- `[70115..135650]` – slots used for compressed bytecodes each in the following format:
+- `[75..142]` – 68 slots for the calldata for the KnownCodesContract call.
+- `[143..10142]` – 10000 slots for the refunds for the transactions.
+- `[10143..20142]` – 10000 slots for the overhead for batch for the transactions. This overhead is suggested by the operator, i.e. the bootloader will still double-check that the operator does not overcharge the user.
+- `[20143..30142]` – slots for the “trusted” gas limits by the operator. The user’s transaction will have at its disposal `min(MAX_TX_GAS(), trustedGasLimit)`, where `MAX_TX_GAS` is a constant guaranteed by the system. Currently, it is equal to 80 million gas. In the future, this feature will be removed. 
+- `[30143..70146]` – slots for storing L2 block info for each transaction. You can read more on the difference L2 blocks and batches [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md).
+- `[70147..266754]` – slots used for compressed bytecodes each in the following format:
     - 32 bytecode hash
     - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the `publishCompressedBytecode` function of the `BytecodeCompresor`)
     - The calldata to the bytecode compressor (without the selector). 
-- `[135651..135652]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](./Handling%20L1→L2%20ops%20on%20zkSync.md).
+- `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](./Handling%20L1→L2%20ops%20on%20zkSync.md).
 
 ### L1Messenger Pubdata
 
-FIXME: constants here need to be checked
+- `[266757..1626756]` – slots where the final batch pubdata is supplied to be verified by the [L2DAValidator](../settlement_contracts/data_availability/custom_da.md).
 
-- `[135653..586652]` – slots where the final batch pubdata is supplied to be verified by the L1Messenger. More on how the L1Messenger system contracts handles the pubdata can be read [here](./Handling%20pubdata.md).
+But briefly, this space is used for the calldata to the L1Messenger’s `publishPubdataAndClearState` function, which accepts the address of the L2DAValidator as well as the pubdata for it to check. The L2DAValidator is a contract that is responsible to ensure efficiency [when handling pubdata](../settlement_contracts/data_availability/custom_da.md). Typically, the calldata `L2DAValidator` would include uncompressed preimages for bytecodes, L2->L1 messages, L2->L1 logs, etc as their compressed counterparts. However, the exact implementation may vary across various ZK chains.  
 
-But briefly, this space is used for the calldata to the L1Messenger’s `publishPubdataAndClearState` function, which accepts the address of the L2DAValidator as well as the pubdata for it to check. The L2DAValidator is a contract that is responsible to ensure efficiency when handling pubdata (FIXME: provide the link). Typically, the calldata `L2DAValidator` would include uncompressed preimages for bytecodes, L2->L1 messages, L2->L1 logs, etc as their compressed counterparts). However, the exact implementation may vary across various ZK chains.  
+Note, that while the realistic number of pubdata that can be published in a batch is ~780kb, the size of the calldata to L1Messenger may be a lot larger due to the fact that this method also accepts the original uncompressed state diff entries. These will not be published to L1, but will be used to verify the correctness of the compression. 
 
-FIXME: constants below are not correct
-
-Note, that while the realistic number of pubdata that can be published in a batch is ~260kb, the size of the calldata to L1Messenger may be a lot larger due to the fact that this method also accepts the original uncompressed state diff entries. These will not be published to L1, but will be used to verify the correctness of the compression. The worst-case number of bytes that may be needed for this scratch space is if all the pubdata consists of repeated writes (i.e. we’ll need only 4 bytes to include key) that turn into 0 (i.e. they’ll need only 1 byte to describe it). However, each of these writes in the uncompressed form will be represented as 272 byte state diff entry and so we get the number of diffs is `260kb / 5 = 52k`. This means that they will have
-accoomdate `52k * 272 = 14144000` bytes of calldata for the uncompressed state diffs. Adding 260k on top leaves us with roughly `14404000` bytes needed for calldata. `450125` slots are needed to accomodate this amount of data.
-We round up to `451000` slots to give space for constant-size factors for ABI-encoding, like offsets, lengths, etc.
-
-In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the operator to ensure that it can form the correct calldata for the L1Messenger.
+One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with roughly 43212000 bytes needed for calldata. 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
+  
+In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
+operator to ensure that it can form the correct calldata for the L1Messenger.
 
 ### **Transaction’s meta descriptions**
 
-- `[586653..606652]` words — 20000 slots for 10000 transaction’s meta descriptions (their structure is explained below).
+- `[1626756..1646756]` words — 20000 slots for 10000 transaction’s meta descriptions (their structure is explained below).
 
 For internal reasons related to possible future integrations of zero-knowledge proofs about some of the contents of the bootloader’s memory, the array of the transactions is not passed as the ABI-encoding of the array of transactions, but:
 
@@ -354,13 +347,13 @@ struct BootloaderTxDescription {
 
 ### **Reserved slots for the calldata for the paymaster’s postOp operation**
 
-- `[606653..606692]` words — 40 slots which could be used for encoding the calls for postOp methods of the paymaster.
+- `[1646756..1646795]` words — 40 slots which could be used for encoding the calls for postOp methods of the paymaster.
 
 To avoid additional copying of transactions for calls for the account abstraction, we reserve some of the slots which could be then used to form the calldata for the `postOp` call for the account abstraction without having to copy the entire transaction’s data.
 
 ### **The actual transaction’s descriptions**
 
-- `[606693..927496]`
+- `[1646796..1967599]`
 
 Starting from the 487312 word, the actual descriptions of the transactions start. (The struct can be found by this [link](https://github.com/code-423n4/2024-03-zksync/blob/7e85e0a997fee7a6d75cadd03d3233830512c2d2/code/system-contracts/contracts/libraries/TransactionHelper.sol#L25)). The bootloader enforces that:
 
@@ -370,13 +363,13 @@ Starting from the 487312 word, the actual descriptions of the transactions start
 
 ### **VM hook pointers**
 
-- `[927497..927499]`
+- `[1967600..1967602]`
 
 These are memory slots that are used purely for debugging purposes (when the VM writes to these slots, the server side can catch these calls and give important insight information for debugging issues).
 
 ### **Result ptr pointer**
 
-- `[927500..937499]`
+- `[1967602..1977602]`
 
 These are memory slots that are used to track the success status of a transaction. If the transaction with number `i` succeeded, the slot `937499 - 10000 + i` will be marked as 1 and 0 otherwise.
 
@@ -620,7 +613,7 @@ A contract used for sending arbitrary length L2→L1 messages from zkSync to L1.
 
 The L1 messenger receives a message, hashes it and sends only its hash as well as the original sender via L2→L1 log. Then, it is the duty of the L1 smart contracts to make sure that the operator has provided full preimage of this hash in the commitment of the batch.
 
-Note, that L1Messenger is calls the L2DAValidator and plays an important role in facilitating the DA validation protocol. (FIXME: provide link)
+Note, that L1Messenger is calls the L2DAValidator and plays an important role in facilitating the [DA validation protocol](../settlement_contracts/data_availability/custom_da.md).
 
 ## NonceHolder
 
@@ -653,7 +646,7 @@ The contract provides two methods:
 - `publishCompressedBytecode` that verifies the correctness of the bytecode compression and publishes it in form of a message to the DA layer.
 - `verifyCompressedStateDiffs` that can verify the correctness of our standard state diff compression. This method can be used by common L2DAValidators and it is for instance utilized by the [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol). 
 
-(FIXME: provide link to da providers doc)
+You can read more about how custom DA is handled [here](../settlement_contracts/data_availability/custom_da.md). 
 
 ## Pubdata Chunk Publisher
 
@@ -690,7 +683,7 @@ Usually an upgrade is performed by calling the `forceDeployOnAddresses` function
 
 For cases like this `ComplexUpgrader` contract has been created. The assumption is that the implementation of the upgrade is predeployed and the `ComplexUpgrader` would delegatecall to it.
 
-> Note, that while `ComplexUpgrader` existed even in the previous upgrade, it lacked `forceDeployAndUpgrade` function. This caused some serious limitations. More on that can be read here (FIXME: link to the upgrade process). 
+> Note, that while `ComplexUpgrader` existed even in the previous upgrade, it lacked `forceDeployAndUpgrade` function. This caused some serious limitations. More on how the gateway upgrade process will look like can be read [here](../upgrade_history/gateway_upgrade/upgrade_process.md). 
 
 # Predeployed contracts
 
@@ -708,7 +701,7 @@ A contract that is responsible for facilitating initialization of a newly create
 
 `L2Bridgehub`, `L2AssetRouter`, `L2NativeTokenVault`, as well as `L2MessageRoot`.
 
-These contracts are used to facilitate cross-chain communication as well value bridging. You can read more about then in the custom asset bridging spec (FIXME link).
+These contracts are used to facilitate cross-chain communication as well value bridging. You can read more about then in [the asset router spec](../bridging/asset_router/Overview.md).
 
 Note, that [L2AssetRouter](../../l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol) and [L2NativeTokenVault](../../l1-contracts/contracts/bridge/ntv/L2NativeTokenVault.sol) have unique code, the L2Bridgehub and L2MessageRoot share the same source code with their L1 precompiles, i.e. the L2Bridgehub has [this](../../l1-contracts/contracts/bridgehub/Bridgehub.sol) code and L2MessageRoot has [this](../../l1-contracts/contracts/bridgehub/MessageRoot.sol) code.
 
