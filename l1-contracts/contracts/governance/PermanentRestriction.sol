@@ -219,13 +219,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
 
-        // Note, that we do not use an explicit call here to ensure that the function does not panic in case of
-        // incorrect `_chain` address.
-        (bool success, bytes memory data) = _chain.staticcall(abi.encodeCall(IGetters.getChainId, ()));
-        if (!success || data.length < 32) {
-            revert NotAHyperchain(_chain);
-        }
-
         // Note, that we do use assembly here to ensure that the function does not panic in case of
         // either incorrect `_chain` address or in case the returndata is too large
 

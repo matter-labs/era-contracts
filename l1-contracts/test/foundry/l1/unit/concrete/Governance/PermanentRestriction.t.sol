@@ -12,7 +12,6 @@ import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.
 import {NotAllowed, NotAHyperchain, NotEnoughGas, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
@@ -127,9 +126,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_isAdminOfAChainNotAHyperchain() public {
-        address chain = makeAddr("random");
-        vm.expectRevert(abi.encodeWithSelector(NotAHyperchain.selector, chain));
-        permRestriction.isAdminOfAChain(chain);
+        assertFalse(permRestriction.isAdminOfAChain(makeAddr("random")));
     }
 
     function test_isAdminOfAChainOfAChainNotAnAdmin() public {
@@ -342,7 +339,6 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_validateMigrationToL2RevertNotAllowed() public {
-        vm.mockCall(address(bridgehub), abi.encodeWithSelector(IGetters.getChainId.selector), abi.encode(271));
         Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
 
         vm.expectRevert(abi.encodeWithSelector(NotAllowed.selector, address(0)));
@@ -350,7 +346,6 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_validateMigrationToL2() public {
-        vm.mockCall(address(bridgehub), abi.encodeWithSelector(IGetters.getChainId.selector), abi.encode(271));
         address expectedAddress = L2ContractHelper.computeCreate2Address(
             L2_FACTORY_ADDR,
             bytes32(0),
