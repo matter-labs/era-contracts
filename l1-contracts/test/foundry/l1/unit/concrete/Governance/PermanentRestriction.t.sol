@@ -9,7 +9,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {ChainZeroAddress, NotAllowed, NotAHyperchain, NotEnoughGas, NotAnAdmin, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {NotAllowed, NotAHyperchain, NotEnoughGas, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -121,20 +121,18 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         return permRestriction.isAdminOfAChain(chainAddr);
     }
 
-    function test_tryCompareAdminOfAChainIsAddressZero() public {
-        vm.expectRevert(abi.encodeWithSelector(ChainZeroAddress.selector));
-        permRestriction.tryCompareAdminOfAChain(address(0), owner);
+    function test_isAdminOfAChainIsAddressZero() public {
+        assertFalse(permRestriction.isAdminOfAChain(address(0)));
     }
 
-    function test_tryCompareAdminOfAChainNotAHyperchain() public {
+    function test_isAdminOfAChainNotAHyperchain() public {
         address chain = makeAddr("random");
         vm.expectRevert(abi.encodeWithSelector(NotAHyperchain.selector, chain));
-        permRestriction.tryCompareAdminOfAChain(chain, owner);
+        permRestriction.isAdminOfAChain(chain);
     }
 
-    function test_tryCompareAdminOfAChainNotAnAdmin() public {
-        vm.expectRevert(abi.encodeWithSelector(NotAnAdmin.selector, IZKChain(hyperchain).getAdmin(), owner));
-        permRestriction.tryCompareAdminOfAChain(hyperchain, owner);
+    function test_isAdminOfAChainOfAChainNotAnAdmin() public {
+        assertFalse(permRestriction.isAdminOfAChain(hyperchain));
     }
 
     function test_tryCompareAdminOfAChain() public {
