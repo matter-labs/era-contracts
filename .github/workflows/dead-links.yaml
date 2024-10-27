@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Install Rust and Lychee
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -19,7 +19,7 @@ jobs:
       - name: Find and check markdown files
         run: |
           GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          find . -type f -name "*.md" ! -path "*/node_modules/*" ! -path "*/openzeppelin*" ! -path "*/murky/*" -exec lychee --github-token $GITHUB_TOKEN {} +
+          find . -type f -name "*.md" ! -path "*/node_modules/*" ! -path "*/openzeppelin*" ! -path "*/murky/*" -exec lychee --github-token $GITHUB_TOKEN {} + > dead_links_report.txt 
 
       - name: Upload Dead Links Report
         uses: actions/upload-artifact@v4
