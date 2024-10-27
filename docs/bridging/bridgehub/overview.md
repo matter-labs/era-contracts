@@ -1,4 +1,5 @@
 # BridgeHub & Asset Routers
+[back to readme](../../README.md)
 
 ## Bridgehub as the main chain registry
 
@@ -13,7 +14,7 @@ Bridgehub is the most important contract in the sysmte, that stores:
 
 Overall, it is the main registry for all the contracts. Note, that a clone of Bridgehub is also deployed on each L2 chain, but this clone is only used on settlement layers. All the in all, the architecture of the entire ecosystem can be seen below:
 
-![Contracts](./img/gateway-architecture.png)
+![Contracts](./img/gateway_architecture.png)
 
 > This document will not cover how ZK Gateway works, you can check it out in [a separate doc](../../gateway/overview.md).
 

@@ -1,4 +1,5 @@
-## Creating new chains with BridgeHub
+# Creating new chains with BridgeHub
+[back to readme](../README.md)
 
 The main contract of the whole hyperchain ecosystem is called *`BridgeHub`*. It contains:
 

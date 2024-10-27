@@ -5,7 +5,7 @@ The order of the files here only roughly represents the order of reading. A lot 
 - [Glossary](./glossary.md)
 - [Overview](./overview.md)
 - Contracts of an individual chain
-    - [L1 smart contracts](./settlement_contracts/overview.md)
+    - [ZK Chain basics](./settlement_contracts/zkchain_basics.md)
     - Data availability
         - [Custom DA support](./settlement_contracts/data_availability/custom_da.md)
         - [Rollup DA support](./settlement_contracts/data_availability/rollup_da.md)
@@ -13,7 +13,7 @@ The order of the files here only roughly represents the order of reading. A lot 
         - [State diff compression v1 spec](./settlement_contracts/data_availability/state_diff_compression_v1_spec.md)
     - L1->L2 transaction handling
         -  [Processing of L1->L2 transactions](./settlement_contracts/priority_queue/processing_of_l1->l2_txs.md)
-        - [Priority tree design][./settlement_contracts/priority_queue/priority-queue.md]
+        - [Priority queue](./settlement_contracts/priority_queue/priority-queue.md)
 - Chain Management
     - [Chain type manager](./chain_management/chain_type_manager.md)
     - [Admin role](./chain_management/admin_role.md)

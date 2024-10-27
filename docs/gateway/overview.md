@@ -1,4 +1,5 @@
 # Gateway
+[back to readme](../README.md)
 
 Gateway is a proof aggregation layer, created to solve the following problems:
 
@@ -12,4 +13,4 @@ In this release, Gateway is basically a fork of Era, that will be deployed withi
 
 ## High level gateway architecture
 
-![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/703ee435-9e35-441a-b595-a8f42972ac1a/e990dbe7-1f05-41c2-b2a8-93781f7b6c25/image.png)
+![image.png](./img/gateway_architecture.png)
