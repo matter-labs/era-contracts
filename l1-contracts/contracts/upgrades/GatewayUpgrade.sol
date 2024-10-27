@@ -28,7 +28,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         THIS_ADDRESS = address(this);
     }
 
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
