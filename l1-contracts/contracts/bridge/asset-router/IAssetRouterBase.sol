@@ -36,7 +36,7 @@ interface IAssetRouterBase {
         uint256 chainId,
         address indexed sender,
         bytes32 indexed assetId,
-        bytes32 assetDataHash // Todo: What's the point of emitting hash?
+        bytes32 assetDataHash
     );
 
     event AssetHandlerRegisteredInitial(
