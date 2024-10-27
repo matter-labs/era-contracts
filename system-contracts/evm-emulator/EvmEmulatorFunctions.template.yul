@@ -105,16 +105,12 @@ function MAX_POSSIBLE_MEM_LEN() -> max {
     max := 0x400000 // 4MB
 }
 
-function MAX_MEMORY_FRAME() -> max {
+function MAX_MEMORY_SLOT() -> max {
     max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
 }
 
 function MAX_UINT() -> max_uint {
     max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-}
-
-function INF_PASS_GAS() -> inf {
-    inf := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 }
 
 // Each evm gas is 5 zkEVM one
@@ -215,10 +211,20 @@ function expandMemory(offset, size) -> gasCost {
     }
 }
 
+function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
+    switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
+    case 0 {
+        maxExpand := expandMemory(retOffset, retSize)
+    }
+    default {
+        maxExpand := expandMemory(argsOffset, argsSize)
+    }
+}
+
 function checkMemIsAccessible(index, offset) {
     checkOverflow(index, offset)
 
-    if gt(add(index, offset), MAX_MEMORY_FRAME()) {
+    if gt(add(index, offset), MAX_MEMORY_SLOT()) {
         panic()
     }
 }
@@ -583,7 +589,7 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
     }
 
     // memory_expansion_cost
-    gasUsed := add(gasUsed, getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize))
+    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
 
     if gt(value, 0) {
         gasUsed := add(gasUsed, 9000) // positive_value_cost
@@ -601,32 +607,16 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
         gasToPass := add(gasToPass, 2300)
     }
 
-    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-    if precompileCost {
-        if lt(gasToPass, precompileCost) {
-            gasToPass := 0 
-        }
-    }
-
-    let success, frameGasLeft := _performCall(
+    let success, frameGasLeft := _genericCall(
         addr,
         gasToPass,
         value,
         add(argsOffset, MEM_OFFSET()),
         argsSize,
         add(retOffset, MEM_OFFSET()),
-        retSize
+        retSize,
+        false
     )
-
-    if precompileCost {
-        switch success 
-        case 0 {
-            frameGasLeft := 0 // consume all provided gas
-        }
-        default {
-            frameGasLeft := sub(gasToPass, precompileCost)
-        }
-    }
 
     newGasLeft := add(evmGasLeft, frameGasLeft)
     stackHead := success
@@ -647,42 +637,28 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
     checkMemIsAccessible(argsOffset, argsSize)
     checkMemIsAccessible(retOffset, retSize)
 
-    let gasUsed := 100
+    let gasUsed := 100 // warm address access cost
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        gasUsed := 2600
+        gasUsed := 2600 // cold address access cost
     }
 
-    gasUsed := add(gasUsed, getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize))
+    // memory_expansion_cost
+    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
 
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
     evmGasLeft := sub(evmGasLeft, gasToPass)
 
-    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
-    if precompileCost {
-        if lt(gasToPass, precompileCost) {
-            gasToPass := 0 
-        }
-    }
-
-    let success, frameGasLeft := _performStaticCall(
+    let success, frameGasLeft := _genericCall(
         addr,
         gasToPass,
+        0,
         add(MEM_OFFSET(), argsOffset),
         argsSize,
         add(MEM_OFFSET(), retOffset),
-        retSize
+        retSize,
+        true
     )
-
-    if precompileCost {
-        switch success 
-        case 0 {
-            frameGasLeft := 0 // consume all provided gas
-        }
-        default {
-            frameGasLeft := sub(gasToPass, precompileCost)
-        }
-    }
 
     newGasLeft := add(evmGasLeft, frameGasLeft)
     stackHead := success
@@ -704,16 +680,17 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
     checkMemIsAccessible(argsOffset, argsSize)
     checkMemIsAccessible(retOffset, retSize)
 
-    let gasUsed := 100
+    let gasUsed := 100 // warm address access cost
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        gasUsed := 2600
+        gasUsed := 2600 // cold address access cost
     }
 
-    gasUsed := add(gasUsed, getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize))
+    // memory_expansion_cost
+    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
 
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
 
-    // it is not possible to delegatecall precompiles
+    // it is also not possible to delegatecall precompiles
     if iszero(isEvmContract(addr)) {
         revertWithGas(evmGasLeft)
     }
@@ -737,76 +714,102 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
     stackHead := success
 }
 
-function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
+function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
     switch isEvmContract(addr)
     case 0 {
-        // zkEVM native
-        let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
-        let zkEvmGasBefore := gas()
+        let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+        switch precompileCost
+        case 0 {
+            success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+        } 
+        default {
+            // zkEVM native call
+            success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+        }
+    }
+    default {
+        pushEvmFrame(gasToPass, isStatic)
+        // VM will add EVM_GAS_STIPEND() to gas for this call, but if value != 0 we will firstly call MsgValueSimulator contract
+        // which is zkVM system contract. So we need to add some gas for MsgValueSimulator
+        let ergsToPass := providedErgs()
+        if value {
+            ergsToPass := add(MSG_VALUE_SIMULATOR_STIPEND_GAS(), ergsToPass)
+        }
+        success := call(ergsToPass, addr, value, argsOffset, argsSize, 0, 0)
+        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+    }
+}
+
+function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
+    let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
+    if lt(gasToPass, precompileCost) {
+        zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
+    }
+
+    switch isStatic
+    case 0 {
+        success := call(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+    }
+    default {
+        success := staticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+    }
+    
+    _saveReturndataAfterZkEVMCall()
+
+    if success {
+        frameGasLeft := sub(gasToPass, precompileCost)
+    }
+    // else consume all provided gas
+}
+
+// Call native ZkVm contract from EVM context
+function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
+    let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
+    let decommitZkVmGasCost := decommitmentCost(addr)
+
+    // we are going to charge decommit cost even if addres is already warm
+    // decommit cost is subtracted from the callee frame
+    switch gt(decommitZkVmGasCost, zkEvmGasToPass)
+    case 0 {
+        zkEvmGasToPass := sub(zkEvmGasToPass, decommitZkVmGasCost)
+    }
+    default {
+        zkEvmGasToPass := 0
+    }
+
+    if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
+        zkEvmGasToPass := UINT32_MAX()
+    }
+
+    let zkEvmGasBefore := gas()
+    switch isStatic
+    case 0 {
         success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
-        _saveReturndataAfterZkEVMCall()
-        let gasUsed := calcUsedEvmGasByZkVmCall(zkEvmGasBefore)
-
-        if gt(gasToPass, gasUsed) {
-            frameGasLeft := sub(gasToPass, gasUsed) // TODO check
-        }
     }
     default {
-        pushEvmFrame(gasToPass, false)
-        // VM will add EVM_GAS_STIPEND() to gas for this call
-        // but if value != 0 we will firstly call MsgValueSimulator contract, which is zkVM system contract
-        // so we need to add some gas for MsgValueSimulator
-        success := call(add(MSG_VALUE_SIMULATOR_STIPEND_GAS(), providedErgs()), addr, value, argsOffset, argsSize, 0, 0)
-        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-    }
-}
-
-function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, retSize) -> success, frameGasLeft {
-    switch isEvmContract(addr)
-    case 0 {
-        // zkEVM native
-        let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
-        let zkEvmGasBefore := gas()
         success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
-        _saveReturndataAfterZkEVMCall()
-        let gasUsed := calcUsedEvmGasByZkVmCall(zkEvmGasBefore)
-
-        if gt(gasToPass, gasUsed) {
-            frameGasLeft := sub(gasToPass, gasUsed) // TODO check
-        }
     }
-    default {
-        pushEvmFrame(gasToPass, true)
-        success := staticcall(providedErgs(), addr, argsOffset, argsSize, 0, 0)
-        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+    let zkEvmGasUsed := sub(zkEvmGasBefore, gas())
+
+    _saveReturndataAfterZkEVMCall()
+    
+    if gt(zkEvmGasUsed, zkEvmGasBefore) { // overflow case
+        zkEvmGasUsed := zkEvmGasToPass // should never happen
+    }
+
+    // refund gas
+    if gt(zkEvmGasToPass, zkEvmGasUsed) {
+        frameGasLeft := div(sub(zkEvmGasToPass, zkEvmGasUsed), GAS_DIVISOR())
     }
 }
 
-function calcUsedEvmGasByZkVmCall(zkEvmGasBefore) -> evmGasUsed {
-    let zkevmGasUsed := sub(zkEvmGasBefore, gas()) // caller should guarantee correctness
-    // should not overflow, VM can't pass more than u32 of gas
-    evmGasUsed := div(add(zkevmGasUsed, sub(GAS_DIVISOR(), 1)), GAS_DIVISOR()) // rounding up
-}
-
-function calcZkVmGasForCall(evmGasToPass, addr) -> zkevmGas {
-    zkevmGas := mul(evmGasToPass, GAS_DIVISOR())
-
+function decommitmentCost(addr) -> cost {
     // charge for contract decommitment
     let byteSize := extcodesize(addr)
-    let decommitGasCost := mul(
+    cost := mul(
         div(add(byteSize, 31), 32), // rounding up
         DECOMMIT_COST_PER_WORD()
-    )
-
-    if gt(decommitGasCost, zkevmGas) {
-        zkevmGas := 0
-    }
-
-    zkevmGas := sub(zkevmGas, decommitGasCost)
-
-    if gt(zkevmGas, UINT32_MAX()) { // Should never happen
-        zkevmGas := UINT32_MAX()
-    }
+    ) 
 }
 
 function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
@@ -814,16 +817,6 @@ function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
     gasToPass := oldGasToPass
     if gt(oldGasToPass, maxGasToPass) { 
         gasToPass := maxGasToPass
-    }
-}
-
-function getMaxMemoryExpansionCost(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-    switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
-    case 0 {
-        maxExpand := expandMemory(retOffset, retSize)
-    }
-    default {
-        maxExpand := expandMemory(argsOffset, argsSize)
     }
 }
 
@@ -987,7 +980,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
 }
 
 function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
-    let gasForTheCall := capGasForCall(evmGasLeftOld, INF_PASS_GAS())
+    let gasForTheCall := capGasForCall(evmGasLeftOld, evmGasLeftOld) // pass 63/64 of remaining gas
 
     let bytecodeHash := 0
     if isCreate2 {

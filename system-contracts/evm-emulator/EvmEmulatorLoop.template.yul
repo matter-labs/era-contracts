@@ -820,7 +820,7 @@ for { } true { } {
         checkMemIsAccessible(destOffset, size)
 
         // dynamic_gas = 3 * words_copied + memory_expansion_cost
-        let dynamicGas := getMaxMemoryExpansionCost(offset, size, destOffset, size)
+        let dynamicGas := expandMemory2(offset, size, destOffset, size)
         let wordsCopied := div(add(size, 31), 32) // div rounding up
         dynamicGas := add(dynamicGas, mul(3, wordsCopied))
 
