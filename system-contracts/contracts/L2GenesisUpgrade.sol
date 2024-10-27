@@ -15,11 +15,12 @@ import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
 /// @author Matter Labs
 /// @notice The l2 component of the genesis upgrade.
 contract L2GenesisUpgrade is IL2GenesisUpgrade {
-    /// @notice The funciton that is delegateCalled from the complex upgrader.
+    /// @notice The function that is delegateCalled from the complex upgrader.
     /// @dev It is used to set the chainId and to deploy the force deployments.
     /// @param _chainId the chain id
     /// @param _ctmDeployer the address of the ctm deployer
-    /// @param _forceDeploymentsData the force deployments data
+    /// @param _fixedForceDeploymentsData the force deployments data
+    /// @param _additionalForceDeploymentsData the additional force deployments data
     function genesisUpgrade(
         uint256 _chainId,
         address _ctmDeployer,
@@ -31,7 +32,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             revert InvalidChainId();
         }
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
-        ForceDeployment[] memory forceDeployments = abi.decode(_forceDeploymentsData, (ForceDeployment[]));
+        ForceDeployment[] memory forceDeployments = abi.decode(_fixedForceDeploymentsData, (ForceDeployment[]));
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(forceDeployments);
 
         // It is expected that either via to the force deployments above
