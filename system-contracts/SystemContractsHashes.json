@@ -122,8 +122,8 @@
     "contractName": "EvmEmulator",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmEmulator.yul/EvmEmulator.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmEmulator.yul",
-    "bytecodeHash": "0x01000d1da7716a3707e171cac5d616ca25088a24436cb9ae9a055a64e1db6239",
-    "sourceCodeHash": "0x154bb70581b8e183cd8698f65d4b17441dc0648c6975169275c0872b2fe40d2a"
+    "bytecodeHash": "0x01000bf951f622f0d9e094c6f9f90056b1c80f99cfae14721855d0f399820e6e",
+    "sourceCodeHash": "0x52bb88bbed85cff18cdb0a4f970135d055161fa9bace1d9373c3063e6d4da8a8"
   },
   {
     "contractName": "EvmGasManager",
