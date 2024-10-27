@@ -75,9 +75,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         );
 
         // slither-disable-next-line controlled-delegatecall
-        (bool success, ) = THIS_ADDRESS.delegatecall(
-            abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade)
-        );
+        (bool success, ) = THIS_ADDRESS.delegatecall(abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade));
         if (!success) {
             revert GatewayUpgradeFailed();
         }
