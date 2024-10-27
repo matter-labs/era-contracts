@@ -1,46 +1,28 @@
-#### Bridges
+# Overview of Custom Asset Bridging with the Asset Router
 
-Bridges are completely separate contracts from the Diamond. They are a wrapper for L1 <-> L2 communication on contracts
-on both L1 and L2. Upon locking assets on one layer, a request is sent to mint these bridged assets on the other layer.
+Bridges are completely separate contracts from the ZKChains and system contracts. They are a wrapper for L1 <-> L2 communication on both L1 and L2. Upon locking assets on one layer, a request is sent to mint these bridged assets on the other layer.
 Upon burning assets on one layer, a request is sent to unlock them on the other.
 
-Unlike the native Ether bridging, all other assets can be bridged by the custom implementation relying on the trustless
-L1 <-> L2 communication.
+Custom asset bridging is a new bridging model that allows to:
 
-##### L1ERC20Bridge
+1. Minimize the effort needed by custom tokens to be able to become part of the elastic chain ecosystem. Before, each custom token would have to build its own bridge, but now just custom asset deployment trackers / asset handler is needed. This is achieved by building a modular bridge which separates the logic of L1<>L2 messaging from the holding of the asset. 
+2. Unify the interfaces between L1 and L2 bridge contracts, paving the way for easy cross chain bridging. It will especially become valuable once interop is enabled.
 
-The legacy implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
-fee-on-transfer tokens or other custom logic for handling user balances. Only works for Era.
+#### New concepts
 
-- `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
-- `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
-- `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
+- assetId => identifier to track bridged assets across chains. This is used to link messages to specific asset handlers in the AssetRouters.
+- AssetHandler => contract that manages liquidity (burns/mints, locks/unlocks, etc.) for specific token (or a set of them) on a chain. Every asset  
+- AssetDeploymentTracker => contract that manages the deployment of asset handlers across chains. This is the contract that registers these asset handlers in the AssetRouters.
 
-##### L1AssetRouter
+### Normal flow
 
-The "standard" implementation of the ERC20 and WETH token bridge. Works only with regular ERC20 tokens, i.e. not with
-fee-on-transfer tokens or other custom logic for handling user balances.
+Assets Handlers are registered in the Routers based on their assetId. The assetId is used to identify the asset when bridging, it is sent with the cross-chain transaction data and Router routes the data to the appropriate Handler. If the asset handler is not registered in the L2 Router, then the L1->L2 bridging transaction will fail on the L2 (expect for NTV assets, see below).
 
-- `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
-- `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
-- `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
+`assetId = keccak256(chainId, asset deployment tracker = msg.sender, additionalData)`
 
-The bridge also handles WETH token deposits between the two domains. It is designed to streamline and
-enhance the user experience for bridging WETH tokens by minimizing the number of transactions required and reducing
-liquidity fragmentation thus improving efficiency and user experience.
+Asset registration is handled by the AssetDeploymentTracker. It is expected that this contract is deployed on the L1. Registration of the assetHandler on a ZKChain can be permissionless depending on the Asset (e.g. the AssetHandler can be deployed on the chain at a predefined address, this can message the L1 ADT, which can then register the asset in the Router). Registering the L1 Handler in the L1 Router can be done via a direct function call from the L1 Deployment Tracker. Registration in the L2 Router is done indirectly via the L1 Router.
 
-This contract accepts WETH deposits on L1, unwraps them to ETH, and sends the ETH to the L2 WETH bridge contract, where
-it is wrapped back into WETH and delivered to the L2 recipient.
+![Asset Registration](./img/custom_asset_handler_registration.png)
 
-Thus, the deposit is made in one transaction, and the user receives L2 WETH that can be unwrapped to ETH.
-
-##### L2SharedBridge
-
-The L2 counterpart of the L1 Shared bridge.
-
-- `withdraw` - initiate a withdrawal by burning funds on the contract and sending a corresponding message to L1.
-- `finalizeDeposit` - finalize the deposit and mint funds on L2.
-
-For WETH withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into WETH, and sends the WETH to
-the L1 recipient.
+The Native Token Vault is a special case of the Asset Handler, as we want it to support automatic bridging. This means it should be possible to bridge a L1 token to an L2 without deploying the Token contract beforehand and without registering it in the L2 Router. For NTV assets, L1->L2 transactions where the AssetHandler is not registered will not fail, but the message will be automatically be forwarded to the L2NTV. Here the contract checks that the asset is indeed deployed by the L1NTV, by checking that the assetId contains the correct ADT address (note, for NTV assets the ADT is the NTV and the used address is the L2NTV address). If the assetId is correct, the token contract is deployed.
 

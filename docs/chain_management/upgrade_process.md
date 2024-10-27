@@ -1,4 +1,4 @@
-# TODO a mess currently
+# TODO a big mess currently
 # Upgrade process document
 
 

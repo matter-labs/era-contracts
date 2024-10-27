@@ -37,7 +37,7 @@ function createNewChain(
 
 BridgeHub will check that the CTM as well as the base token are whitelisted and route the call to the State 
 
-![newChain (2).png](./L1%20smart%20contracts/newChain.png)
+![newChain (2).png](./img/create_new_chain.png)
 
 ### Creation of a chain in the first release
 
@@ -51,3 +51,21 @@ So the flow for deploying their own ST for users will be the following:
 2. Our server will generate a chainId not reserved by any other major chain and the `admin` will call the `BridgeHub.createNewChain` . This will call the `CTM.createNewChain` that will deploy the instance of the rollup as well as initialize the first transaction there — the system upgrade transaction needed to set the chainId on L2.
 
 After that, the ST is ready to be used. Note, that the admin of the newly created chain (this will be the organization that will manage this chain from now on) will have to conduct certain configurations before the chain can be used securely (FIXME: link).
+
+# todo check below
+## Built-in contracts and their initialization
+
+Each single ZK Chain has a set of the following contracts that, while not belong to kernel space, are built-in and provide important functionality:
+
+- Bridgehub (the source code is identical to the L1 one). The role of bridgehub is to facilitate cross chain transactions. It contains a mapping from chainId to the address of the diamond proxy of the chain. It is really used only on the L1 and Gateway, i.e. layers that can serve as a settlement layer.
+- L2AssetRouter. The new iteration of the SharedBridge.
+- L2NativeTokenVault. The Native token vault on L2.
+- MessageRoot (the source code is identical to the L1 one). Similar to bridgehub, it facilitates cross-chain communication, but is practically unused on all chains except for L1/GW.
+
+To reuse as much code as possible from L1 and also to allow easier initialization, most of these contracts are not initialized as just part of the genesis storage root. Instead, the data for their initialization is part of the original diamondcut for the chain. In the same initial upgrade transaction when the chainId is initialized, these contracts are force-deployed and initialized also. An important part in it plays the new `L2Genesis` contract, which is pre-deployed in a user-space contract, but it is delegated to the `ComplexUpgrader` system contract (already exists as part of genesis and existed before this upgrade).
+
+# Additional limitations for the current version
+
+In the current version creating new chains will not be permissionless. That is needed to ensure that no malicious input can be provided there. 
+
+Also, since in the current release, there will be little benefits from shared liquidity, i.e. the there will be no direct ZKChain<>ZKChain transfers supported, as a measure of additional security we’ll also keep track of balances for each individual ZKChain and will not allow it to withdraw more than it has deposited into the system.
