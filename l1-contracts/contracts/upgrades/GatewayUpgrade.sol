@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
-
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -20,7 +18,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
+contract GatewayUpgrade is BaseZkSyncUpgrade {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
