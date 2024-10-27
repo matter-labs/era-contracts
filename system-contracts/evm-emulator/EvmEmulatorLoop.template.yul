@@ -3,13 +3,12 @@ let sp := sub(STACK_OFFSET(), 32)
 // instruction pointer - index to next instruction. Not called pc because it's an
 // actual yul/evm instruction.
 let ip := add(BYTECODE_OFFSET(), 32)
-let opcode
 let stackHead
 
 let bytecodeEndOffset := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 32)
 
 for { } true { } {
-    opcode := readIP(ip, bytecodeEndOffset)
+    let opcode := readIP(ip, bytecodeEndOffset)
 
     switch opcode
     case 0x00 { // OP_STOP
@@ -1110,7 +1109,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         ip := add(ip, 1)
-        let value := readBytes(add(ip, 1), 32)
+        let value := readBytes(ip, 32)
 
         sp, stackHead := pushStackItem(sp, value, stackHead)
         ip := add(ip, 32)
