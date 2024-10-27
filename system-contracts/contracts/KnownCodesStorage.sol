@@ -85,19 +85,15 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
         }
     }
 
+    /// @notice The method used by ContractDeployer to publish EVM bytecode
+    /// @dev Bytecode should be padded by EraVM rules
+    /// @param paddedBytecode The bytecode to be published
     function publishEVMBytecode(
         bytes calldata paddedBytecode
     ) external payable onlyCallFrom(address(DEPLOYER_SYSTEM_CONTRACT)) returns (bytes32) {
-        /*
-            TODO: ensure that it is properly padded, etc.
-            To preserve EVM compatibility, we can not emit any events here.
-        */
-
-        // ToDO: use efficient call
         bytes32 vesionedBytecodeHash = Utils.hashEVMBytecode(paddedBytecode);
 
         if (getMarker(vesionedBytecodeHash) == 0) {
-            // ToDO: use efficient call
             L1_MESSENGER_CONTRACT.sendToL1(paddedBytecode);
 
             assembly {
