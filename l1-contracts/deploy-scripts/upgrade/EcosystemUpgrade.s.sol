@@ -341,7 +341,7 @@ contract EcosystemUpgrade is Script {
 
     function _composeUpgradeTx() internal returns (L2CanonicalTransaction memory transaction) {
         transaction = L2CanonicalTransaction({
-            // FIXME: dont use hardcoded values
+            // TODO: dont use hardcoded values
             txType: 254,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             // Note, that we actually do force deployments to the ContractDeployer and not complex upgrader.
@@ -527,8 +527,6 @@ contract EcosystemUpgrade is Script {
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: postUpgradeCalldata,
-            // FIXME: TBH, I am not sure if even should even put any time there,
-            // but we may
             upgradeTimestamp: 0,
             newProtocolVersion: getNewProtocolVersion()
         });
@@ -710,7 +708,7 @@ contract EcosystemUpgrade is Script {
         config.contracts.eraDiamondProxy = toml.readAddress("$.contracts.era_diamond_proxy");
         config.contracts.legacyErc20BridgeAddress = toml.readAddress("$.contracts.legacy_erc20_bridge_address");
         config.contracts.oldValidatorTimelock = toml.readAddress("$.contracts.old_validator_timelock");
-        // FIXME: value stored there is incorrect at the moment, figure out the correct value
+        // TODO: value stored there is incorrect at the moment, figure out the correct value
         config.contracts.blobVersionedHashRetriever = toml.readAddress("$.contracts.blob_versioned_hash_retriever");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");

@@ -327,7 +327,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _chainId the chainId of the chain
     /// @param _validator the new validator
     /// @param _active whether the validator is active
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
         IZKChain(getZKChain(_chainId)).setValidator(_validator, _active);
     }
 

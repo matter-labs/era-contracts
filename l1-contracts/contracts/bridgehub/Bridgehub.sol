@@ -245,7 +245,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (chainAddress == address(0)) {
             revert ChainNotPresentInCTM();
         }
-        _registerNewZKChain(_chainId, chainAddress);
+        _registerNewZKChain(_chainId, chainAddress, false);
     }
 
     //// Registry
@@ -368,18 +368,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _initData: _initData,
             _factoryDeps: _factoryDeps
         });
-        _registerNewZKChain(_chainId, chainAddress);
+        _registerNewZKChain(_chainId, chainAddress, true);
         messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
     }
 
-    /// @dev This internal function is used to register a new zkChain in the system.
-    function _registerNewZKChain(uint256 _chainId, address _zkChain) internal {
+    /// @notice This internal function is used to register a new zkChain in the system.
+    /// @param _chainId The chain ID of the ZK chain
+    /// @param _zkChain The address of the ZK chain's DiamondProxy contract.
+    /// @param _checkMaxNumberOfZKChains Whether to check that the limit for the number
+    /// of chains has not been crossed.
+    /// @dev Providing `_checkMaxNumberOfZKChains = false` may be preferable in cases
+    /// where we want to guarantee that a chain can be added. These include:
+    /// - Migration of a chain from the mapping in the old CTM
+    /// - Migration of a chain to a new settlement layer
+    function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
-        if (zkChainMap.length() > MAX_NUMBER_OF_ZK_CHAINS) {
+        if (_checkMaxNumberOfZKChains && zkChainMap.length() > MAX_NUMBER_OF_ZK_CHAINS) {
             revert ZKChainLimitReached();
         }
     }
@@ -764,7 +772,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             if (zkChain == address(0)) {
                 revert ChainIdNotRegistered(bridgehubData.chainId);
             }
-            _registerNewZKChain(bridgehubData.chainId, zkChain);
+            // We want to allow any chain to be migrated,
+            _registerNewZKChain(bridgehubData.chainId, zkChain, false);
             messageRoot.addNewChain(bridgehubData.chainId);
         }
 
@@ -832,7 +841,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
         settlementLayer[_chainId] = block.chainid;
 
-        _registerNewZKChain(_chainId, _zkChain);
+        _registerNewZKChain(_chainId, _zkChain, true);
         messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, ctm, chainAdmin);
