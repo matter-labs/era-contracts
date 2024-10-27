@@ -125,7 +125,6 @@ library DataEncoding {
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
         bytes1 encodingVersion = _tokenData[0];
-        // kl todo check correct
         if (encodingVersion == LEGACY_ENCODING_VERSION) {
             (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
         } else if (encodingVersion == NEW_ENCODING_VERSION) {
