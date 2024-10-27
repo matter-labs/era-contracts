@@ -21,7 +21,7 @@ Overall, it is the main registry for all the contracts. Note, that a clone of Br
 
 ## Asset router as the main asset bridging entrypoint
 
-The main entry for passing value between chains is the AssetRouter, it is responsible for facilitating bridging between multiple asset types. To read more in detail on how it works, please refer to custom [asset bridging documentation](../asset_router/Overview.md).
+The main entry for passing value between chains is the AssetRouter, it is responsible for facilitating bridging between multiple asset types. To read more in detail on how it works, please refer to custom [asset bridging documentation](../asset_router/overview.md).
 
 For the purpose of this document, it is enough to treat the Asset Router as a blackbox that is responsible for processing escrowing funds on the source chain and minting them on the destination chain.
 
@@ -61,7 +61,7 @@ Most of the params are self-explanatory & replicate the logic of zkSync Era. The
 
 Here is a quick guide on how this transaction is routed through the bridgehub.
 
-1. The bridgehub retrieves the `baseTokenAssetId` of the chain with the corresponding `chainId` and calls `L1AssetRouter.bridgehubDepositBaseToken` method. The `L1AssetRouter` will then use standard token depositing mechanism to burn/escrow the respective amount of the `baseTokenAssetId`. You can read more about it in [the asset router doc](../asset_router/Overview.md). This step ensures that the baseToken will be backed 1-1 on L1.
+1. The bridgehub retrieves the `baseTokenAssetId` of the chain with the corresponding `chainId` and calls `L1AssetRouter.bridgehubDepositBaseToken` method. The `L1AssetRouter` will then use standard token depositing mechanism to burn/escrow the respective amount of the `baseTokenAssetId`. You can read more about it in [the asset router doc](../asset_router/overview.md). This step ensures that the baseToken will be backed 1-1 on L1.
 
 2. After that, it just routes the corresponding call to the ZKChain with the corresponding `chainId` . It is now the responsibility of the ZKChain to validate that the transaction is correct and can be accepted by it. This validation includes, but not limited to:
 
@@ -98,7 +98,7 @@ Once the chain is created, its L2AssetRouter will be automatically deployed upon
 
 ## `requestL2TransactionTwoBridges`
 
-`L1AssetRouter` is used as the main "glue" for value bridging across chains. Whenever a token that is not native needs to be bridged between two chains an L1<>L2 transaction out of the name of an AssetRouter needs to be performed. For more details, check out the [asset router documentation](../asset_router/Overview.md). But for this section it is enough to understand that we need to somehow make a transaction out of the name of `L1AssetRouter` to its L2 counterpart to deliver the message about certain amount of asset being bridged.
+`L1AssetRouter` is used as the main "glue" for value bridging across chains. Whenever a token that is not native needs to be bridged between two chains an L1<>L2 transaction out of the name of an AssetRouter needs to be performed. For more details, check out the [asset router documentation](../asset_router/overview.md). But for this section it is enough to understand that we need to somehow make a transaction out of the name of `L1AssetRouter` to its L2 counterpart to deliver the message about certain amount of asset being bridged.
 
 > In the next paragraphs we will often refer to `L1AssetRouter` as performing something. It is good enough for understanding of how bridgehub functionality works. Under the hood though, it mainly serves as common entry that calls various asset handlers that are chosen based on asset id. You can read more about it in the [asset router documentation](../asset_router/asset_router.md).
 
@@ -142,7 +142,7 @@ This call will return the parameters to call the l2 contract with (the address o
 #### L2
 
 1. After some time, the corresponding L1→L2 is created.
-2. The L2AssetRouter will receive the message and re-route it to the asset handler of the bridged token. To read more about how it works, check out the [asset router documentation](../asset_router/Overview.md).
+2. The L2AssetRouter will receive the message and re-route it to the asset handler of the bridged token. To read more about how it works, check out the [asset router documentation](../asset_router/overview.md).
 
 **_Diagram of a depositing ETH onto a chain with USDC as the baseToken. Note that some contract calls (like `USDC.transferFrom` are omitted for the sake of consiceness):_**
 
@@ -236,7 +236,7 @@ In case a deposit fails, the `L1AssetRouter` allows users to recover the deposit
 
 Funds withdrawal is a similar way to how it is done currently on Era.
 
-The user needs to call the `L2AssetRouter.withdraw` function on L2, while providing the token they want to withdraw. This function would then calls the corresponding L2 asset handler and ask him to burn the funds. We expand a bit more about it in the [asset router documentation](../asset_router/Overview.md).
+The user needs to call the `L2AssetRouter.withdraw` function on L2, while providing the token they want to withdraw. This function would then calls the corresponding L2 asset handler and ask him to burn the funds. We expand a bit more about it in the [asset router documentation](../asset_router/overview.md).
 
 Note, however, that it is not the way to withdraw base token. To withdraw base token, `L2BaseToken.withdraw` needs to be called.
 

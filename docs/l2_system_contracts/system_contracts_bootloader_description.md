@@ -706,7 +706,7 @@ A contract that is responsible for facilitating initialization of a newly create
 
 `L2Bridgehub`, `L2AssetRouter`, `L2NativeTokenVault`, as well as `L2MessageRoot`.
 
-These contracts are used to facilitate cross-chain communication as well value bridging. You can read more about then in [the asset router spec](../bridging/asset_router/Overview.md).
+These contracts are used to facilitate cross-chain communication as well value bridging. You can read more about then in [the asset router spec](../bridging/asset_router/overview.md).
 
 Note, that [L2AssetRouter](../../l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol) and [L2NativeTokenVault](../../l1-contracts/contracts/bridge/ntv/L2NativeTokenVault.sol) have unique code, the L2Bridgehub and L2MessageRoot share the same source code with their L1 precompiles, i.e. the L2Bridgehub has [this](../../l1-contracts/contracts/bridgehub/Bridgehub.sol) code and L2MessageRoot has [this](../../l1-contracts/contracts/bridgehub/MessageRoot.sol) code.
 
@@ -726,3 +726,20 @@ The protocol, while conceptually complete, contains some known issues which will
 
 - Fee modeling is yet to be improved. More on it in the [document](./zksync_fee_model.md) on the fee model.
 - We may add some kind of default implementation for the contracts in the kernel space (i.e. if called, they wouldn’t revert but behave like an EOA).
+
+.github/SECURITY.md
+CONTRIBUTING.md
+SECURITY.md
+docs/overview.md
+docs/bridging/bridgehub/overview.md
+docs/l2_system_contracts/batches_and_blocks_on_zksync.md
+docs/l2_system_contracts/system_contracts_bootloader_description.md
+docs/settlement_contracts/data_availability/custom_da.md
+docs/settlement_contracts/data_availability/rollup_da.md
+docs/settlement_contracts/data_availability/standard_pubdata_format.md
+docs/settlement_contracts/priority_queue/priority-queue.md
+docs/settlement_contracts/priority_queue/processing_of_l1->l2_txs.md
+docs/settlement_contracts/zkchain_basics.md
+docs/upgrade_history/gateway_upgrade/gateway_diff_review.md
+docs/upgrade_history/gateway_upgrade/upgrade_process.md
+system-contracts/README.md
