@@ -19,4 +19,4 @@ jobs:
       - name: Find and check markdown files
         run: |
           GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          find . -type f -name "*.md" ! -path "*/node_modules/*" ! -path "*/openzeppelin*" ! -path "*/murky/*" -exec lychee --github-token $GITHUB_TOKEN {} + > dead_links_report.txt
+          find . -type f -name "*.md" ! -path "*/node_modules/*" ! -path "*/openzeppelin*" ! -path "*/murky/*" -exec lychee --github-token $GITHUB_TOKEN {} +
