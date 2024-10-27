@@ -1,9 +1,10 @@
 # Standard pubdata format
+
 [back to readme](../../README.md)
 
 While with the introduction of [custom DA validators](./custom_da.md), any pubdata logic could be applied for each chain (including calldata-based pubdata), ZK chains are generally optimized for using state-diffs based rollup model.
 
-This document will describe how the standard pubdata format looks like. This is the format that is enforced for [permanent rollup chains](../../chain_management/admin_role.md#ispermanentrollup-setting). 
+This document will describe how the standard pubdata format looks like. This is the format that is enforced for [permanent rollup chains](../../chain_management/admin_role.md#ispermanentrollup-setting).
 
 Pubdata in zkSync can be divided up into 4 different categories:
 
@@ -65,7 +66,7 @@ Note, that the user is charged for necessary future the computation that will be
 
 At the end of the execution, the bootloader will [provide](../../../system-contracts/bootloader/bootloader.yul#L2676) a list of all the L2ToL1 logs (this will be provided by the operator in the memory of the bootloader). The L1Messenger checks that the rolling hash from the provided logs is the same as in the `chainedLogsHash` and calculate the merkle tree of the provided messages. Right now, we always build the Merkle tree of size `16384`, but we charge the user as if the tree was built dynamically based on the number of leaves in there. The implementation of the dynamic tree has been postponed until the later upgrades.
 
-> Note, that unlike most other parts of pubdata, the user L2->L1 must always be validated by the trusted `L1Messenger` system contract. If we moved this responsibility to L2DAValidator it would be possible that a malicious operator provided incorrect data and forged transactions out of names of certain users. 
+> Note, that unlike most other parts of pubdata, the user L2->L1 must always be validated by the trusted `L1Messenger` system contract. If we moved this responsibility to L2DAValidator it would be possible that a malicious operator provided incorrect data and forged transactions out of names of certain users.
 
 ### Long L2→L1 messages & bytecodes
 
@@ -77,7 +78,7 @@ Note, that in for backward compatibility, just like before any long message or b
 
 ### Using system L2→L1 logs vs the user logs
 
-The content of the L2→L1 logs by the L1Messenger will go to the blob of EIP4844. Meaning, that all the data that belongs to the tree by L1Messenger’s L2→L1 logs should not be needed during block commitment. Also, note that in the future we will remove the calculation of the Merkle root of the built-in L2→L1 messages. 
+The content of the L2→L1 logs by the L1Messenger will go to the blob of EIP4844. Meaning, that all the data that belongs to the tree by L1Messenger’s L2→L1 logs should not be needed during block commitment. Also, note that in the future we will remove the calculation of the Merkle root of the built-in L2→L1 messages.
 
 The only places where the built-in L2→L1 messaging should continue to be used:
 
@@ -111,7 +112,7 @@ Unlike uncompressed bytecode which are published as part of `factoryDeps`, compr
 
 This is the part that is responsible for taking bytecode, that has already been chunked into 8 byte words, performing validation, and compressing it.
 
-Each 8 byte word from the chunked bytecode is assigned a 2 byte index (constraint on size of dictionary of chunk → index is 2^16 - 1 elements). The length of the dictionary, dictionary entries (index assumed through order), and indexes are all concatenated together to yield the final compressed version. 
+Each 8 byte word from the chunked bytecode is assigned a 2 byte index (constraint on size of dictionary of chunk → index is 2^16 - 1 elements). The length of the dictionary, dictionary entries (index assumed through order), and indexes are all concatenated together to yield the final compressed version.
 
 For bytecode to be considered valid it must satisfy the following:
 
@@ -127,10 +128,10 @@ dictionary: Map[chunk, index]
 encoded_data: List[index]
 
 for position, chunk in chunked_bytecode:
-	if chunk is in statistic:
-		statistic[chunk].count += 1
-	else:
-		statistic[chunk] = (count=1, first_pos=pos)
+ if chunk is in statistic:
+  statistic[chunk].count += 1
+ else:
+  statistic[chunk] = (count=1, first_pos=pos)
 
 # We want the more frequently used bytes to have smaller ids to save on calldata (zero bytes cost less)
 statistic.sort(primary=count, secondary=first_pos, order=desc)
@@ -139,14 +140,14 @@ for index, chunk in enumerated(sorted_statistics):
   dictionary[chunk] = index
 
 for chunk in chunked_bytecode:
-	encoded_data.append(dictionary[chunk])
+ encoded_data.append(dictionary[chunk])
 
 return [len(dictionary), dictionary.keys(order=index asc), encoded_data]
 ```
 
 ### Verification And Publishing — L2 Contract
 
-The function `publishCompressBytecode` takes in both the original `_bytecode` and the `_rawCompressedData` , the latter of which comes from the output of the server’s compression algorithm. Looping over the encoded data, derived from `_rawCompressedData` , the corresponding chunks are pulled from the dictionary and compared to the original byte code, reverting if there is a mismatch. After the encoded data has been verified, it is published to L1 and marked accordingly within the `KnownCodesStorage` contract. 
+The function `publishCompressBytecode` takes in both the original `_bytecode` and the `_rawCompressedData` , the latter of which comes from the output of the server’s compression algorithm. Looping over the encoded data, derived from `_rawCompressedData` , the corresponding chunks are pulled from the dictionary and compared to the original byte code, reverting if there is a mismatch. After the encoded data has been verified, it is published to L1 and marked accordingly within the `KnownCodesStorage` contract.
 
 Pseudo-code implementation:
 
@@ -160,9 +161,9 @@ assert(num_entries(dictionary) <= 2^16)
 assert(len(encoded_data) * 4 == len(_bytecode)) # given that each chunk is 8 bytes and each index is 2 bytes they should differ by a factor of 4
 
 for (index, dict_index) in list(enumerate(encoded_data)):
-	encoded_chunk = dictionary[dict_index]
-	real_chunk = _bytecode.readUint64(index * 8) # need to pull from index * 8 to account for difference in element size
-	verify(encoded_chunk == real_chunk)
+ encoded_chunk = dictionary[dict_index]
+ real_chunk = _bytecode.readUint64(index * 8) # need to pull from index * 8 to account for difference in element size
+ verify(encoded_chunk == real_chunk)
 
 # Sending the compressed bytecode to L1 for data availability
 sendToL1(_rawCompressedBytecode)
@@ -173,11 +174,11 @@ markAsPublished(hash(_bytecode))
 
 zkSync is a statediff-based rollup and so publishing the correct state diffs plays an integral role in ensuring data availability.
 
-## Difference between initial and repeated writes.
+## Difference between initial and repeated writes
 
 zkSync publishes state changes that happened within the batch instead of transactions themselves. Meaning, that for instance some storage slot `S` under account `A` has changed to value `V`, we could publish a triple of `A,S,V`. Users by observing all the triples could restore the state of zkSync. However, note that our tree unlike Ethereum’s one is not account based (i.e. there is no first layer of depth 160 of the merkle tree corresponding to accounts and second layer of depth 256 of the merkle tree corresponding to users). Our tree is “flat”, i.e. a slot `S` under account `A` is just stored in the leaf number `H(S,A)`. Our tree is of depth 256 + 8 (the 256 is for these hashed account/key pairs and 8 is for potential shards in the future, we currently have only one shard and it is irrelevant for the rest of the document).
 
-We call this `H(S,A)` *derived key*, because it is derived from the address and the actual key in the storage of the account. Since our tree is flat, whenever a change happens, we can publish a pair `DK, V`, where `DK=H(S,A)`. 
+We call this `H(S,A)` *derived key*, because it is derived from the address and the actual key in the storage of the account. Since our tree is flat, whenever a change happens, we can publish a pair `DK, V`, where `DK=H(S,A)`.
 
 However, these is an optimization that could be done:
 
@@ -209,12 +210,12 @@ Basically, it contains all the values which might interest us about the state di
 - `address` where the storage has been changed.
 - `key` (the original key inside the address)
 - `derived_key` — `H(key, address)` as described in the previous section.
-    - Note, the hashing algorithm currently used here is `Blake2s`
+  - Note, the hashing algorithm currently used here is `Blake2s`
 - `enumeration_index` — Enumeration index as explained above. It is equal to 0 if the write is initial and contains the non-zero enumeration index if it is the repeated write (indexes are numerated starting from 1).
 - `initial_value` — The value that was present in the key at the start of the batch
 - `final_value` — The value that the key has changed to by the end of the batch.
 
-We will consider `stateDiffs` an array of such objects, sorted by (address, key). 
+We will consider `stateDiffs` an array of such objects, sorted by (address, key).
 
 This is the internal structure that is used by the circuits to represent the state diffs. The most basic “compression” algorithm is the one described above:
 
@@ -232,10 +233,10 @@ Note, that values like `initial_value`, `address` and `key` are not used in the 
 
 **L1**
 
-1. During committing the block, the standard DA protocol follows and the L1DAValidator is responsible to check that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./Rollup%20DA.md). 
+1. During committing the block, the standard DA protocol follows and the L1DAValidator is responsible to check that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./Rollup%20DA.md).
 2. The block commitment [includes](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) *the hash of the `stateDiffs`. Thus, during ZKP verification will fail if the provided stateDiff hash is not correct.
 
-It is a secure construction because the proof can be verified only if both the execution was correct and the hash of the provided hash of the `stateDiffs` is correct. This means that the L2DAValidator indeed received the array of correct `stateDiffs` and, assuming the L2DAValidator is working correctly, double-checked that the compression is of the correct format, while L1 contracts on the commit stage double checked that the operator provided the preimage for the compressed state diffs. 
+It is a secure construction because the proof can be verified only if both the execution was correct and the hash of the provided hash of the `stateDiffs` is correct. This means that the L2DAValidator indeed received the array of correct `stateDiffs` and, assuming the L2DAValidator is working correctly, double-checked that the compression is of the correct format, while L1 contracts on the commit stage double checked that the operator provided the preimage for the compressed state diffs.
 
 ## State diff compression format
 

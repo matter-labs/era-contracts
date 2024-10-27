@@ -1,4 +1,5 @@
 # Messaging via Gateway
+
 [back to readme](../README.md)
 
 ## Deeper dive into MessageRoot contract and how L3→L1 communication works
@@ -47,5 +48,5 @@ To simplify things, for now, we provide the L1→GW with a large amount of gas (
 - Creating a large transaction on L1 that would cause the L1→GW part to fail is not possible due to high L1 gas costs that would be required to create such a tx.
 
 Both of the assumptions above will be removed in subsequent releases, but for now this is how things are.
-> 
+>
 

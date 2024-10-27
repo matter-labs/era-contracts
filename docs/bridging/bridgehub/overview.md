@@ -1,4 +1,5 @@
 # BridgeHub & Asset Routers
+
 [back to readme](../../README.md)
 
 ## Bridgehub as the main chain registry
@@ -58,7 +59,7 @@ Most of the params are self-explanatory & replicate the logic of zkSync Era. The
 
 - `mintValue` is the total amount of the base tokens that should be minted on L2 as the result of this transaction. The requirement is that `request.mintValue >= request.l2Value + request.l2GasLimit * derivedL2GasPrice(...)`, where  `derivedL2GasPrice(...)` is the gas price to be used by this L1→L2 transaction. The exact price is defined by the ZKChain.
 
-Here is a quick guide on how this transaction is routed through the bridgehub. 
+Here is a quick guide on how this transaction is routed through the bridgehub.
 
 1. The bridgehub retrieves the `baseTokenAssetId`  of the chain with the corresponding `chainId` and calls `L1AssetRouter.bridgehubDepositBaseToken` method. The `L1AssetRouter` will then use standard token depositing mechanism to burn/escrow the respective amount of the `baseTokenAssetId`. You can read more about it in [the asset router doc](../asset_router/Overview.md).
 
@@ -68,7 +69,8 @@ This step ensures that the baseToken will be backed 1-1 on L1.
 
 - The fact that the user paid enough funds for the transaction (basically `request.l2GasLimit * derivedL2GasPrice(...) + request.l2Value >= request.mintValue`.
 - The fact the transaction is always executable (the `request.l2GasLimit`  is not high enough).
-- etc. 
+- etc.
+
 3. After the ZKChain validates the tx, it includes it into its priority queue. Once the operator executes this transaction on L2, the `mintValue` of the baseToken will be minted on L2. The `derivedL2GasPrice(...) * gasUsed` will be given to the operator’s balance. The other funds can be routed either of the following way:
 
 If the transaction is successful, the `request.l2Value`  will be minted on the `request.l2Contract` address (it can potentially transfer these funds within the transaction).   The rest are minted to the `request.refundRecipient`  address. In case the transaction is not successful, all of the base token will be minted to the `request.refundRecipient` address. These are the same rules as for the zkSync Era.
@@ -100,9 +102,9 @@ Once the chain is created, its L2AssetRouter will be automatically deployed upon
 
 `L1AssetRouter` is used as the main "glue" for value bridging across chains. Whenever a token that is not native needs to be bridged between two chains an L1<>L2 transaction out of the name of an AssetRouter needs to be performed. For more details, check out the [asset router documentation](../asset_router/Overview.md). But for this section it is enough to understand that we need to somehow make a transaction out of the name of `L1AssetRouter` to its L2 counterpart to deliver the message about certain amount of asset being bridged.
 
-> In the next paragraphs we will often refer to `L1AssetRouter` as performing something. It is good enough for understanding of how bridgehub functionality works. Under the hood though, it mainly serves as common entry that calls various asset handlers that are chosen based on asset id. You can read more about it in the [asset router documentation](../asset_router/asset_router.md). 
+> In the next paragraphs we will often refer to `L1AssetRouter` as performing something. It is good enough for understanding of how bridgehub functionality works. Under the hood though, it mainly serves as common entry that calls various asset handlers that are chosen based on asset id. You can read more about it in the [asset router documentation](../asset_router/asset_router.md).
 
-Let’s say that a ZKChain has ETH as its base token. Let’s say that the depositor wants to bridge USDC to that chain. We can not use `BridgeHub.requestL2TransactionDirect`, because it only takes base token `mintValue` and then starts an L1→L2 transaction rightaway out of the name of the user and not the `L1AssetRouter`. 
+Let’s say that a ZKChain has ETH as its base token. Let’s say that the depositor wants to bridge USDC to that chain. We can not use `BridgeHub.requestL2TransactionDirect`, because it only takes base token `mintValue` and then starts an L1→L2 transaction rightaway out of the name of the user and not the `L1AssetRouter`.
 
 We need some way to atomically deposit both ETH and USDC to the shared bridge + start a transaction from `L1AssetRouter`. For that we have a separate function on `Bridgehub`: `BridgeHub.requestL2TransactionTwoBridges`. The reason behind the name “two bridges” is a bit historical: the transaction supposed compose to do actions with two bridges: the bridge responsible for base tokens and the second bridge responsible for any other token.
 
@@ -144,7 +146,7 @@ This call will return the parameters to call the l2 contract with (the address o
 **L2**
 
 1. After some time, the corresponding L1→L2 is created.
-2. The L2AssetRouter will receive the message and re-route it to the asset handler of the bridged token. To read more about how it works, check out the [asset router documentation](../asset_router/Overview.md). 
+2. The L2AssetRouter will receive the message and re-route it to the asset handler of the bridged token. To read more about how it works, check out the [asset router documentation](../asset_router/Overview.md).
 
 ***Diagram of a depositing ETH onto a chain with USDC as the baseToken. Note that some contract calls (like `USDC.transerFrom` are omitted for the sake of consiceness):***
 
@@ -152,7 +154,7 @@ This call will return the parameters to call the l2 contract with (the address o
 
 ## Generic usage of `BridgeHub.requestL2TransactionTwoBridges`
 
-`L1AssetRouter` is the only bridge that can handle base tokens. However, the `BridgeHub.requestL2TransactionTwoBridges` could be used by `secondBridgeAddress` on L1. A notable example of how it is done is how our [CTMDeploymentTracker](../../l1-contracts/contracts/bridgehub/CTMDeploymentTracker.sol) uses it to register the correct CTM address on Gateway. You can read more about how Gateway works in [its documentation](../../gateway/overview.md). 
+`L1AssetRouter` is the only bridge that can handle base tokens. However, the `BridgeHub.requestL2TransactionTwoBridges` could be used by `secondBridgeAddress` on L1. A notable example of how it is done is how our [CTMDeploymentTracker](../../l1-contracts/contracts/bridgehub/CTMDeploymentTracker.sol) uses it to register the correct CTM address on Gateway. You can read more about how Gateway works in [its documentation](../../gateway/overview.md).
 
 Let’s do a quick recap on how it works:
 
@@ -226,7 +228,7 @@ function bridgehubConfirmL2Transaction(
 ) external;
 ```
 
-This function is needed for whatever actions are needed to be done after the L1→L2 transaction has been invoked. 
+This function is needed for whatever actions are needed to be done after the L1→L2 transaction has been invoked.
 
 On `L1AssetRouter` it is used to remember the hash of each deposit transaction, so that later on, the funds could be returned to user if the `L1->L2` transaction fails.  The `_txDataHash` is stored so that the whenever the users will want to reclaim funds from a failed deposit, they would provide the token and the amount as well as the sender to send the money to.  
 

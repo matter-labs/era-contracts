@@ -1,11 +1,12 @@
 ## Chain Type Manager (CTM)
+
 [back to readme](../README.md)
 
 > If someone is already familiar with the [previous version](https://github.com/code-423n4/2024-03-zksync) of zkSync architecture, this contract was previously known as "State Transition Manager (CTM)".
 
 Currently bridging between different zk rollups requires the funds to pass through L1. This is slow & expensive.
 
-The vision of seamless internet of value requires transfers of value to be *both* seamless and trustless. This means that for instance different STs need to share the same L1 liquidity, i.e. a transfer of funds should never touch L1 in the process. However, it requires some sort of trust between two chains. If a malicious (or broken) rollup becomes a part of the shared liquidity pool it can steal all the funds. 
+The vision of seamless internet of value requires transfers of value to be *both* seamless and trustless. This means that for instance different STs need to share the same L1 liquidity, i.e. a transfer of funds should never touch L1 in the process. However, it requires some sort of trust between two chains. If a malicious (or broken) rollup becomes a part of the shared liquidity pool it can steal all the funds.
 
 However, can two instances of the same zk rollup trust each other? The answer is yes, because no new additions of rollups introduce new trust assumptions. Assuming there are no bugs in circuits, the system will work as intended.
 
@@ -49,11 +50,11 @@ In the current release, each chain will be an instance of zkSync Era and so the 
 1. Firstly, the governance of the CTM will publish the server (including sequencer, prover, etc) that support the new version . This is done offchain. Enough time should be given to various zkStack devs to update their version.
 2. The governance of the CTM will publish the upgrade onchain by automatically executing the following three transactions:
 
-- `setChainCreationParams` ⇒ to ensure that new chains will be created with the version 
+- `setChainCreationParams` ⇒ to ensure that new chains will be created with the version
 - `setValidatorTimelock` (if needed) ⇒ to ensure that the new chains will use the new validator timelock right-away
 - `setNewVersionUpgrade` ⇒ to save the upgrade information that each ST will need to follow to conduct the upgrade on their side.
 
-3. After that, each ChainAdmin can upgrade to the new version in suitable time for them. 
+3. After that, each ChainAdmin can upgrade to the new version in suitable time for them.
 
 > Note, that while the governance does try to give the maximal possible time for chains to upgrade, the governance will typically put restrictions (aka deadlines) on the time by which the chain has to be upgraded. If the deadline is passed, the chain can not commit new batches until the upgrade is executed.
 

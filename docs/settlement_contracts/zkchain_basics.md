@@ -1,4 +1,5 @@
 # L1 smart contract of an individual chain
+
 [back to readme](../README.md)
 
 ## Diamond (also mentioned as State Transition contract)
@@ -20,7 +21,7 @@ even an upgrade system is a separate facet that can be replaced.
 
 One of the differences from the reference implementation is access freezability. Each of the facets has an associated
 parameter that indicates if it is possible to freeze access to the facet. Privileged actors can freeze the **diamond**
-(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or admin 
+(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or admin
 unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade system and then
 the diamond will be frozen forever.
 
@@ -41,8 +42,8 @@ This facet responsible for the configuration setup and upgradabity, handling tas
 * Freezability: Executing the freezing/unfreezing of facets within the diamond proxy to safeguard the ecosystem during upgrades or in response to detected vulnerabilities.
 
 Control over the AdminFacet is divided between two main entities:
-- CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to [this document](../chain_management/chain_type_manager.md). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below). 
-- Chain Admin - Multisig smart contract managed by each individual chain that can perform non-critical changes to the system such as granting validator permissions.
+* CTM (Chain Type Manager, formerly known as `StateTransitionManager`) - Separate smart contract that can perform critical changes to the system as protocol upgrades. For more detailed information on its function and design, refer to [this document](../chain_management/chain_type_manager.md). Although currently only one version of the CTM exists, the architecture allows for future versions to be introduced via subsequent upgrades. The owner of the CTM is the [decentralized governance](https://blog.zknation.io/introducing-zk-nation/), while for non-critical an Admin entity is used (see details below).
+* Chain Admin - Multisig smart contract managed by each individual chain that can perform non-critical changes to the system such as granting validator permissions.
 
 ### MailboxFacet
 
@@ -106,11 +107,12 @@ A contract that accepts L2 batches, enforces data availability via DA validators
 
 The state transition is divided into three stages:
 
-- `commitBatches` - check L2 batch timestamp, process the L2 logs, save data for a batch, and prepare data for zk-proof.
-- `proveBatches` - validate zk-proof.
-- `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
+* `commitBatches` - check L2 batch timestamp, process the L2 logs, save data for a batch, and prepare data for zk-proof.
+* `proveBatches` - validate zk-proof.
+* `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
 
 Each L2 -> L1 system log will have a key that is part of the following:
+
 ```solidity
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -126,20 +128,20 @@ enum SystemLogKey {
 
 When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:
 
-- In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
-- There will be a single log for each key that is contained within `SystemLogKey`
-- Three logs from the `L2_TO_L1_MESSENGER` with keys:
- - `L2_TO_L1_LOGS_TREE_ROOT_KEY`
- - `L2_DA_VALIDATOR_OUTPUT_HASH_KEY`
- - `USED_L2_DA_VALIDATOR_ADDRESS_KEY`
-- Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
-  - `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
-  - `PREV_BATCH_HASH_KEY`
-- Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
-  - `CHAINED_PRIORITY_TXN_HASH_KEY`
-  - `NUMBER_OF_LAYER_1_TXS_KEY`
-  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY` 
-- None logs from other addresses (may be changed in the future).
+* In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
+* There will be a single log for each key that is contained within `SystemLogKey`
+* Three logs from the `L2_TO_L1_MESSENGER` with keys:
+* `L2_TO_L1_LOGS_TREE_ROOT_KEY`
+* `L2_DA_VALIDATOR_OUTPUT_HASH_KEY`
+* `USED_L2_DA_VALIDATOR_ADDRESS_KEY`
+* Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
+  * `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
+  * `PREV_BATCH_HASH_KEY`
+* Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
+  * `CHAINED_PRIORITY_TXN_HASH_KEY`
+  * `NUMBER_OF_LAYER_1_TXS_KEY`
+  * `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY`
+* None logs from other addresses (may be changed in the future).
 
 ### DiamondInit
 
@@ -166,6 +168,6 @@ When the validator calls `commitBatches`, the same calldata will be propagated t
 the time these batches are committed by the validator to enforce a delay between committing and execution of batches. Then, the
 validator can prove the already committed batches regardless of the mentioned timestamp, and again the same calldata (related
 to the `proveBatches` function) will be propagated to the zkSync contract. After the `delay` is elapsed, the validator
-is allowed to call `executeBatches` to propagate the same calldata to zkSync contract. 
+is allowed to call `executeBatches` to propagate the same calldata to zkSync contract.
 
 The owner of the ValidatorTimelock contract is the decentralized governance. Note, that all the chains share the same ValidatorTimelock for simplicity.

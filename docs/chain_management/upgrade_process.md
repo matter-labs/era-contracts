@@ -1,5 +1,7 @@
-# TODO 
+# TODO
+
 # Upgrade process document
+
 [back to readme](../README.md)
 
 ## Intro
@@ -13,7 +15,7 @@ Where each upgrade consists of two parameters:
 - Facet cuts - change of the internal implementation of the diamond proxy
 - Diamond Initialization - delegate call to the specified address wit`h specified data
 
-The second parameter is very powerful and flexible enough to move majority of upgrade logic there. 
+The second parameter is very powerful and flexible enough to move majority of upgrade logic there.
 
 ## Upgrade structure
 

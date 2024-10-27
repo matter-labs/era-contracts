@@ -1,10 +1,11 @@
 # Batches & L2 blocks on zkSync
+
 [back to readme](../README.md)
 
 ## Glossary
 
 - Batch - a set of transactions that the bootloader processes (`commitBatches`, `proveBatches`, and `executeBatches` work with it). A batch consists of multiple transactions.
-- L2 blocks - non-intersecting sub-sets of consecutively executed transactions in a batch. This is the kind of block you see in the API. This is the one that is used for `block.number`/`block.timestamp`/etc. 
+- L2 blocks - non-intersecting sub-sets of consecutively executed transactions in a batch. This is the kind of block you see in the API. This is the one that is used for `block.number`/`block.timestamp`/etc.
 
 > Note that sometimes in code you can see notion of "virtual blocks". In the past, we returned batch information for `block.number`/`block.timestamp`. However due to DevEx issues we decided to move to returned these values for L2 blocks. Virtual blocks were used during migration, but are not used anymore. You consider that there is one virtual block per one L2 block and it has exactly the same properties.
 

@@ -5,39 +5,39 @@ The order of the files here only roughly represents the order of reading. A lot 
 - [Glossary](./glossary.md)
 - [Overview](./overview.md)
 - Contracts of an individual chain
-    - [ZK Chain basics](./settlement_contracts/zkchain_basics.md)
-    - Data availability
-        - [Custom DA support](./settlement_contracts/data_availability/custom_da.md)
-        - [Rollup DA support](./settlement_contracts/data_availability/rollup_da.md)
-        - [Standard pubdata format](./settlement_contracts/data_availability/standard_pubdata_format.md)
-        - [State diff compression v1 spec](./settlement_contracts/data_availability/state_diff_compression_v1_spec.md)
-    - L1->L2 transaction handling
-        -  [Processing of L1->L2 transactions](./settlement_contracts/priority_queue/processing_of_l1->l2_txs.md)
-        - [Priority queue](./settlement_contracts/priority_queue/priority-queue.md)
+  - [ZK Chain basics](./settlement_contracts/zkchain_basics.md)
+  - Data availability
+    - [Custom DA support](./settlement_contracts/data_availability/custom_da.md)
+    - [Rollup DA support](./settlement_contracts/data_availability/rollup_da.md)
+    - [Standard pubdata format](./settlement_contracts/data_availability/standard_pubdata_format.md)
+    - [State diff compression v1 spec](./settlement_contracts/data_availability/state_diff_compression_v1_spec.md)
+  - L1->L2 transaction handling
+    - [Processing of L1->L2 transactions](./settlement_contracts/priority_queue/processing_of_l1->l2_txs.md)
+    - [Priority queue](./settlement_contracts/priority_queue/priority-queue.md)
 - Chain Management
-    - [Chain type manager](./chain_management/chain_type_manager.md)
-    - [Admin role](./chain_management/admin_role.md)
-    - [Chain genesis](./chain_management/chain_genesis.md)
-    - [Standard Upgrade process](./chain_management/upgrade_process.md)
+  - [Chain type manager](./chain_management/chain_type_manager.md)
+  - [Admin role](./chain_management/admin_role.md)
+  - [Chain genesis](./chain_management/chain_genesis.md)
+  - [Standard Upgrade process](./chain_management/upgrade_process.md)
 - Bridging
-    - Bridgehub
-        - [Overview of the bridgehub functionality](./bridging/bridgehub/overview.md)
-    - [Asset Router](./bridging/asset_router/Overview.md)
+  - Bridgehub
+    - [Overview of the bridgehub functionality](./bridging/bridgehub/overview.md)
+  - [Asset Router](./bridging/asset_router/Overview.md)
 - L2 System Contracts
-    - [System contracts bootloader description](./l2_system_contracts/system_contracts_bootloader_description.md)
-    - [Batches and blocks on ZKsync](./l2_system_contracts/batches_and_blocks_on_zksync.md)
-    - [Elliptic curve precompiles](./l2_system_contracts/elliptic_curve_precompiles.md)
-    - [ZKsync fee model](./l2_system_contracts/zksync_fee_model.md)
+  - [System contracts bootloader description](./l2_system_contracts/system_contracts_bootloader_description.md)
+  - [Batches and blocks on ZKsync](./l2_system_contracts/batches_and_blocks_on_zksync.md)
+  - [Elliptic curve precompiles](./l2_system_contracts/elliptic_curve_precompiles.md)
+  - [ZKsync fee model](./l2_system_contracts/zksync_fee_model.md)
 - Gateway
-    - [General overview](./gateway/overview.md)
-    - [Chain migration](./gateway/chain_migration.md)
-    - [L1->L3 messaging via gateway](./gateway/messaging_via_gateway.md)
-    - [L3->L1 messaging via gateway](./gateway/nested_l3_l1_messaging.md)
-    - [Gateway protocol versioning](./gateway/gateway_protocol_upgrades.md)
-    - [DA handling on Gateway](./gateway/gateway_da.md)
+  - [General overview](./gateway/overview.md)
+  - [Chain migration](./gateway/chain_migration.md)
+  - [L1->L3 messaging via gateway](./gateway/messaging_via_gateway.md)
+  - [L3->L1 messaging via gateway](./gateway/nested_l3_l1_messaging.md)
+  - [Gateway protocol versioning](./gateway/gateway_protocol_upgrades.md)
+  - [DA handling on Gateway](./gateway/gateway_da.md)
 - Upgrade history
-    - [Gateway upgrade diff](./upgrade_history/gateway_upgrade/gateway_diff_review.md)
-    - [Gateway upgrade process](./upgrade_history/gateway_upgrade/upgrade_process.md)
+  - [Gateway upgrade diff](./upgrade_history/gateway_upgrade/gateway_diff_review.md)
+  - [Gateway upgrade process](./upgrade_history/gateway_upgrade/upgrade_process.md)
 
 ![Reading order](./img/reading_order.png)
 

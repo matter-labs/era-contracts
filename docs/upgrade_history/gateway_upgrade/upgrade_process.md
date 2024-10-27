@@ -1,4 +1,5 @@
 # The upgrade process to the new version
+
 [back to readme](../../README.md)
 
 Gateway system introduces a lot of new contracts and so conducting so to provide the best experience for ZK chains the multistage upgrade will be provided. The upgrade will require some auxiliary contracts that will exist only for the purpose of this upgrade.
@@ -29,7 +30,7 @@ There are four roles that will be mentioned within this document:
 
 This stage involves everything that is done before the voting starts. At this stage, all the details of the upgrade must be fixed, including the chain id of the gateway.
 
-More precisely, the implementations for the contracts will have to be deployed. Also, all of the new contracts will have to be deployed along with their proxies, e.g. `CTMDeploymentTracker`, `L1AssetRouter`, etc. 
+More precisely, the implementations for the contracts will have to be deployed. Also, all of the new contracts will have to be deployed along with their proxies, e.g. `CTMDeploymentTracker`, `L1AssetRouter`, etc.
 
 Also, at this stage the bytecodes all L2 contracts have to be fixed, this includes bytecode for the things like `L2DAValidators`, `GatewayCTMDeployer`, etc.
 
@@ -93,28 +94,28 @@ The governance should sign all operations that will happen in all of the consecu
 
 Note, that to support “Stage 3” it would also need to finalize all the details for Gateway, including its chain id, chain admin, etc.
 
-## Stage 1. Publishing of the new protocol upgrade.
+## Stage 1. Publishing of the new protocol upgrade
 
 ### Txs by governance (in one multicall)
 
 1. The governance accepts ownership for all the contracts that used  `TransitionaryOwner`.
 2. The governance publishes the new version by calling `function setNewVersionUpgrade`.
 3. The governance calls `setChainCreationParams` and sets temporary incorrect values there that use a contract that always reverts as the `genesisUpgrade`, ensuring that no new chains can be created until Stage 2.
-4. The governance should call the `GovernanceUpgradeTimer.startTimer()` to ensure that the timer for the upgrade starts. 
+4. The governance should call the `GovernanceUpgradeTimer.startTimer()` to ensure that the timer for the upgrade starts.
 
 ### Impact
 
 The chains will get the ability to upgrade to the new protocol version. They will be advised to do so before the deadline for upgrade runs out.
 
-Also, new chains wont be deployable during this stage due to step (3). 
+Also, new chains wont be deployable during this stage due to step (3).
 
-Chains, whether upgraded or not, should work as usual as the new L2 bridging ecosystem is fully compatible with the old L1SharedBridge. 
+Chains, whether upgraded or not, should work as usual as the new L2 bridging ecosystem is fully compatible with the old L1SharedBridge.
 
 Chains that upgrade need to carefully coordinate this upgrade on the server side, since validator timelock changes and also there is a need to keep track of the number of already existing priority ops that were not included into the priority tree.
 
 ## Chain Upgrade flow
 
-Let’s take a deeper look at how upgrading of an individual chain would look like. 
+Let’s take a deeper look at how upgrading of an individual chain would look like.
 
 ### Actions by Chain Admins
 
@@ -130,9 +131,9 @@ This upgrade adds a lot of new chain parameters and so these [should be managed 
 
 ### Upgrade flow in contracts
 
-Usually, we would perform an upgrade by simply doing a list of force deployments: basically providing an array of the contracts to deploy for the system. This array would be constant for all chains and it would work fine. 
+Usually, we would perform an upgrade by simply doing a list of force deployments: basically providing an array of the contracts to deploy for the system. This array would be constant for all chains and it would work fine.
 
-However in this upgrade we have an issue that some of the constructor parameters (e.g. the address of the `L2SharedBridgeLegacy`) are specific to each chain. Thus, besides the standard parts of the upgrades each chain also has `ZKChainSpecificForceDeploymentsData` populated. Some of the params to conduct those actions are constant and so populate the `FixedForceDeploymentsData` struct. 
+However in this upgrade we have an issue that some of the constructor parameters (e.g. the address of the `L2SharedBridgeLegacy`) are specific to each chain. Thus, besides the standard parts of the upgrades each chain also has `ZKChainSpecificForceDeploymentsData` populated. Some of the params to conduct those actions are constant and so populate the `FixedForceDeploymentsData` struct.
 
 If the above could be composed on L1 to still reuse the old list of `(address, bytecodeHash, constructorData)` list, there are also other rather complex actions such as upgrading the L2SharedBridge to the L2SharedBridgeLegacy implementation that require rather complex logic.
 
@@ -157,7 +158,7 @@ So entire flow can be summarized by the following:
 - upgrade the old contracts to the new implementation.
 - set the correct new chain creation params, upgrade the old contracts to the new one
 
-### Txs by anyone:
+### Txs by anyone
 
 After the governance has finalized the upgrade above, anyone can do the following transactions to finalize the upgrade:
 
@@ -184,7 +185,7 @@ All the chains should start returning the address of the `L1AssetRouter` as the 
 
 ## Stage 3. Deploying of Gateway
 
-### Txs by governance (sequentially, potentially different txs):
+### Txs by governance (sequentially, potentially different txs)
 
 1. Call `Bridgehub.createNewChain` with the data for gateway.
 2. It will have to register it via `bridgehub.registerSettlementLayer`
@@ -198,9 +199,9 @@ In case anyone will try to migrate their chain on top of gateway while CTM is no
 
 Anyone with funds on Gateway can deploy the `GatewayCTMDeployer` and it will deploy inside its constructor the CTM described from above.
 
-It can not be done as part of the governance transactions from above since it requires pre-publishing CTM-specific bytecodes. 
+It can not be done as part of the governance transactions from above since it requires pre-publishing CTM-specific bytecodes.
 
-## Security notes 
+## Security notes
 
 ### Importance of preventing new batches being committed with the old version
 

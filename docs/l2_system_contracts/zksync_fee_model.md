@@ -1,4 +1,5 @@
 # zkSync fee model
+
 [back to readme](../README.md)
 
 This document will assume that you already know how gas & fees work on Ethereum.
@@ -65,11 +66,12 @@ That being said, zkSync transactions do come with some small intrinsic costs, bu
 
 ## Charging for pubdata
 
-An important cost factor for users is the pubdata. zkSync Era is a state diff-based rollup, meaning that the pubdata is published not for the transaction data, but for the state changes: modified storage slots, deployed bytecodes, L2->L1 messages. This allows for applications that modify the same storage slot multiple times such as oracles, to update the storage slots multiple times while maintaining a constant footprint on L1 pubdata. Correctly a state diff rollups requires a special solution to charging for pubdata. It is explored in the next section. 
+An important cost factor for users is the pubdata. zkSync Era is a state diff-based rollup, meaning that the pubdata is published not for the transaction data, but for the state changes: modified storage slots, deployed bytecodes, L2->L1 messages. This allows for applications that modify the same storage slot multiple times such as oracles, to update the storage slots multiple times while maintaining a constant footprint on L1 pubdata. Correctly a state diff rollups requires a special solution to charging for pubdata. It is explored in the next section.
 
 # How L2 gas price works
 
 ## Batch overhead & limited resources of the batch
+
 To process the batch, the zkSync team has to pay for proving the batch, committing to it, etc. Processing a batch involves some operational costs as well. All of these values we call “Batch overhead”. It consists of two parts:
 
 - The L2 requirements for proving the circuits (denoted in L2 gas).
@@ -90,7 +92,7 @@ Note, that before the transaction is executed, the system can not know how many 
 
 ## `MAX_TRANSACTION_GAS_LIMIT`
 
-A recommended maximal amount of gas that a transaction can spend on computation is `MAX_TRANSACTION_GAS_LIMIT`. But in case the operator trusts the user, the operator may provide the [trusted gas limit](../../system-contracts/bootloader/bootloader.yul#L1242), i.e. the limit which exceeds `MAX_TRANSACTION_GAS_LIMIT` assuming that the operator knows what he is doing. This can be helpful in the case of a hyperchain with different parameters. 
+A recommended maximal amount of gas that a transaction can spend on computation is `MAX_TRANSACTION_GAS_LIMIT`. But in case the operator trusts the user, the operator may provide the [trusted gas limit](../../system-contracts/bootloader/bootloader.yul#L1242), i.e. the limit which exceeds `MAX_TRANSACTION_GAS_LIMIT` assuming that the operator knows what he is doing. This can be helpful in the case of a hyperchain with different parameters.
 
 ## Derivation of `baseFee` and `gasPerPubdata`
 
@@ -113,7 +115,7 @@ gasPerPubdata := ceilDiv(pubdataPrice, baseFee)
 
 While the way how we [charge for pubdata](#how-we-charge-for-pubdata) in theory allows for any `gasPerPubdata`, some SDKs expect the `gasLimit` by a transaction to be a uint64 number. We would prefer `gasLimit` for transactions to stay within JS's safe "number" range in case someone uses `number` type to denote gas there. For this reason, we will bind the `MAX_L2_GAS_PER_PUBDATA` to `2^20` gas per 1 pubdata byte. The number is chosen such that `MAX_L2_GAS_PER_PUBDATA * 2^32` is a safe JS integer. The `2^32` part is the maximal possible value for pubdata counter that could be in theory used. It is unrealistic that this value will ever appear under an honest operator, but it is needed just in case.
 
-Note, however, that it means that the total under high L1 gas prices `gasLimit` may be larger than `u32::MAX` and it is recommended that no more than `2^20` bytes of pubdata can be published within a transaction. 
+Note, however, that it means that the total under high L1 gas prices `gasLimit` may be larger than `u32::MAX` and it is recommended that no more than `2^20` bytes of pubdata can be published within a transaction.
 
 ### Recommended calculation of `FAIR_L2_GAS_PRICE`/`FAIR_PUBDATA_PRICE`
 
@@ -147,7 +149,7 @@ In the long run, the consensus will ensure the correctness of these values on th
 
 ### Overhead for transaction slot and memory
 
-We also have a limit on the number of memory that can be consumed within a batch as well as the number of transactions that can be included there. 
+We also have a limit on the number of memory that can be consumed within a batch as well as the number of transactions that can be included there.
 
 To simplify the codebase we've chosen the following constants:
 
@@ -169,7 +171,7 @@ The formulas above apply to L1→L2 transactions. However, note that the `gas_pe
 
 ### Refunds
 
-Note, that the used constants for the fee model are probabilistic, i.e. we never know in advance the exact reason why a batch is going to be sealed. These constants are meant to cover the expenses of the operator over a longer period so we do not refund the fact that the transaction might've been charged for overhead above the level at which the transaction has brought the batch to being closed, since these funds are used to cover transactions that did not pay in full for the limited batch's resources that they used.   
+Note, that the used constants for the fee model are probabilistic, i.e. we never know in advance the exact reason why a batch is going to be sealed. These constants are meant to cover the expenses of the operator over a longer period so we do not refund the fact that the transaction might've been charged for overhead above the level at which the transaction has brought the batch to being closed, since these funds are used to cover transactions that did not pay in full for the limited batch's resources that they used.
 
 ### Refunds for repeated writes
 
@@ -188,6 +190,7 @@ The important part here is that while such refunds are inlined (i.e. unlike the 
 zkSync Era is a state diff-based rollup. It means that it is not possible to know how much pubdata a transaction will take before its execution. We *could* charge for pubdata the following way: whenever a user does an operation that emits pubdata (writes to storage, publishes an L2->L1 message, etc.), we charge `pubdata_bytes_published * gas_per_pubdata` directly from the context of the execution.
 
 However, such an approach has the following disadvantages:
+
 - This would inherently make execution very divergent from EVM.
 - It is prone to unneeded overhead. For instance, in the case of reentrancy locks, the user will still have to pay the initial price for marking the lock as used. The price will get refunded in the end, but it still worsens the UX.
 - If we want to impose any sort of limit on how much computation a transaction could take (let's call this limit `MAX_TX_GAS_LIMIT`), it would mean that no more than `MAX_TX_GAS_LIMIT / gas_per_pubdata` could be published in a transaction, making this limit either too small or forcing us to increase `baseFee` to prevent the number from growing too much.
@@ -219,7 +222,7 @@ Now it has become easier for a transaction to use up more pubdata than what can 
 
 ## Security considerations for users
 
-The approach with post-charging introduces one distinctive feature: it is not trivial to know the final price for a transaction at the time of its execution. When a user does `.call{gas: some_gas}` the final impact on the price of the transaction may be higher than `some_gas` since the pubdata counter will be incremented during the execution and charged only at the end of the transaction. 
+The approach with post-charging introduces one distinctive feature: it is not trivial to know the final price for a transaction at the time of its execution. When a user does `.call{gas: some_gas}` the final impact on the price of the transaction may be higher than `some_gas` since the pubdata counter will be incremented during the execution and charged only at the end of the transaction.
 
 While for the average user, this limitation is not relevant, some specific applications may receive certain issues.
 
@@ -239,7 +242,7 @@ uint256 lastProcessed;
 
 function processNWithdrawals(uint256 N) external nonReentrant {
   uint256 current = lastProcessed + 1;
- 	uint256 lastToProcess = current + N - 1;
+  uint256 lastToProcess = current + N - 1;
   
   while(current <= lastToProcess) {
     // If the user provided some bad token that takes more than MAX_WITHDRAWAL_GAS  
@@ -253,9 +256,9 @@ function processNWithdrawals(uint256 N) external nonReentrant {
 }
 ```
 
-The contract above supports a queue of withdrawals. This queue supports any type of token, including potentially malicious ones. However, the queue will never get stuck, since the `MAX_WITHDRAWAL_GAS` ensures that even if the malicious token does a lot of computation, it will be bound by this number and so the caller of the `processNWithdrawals` won't spend more than `MAX_WITHDRAWAL_GAS` per token. 
+The contract above supports a queue of withdrawals. This queue supports any type of token, including potentially malicious ones. However, the queue will never get stuck, since the `MAX_WITHDRAWAL_GAS` ensures that even if the malicious token does a lot of computation, it will be bound by this number and so the caller of the `processNWithdrawals` won't spend more than `MAX_WITHDRAWAL_GAS` per token.
 
-The above assumptions work in the pre-charge model (calldata based rollups) or pay-as-you-go model (pre-1.5.0 Era). However, in the post-charge model, the `MAX_WITHDRAWAL_GAS`` limits the amount of computation that can be done within the transaction, but it does not limit the amount of pubdata that can be published. Thus, if such a function publishes a very large L1→L2 message, it might make the entire top transaction fail. This effectively means that such a queue would be stalled. 
+The above assumptions work in the pre-charge model (calldata based rollups) or pay-as-you-go model (pre-1.5.0 Era). However, in the post-charge model, the `MAX_WITHDRAWAL_GAS`` limits the amount of computation that can be done within the transaction, but it does not limit the amount of pubdata that can be published. Thus, if such a function publishes a very large L1→L2 message, it might make the entire top transaction fail. This effectively means that such a queue would be stalled.
 
 ### How to prevent this issue on the users' side
 
@@ -269,9 +272,9 @@ In this case, the topmost transaction will be able to sponsor such subcalls. Whe
 
 ### 2. Case of when a malicious contract consumes an unprocessable amount of pubdata**
 
-In this case, the malicious callee published so much pubdata, that such a transaction can not be included into a batch. This effectively means that no matter how much money the topmost transaction willing to pay, the queue is stalled. 
+In this case, the malicious callee published so much pubdata, that such a transaction can not be included into a batch. This effectively means that no matter how much money the topmost transaction willing to pay, the queue is stalled.
 
-The only way how it is combated is by setting some minimal amount of ergs that still have to be consumed with each emission of pubdata (basically to make sure that it is not possible to publish large chunks of pubdata while using negligible computation). Unfortunately, setting this minimal amount to cover the worst possible case (i.e. 80M ergs spent with maximally 100k of pubdata available, leading to 800 L2 gas / pubdata byte) would likely be too harsh and will negatively impact average UX. Overall, this *is* the way to go, however for now the only guarantee will be that a subcall of 1M gas is always processable, which will mean that at least 80 gas will have to be spent for each published pubdata byte. Even if higher than real L1 gas costs, it is reasonable even in the long run, since all the things that are published as pubdata are state-related and so they have to be well-priced for long-term storage.    
+The only way how it is combated is by setting some minimal amount of ergs that still have to be consumed with each emission of pubdata (basically to make sure that it is not possible to publish large chunks of pubdata while using negligible computation). Unfortunately, setting this minimal amount to cover the worst possible case (i.e. 80M ergs spent with maximally 100k of pubdata available, leading to 800 L2 gas / pubdata byte) would likely be too harsh and will negatively impact average UX. Overall, this *is* the way to go, however for now the only guarantee will be that a subcall of 1M gas is always processable, which will mean that at least 80 gas will have to be spent for each published pubdata byte. Even if higher than real L1 gas costs, it is reasonable even in the long run, since all the things that are published as pubdata are state-related and so they have to be well-priced for long-term storage.
 
 In the future, we will guarantee the processability of subcalls of larger size by increasing the number of pubdata that can be published per batch.
 
@@ -293,15 +296,15 @@ The `executeBatches` operation on L1 is executed in `O(N)` where N is the number
 # zkSync Era Fee Components (Revenue & Costs)
 
 - On-Chain L1 Costs
-    - L1 Commit Batches
-        - The commit batch transaction submits pubdata (which is the list of updated storage slots) to L1. The cost of a commit transaction is calculated as `constant overhead + price of pubdata`. The `constant overhead` cost is evenly distributed among L2 transactions in the L1 commit transaction, but only at higher transaction loads. As for the `price of pubdata`, it is known how much pubdata each L2 transaction consumed, therefore, they are charged directly for that. Multiple L1 batches can be included in a single commit transaction.
-    - L1 Prove Batches
-        - Once the off-chain proof is generated, it is submitted to L1 to make the rollup batch final. Currently, each proof contains only one L1 batch.
-    - L1 Execute Batches
-        - The execute batches transaction processes L2 -> L1 messages and marks executed priority operations as such. Multiple L1 batches can be included in a single execute transaction.
-    - L1 Finalize Withdrawals
-        - While not strictly part of the L1 fees, the cost to finalize L2 → L1 withdrawals are covered by Matter Labs. The finalize withdrawals transaction processes user token withdrawals from zkSync Era to Ethereum. Multiple L2 withdrawal transactions are included in each finalize withdrawal transaction.
+  - L1 Commit Batches
+    - The commit batch transaction submits pubdata (which is the list of updated storage slots) to L1. The cost of a commit transaction is calculated as `constant overhead + price of pubdata`. The `constant overhead` cost is evenly distributed among L2 transactions in the L1 commit transaction, but only at higher transaction loads. As for the `price of pubdata`, it is known how much pubdata each L2 transaction consumed, therefore, they are charged directly for that. Multiple L1 batches can be included in a single commit transaction.
+  - L1 Prove Batches
+    - Once the off-chain proof is generated, it is submitted to L1 to make the rollup batch final. Currently, each proof contains only one L1 batch.
+  - L1 Execute Batches
+    - The execute batches transaction processes L2 -> L1 messages and marks executed priority operations as such. Multiple L1 batches can be included in a single execute transaction.
+  - L1 Finalize Withdrawals
+    - While not strictly part of the L1 fees, the cost to finalize L2 → L1 withdrawals are covered by Matter Labs. The finalize withdrawals transaction processes user token withdrawals from zkSync Era to Ethereum. Multiple L2 withdrawal transactions are included in each finalize withdrawal transaction.
 - On-Chain L2 Revenue
-    - L2 Transaction Fee
-        - This fee is what the user pays to complete a transaction on zkSync Era. It is calculated as `gasLimit x baseFeePerGas - refundedGas x baseFeePerGas`, or more simply, `gasUsed x baseFeePerGas`.
+  - L2 Transaction Fee
+    - This fee is what the user pays to complete a transaction on zkSync Era. It is calculated as `gasLimit x baseFeePerGas - refundedGas x baseFeePerGas`, or more simply, `gasUsed x baseFeePerGas`.
 - Profit = L2 Revenue - L1 Costs - Off-Chain Infrastructure Costs

@@ -1,4 +1,5 @@
 # Safe ChainAdmin management
+
 [back to readme](../README.md)
 
 While the ecosystem does a [decentralized trusted governance](https://blog.zknation.io/introducing-zk-nation/), each chain has its own Chain Admin. While the upgrade parameters are chosen by the governance, chain admin is still a powerful role and should be managed carefully.
@@ -7,11 +8,11 @@ In this document we will explore what are the abilities of the ChainAdmin, how d
 
 ## General guidelines
 
-The system does not restrict in any way how the admin of the chain should be implemented. However special caution should be taken to keep it safe. 
+The system does not restrict in any way how the admin of the chain should be implemented. However special caution should be taken to keep it safe.
 
 The general guideline is that an admin of a ZK chain should be *at least* a well-distributed multisig. Having it as an EOA is definitely a bad idea since having this address stolen can lead to [chain being permanently frozen](#setting-da-layer).
 
-Additional measures may be taken [to self-restrict](#proposed-modular-chainadmin-implementation) the ChainAdmin to ensure that some operations can be only done in safe fasion. 
+Additional measures may be taken [to self-restrict](#proposed-modular-chainadmin-implementation) the ChainAdmin to ensure that some operations can be only done in safe fasion.
 
 Generally all the functionality of chain admin should be treated with maximal security and caution, and having hotkey separate roles in rare circuimstances, e.g. to call `setTokenMultiplier` in case of an ERC-20 based chain.
 
@@ -41,7 +42,7 @@ This setting is preserved even when migrating to [gateway](../gateway/overview.m
 
 ### `changeFeeParams` method
 
-This method allows to change how the fees are charged for priority operations. 
+This method allows to change how the fees are charged for priority operations.
 
 The worst impact of setting this value wrongly is having L1->L2 transactions underpriced.
 
@@ -65,17 +66,18 @@ This method allows to set a transaction filterer, i.e. an additional validator f
 
 ### Migration to another settlement layer
 
-The upgrade can start migration of a chain to another settlement layer. Currently all the settlement layers are whitelisted, so generally this operation is harmless (except for the inconvenience in case the migration was unplanned). 
+The upgrade can start migration of a chain to another settlement layer. Currently all the settlement layers are whitelisted, so generally this operation is harmless (except for the inconvenience in case the migration was unplanned).
 
 However, some caution needs to be applied to migrate properly as described in the section below.
 
 ## Chain admin when migrating to gateway
 
 When a chain migrates to gateway, it provides the address of the new admin on L2. The following rules apply:
+
 - If a ZK chain has already been deployed on a settlement layer, its admin stays the same.
 - If a ZK chain has not been deployed yet, then the new admin is set.
 
-The above means that in the current release the admin of the chain on the new settlement layer is "detached" from the admin on L1. It is the responsibility of the chain to set the L2 admin correctly: either it should have the same signers or, even better in the long run, put the aliased L1 admin to have most of the abilities inside the L2 chain admin. 
+The above means that in the current release the admin of the chain on the new settlement layer is "detached" from the admin on L1. It is the responsibility of the chain to set the L2 admin correctly: either it should have the same signers or, even better in the long run, put the aliased L1 admin to have most of the abilities inside the L2 chain admin.
 
 Since most of the Admin's functionality above are related to L1->L2 operations, the L1 chain admin will continue playing a crucial role even after the chain migrates to Gateway. However, some of the new functionality are relevant on the chain admin on the settlement layer only:
 

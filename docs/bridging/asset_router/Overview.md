@@ -1,4 +1,5 @@
 # Overview of Custom Asset Bridging with the Asset Router
+
 [back to readme](../../README.md)
 
 Bridges are completely separate contracts from the ZKChains and system contracts. They are a wrapper for L1 <-> L2 communication on both L1 and L2. Upon locking assets on one layer, a request is sent to mint these bridged assets on the other layer.
@@ -6,7 +7,7 @@ Upon burning assets on one layer, a request is sent to unlock them on the other.
 
 Custom asset bridging is a new bridging model that allows to:
 
-1. Minimize the effort needed by custom tokens to be able to become part of the elastic chain ecosystem. Before, each custom token would have to build its own bridge, but now just custom asset deployment trackers / asset handler is needed. This is achieved by building a modular bridge which separates the logic of L1<>L2 messaging from the holding of the asset. 
+1. Minimize the effort needed by custom tokens to be able to become part of the elastic chain ecosystem. Before, each custom token would have to build its own bridge, but now just custom asset deployment trackers / asset handler is needed. This is achieved by building a modular bridge which separates the logic of L1<>L2 messaging from the holding of the asset.
 2. Unify the interfaces between L1 and L2 bridge contracts, paving the way for easy cross chain bridging. It will especially become valuable once interop is enabled.
 
 #### New concepts

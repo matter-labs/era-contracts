@@ -1,4 +1,5 @@
 # Handling L1→L2 ops on zkSync
+
 [back to readme](../../README.md)
 
 The transactions on zkSync can be initiated not only on L2, but also on L1. There are two types of transactions that can be initiated on L1:
@@ -16,7 +17,7 @@ Please read the full [article](../../l2_system_contracts/system_contracts_bootlo
 
 A new priority operation can be appended by calling the `requestL2TransactionDirect` or `requestL2TransactionTwoBridges` methods on `BridgeHub` smart contract. `BridgeHub` will ensure that the base token is deposited via `L1AssetRouter` and send transaction request to the specified state transition contract (selected by the chainID). State transition contract will perform several checks for the transaction, making sure that it is processable and provides enough fee to compensate the operator for this transaction. Then, this transaction will be [appended](../../l1-contracts/contracts/state-transition/chain-deps/facets/Mailbox.sol#569) to the priority tree (and optionally to the legacy priority queue).
 
-> In the previous system, priority operations were structured in a queue. However, now they will be stored in an incremental merkle tree. The motivation for the tree structure can be read [here](./priority-queue.md). 
+> In the previous system, priority operations were structured in a queue. However, now they will be stored in an incremental merkle tree. The motivation for the tree structure can be read [here](./priority-queue.md).
 
 The difference between `requestL2TransactionDirect` and `requestL2TransactionTwoBridges` is that the `msg.sender` on the L2 Transaction is the second bridge in the `requestL2TransactionTwoBridges` case, while it is the `msg.sender` of the `requestL2TransactionDirect` in the first case. For more details read the [bridgehub documentation](../../bridging/bridgehub/overview.md)
 
@@ -83,7 +84,7 @@ Once batch with the upgrade transaction has been executed, we [delete](../../../
 
 Since the operator can put any data into the bootloader memory and for L1→L2 transactions the bootloader has to blindly trust it and rely on L1 contracts to validate it, it may be a very powerful tool for a malicious operator. Note, that while the governance mechanism is trusted, we try to limit our trust for the operator as much as possible, since in the future anyone would be able to become an operator.
 
-Some time ago, we *used to* have a system where the upgrades could be done via L1→L2 transactions, i.e. the implementation of the `DiamondProxy` upgrade would include a priority transaction (with `from` equal to for instance `FORCE_DEPLOYER`) with all the upgrade params. 
+Some time ago, we *used to* have a system where the upgrades could be done via L1→L2 transactions, i.e. the implementation of the `DiamondProxy` upgrade would include a priority transaction (with `from` equal to for instance `FORCE_DEPLOYER`) with all the upgrade params.
 
 In the current system though having such logic would be dangerous and would allow for the following attack:
 
@@ -91,6 +92,7 @@ In the current system though having such logic would be dangerous and would allo
 - The operator puts a malicious priority operation with an upgrade into the bootloader memory. This operation was never included in the priority operations queue / and it is not an upgrade transaction. However, as already mentioned above the bootloader has no idea what priority / upgrade transactions are correct and so this transaction will be processed.
 
 The most important caveat of this malicious upgrade is that it may change implementation of the `Keccak256` precompile to return any values that the operator needs.
+
 - When the`priorityOperationsRollingHash` will be updated, instead of the “correct” rolling hash of the priority transactions, the one which would appear with the correct topmost priority operation is returned. The operator can’t amend the behaviour of `numberOfPriorityTransactions`, but it won’t help much, since the the `priorityOperationsRollingHash` will match on L1 on the execution step.
 
 That’s why the concept of the upgrade transaction is needed: this is the only transaction that can initiate transactions out of the kernel space and thus change bytecodes of system contracts. That’s why it must be the first one and that’s why bootloader [emits](../../../system-contracts/bootloader/bootloader.yul#L603) its hash via a system L2→L1 log before actually processing it.

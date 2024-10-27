@@ -1,4 +1,5 @@
 # System contracts/bootloader description (VM v1.5.0)
+
 [back to readme](../README.md)
 
 ## Bootloader
@@ -110,9 +111,9 @@ These opcodes are allowed only for contracts in kernel space (i.e. system contr
 - `to_l1`. Sends a system L2→L1 log to Ethereum. The structure of this log can be seen [here](../../l1-contracts/contracts/common/Messaging.sol#L23).
 - `event`. Emits an L2 log to zkSync. Note, that L2 logs are not equivalent to Ethereum events. Each L2 log can emit 64 bytes of data (the actual size is 88 bytes, because it includes the emitter address, etc). A single Ethereum event is represented with multiple `event` logs constitute. This opcode is only used by `EventWriter` system contract.
 - `precompile_call`. This is an opcode that accepts two parameters: the uint256 representing the packed parameters for it as well as the ergs to burn. Besides the price for the precompile call itself, it burns the provided ergs and executes the precompile. The action that it does depend on `this` during execution:
-    - If it is the address of the `ecrecover` system contract, it performs the ecrecover operation
-    - If it is the address of the `sha256`/`keccak256` system contracts, it performs the corresponding hashing operation.
-    - It does nothing (i.e. just burns ergs) otherwise. It can be used to burn ergs needed for L2→L1 communication or publication of bytecodes onchain.
+  - If it is the address of the `ecrecover` system contract, it performs the ecrecover operation
+  - If it is the address of the `sha256`/`keccak256` system contracts, it performs the corresponding hashing operation.
+  - It does nothing (i.e. just burns ergs) otherwise. It can be used to burn ergs needed for L2→L1 communication or publication of bytecodes onchain.
 - `setValueForNextFarCall` sets `msg.value` for the next `call`/`mimic_call`. Note, that it does not mean that the value will be really transferred. It just sets the corresponding `msg.value` context variable. The transferring of ETH should be done via other means by the system contract that uses this parameter. Note, that this method has no effect on `delegatecall` , since `delegatecall` inherits the `msg.value` of the previous frame.
 - `increment_tx_counter` increments the counter of the transactions within the VM. The transaction counter used mostly for the VM’s internal tracking of events. Used only in bootloader after the end of each transaction.
 - `decommit` will return a pointer to a slice with the corresponding bytecode hash preimage. If this bytecode has been unpacked before, the memory page where it was unpacked will be reused. If it has never been unpacked before, it will be unpacked into the current heap.
@@ -302,12 +303,12 @@ The batch information slots [are used at the beginning of the batch](../../syste
 - `[75..142]` – 68 slots for the calldata for the KnownCodesContract call.
 - `[143..10142]` – 10000 slots for the refunds for the transactions.
 - `[10143..20142]` – 10000 slots for the overhead for batch for the transactions. This overhead is suggested by the operator, i.e. the bootloader will still double-check that the operator does not overcharge the user.
-- `[20143..30142]` – slots for the “trusted” gas limits by the operator. The user’s transaction will have at its disposal `min(MAX_TX_GAS(), trustedGasLimit)`, where `MAX_TX_GAS` is a constant guaranteed by the system. Currently, it is equal to 80 million gas. In the future, this feature will be removed. 
+- `[20143..30142]` – slots for the “trusted” gas limits by the operator. The user’s transaction will have at its disposal `min(MAX_TX_GAS(), trustedGasLimit)`, where `MAX_TX_GAS` is a constant guaranteed by the system. Currently, it is equal to 80 million gas. In the future, this feature will be removed.
 - `[30143..70146]` – slots for storing L2 block info for each transaction. You can read more on the difference L2 blocks and batches [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md).
 - `[70147..266754]` – slots used for compressed bytecodes each in the following format:
-    - 32 bytecode hash
-    - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the `publishCompressedBytecode` function of the `BytecodeCompresor`)
-    - The calldata to the bytecode compressor (without the selector). 
+  - 32 bytecode hash
+  - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the `publishCompressedBytecode` function of the `BytecodeCompresor`)
+  - The calldata to the bytecode compressor (without the selector).
 - `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](./Handling%20L1→L2%20ops%20on%20zkSync.md).
 
 ### L1Messenger Pubdata
@@ -316,7 +317,7 @@ The batch information slots [are used at the beginning of the batch](../../syste
 
 But briefly, this space is used for the calldata to the L1Messenger’s `publishPubdataAndClearState` function, which accepts the address of the L2DAValidator as well as the pubdata for it to check. The L2DAValidator is a contract that is responsible to ensure efficiency [when handling pubdata](../settlement_contracts/data_availability/custom_da.md). Typically, the calldata `L2DAValidator` would include uncompressed preimages for bytecodes, L2->L1 messages, L2->L1 logs, etc as their compressed counterparts. However, the exact implementation may vary across various ZK chains.  
 
-Note, that while the realistic number of pubdata that can be published in a batch is ~780kb, the size of the calldata to L1Messenger may be a lot larger due to the fact that this method also accepts the original uncompressed state diff entries. These will not be published to L1, but will be used to verify the correctness of the compression. 
+Note, that while the realistic number of pubdata that can be published in a batch is ~780kb, the size of the calldata to L1Messenger may be a lot larger due to the fact that this method also accepts the original uncompressed state diff entries. These will not be published to L1, but will be used to verify the correctness of the compression.
 
 One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with roughly 43212000 bytes needed for calldata. 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
   
@@ -390,14 +391,18 @@ We process the L2 transactions according to our account abstraction protocol: [h
 1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1163) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zkSync%20fee%20model.md).
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
 3. We [conduct the validation step](../../system-contracts/bootloader/bootloader.yul#L1278) of the AA protocol:
+
 - We calculate the hash of the transaction.
 - If enough gas has been provided, we near_call the validation function in the bootloader. It sets the tx.origin to the address of the bootloader, sets the ergsPrice. It also marks the factory dependencies provided by the transaction as marked and then invokes the validation method of the account and verifies the returned magic.
 - Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L787) for any excess funds sent.
+
 4. [We perform the execution of the transaction](../../system-contracts/bootloader/bootloader.yul#L1343). Note, that if the sender is an EOA, tx.origin is set equal to the `from` the value of the transaction. During the execution of the transaction, the publishing of the compressed bytecodes happens: for each factory dependency if it has not been published yet and its hash is currently pointed to in the compressed bytecodes area of the bootloader, a call to the bytecode compressor is done. Also, at the end the call to the KnownCodeStorage is done to ensure all the bytecodes have indeed been published.
 5. We [refund](../../system-contracts/bootloader/bootloader.yul#L1553) the user for any excess funds he spent on the transaction:
+
 - Firstly, the `postTransaction` operation is called to the paymaster.
 - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zkSync%20fee%20model.md) of the fee model.
 - The bootloader refunds the user.
+
 1. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1211) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
 
 ## L1->L2 transactions
@@ -519,11 +524,13 @@ While using `.send/.transfer` is generally not recommended, as a step towards be
 Note, that unlike EVM any unused gas from such calls will be refunded.
 
 The system preserves the following guarantees about `.send/.transfer`:
+
 - No more than `2300` gas will be received by the callee. Note, [that a smaller, but a close amount](../../system-contracts/contracts/test-contracts/TransferTest.sol#L33) may be passed.
 - It is not possible to do any storage changes within this stipend. This is enforced by having cold write cost more than `2300` gas. Also, cold write cost always has to be prepaid whenever executing storage writes. More on it can be read [here](../l2_system_contracts/zksync_fee_model.md#io-pricing).
 - Any callee with bytecode size of up to `100000` will work.
 
 The system does not guarantee the following:
+
 - That callees with bytecode size larger than `100000` will work. Note, that a malicious operator can fail any call to a callee with large bytecode even if it has been decommitted before. More on it can be read [here](../l2_system_contracts/zksync_fee_model.md#io-pricing).
 
 As a conclusion, using `.send/.transfer` should be generally avoided, but when avoiding is not possible it should be used with small callees, e.g. EOAs, which implement [DefaultAccount](../../system-contracts/contracts/DefaultAccount.sol).
@@ -642,13 +649,13 @@ One of the most expensive resource for a rollup is data availability, so in orde
 The contract provides two methods:
 
 - `publishCompressedBytecode` that verifies the correctness of the bytecode compression and publishes it in form of a message to the DA layer.
-- `verifyCompressedStateDiffs` that can verify the correctness of our standard state diff compression. This method can be used by common L2DAValidators and it is for instance utilized by the [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol). 
+- `verifyCompressedStateDiffs` that can verify the correctness of our standard state diff compression. This method can be used by common L2DAValidators and it is for instance utilized by the [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol).
 
-You can read more about how custom DA is handled [here](../settlement_contracts/data_availability/custom_da.md). 
+You can read more about how custom DA is handled [here](../settlement_contracts/data_availability/custom_da.md).
 
 ## Pubdata Chunk Publisher
 
-This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](./Rollup%20DA.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes as the circuits will require that the chunk is of exact size. 
+This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](./Rollup%20DA.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes as the circuits will require that the chunk is of exact size.
 
 This contract can be utilized by L2DAValidators, e.g. [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol) uses it to compress the pubdata into blobs.
 
@@ -661,7 +668,7 @@ It works the following way:
 1. It accepts a versioned hash and double checks that it is marked as “known”, i.e. the operator must know the preimage for such hash.
 2. After that, it uses the `decommit` opcode, which accepts the versioned hash and the number of ergs to spent, which is proportional to the length of the preimage. If the preimage has been decommitted before, the requested cost will be refunded to the user.
 
-Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possilbe price and then it will be refunded in case the bytecode has been decommitted before. 
+Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possilbe price and then it will be refunded in case the bytecode has been decommitted before.
 
 3. The `decommit` opcode returns to the slice of the decommitted bytecode. Note, that the returned pointer always has length of 2^21 bytes, regardless of the length of the actual bytecode. So it is the job of the `CodeOracle` system contract to shrink the length of the returned data.
 
@@ -677,15 +684,15 @@ Note, that it is a deliberate decision not to deploy this contract in the kernel
 
 ## ComplexUpgrader
 
-Usually an upgrade is performed by calling the `forceDeployOnAddresses` function of ContractDeployer out of the name of the `FORCE_DEPLOYER` constant address. However some upgrades may require more complex iteractions, e.g. query something from a contract to determine which calls to make etc. 
+Usually an upgrade is performed by calling the `forceDeployOnAddresses` function of ContractDeployer out of the name of the `FORCE_DEPLOYER` constant address. However some upgrades may require more complex iteractions, e.g. query something from a contract to determine which calls to make etc.
 
 For cases like this `ComplexUpgrader` contract has been created. The assumption is that the implementation of the upgrade is predeployed and the `ComplexUpgrader` would delegatecall to it.
 
-> Note, that while `ComplexUpgrader` existed even in the previous upgrade, it lacked `forceDeployAndUpgrade` function. This caused some serious limitations. More on how the gateway upgrade process will look like can be read [here](../upgrade_history/gateway_upgrade/upgrade_process.md). 
+> Note, that while `ComplexUpgrader` existed even in the previous upgrade, it lacked `forceDeployAndUpgrade` function. This caused some serious limitations. More on how the gateway upgrade process will look like can be read [here](../upgrade_history/gateway_upgrade/upgrade_process.md).
 
 # Predeployed contracts
 
-There are some contracts need to predeployed, but having kernel space rights is not desirable for them. Such contracts are usuall predeployed at sequential addresses starting from `2^16`. 
+There are some contracts need to predeployed, but having kernel space rights is not desirable for them. Such contracts are usuall predeployed at sequential addresses starting from `2^16`.
 
 ## Create2Factory
 
@@ -711,7 +718,7 @@ While it is only used for the upgrade, it was decided to leave it as a predeploy
 
 ## L2WrappedBaseTokenImplementation
 
-While bridging wrapped base tokens (e.g. WETH) is not yet supported. The address of it is enshrined within the native token vault (both the L1 and L2 one). For consistency with other networks, our WETH token is deployed as a TransparentUpgradeableProxy. To have the deployment process easier, we predeploy the implementation. 
+While bridging wrapped base tokens (e.g. WETH) is not yet supported. The address of it is enshrined within the native token vault (both the L1 and L2 one). For consistency with other networks, our WETH token is deployed as a TransparentUpgradeableProxy. To have the deployment process easier, we predeploy the implementation.
 
 # Known issues to be resolved
 
