@@ -82,7 +82,7 @@ Note, that you can *not* use the pointer that you received via calldata as retur
 
 Note, that the rule above is implemented by the principle "it is not possible to return a slice of data with memory page id lower than the memory page id of the current heap", since a memory page with smaller id could only be created before the call. That's why a user contract can usually safely return a slice of previously returned returndata (since it is guaranteed to have a higher memory page id). However, system contracts have an exemption from the rule above. It is needed in particular to the correct functionality of the `CodeOracle` system contract. You can read more about it [here](#codeoracle). So the rule of thumb is that returndata from `CodeOracle` should never be passed along.
 
-Some of these memory optimizations can be seen utilized in the [EfficientCall](https://github.com/code-423n4/2024-03-zksync/blob/7e85e0a997fee7a6d75cadd03d3233830512c2d2/code/system-contracts/contracts/libraries/EfficientCall.sol#L32) library that allows to perform a call while reusing the slice of calldata that the frame already has, without memory copying.
+Some of these memory optimizations can be seen utilized in the [EfficientCall](../../system-contracts/contracts/libraries/EfficientCall.sol#L34) library that allows to perform a call while reusing the slice of calldata that the frame already has, without memory copying.
 
 ### Returndata & precompiles
 
@@ -100,14 +100,14 @@ Since the call to keccak precompile would modify the `returndata`. To avoid this
 
 While some Ethereum opcodes are not supported out of the box, some of the new opcodes were added to facilitate the development of the system contracts.
 
-Note, that this lists does not aim to be specific about the internals, but rather explain methods in the [SystemContractHelper.sol](https://github.com/code-423n4/2024-03-zksync/blob/7e85e0a997fee7a6d75cadd03d3233830512c2d2/code/system-contracts/contracts/libraries/SystemContractHelper.sol#L41)
+Note, that this lists does not aim to be specific about the internals, but rather explain methods in the [SystemContractHelper.sol](../../system-contracts/contracts/libraries/SystemContractHelper.sol#L44)
 
 ### **Only for kernel space**
 
 These opcodes are allowed only for contracts in kernel space (i.e. system contracts). If executed in other places they result in `revert(0,0)`.
 
 - `mimic_call`. The same as a normal `call`, but it can alter the `msg.sender` field of the transaction.
-- `to_l1`. Sends a system L2→L1 log to Ethereum. The structure of this log can be seen [here](https://github.com/code-423n4/2024-03-zksync/blob/7e85e0a997fee7a6d75cadd03d3233830512c2d2/code/contracts/ethereum/contracts/common/Messaging.sol#L23).
+- `to_l1`. Sends a system L2→L1 log to Ethereum. The structure of this log can be seen [here](../../l1-contracts/contracts/common/Messaging.sol#L23).
 - `event`. Emits an L2 log to zkSync. Note, that L2 logs are not equivalent to Ethereum events. Each L2 log can emit 64 bytes of data (the actual size is 88 bytes, because it includes the emitter address, etc). A single Ethereum event is represented with multiple `event` logs constitute. This opcode is only used by `EventWriter` system contract.
 - `precompile_call`. This is an opcode that accepts two parameters: the uint256 representing the packed parameters for it as well as the ergs to burn. Besides the price for the precompile call itself, it burns the provided ergs and executes the precompile. The action that it does depend on `this` during execution:
     - If it is the address of the `ecrecover` system contract, it performs the ecrecover operation
@@ -119,7 +119,7 @@ These opcodes are allowed only for contracts in kernel space (i.e. system contr
 
 Note, that currently we do not have access to the `tx_counter` within VM (i.e. for now it is possible to increment it and it will be automatically used for logs such as `event`s as well as system logs produced by `to_l1`, but we can not read it). We need to read it to publish the *user* L2→L1 logs, so `increment_tx_counter` is always accompanied by the corresponding call to the [SystemContext](#systemcontext) contract.
 
-More on the difference between system and user logs can be read [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/Handling%20pubdata.md).
+More on the difference between system and user logs can be read [here](../settlement_contracts/data_availability/standard_pubdata_format.md).
 
 ### **Generally accessible**
 
@@ -128,7 +128,7 @@ Here are opcodes that can be generally accessed by any contract. Note that while
 - `near_call`. It is basically a “framed” jump to some location of the code of your contract. The difference between the `near_call` and ordinary jump are:
     1. It is possible to provide an ergsLimit for it. Note, that unlike “`far_call`”s (i.e. calls between contracts) the 63/64 rule does not apply to them.
     2. If the near call frame panics, all state changes made by it are reversed. Please note, that the memory changes will **not** be reverted.
-- `getMeta`. Returns an u256 packed value of [ZkSyncMeta](https://github.com/code-423n4/2024-03-zksync/blob/7e85e0a997fee7a6d75cadd03d3233830512c2d2/code/system-contracts/contracts/libraries/SystemContractHelper.sol#L15) struct. Note that this is not tight packing. The struct is formed by the [following rust code](https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/definitions/abi/meta.rs#L4).
+- `getMeta`. Returns an u256 packed value of [ZkSyncMeta](../../system-contracts/contracts/libraries/SystemContractHelper.sol#L18) struct. Note that this is not tight packing. The struct is formed by the [following rust code](https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/definitions/abi/meta.rs#L4).
 - `getCodeAddress` — receives the address of the executed code. This is different from `this` , since in case of delegatecalls `this` is preserved, but `codeAddress` is not.
 
 ### Flags for calls
@@ -287,7 +287,7 @@ The first 8 words are reserved for the batch information provided by the operato
 - `1` word — the hash of the previous batch. Its validation will be explained later on.
 - `2` word — the timestamp of the current batch. Its validation will be explained later on.
 - `3` word — the number of the new batch.
-- `4` word — the fair pubdata price. More on how our pubdata is calculated can be read [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/zkSync%20fee%20model.md#recommended-calculation-of-fair_l2_gas_pricefair_pubdata_price).
+- `4` word — the fair pubdata price. More on how our pubdata is calculated can be read [here](../l2_system_contracts/zksync_fee_model.md).
 - `5` word — the “fair” price for L2 gas, i.e. the price below which the `baseFee` of the batch should not fall. For now, it is provided by the operator, but it in the future it may become hardcoded.
 - `6` word — the base fee for the batch that is expected by the operator. While the base fee is deterministic, it is still provided to the bootloader just to make sure that the data that the operator has coincides with the data provided by the bootloader.
 - `7` word — reserved word. Unused on proved batch.
@@ -355,7 +355,7 @@ To avoid additional copying of transactions for calls for the account abstractio
 
 - `[1646796..1967599]`
 
-Starting from the 487312 word, the actual descriptions of the transactions start. (The struct can be found by this [link](https://github.com/code-423n4/2024-03-zksync/blob/7e85e0a997fee7a6d75cadd03d3233830512c2d2/code/system-contracts/contracts/libraries/TransactionHelper.sol#L25)). The bootloader enforces that:
+Starting from the 487312 word, the actual descriptions of the transactions start. (The struct can be found by this [link](../../system-contracts/contracts/libraries/TransactionHelper.sol#L25)). The bootloader enforces that:
 
 - They are correctly ABI encoded representations of the struct above.
 - They are located without any gaps in memory (the first transaction starts at word 653 and each transaction goes right after the next one).
@@ -381,13 +381,11 @@ These are memory slots that are used to track the success status of a transactio
 
 ## L2 transactions
 
-On zkSync, every address is a contract. Users can start transactions from their EOA accounts, because every address that does not have any contract deployed on it implicitly contains the code defined in the [DefaultAccount.sol](https://github.com/code-423n4/2024-03-zksync/blob/main/code/system-contracts/contracts/DefaultAccount.sol) file. Whenever anyone calls a contract that is not in kernel space (i.e. the address is ≥ 2^16) and does not have any contract code deployed on it, the code for `DefaultAccount` will be used as the contract’s code.
+On zkSync, every address is a contract. Users can start transactions from their EOA accounts, because every address that does not have any contract deployed on it implicitly contains the code defined in the [DefaultAccount.sol](../../system-contracts/contracts/DefaultAccount.sol) file. Whenever anyone calls a contract that is not in kernel space (i.e. the address is ≥ 2^16) and does not have any contract code deployed on it, the code for `DefaultAccount` will be used as the contract’s code.
 
 Note, that if you call an account that is in kernel space and does not have any code deployed there, right now, the transaction will revert.
 
-FIXME: the link below is broken
-
-We process the L2 transactions according to our account abstraction protocol: [https://v2-docs.zksync.io/dev/tutorials/custom-aa-tutorial.html#prerequisite](https://v2-docs.zksync.io/dev/tutorials/custom-aa-tutorial.html#prerequisite).
+We process the L2 transactions according to our account abstraction protocol: [https://docs.zksync.io/build/developer-reference/account-abstraction](https://docs.zksync.io/build/developer-reference/account-abstraction).
 
 1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1163) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zkSync%20fee%20model.md).
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
@@ -521,14 +519,14 @@ While using `.send/.transfer` is generally not recommended, as a step towards be
 Note, that unlike EVM any unused gas from such calls will be refunded.
 
 The system preserves the following guarantees about `.send/.transfer`:
-- No more than `2300` gas will be received by the callee. Note, [that a smaller, but a close amount](https://github.com/code-423n4/2024-03-zksync/blob/3165e07bab249591404fff36e4802f9921ef168c/code/system-contracts/contracts/test-contracts/TransferTest.sol#L33) may be passed.
-- It is not possible to do any storage changes within this stipend. This is enforced by having cold write cost more than `2300` gas. Also, cold write cost always has to be prepaid whenever executing storage writes. More on it can be read [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/zkSync%20fee%20model.md#io-pricing).
+- No more than `2300` gas will be received by the callee. Note, [that a smaller, but a close amount](../../system-contracts/contracts/test-contracts/TransferTest.sol#L33) may be passed.
+- It is not possible to do any storage changes within this stipend. This is enforced by having cold write cost more than `2300` gas. Also, cold write cost always has to be prepaid whenever executing storage writes. More on it can be read [here](../l2_system_contracts/zksync_fee_model.md#io-pricing).
 - Any callee with bytecode size of up to `100000` will work.
 
 The system does not guarantee the following:
-- That callees with bytecode size larger than `100000` will work. Note, that a malicious operator can fail any call to a callee with large bytecode even if it has been decommitted before. More on it can be read [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/zkSync%20fee%20model.md#io-pricing).
+- That callees with bytecode size larger than `100000` will work. Note, that a malicious operator can fail any call to a callee with large bytecode even if it has been decommitted before. More on it can be read [here](../l2_system_contracts/zksync_fee_model.md#io-pricing).
 
-As a conclusion, using `.send/.transfer` should be generally avoided, but when avoiding is not possible it should be used with small callees, e.g. EOAs, which implement [DefaultAccount](https://github.com/code-423n4/2024-03-zksync/blob/main/code/system-contracts/contracts/DefaultAccount.sol).
+As a conclusion, using `.send/.transfer` should be generally avoided, but when avoiding is not possible it should be used with small callees, e.g. EOAs, which implement [DefaultAccount](../../system-contracts/contracts/DefaultAccount.sol).
 
 ## KnownCodeStorage
 
@@ -604,7 +602,7 @@ If the call succeeded, the address of the deployed contract is returned. If the 
 
 The implementation of the default account abstraction. This is the code that is used by default for all addresses that are not in kernel space and have no contract deployed on them. This address:
 
-- Contains minimal implementation of our account abstraction protocol. Note that it supports the [built-in paymaster flows](https://v2-docs.zksync.io/dev/developer-guides/aa.html#paymasters).
+- Contains minimal implementation of our account abstraction protocol. Note that it supports the [built-in paymaster flows](https://docs.zksync.io/build/developer-reference/account-abstraction/paymasters).
 - When anyone (except bootloader) calls it, it behaves in the same way as a call to an EOA, i.e. it always returns `success = 1, returndatasize = 0` for calls from anyone except for the bootloader.
 
 ## L1Messenger

@@ -90,7 +90,7 @@ Note, that before the transaction is executed, the system can not know how many 
 
 ## `MAX_TRANSACTION_GAS_LIMIT`
 
-A recommended maximal amount of gas that a transaction can spend on computation is `MAX_TRANSACTION_GAS_LIMIT`. But in case the operator trusts the user, the operator may provide the [trusted gas limit](https://github.com/code-423n4/2024-03-zksync/blob/e8527cab32c9fe2e1be70e414d7c73a20d357550/code/system-contracts/bootloader/bootloader.yul#L1236), i.e. the limit which exceeds `MAX_TRANSACTION_GAS_LIMIT` assuming that the operator knows what he is doing. This can be helpful in the case of a hyperchain with different parameters. 
+A recommended maximal amount of gas that a transaction can spend on computation is `MAX_TRANSACTION_GAS_LIMIT`. But in case the operator trusts the user, the operator may provide the [trusted gas limit](../../system-contracts/bootloader/bootloader.yul#L1242), i.e. the limit which exceeds `MAX_TRANSACTION_GAS_LIMIT` assuming that the operator knows what he is doing. This can be helpful in the case of a hyperchain with different parameters. 
 
 ## Derivation of `baseFee` and `gasPerPubdata`
 
@@ -179,7 +179,7 @@ zkSync Era is a state diff-based rollup, i.e. the pubdata is published not for t
 - Depending on the `value` written into a slot, various compression optimizations could be used and so we should reflect that too.
 - Maybe the slot has been already written to in this batch so we don’t have to charge anything for it.
 
-You can read more about how we treat the pubdata [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/Handling%20pubdata.md).
+You can read more about how we treat the pubdata [here](../settlement_contracts/data_availability/standard_pubdata_format.md).
 
 The important part here is that while such refunds are inlined (i.e. unlike the refunds for overhead they happen in place during execution and not after the whole transaction has been processed), they are enforced by the operator. Right now, the operator is the one who decides what refund to provide.
 
@@ -261,7 +261,7 @@ The above assumptions work in the pre-charge model (calldata based rollups) or p
 
 If a user really needs to limit the amount of gas that the subcall takes, all the subcalls should be routed through a special contract, that will guarantee that the total cost of the subcall wont be larger than the gas provided (by reverting if needed).
 
-An implementation of this special contract can be seen [here](https://github.com/code-423n4/2024-03-zksync/blob/main/code/system-contracts/contracts/GasBoundCaller.sol). Note, that this contract is *not* a system one and it will be deployed on some fixed, but not kernel space address.
+An implementation of this special contract can be seen [here](../../gas-bound-caller/contracts/GasBoundCaller.sol). Note, that this contract is *not* a system one and it will be deployed on some fixed, but not kernel space address.
 
 ### 1. Case of when a malicious contract consumes a large, but processable amount of pubdata**
 
