@@ -367,10 +367,7 @@ function expandMemory(offset, size) -> gasCost {
     }
 }
 
-function performSystemCall(
-    to,
-    dataLength,
-) {
+function performSystemCall(to, dataLength) {
     let success := performSystemCallRevertable(to, dataLength)
 
     if iszero(success) {
@@ -379,10 +376,7 @@ function performSystemCall(
     }
 }
 
-function performSystemCallRevertable(
-    to,
-    dataLength,
-) -> success {
+function performSystemCallRevertable(to, dataLength) -> success {
     let farCallAbi := shl(248, 1) // system call
     // dataOffset is 0
     // dataStart is 0
@@ -754,7 +748,7 @@ function _performCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, r
     switch _isEVM(addr)
     case 0 {
         // zkEVM native
-        let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+        let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
         let zkEvmGasBefore := gas()
         success := call(zkEvmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
         _saveReturndataAfterZkEVMCall()
@@ -778,7 +772,7 @@ function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, re
     switch _isEVM(addr)
     case 0 {
         // zkEVM native
-        let zkEvmGasToPass := _getZkEVMGasForCall(gasToPass, addr)
+        let zkEvmGasToPass := calcZkVmGasForCall(gasToPass, addr) // EVM gas -> ZkVM gas
         let zkEvmGasBefore := gas()
         success := staticcall(zkEvmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
         _saveReturndataAfterZkEVMCall()
@@ -798,20 +792,26 @@ function _performStaticCall(addr, gasToPass, argsOffset, argsSize, retOffset, re
 function calcUsedEvmGasByZkVmCall(zkEvmGasBefore) -> evmGasUsed {
     let zkevmGasUsed := sub(zkEvmGasBefore, gas()) // caller should guarantee correctness
     // should not overflow, VM can't pass more than u32 of gas
-    evmGasUsed := div(add(zkevmGas, sub(GAS_DIVISOR(), 1)), GAS_DIVISOR()) // rounding up
+    evmGasUsed := div(add(zkevmGasUsed, sub(GAS_DIVISOR(), 1)), GAS_DIVISOR()) // rounding up
 }
 
-function _getZkEVMGasForCall(_evmGas, addr) -> zkevmGas {
-    // TODO CHECK COSTS CALCULATION
-    zkevmGas := mul(_evmGas, GAS_DIVISOR())
+function calcZkVmGasForCall(evmGasToPass, addr) -> zkevmGas {
+    zkevmGas := mul(evmGasToPass, GAS_DIVISOR())
+
+    // charge for contract decommitment
     let byteSize := extcodesize(addr)
-    let should_ceil := mod(byteSize, 32)
-    if gt(should_ceil, 0) {
-        byteSize := add(byteSize, sub(32, should_ceil))
+    let decommitGasCost := mul(
+        div(add(byteSize, 31), 32), // rounding up
+        DECOMMIT_COST_PER_WORD()
+    )
+
+    if gt(decommitGasCost, zkevmGas) {
+        zkevmGas := 0
     }
-    let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
+
     zkevmGas := sub(zkevmGas, decommitGasCost)
-    if gt(zkevmGas, UINT32_MAX()) {
+
+    if gt(zkevmGas, UINT32_MAX()) { // Should never happen
         zkevmGas := UINT32_MAX()
     }
 }
@@ -892,15 +892,11 @@ function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
 
 function _saveReturndataAfterZkEVMCall() {
     loadReturndataIntoActivePtr()
-    let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-
-    mstore(lastRtSzOffset, returndatasize())
+    mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
 }
 
 function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
-    let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
     let rtsz := returndatasize()
-
     loadReturndataIntoActivePtr()
 
     // if (rtsz > 31)
@@ -920,7 +916,7 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
                 case 0 { returndatacopy(_outputOffset, 32, _outputLen) }
                 default { returndatacopy(_outputOffset, 32, sub(rtsz, 32)) }
 
-            mstore(lastRtSzOffset, sub(rtsz, 32))
+            mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
 
             // Skip the returnData
             ptrAddIntoActive(32)
@@ -928,11 +924,9 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
 }
 
 function _eraseReturndataPointer() {
-    let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
-
     let activePtrSize := getActivePtrDataSize()
     ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
-    mstore(lastRtSzOffset, 0)
+    mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1070,11 +1064,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
     }
 }
 
-function performSystemCallForCreate(
-    value,
-    bytecodeStart,
-    bytecodeLen,
-) -> success {
+function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
     let farCallAbi := shl(248, 1) // system call
     // dataOffset is 0
     farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
