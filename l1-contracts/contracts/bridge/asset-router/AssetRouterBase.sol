@@ -109,7 +109,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
         } else {
             assetHandlerAddress[_assetId] = _nativeTokenVault;
-            IAssetHandler(_nativeTokenVault).bridgeMint(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
+            IAssetHandler(_nativeTokenVault).bridgeMint(_chainId, _assetId, _transferData);
         }
     }
 
@@ -148,6 +148,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             _data: _transferData
         });
     }
+
+    /// @notice Ensures that token is registered with native token vault.
+    /// @dev Only used when deposit is made with legacy data encoding format.
+    /// @param _token The native token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _token) internal virtual returns (bytes32 assetId);
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

@@ -6,6 +6,7 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
+import {ZKChainCommitment} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -79,6 +80,13 @@ interface IAdmin is IZKChainBase {
     /// @param _l2DAValidator The address of the L2 DA validator
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
 
+    /// @notice Makes the chain as permanent rollup.
+    /// @dev This is a security feature needed for chains that should be
+    /// trusted to keep their data available even if the chain admin becomes malicious
+    /// and tries to set the DA validator pair to something which does not publish DA to Ethereum.
+    /// @dev DANGEROUS: once activated, there is no way back!
+    function makePermanentRollup() external;
+
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 
@@ -128,8 +136,6 @@ interface IAdmin is IZKChainBase {
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
-    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
-
     event BridgeMint(address indexed _account, uint256 _amount);
 
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
@@ -149,4 +155,6 @@ interface IAdmin is IZKChainBase {
 
     /// @dev Similar to IL1AssetHandler interface, used to receive chains.
     function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
+
+    function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);
 }

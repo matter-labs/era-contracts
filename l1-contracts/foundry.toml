@@ -9,7 +9,9 @@ solc_version = "0.8.24"
 evm_version = "cancun"
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
-    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
+    { access = "read", path = "../system-contracts/artifacts-zk/" },
+    { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },
+    { access = "read", path = "../system-contracts/contracts-preprocessed/artifacts" },
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "../l1-contracts/artifacts-zk/" },
     { access = "read", path = "../da-contracts/" },
@@ -17,8 +19,10 @@ fs_permissions = [
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "./out" },
-    { access = "read", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read", path = "zkout" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
@@ -34,7 +38,7 @@ remappings = [
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 optimizer = true
-optimizer_runs = 9999999
+optimizer_runs = 200
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.3"

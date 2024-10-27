@@ -51,12 +51,12 @@ contract TestStateDiffComposer {
             ++bytecodesNumber;
             bytecodes = bytes.concat(bytecodes, bytes4(uint32(bytecode.length)), bytecode);
             currentRollingBytecodesHash = keccak256(
-                abi.encode(currentRollingBytecodesHash, L2ContractHelper.hashL2BytecodeMemory(bytecode))
+                abi.encode(currentRollingBytecodesHash, L2ContractHelper.hashL2Bytecode(bytecode))
             );
         }
         if (includeToCorrectHash) {
             correctRollingBytecodesHash = keccak256(
-                abi.encode(correctRollingBytecodesHash, L2ContractHelper.hashL2BytecodeMemory(bytecode))
+                abi.encode(correctRollingBytecodesHash, L2ContractHelper.hashL2Bytecode(bytecode))
             );
         }
     }

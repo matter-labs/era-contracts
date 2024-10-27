@@ -1,0 +1,36 @@
+era_chain_id = 324
+owner_address = "8f7a9912416e8adc4d9c21fae1415d3318a11897"
+testnet_verifier = false
+
+[contracts]
+max_number_of_chains = 100
+create2_factory_salt = "0xde6b9c610417de5c775c1601c947f482e4f4e30c0f7b848c6d2b0554d76f607e"
+validator_timelock_execution_delay = 0
+genesis_root = "0xf9030b78c5bf5ac997a76962aa32c90a6d8e8ebce9838c8eeb388d73e1f7659a"
+genesis_rollup_leaf_index = 64
+genesis_batch_commitment = "0x34c1b220363e0cde7eaf10fe95754d61de097e0f9d9a1dc56c8026562e395259"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x010008c79fe70427642db69b14314af076e5d54f1dada975b905bcbb5feb9f9e"
+default_aa_hash = "0x0100055d4fddeeba9063fbdecd1dde707c04f84fdbd1b576f5230977e78ca775"
+bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
+old_shared_bridge_proxy_address = "0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB"
+state_transition_manager_address = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
+transparent_proxy_admin = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"
+era_diamond_proxy = "0x32400084c286cf3e17e7b677ea9583e60a000324"
+blob_versioned_hash_retriever = "0x0000000000000000000000000000000000000001"
+legacy_erc20_bridge_address = "0x57891966931eb4bb6fb81430e6ce0a03aabde063"
+old_validator_timelock = "0x5D8ba173Dc6C3c90C8f7C04C9288BeF5FDbAd06E"
+l2_bridge_proxy_owner_address = "0x0000000000000000000000000000000000000001"
+l2_bridged_standard_erc20_proxy_owner_address = "0x0000000000000000000000000000000000000001"
+
+[tokens]
+token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
