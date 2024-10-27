@@ -83,7 +83,7 @@ function MAX_POSSIBLE_INIT_BYTECODE() -> max {
 }
 
 function MEM_OFFSET() -> offset {
-    offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_INIT_BYTECODE())
+    offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
 }
 
 function MEM_OFFSET_INNER() -> offset {

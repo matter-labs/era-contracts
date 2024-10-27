@@ -108,8 +108,8 @@
     "contractName": "SystemContext",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/SystemContext.sol/SystemContext.json",
     "sourceCodePath": "contracts-preprocessed/SystemContext.sol",
-    "bytecodeHash": "0x010001c5a6801732584ea1804b91e5621ac25460be6b91196fc4d68fd3a65105",
-    "sourceCodeHash": "0xc5ce25a94e3b510183635dd2fe0152dbcaa705bc8802fb3a4390253b5af3aa0a"
+    "bytecodeHash": "0x010001c516b1721bd4745d8d3a36607d4f6b65c0d51dcb1b5801aaf0234293cc",
+    "sourceCodeHash": "0xe2f6eb015d260aafe9405b28ef3ec27921add4de7f329b7ef61e0aa6c9365e29"
   },
   {
     "contractName": "EventWriter",
@@ -122,8 +122,8 @@
     "contractName": "EvmEmulator",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmEmulator.yul/EvmEmulator.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmEmulator.yul",
-    "bytecodeHash": "0x01000d1da56c97d7554e0e9c8397a970b5a44c569aab6fb6661f820c5ae3e58e",
-    "sourceCodeHash": "0xb6b321ccc368ca848ca6675eaf968dedd4b4da388d74829cd3fb9927f4550071"
+    "bytecodeHash": "0x01000d6d51fe13baa8278266bb8775c03df377c8b0aa6ebca6c8d98a096b7bb2",
+    "sourceCodeHash": "0x676b1652efec61f16eb271efda30e3a695681ce7b2f1a509b33c4afb15c55723"
   },
   {
     "contractName": "EvmGasManager",

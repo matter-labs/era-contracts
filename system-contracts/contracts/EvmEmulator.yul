@@ -1,5 +1,9 @@
 object "EvmEmulator" {
     code {
+        function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
+            max := MAX_POSSIBLE_INIT_BYTECODE()
+        }
+
         /// @dev This function is used to get the initCode.
         /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
         /// to obtain the bytecode.
@@ -143,7 +147,7 @@ object "EvmEmulator" {
         }
         
         function MEM_OFFSET() -> offset {
-            offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_INIT_BYTECODE())
+            offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
         }
         
         function MEM_OFFSET_INNER() -> offset {
@@ -3070,6 +3074,10 @@ object "EvmEmulator" {
     }
     object "EvmEmulator_deployed" {
         code {
+            function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
+                max := MAX_POSSIBLE_DEPLOYED_BYTECODE()
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
@@ -3155,7 +3163,7 @@ object "EvmEmulator" {
             }
             
             function MEM_OFFSET() -> offset {
-                offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_INIT_BYTECODE())
+                offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
             }
             
             function MEM_OFFSET_INNER() -> offset {

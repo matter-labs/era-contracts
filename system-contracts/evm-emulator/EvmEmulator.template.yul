@@ -1,5 +1,9 @@
 object "EvmEmulator" {
     code {
+        function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
+            max := MAX_POSSIBLE_INIT_BYTECODE()
+        }
+
         /// @dev This function is used to get the initCode.
         /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
         /// to obtain the bytecode.
@@ -104,6 +108,10 @@ object "EvmEmulator" {
     }
     object "EvmEmulator_deployed" {
         code {
+            function MAX_POSSIBLE_ACTIVE_BYTECODE() -> max {
+                max := MAX_POSSIBLE_DEPLOYED_BYTECODE()
+            }
+
             <!-- @include EvmEmulatorFunctions.template.yul -->
 
             function $llvm_NoInline_llvm$_simulate(
