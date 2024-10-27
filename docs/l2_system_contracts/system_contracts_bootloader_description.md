@@ -693,7 +693,7 @@ Just a built-in Create2Factory. It allows to deterministically deploy contracts 
 
 ## L2GenesisUpgrade
 
-A contract that is responsible for facilitating initialization of a newly created chain. This is part of a chain creation flow (TODO link).
+A contract that is responsible for facilitating initialization of a newly created chain. This is part of a [chain creation flow](../chain_management/chain_genesis.md).
 
 ## Bridging-related contracts
 

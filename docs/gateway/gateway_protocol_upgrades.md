@@ -47,7 +47,9 @@ The only unrecoverable state that a chain can achieve is:
 - While the migration has happening an “inactive” upgrade has been conducted.
 - Now recovery of the chain is not possible as the “protocol version” check will fail.
 
-This is considered to be a rare event, but it will be strongly recommended that before conducting any inactive upgrades the migration transaction should be finalized. (TODO: we could actively force it, but it is a separate feature, i.e. require confirmation of a successful migration before any upgrades on a migrated chain could be done).
+This is considered to be a rare event, but it will be strongly recommended that before conducting any inactive upgrades the migration transaction should be finalized. 
+
+In the future, we could actively force it, i.e. require confirmation of a successful migration before any upgrades on a migrated chain could be done.
 
 ## Safety guards for GW→L1 migrations
 
@@ -148,8 +150,6 @@ Definition:
 
 1. Same as above (check protocol version - but on chain Z)
 2. Same as above (start burn process - but on chain Z)
-    1. same as above
-    2. TODO: should we ‘remove’ the IZKChain from Z completely? (’parent’ chain Y doesn’t really have an address on Z). 
 3. Same as above (start ‘mint’ - but on chain Y)
     1. same as above
     2. creation is probably not needed - as the contract was already there in a first place.
