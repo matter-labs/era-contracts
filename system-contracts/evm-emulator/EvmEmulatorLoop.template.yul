@@ -706,10 +706,9 @@ for { } true { } {
     // NOTE: We don't currently do full jumpdest validation
     // (i.e. validating a jumpdest isn't in PUSH data)
     case 0x56 { // OP_JUMP
-        evmGasLeft := chargeGas(evmGasLeft, 8)
+        evmGasLeft := chargeGas(evmGasLeft, 9) // charge for OP_JUMP (8) and OP_JUMPDEST (1) immediately
 
         let counter
-
         counter, sp, stackHead := popStackItem(sp, stackHead)
 
         ip := add(add(BYTECODE_OFFSET(), 32), counter)
@@ -721,7 +720,6 @@ for { } true { } {
         }
 
         // execute JUMPDEST immediately
-        evmGasLeft := chargeGas(evmGasLeft, 1)
         ip := add(ip, 1)
     }
     case 0x57 { // OP_JUMPI
