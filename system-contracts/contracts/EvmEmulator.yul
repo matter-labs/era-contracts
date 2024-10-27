@@ -19,8 +19,14 @@ object "EvmEmulator" {
                 panic()
             }
 
-            mstore(bytecodeLengthOffset, size)
             copyActivePtrData(bytecodeOffset, 0, size)
+
+            if iszero(size) {
+                size := 1
+                mstore(bytecodeOffset, 0)
+            }
+
+            mstore(bytecodeLengthOffset, size)
         }
 
         function padBytecode(offset, len) -> blobOffset, blobLen {
@@ -388,6 +394,12 @@ object "EvmEmulator" {
                 add(BYTECODE_OFFSET(), 32),
                 MAX_POSSIBLE_DEPLOYED_BYTECODE()
             )
+        
+        
+            if iszero(codeLen) {
+                codeLen := 1
+                mstore(add(BYTECODE_OFFSET(), 32), 0)
+            }
         
             mstore(BYTECODE_OFFSET(), codeLen)
         }
@@ -1252,7 +1264,7 @@ object "EvmEmulator" {
             let maxAcceptablePos := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 31)
             
             for { } true { } {
-                opcode := readIP(ip,maxAcceptablePos)
+                opcode := readIP(ip, maxAcceptablePos)
             
                 switch opcode
                 case 0x00 { // OP_STOP
@@ -3405,6 +3417,12 @@ object "EvmEmulator" {
                     MAX_POSSIBLE_DEPLOYED_BYTECODE()
                 )
             
+            
+                if iszero(codeLen) {
+                    codeLen := 1
+                    mstore(add(BYTECODE_OFFSET(), 32), 0)
+                }
+            
                 mstore(BYTECODE_OFFSET(), codeLen)
             }
             
@@ -4268,7 +4286,7 @@ object "EvmEmulator" {
                 let maxAcceptablePos := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 31)
                 
                 for { } true { } {
-                    opcode := readIP(ip,maxAcceptablePos)
+                    opcode := readIP(ip, maxAcceptablePos)
                 
                     switch opcode
                     case 0x00 { // OP_STOP

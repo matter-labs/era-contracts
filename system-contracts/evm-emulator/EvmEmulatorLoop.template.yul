@@ -9,7 +9,7 @@ let stackHead
 let maxAcceptablePos := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 31)
 
 for { } true { } {
-    opcode := readIP(ip,maxAcceptablePos)
+    opcode := readIP(ip, maxAcceptablePos)
 
     switch opcode
     case 0x00 { // OP_STOP

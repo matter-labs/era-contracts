@@ -325,6 +325,12 @@ function getDeployedBytecode() {
         MAX_POSSIBLE_DEPLOYED_BYTECODE()
     )
 
+
+    if iszero(codeLen) {
+        codeLen := 1
+        mstore(add(BYTECODE_OFFSET(), 32), 0) // pretend that bytecode is 0x00
+    }
+
     mstore(BYTECODE_OFFSET(), codeLen)
 }
 
