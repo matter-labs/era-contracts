@@ -203,7 +203,7 @@ Note, that the enumeration indexes are assigned in the order of sorted array of 
 
 Firstly, let’s define what we mean by _state diffs_. A _state diff_ is an element of the following structure.
 
-[State diff structure](https://github.com/matter-labs/era-zkevm_test_harness/blob/3cd647aa57fc2e1180bab53f7a3b61ec47502a46/circuit_definitions/src/encodings/state_diff_record.rs#L8).
+[State diff structure](https://github.com/matter-labs/zksync-protocol/blob/main/crates/circuit_encodings/src/state_diff_record.rs#L8).
 
 Basically, it contains all the values which might interest us about the state diff:
 
