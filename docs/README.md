@@ -35,12 +35,11 @@ The order of the files here only roughly represents the order of reading. A lot 
     - [L3->L1 messaging via gateway](./gateway/nested_l3_l1_messaging.md)
     - [Gateway protocol versioning](./gateway/gateway_protocol_upgrades.md)
     - [DA handling on Gateway](./gateway/gateway_da.md)
-- [Upgrade History](./upgrade_history.md)
-    - [Gateway upgrade](./upgrade_history/gateway_upgrade.md)
+- Upgrade history
+    - [Gateway upgrade diff](./upgrade_history/gateway_upgrade/gateway_diff_review.md)
+    - [Gateway upgrade process](./upgrade_history/gateway_upgrade/upgrade_process.md)
 
 ![Reading order](./img/reading_order.png)
-
-> The reading order roughly describes sections and me a 
 
 # Invariants/tricky places to look out for
 

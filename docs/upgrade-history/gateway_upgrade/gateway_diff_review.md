@@ -2,16 +2,11 @@
 
 This document assumes that the reader has general knowledge of how ZKsync Era works and how our ecosystem used to be like at the moment of shared bridge in general. 
 
-For more info, one can reach out to the following documentation:
+To read the documentation about the current system, you can read [here](../../README.md).
+
+For more info about the previous one, you can reach out to the following documentation:
 
 [https://github.com/code-423n4/2024-03-zksync/tree/main/docs/Smart contract Section](https://github.com/code-423n4/2024-03-zksync/tree/main/docs/Smart%20contract%20Section) 
-
-Especially helpful are articles about the l1 ecosystem contracts: [https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart contract Section/L1 ecosystem contracts.md](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/L1%20ecosystem%20contracts.md) as well as how we handle priority transactions: [https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart contract Section/Handling L1→L2 ops on zkSync.md](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/Handling%20L1%E2%86%92L2%20ops%20on%20zkSync.md).
-
-However, reading all of the documents is highly encouraged.
-
-While the audit is built on top of the previous ones which had the following documentation: https://github.com/matter-labs/era-contracts/tree/sync-layer-stable/docs (CAB and gateway docs correspondingly), this document will structurize all the information about the gateway/CAB changes as well as provide the structure of contracts in general, so it should be relatively friendly even for the first time reader. We will also provide comparisons to the previous audit’s code to emphasize on what has changed since the previous review.
-
 
 ## Changes from the shared bridge design
 
@@ -42,11 +37,15 @@ To initialize the new `baseTokenAssetId` mapping the following function should b
 
 For the old tooling that may rely on getters of sort `getBaseTokenAddress(chainId)` working, we provide a getter method, but its exact behavior depends on the asset handler of the `setLegacyBaseTokenAssetId`, i.e. it is even possible that the method will revert for an incompatible assetId.   
 
-### Shared bridge is deployed everywhere at the same address
+### L2 Shared bridge (not L2AssetRouter) is deployed everywhere at the same address
 
 Before, for each new chain, we would have to initialize the mapping in the L1SharedBridge to remember the address of the l2 shared bridge on the corresponding L2 chain.
 
-Now, however, the L2AssetRouter is set on the same constant on all chains. 
+Now, however, the L2AssetRouter is set on the same constant on all chains.
+
+#### L2SharedBridgeLegacy
+
+Note, that for the chains that contained the `L2SharedBridge` before the upgrade, it will be upgraded to the `L2SharedBridgeLegacy` code. The `L2AssetRouter` will have the same address on all chains, including old ones.
 
 ### StateTransitionManager was renamed to ChainTypeManager
 
@@ -62,7 +61,7 @@ While fully reusing contracts on both L1 and L2 is not always possible, it was d
 
 ## Priority tree
 
-[Migrating Priority Queue to Merkle Tree](https://www.notion.so/Migrating-Priority-Queue-to-Merkle-Tree-e6e563867067470aa66d010f0294ea3e?pvs=21)
+[Migrating Priority Queue to Merkle Tree](../../settlement_contracts/priority_queue/priority-queue.md)
 
 In the currently deployed system, L1→L2 transactions are added as a part of a priority queue, i.e. all of them are stored 1-by-1 on L1 in a queue-like structure.
 
@@ -72,7 +71,7 @@ If someone tries to DDoS the priority queue, the chain can be blocked from migra
 
 To combat all the issues above, it was decided to move from the priority queue to a priority tree, i.e. only the incremental merkle tree is stored on L1, while at the end of the batch the operator will provide a merkle proof for the inclusion of the priority transactions that were present in the batch. It does not impact the bootloader, but rather only how the L1 checks that the priority transactions did indeed belong to the chain
 
-# Custom DA layers
+## Custom DA layers
 
 Custom DA layer support was added. 
 
@@ -91,19 +90,3 @@ In order to achieve CAB, we separated the liquidity managing logic from the Shar
     - This means the legacy finalizeDeposit with tokenAddress which calls the new finalizeDeposit with assetId.
     - On the other hand, new assets will use the new finalizeDeposit directly
 - The originChainId will be tracked for each assetId in the NTVs. This will be the chain where the token is originally native to. This is needed to accurately track chainBalance (especially for l2 native tokens bridged to other chains via L1), and to verify the assetId is indeed an NTV asset id (i.e. has the L2_NATIVE_TOKEN_VAULT_ADDR as deployment tracker).
-
-
-# Invariants/tricky places to look out for
-
-This section is for auditors of the codebase. It includes some of the important invariants that the system relies on and which if broken could have bad consequences.
-
-- Assuming that the accepting CTM is correct & efficient, the L1→GW part of the L1→GW→L3 transaction never fails. It is assumed that the provided max amount for gas is always enough for any transaction that can realistically come from L1.
-- GW → L1 migration never fails. If it is possible to get into a state where the migration is not possible to finish, then the chain is basically lost. There are some exceptions where for now it is the expected behavior. (check out the “Migration invariants  & protocol upgradability” section)
-- The general consistency of chains when migration between different settlement layers is done. Including the feasibility of emergency upgrades, etc. I.e. whether the whole system is thought-through.
-- Preimage attacks in the L3→L1 tree, we apply special prefixes to ensure that the tree structure is fixed, i.e. all logs are 88 bytes long (this is for backwards compatibility reasons). For batch leafs and chain id leafs we use special prefixes.
-- Data availability guarantees. Whether rollup users can always restore all their storage slots, etc. An example of a potential tricky issue can be found in “Security notes for Gateway-based rollups”
-
-## Appendix: Upgrade strategy
-
-The text about applies to [the following branch](https://github.com/matter-labs/era-contracts/pull/964)https://github.com/matter-labs/era-contracts/pull/964. So if you are auditing a different commit, there is little point in reading it.
-
