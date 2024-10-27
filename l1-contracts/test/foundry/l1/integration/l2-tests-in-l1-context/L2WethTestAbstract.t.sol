@@ -11,9 +11,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-
+import {Unauthorized, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
@@ -31,7 +29,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {Unauthorized, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
 
 abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     function test_shouldDepositWethByCallingDeposit() public {

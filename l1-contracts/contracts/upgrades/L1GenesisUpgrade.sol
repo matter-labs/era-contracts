@@ -24,7 +24,13 @@ import {L1GatewayHelper} from "./L1GatewayHelper.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be called by the Admin facet.
+    /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
+    /// @param _chainId the chain id
+    /// @param _protocolVersion the current protocol version
+    /// @param _l1CtmDeployerAddress the address of the l1 ctm deployer
+    /// @param _fixedForceDeploymentsData the force deployments data
+    /// @param _factoryDeps the factory dependencies
     function genesisUpgrade(
         address _l1GenesisUpgrade,
         uint256 _chainId,

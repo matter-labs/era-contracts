@@ -121,16 +121,16 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         return permRestriction.isAdminOfAChain(chainAddr);
     }
 
-    function test_tryCompareAdminOfAChainIsAddressZero() public {
-        assertFalse(isAddressAdmin(address(0), owner));
+    function test_isAdminOfAChainIsAddressZero() public {
+        assertFalse(permRestriction.isAdminOfAChain(address(0)));
     }
 
-    function test_tryCompareAdminOfAChainNotAHyperchain() public {
-        assertFalse(isAddressAdmin(makeAddr("random"), owner));
+    function test_isAdminOfAChainNotAHyperchain() public {
+        assertFalse(permRestriction.isAdminOfAChain(makeAddr("random")));
     }
 
-    function test_tryCompareAdminOfAChainNotAnAdmin() public {
-        assertFalse(isAddressAdmin(hyperchain, owner));
+    function test_isAdminOfAChainOfAChainNotAnAdmin() public {
+        assertFalse(permRestriction.isAdminOfAChain(hyperchain));
     }
 
     function test_tryCompareAdminOfAChain() public {
