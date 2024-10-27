@@ -41,7 +41,7 @@ The order of the files here only roughly represents the order of reading. A lot 
 
 ![Reading order](./img/reading_order.png)
 
-# Invariants/tricky places to look out for
+## For auditors: Invariants/tricky places to look out for
 
 This section is for auditors of the codebase. It includes some of the important invariants that the system relies on and which if broken could have bad consequences.
 

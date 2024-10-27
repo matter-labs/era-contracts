@@ -166,9 +166,9 @@ To compute $2P$ (or $P+P$), there are three cases:
   - If $y = 0$, then $2P = O$.
   - Else $y≠0$, then
 
-        $$
-        \begin{gather*} \lambda = \frac{3x_{p}^{2} + a}{2y_{p}} \\ x_{r} = \lambda^{2} - 2x_{p} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
-        $$
+    $$
+    \begin{gather*} \lambda = \frac{3x_{p}^{2} + a}{2y_{p}} \\ x_{r} = \lambda^{2} - 2x_{p} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
+    $$
 
 
 The complicated case involves approximately 6 multiplications, 4 additions/subtractions, and 1 division. There could also be 4 multiplications, 6 additions/subtractions, and 1 division, and if you want you could trade a multiplication with 2 more additions.
@@ -183,11 +183,11 @@ To compute $P + Q$ where $P \neq Q$, there are four cases:
   - If $x_{p} = x_{q}$ (and necessarily $y_{p} \neq y_{q}$), then $P + Q = O$.
   - Else $x_{p} \neq x_{q}$, then
 
-        $$
-        \begin{gather*} \lambda = \frac{y_{2} - y_{1}}{x_{2} - x_{1}} \\ x_{r} = \lambda^{2} - x_{p} - x_{q} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
-        $$
+    $$
+    \begin{gather*} \lambda = \frac{y_{2} - y_{1}}{x_{2} - x_{1}} \\ x_{r} = \lambda^{2} - x_{p} - x_{q} \\ y_{r} = \lambda(x_{p} - x_{r}) - y_{p}\end{gather*}
+    $$
 
-        and $P + Q = R = (x_{r},\ y_{r})$.
+    and $P + Q = R = (x_{r},\ y_{r})$.
 
 
 The complicated case involves approximately 2 multiplications, 6 additions/subtractions, and 1 division.

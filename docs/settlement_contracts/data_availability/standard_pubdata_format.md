@@ -15,7 +15,7 @@ Pubdata in zkSync can be divided up into 4 different categories:
 
 Using data corresponding to these 4 facets, across all executed batches, we’re able to reconstruct the full state of L2. To restore the state we just need to filter all of the transactions to the L1 zkSync contract for only the `commitBatches` transactions where the proposed block has been referenced by a corresponding `executeBatches` call (the reason for this is that a committed or even proven block can be reverted but an executed one cannot). Once we have all the committed batches that have been executed, we then will pull the transaction input and the relevant fields, applying them in order to reconstruct the current state of L2.
 
-# L2→L1 communication
+## L2→L1 communication
 
 We will implement the calculation of the Merkle root of the L2→L1 messages via a system contract as part of the `L1Messenger`. Basically, whenever a new log emitted by users that needs to be Merklized is created, the `L1Messenger` contract will append it to its rolling hash and then at the end of the batch, during the formation of the blob it will receive the original preimages from the operator, verify their consistency, and send those to the L2DAValidator to facilitate the DA protocol.
 
@@ -90,25 +90,25 @@ The only places where the built-in L2→L1 messaging should continue to be used:
 
 To have the same log format, the `txNumberInBlock` must be obtained. While it is internally counted in the VM, there is currently no opcode to retrieve this number. We will have a public variable `txNumberInBlock` in the `SystemContext`, which will be incremented with each new transaction and retrieve this variable from there. It is [zeroed out](../../../system-contracts/contracts/SystemContext.sol#L515) at the end of the batch.
 
-## Bootloader implementation
+### Bootloader implementation
 
 The bootloader has a memory segment dedicated to the ABI-encoded data of the L1ToL2Messenger to perform the `publishPubdataAndClearState` call.
 
 At the end of the execution of the batch, the operator should provide the corresponding data into the bootloader memory, i.e user L2→L1 logs, long messages, bytecodes, etc. After that, the [call](../../../system-contracts/bootloader/bootloader.yul#L2676) is performed to the `L1Messenger` system contract, that would call the L2DAValidator that should check the adherence of the pubdata to the specified format.
 
-# Bytecode Publishing
+## Bytecode Publishing
 
 Within pubdata, bytecodes are published in 1 of 2 ways: (1) uncompressed as part of the bytecodes array and (2) compressed via long l2 → l1 messages.
 
-## Uncompressed Bytecode Publishing
+### Uncompressed Bytecode Publishing
 
 Uncompressed bytecodes are included within the `totalPubdata` bytes and have the following format: `number of bytecodes || forEachBytecode (length of bytecode(n) || bytecode(n))` .
 
-## Compressed Bytecode Publishing
+### Compressed Bytecode Publishing
 
 Unlike uncompressed bytecode which are published as part of `factoryDeps`, compressed bytecodes are published as long l2 → l1 messages which can be seen [here](../../../system-contracts/contracts/Compressor.sol#L78).
 
-### Bytecode Compression Algorithm — Server Side
+#### Bytecode Compression Algorithm — Server Side
 
 This is the part that is responsible for taking bytecode, that has already been chunked into 8 byte words, performing validation, and compressing it.
 
@@ -145,7 +145,7 @@ for chunk in chunked_bytecode:
 return [len(dictionary), dictionary.keys(order=index asc), encoded_data]
 ```
 
-### Verification And Publishing — L2 Contract
+#### Verification And Publishing — L2 Contract
 
 The function `publishCompressBytecode` takes in both the original `_bytecode` and the `_rawCompressedData` , the latter of which comes from the output of the server’s compression algorithm. Looping over the encoded data, derived from `_rawCompressedData` , the corresponding chunks are pulled from the dictionary and compared to the original byte code, reverting if there is a mismatch. After the encoded data has been verified, it is published to L1 and marked accordingly within the `KnownCodesStorage` contract.
 
@@ -170,11 +170,11 @@ sendToL1(_rawCompressedBytecode)
 markAsPublished(hash(_bytecode))
 ```
 
-# Storage diff publishing
+## Storage diff publishing
 
 zkSync is a statediff-based rollup and so publishing the correct state diffs plays an integral role in ensuring data availability.
 
-## Difference between initial and repeated writes
+### Difference between initial and repeated writes
 
 zkSync publishes state changes that happened within the batch instead of transactions themselves. Meaning, that for instance some storage slot `S` under account `A` has changed to value `V`, we could publish a triple of `A,S,V`. Users by observing all the triples could restore the state of zkSync. However, note that our tree unlike Ethereum’s one is not account based (i.e. there is no first layer of depth 160 of the merkle tree corresponding to accounts and second layer of depth 256 of the merkle tree corresponding to users). Our tree is “flat”, i.e. a slot `S` under account `A` is just stored in the leaf number `H(S,A)`. Our tree is of depth 256 + 8 (the 256 is for these hashed account/key pairs and 8 is for potential shards in the future, we currently have only one shard and it is irrelevant for the rest of the document).
 
@@ -199,7 +199,7 @@ We call this id *enumeration_index*.
 
 Note, that the enumeration indexes are assigned in the order of sorted array of (address, key), i.e. they are internally sorted. The enumeration indexes are part of the state merkle tree, it is **crucial** that the initial writes are published in the correct order, so that anyone could restore the correct enum indexes for the storage slots. In addition, an enumeration index of `0` indicates that the storage write is an initial write.
 
-## State diffs structure
+### State diffs structure
 
 Firstly, let’s define what we mean by *state diffs*. A *state diff* is an element of the following structure.
 
@@ -224,27 +224,27 @@ This is the internal structure that is used by the circuits to represent the sta
 
 Note, that values like `initial_value`, `address` and `key` are not used in the "simplified" algorithm above, but they will be helpful for the more advanced compression algorithms in the future. The [algorithm](#state-diff-compression-format) for Boojum already utilizes the difference between the `initial_value` and `final_value` for saving up on pubdata.
 
-## How the new pubdata verification works
+### How the new pubdata verification works
 
-**L2**
+#### **L2**
 
 1. The operator provides both full `stateDiffs` (i.e. the array of the structs above) and the compressed state diffs (i.e. the array which contains the state diffs, compressed by the algorithm explained [below](#state-diff-compression-format)).
 2. The L2DAValidator must verify that the compressed version is consistent with the original stateDiffs and send the the *hash* of the original state diff to its L1 counterpart. It will also include the compressed state diffs into the totalPubdata to be published onto L1.
 
-**L1**
+#### **L1**
 
 1. During committing the block, the standard DA protocol follows and the L1DAValidator is responsible to check that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./Rollup%20DA.md).
 2. The block commitment [includes](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) *the hash of the `stateDiffs`. Thus, during ZKP verification will fail if the provided stateDiff hash is not correct.
 
 It is a secure construction because the proof can be verified only if both the execution was correct and the hash of the provided hash of the `stateDiffs` is correct. This means that the L2DAValidator indeed received the array of correct `stateDiffs` and, assuming the L2DAValidator is working correctly, double-checked that the compression is of the correct format, while L1 contracts on the commit stage double checked that the operator provided the preimage for the compressed state diffs.
 
-## State diff compression format
+### State diff compression format
 
 The following algorithm is used for the state diff compression:
 
 [State diff compression v1 spec](./state_diff_compression_v1_spec.md)
 
-# General pubdata format
+## General pubdata format
 
 The `totalPubdata` has the following structure:
 

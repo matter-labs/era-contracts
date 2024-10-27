@@ -392,18 +392,17 @@ We process the L2 transactions according to our account abstraction protocol: [h
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
 3. We [conduct the validation step](../../system-contracts/bootloader/bootloader.yul#L1278) of the AA protocol:
 
-- We calculate the hash of the transaction.
-- If enough gas has been provided, we near_call the validation function in the bootloader. It sets the tx.origin to the address of the bootloader, sets the ergsPrice. It also marks the factory dependencies provided by the transaction as marked and then invokes the validation method of the account and verifies the returned magic.
-- Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L787) for any excess funds sent.
+    - We calculate the hash of the transaction.
+    - If enough gas has been provided, we near_call the validation function in the bootloader. It sets the tx.origin to the address of the bootloader, sets the ergsPrice. It also marks the factory dependencies provided by the transaction as marked and then invokes the validation method of the account and verifies the returned magic.
+    - Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L787) for any excess funds sent.
 
 4. [We perform the execution of the transaction](../../system-contracts/bootloader/bootloader.yul#L1343). Note, that if the sender is an EOA, tx.origin is set equal to the `from` the value of the transaction. During the execution of the transaction, the publishing of the compressed bytecodes happens: for each factory dependency if it has not been published yet and its hash is currently pointed to in the compressed bytecodes area of the bootloader, a call to the bytecode compressor is done. Also, at the end the call to the KnownCodeStorage is done to ensure all the bytecodes have indeed been published.
 5. We [refund](../../system-contracts/bootloader/bootloader.yul#L1553) the user for any excess funds he spent on the transaction:
+    - Firstly, the `postTransaction` operation is called to the paymaster.
+    - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zkSync%20fee%20model.md) of the fee model.
+    - The bootloader refunds the user.
 
-- Firstly, the `postTransaction` operation is called to the paymaster.
-- The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zkSync%20fee%20model.md) of the fee model.
-- The bootloader refunds the user.
-
-1. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1211) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
+6. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1211) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
 
 ### L1->L2 transactions
 
@@ -668,7 +667,7 @@ It works the following way:
 1. It accepts a versioned hash and double checks that it is marked as “known”, i.e. the operator must know the preimage for such hash.
 2. After that, it uses the `decommit` opcode, which accepts the versioned hash and the number of ergs to spent, which is proportional to the length of the preimage. If the preimage has been decommitted before, the requested cost will be refunded to the user.
 
-Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possilbe price and then it will be refunded in case the bytecode has been decommitted before.
+    Note, that the decommitment process does not only happen using the `decommit` opcode, but during calls to contracts. Whenever a contract is called, its code is decommitted into a memory page dedicated to contract code. We never decommit the same preimage twice, regardless of whether it was decommitted via an explicit opcode or during a call to another contract, the previous unpacked bytecode memory page will be reused. When executing `decommit` inside the `CodeOracle` contract, the user will be firstly precharged with maximal possilbe price and then it will be refunded in case the bytecode has been decommitted before.
 
 3. The `decommit` opcode returns to the slice of the decommitted bytecode. Note, that the returned pointer always has length of 2^21 bytes, regardless of the length of the actual bytecode. So it is the job of the `CodeOracle` system contract to shrink the length of the returned data.
 
