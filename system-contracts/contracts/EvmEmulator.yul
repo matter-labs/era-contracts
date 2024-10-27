@@ -196,10 +196,6 @@ object "EvmEmulator" {
         
         function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
         
-        function KECCAK_EMPTY() -> value {
-            value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
-        }
-        
         ////////////////////////////////////////////////////////////////
         //                  GENERAL FUNCTIONS
         ////////////////////////////////////////////////////////////////
@@ -3192,10 +3188,6 @@ object "EvmEmulator" {
             function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
             
             function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
-            
-            function KECCAK_EMPTY() -> value {
-                value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
-            }
             
             ////////////////////////////////////////////////////////////////
             //                  GENERAL FUNCTIONS
