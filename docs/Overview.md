@@ -4,7 +4,7 @@
 
 Ethereum's future is rollup-centric. This means breaking with the current paradigm of isolated EVM chains to infrastructure that is focused on an ecosystem of interconnected zkEVMs/zkVMs, (which we name ZK chain). This ecosystem will be grounded on Ethereum, requiring the appropriate L1 smart contracts. Here we outline our ZK Stack approach for these contracts, their interfaces, the needed changes to the existing architecture, as well as future features to be implemented.
 
-If you want to know more about ZK chains, check this [blog post](https://blog.matter-labs.io/introduction-to-hyperchains-fdb33414ead7), or go through [our docs](https://era.zksync.io/docs/reference/concepts/hyperscaling.html).
+If you want to know more about ZK chains, check this [blog post](https://blog.matter-labs.io/introduction-to-hyperchains-fdb33414ead7), or go through [our docs](hhttps://docs.zksync.io/zk-stack/concepts/zk-chains).
 
 This document will assume the reader already knows how rollups (esp. zkSync Era) work.
 

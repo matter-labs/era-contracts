@@ -63,7 +63,7 @@ The hash of an L2 block is `keccak256(abi.encode(_blockNumber, _blockTimestamp, 
 
 To add a transaction hash to the current miniblock we use the `appendTransactionToCurrentL2Block` function of the `SystemContext` contract.
 
-Since zkSync is a state-diff based rollup, there is no way to deduce the hashes of the L2 blocks based on the transactions’ in the batch (because there is no access to the transaction’s hashes). At the same time, in order to execute `blockhash` method, the VM requires the knowledge of some of the previous L2 block hashes. In order to save up on pubdata (by making sure that the same storage slots are reused, i.e. we only have repeated writes) we [store](../../system-contracts/contracts/SystemContext.sol#L73) only the last 257 block hashes. You can read more on what are the repeated writes and how the pubdata is processed [here](../data_availability/Standard%20pubdata%20format.md).
+Since zkSync is a state-diff based rollup, there is no way to deduce the hashes of the L2 blocks based on the transactions’ in the batch (because there is no access to the transaction’s hashes). At the same time, in order to execute `blockhash` method, the VM requires the knowledge of some of the previous L2 block hashes. In order to save up on pubdata (by making sure that the same storage slots are reused, i.e. we only have repeated writes) we [store](../../system-contracts/contracts/SystemContext.sol#L73) only the last 257 block hashes. You can read more on what are the repeated writes and how the pubdata is processed [here](../settlement_contracts/data_availability/standard_pubdata_format.md).
 
 We store only the last 257 blocks, since the EVM requires only 256 previous ones and we use 257 as a safe margin.
 

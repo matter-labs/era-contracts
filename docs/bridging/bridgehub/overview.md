@@ -11,7 +11,7 @@ Bridgehub is the most important contract in the system, that stores:
 - A mapping from chainId to its base token (i.e. the token that is used for paying fees)
 - etc
 
-> Note sure what CTM is? Check our the [overview](../../settlement_contracts/overview.md) for contracts for settlement layer.
+> Note sure what CTM is? Check our the [overview](../../settlement_contracts/zkchain_basics.md) for contracts for settlement layer.
 
 Overall, it is the main registry for all the contracts. Note, that a clone of Bridgehub is also deployed on each L2 chain, but this clone is only used on settlement layers. All the in all, the architecture of the entire ecosystem can be seen below:
 
@@ -25,7 +25,7 @@ The main entry for passing value between chains is the AssetRouter, it is respon
 
 For the purpose of this document, it is enough to treat the Asset Router as a blackbox that is responsible for processing escrowing funds on the source chain and minting them on the destination chain.
 
-> For those that are aware of the [previous zkSync architecture](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/L1%20ecosystem%20contracts.md), its role is similar to L1SharedBridge that we had before. Note, however, that it is a different contract with much enhanced functionality. Also, note that the L1SharedBridge will NOT be upgraded to the L1AssetRouter. For more details about migration, please check out [the migration doc](../../upgrade-history/gateway_upgrade/gateway_diff_review.md).
+> For those that are aware of the [previous zkSync architecture](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/Smart%20contract%20Section/L1%20ecosystem%20contracts.md), its role is similar to L1SharedBridge that we had before. Note, however, that it is a different contract with much enhanced functionality. Also, note that the L1SharedBridge will NOT be upgraded to the L1AssetRouter. For more details about migration, please check out [the migration doc](../../upgrade_history/gateway_upgrade/gateway_diff_review.md).
 
 ### Handling base tokens
 
@@ -35,7 +35,7 @@ In other words, in the current release base assets can only be transferred throu
 
 ## L1→L2 communication via `Bridgehub.requestL2TransactionDirect`
 
-L1→L2 communication allows users on L1 to create a request for a transaction to happen on L2. This is the primary censorship resistance mechanism. If you are interested, you can read more on L1→L2 communications [here](./Handling%20L1→L2%20ops%20on%20zkSync.md), but for now just understanding that L1→L2 communication allows to request transactions to happen on L2 is enough.
+L1→L2 communication allows users on L1 to create a request for a transaction to happen on L2. This is the primary censorship resistance mechanism. If you are interested, you can read more on L1→L2 communications [here](../../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md), but for now just understanding that L1→L2 communication allows to request transactions to happen on L2 is enough.
 
 The L1→L2 communication is also the only way to mint a base asset at the moment. Fees to the operator as well as `msg.value` will be minted on `L2BaseToken` after the corresponding L1→L2 tx has been processed.
 
@@ -150,7 +150,7 @@ This call will return the parameters to call the l2 contract with (the address o
 
 ## Generic usage of `BridgeHub.requestL2TransactionTwoBridges`
 
-`L1AssetRouter` is the only bridge that can handle base tokens. However, the `BridgeHub.requestL2TransactionTwoBridges` could be used by `secondBridgeAddress` on L1. A notable example of how it is done is how our [CTMDeploymentTracker](../../l1-contracts/contracts/bridgehub/CTMDeploymentTracker.sol) uses it to register the correct CTM address on Gateway. You can read more about how Gateway works in [its documentation](../../gateway/overview.md).
+`L1AssetRouter` is the only bridge that can handle base tokens. However, the `BridgeHub.requestL2TransactionTwoBridges` could be used by `secondBridgeAddress` on L1. A notable example of how it is done is how our [CTMDeploymentTracker](../../../l1-contracts/contracts/bridgehub/CTMDeploymentTracker.sol) uses it to register the correct CTM address on Gateway. You can read more about how Gateway works in [its documentation](../../gateway/overview.md).
 
 Let’s do a quick recap on how it works:
 

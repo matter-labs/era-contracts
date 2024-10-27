@@ -29,7 +29,7 @@ Let's see an example of how the approach above works in rollup DA validators.
 
 ### RollupL2DAValidator
 
-![RollupL2DAValidator.png](./L1%20smart%20contracts/Rollup_DA.png)
+![RollupL2DAValidator.png](./img/Rollup_DA.png)
 
 `RollupL2DAValidator` accepts the preimages for the data to publishes as well as their compressed format. After verifying the compression, it forms the `_totalPubdata` bytes array, which represents the entire blob of data that should be published to L1.
 
@@ -77,4 +77,4 @@ The final `blobCommitment` is calculated as the hash between the `blobVersionedH
 
 ## Structure of the pubdata
 
-Rollups maintain the same structure of pubdata and apply the same rules for compresison as those that were used in the previous versions of the system. These can be read [here](./Handling%20pubdata.md).
+Rollups maintain the same structure of pubdata and apply the same rules for compresison as those that were used in the previous versions of the system. These can be read [here](./state_diff_compression_v1_spec.md).

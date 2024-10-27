@@ -10,7 +10,7 @@ On standard Ethereum clients, the workflow for executing blocks is the following
 2. Gather the state changes (if the transaction has not reverted), apply them to the state.
 3. Go back to step (1) if the block gas limit has not been yet exceeded.
 
-However, having such flow on zkSync (i.e. processing transaction one-by-one) would be too inefficient, since we have to run the entire proving workflow for each individual transaction. That’s what we need the _bootloader_ for: instead of running N transactions separately, we run the entire batch (set of blocks, more can be found [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md)) as a single program that accepts the array of transactions as well as some other batch metadata and processes them inside a single big “transaction”. The easiest way to think about bootloader is to think in terms of EntryPoint from EIP4337: it also accepts the array of transactions and facilitates the Account Abstraction protocol.
+However, having such flow on zkSync (i.e. processing transaction one-by-one) would be too inefficient, since we have to run the entire proving workflow for each individual transaction. That’s what we need the _bootloader_ for: instead of running N transactions separately, we run the entire batch (set of blocks, more can be found [here](./batches_and_blocks_on_zksync.md)) as a single program that accepts the array of transactions as well as some other batch metadata and processes them inside a single big “transaction”. The easiest way to think about bootloader is to think in terms of EntryPoint from EIP4337: it also accepts the array of transactions and facilitates the Account Abstraction protocol.
 
 The hash of the code of the bootloader is stored on L1 and can only be changed as a part of a system upgrade. Note, that unlike system contracts, the bootloader’s code is not stored anywhere on L2. That’s why we may sometimes refer to the bootloader’s address as formal. It only exists for the sake of providing some value to `this` / `msg.sender`/etc. When someone calls the bootloader address (e.g. to pay fees) the EmptyContract’s code is actually invoked.
 
@@ -216,7 +216,7 @@ A call to a contract with invalid bytecode can not be proven. That is why it is 
 
 ## Account abstraction
 
-One of the other important features of zkSync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://era.zksync.io/docs/reference/concepts/account-abstraction.html#introduction](https://era.zksync.io/docs/reference/concepts/account-abstraction.html#introduction)
+One of the other important features of zkSync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zk-stack/concepts/account-abstraction](https://docs.zksync.io/zk-stack/concepts/account-abstraction)
 
 #### Account versioning
 
@@ -272,7 +272,7 @@ The exact type of the transaction is marked by the `txType` field of the transac
 - `txType`: 254. It is a transaction type that is used for upgrading the L2 system. This is the only type of transaction is allowed to start a transaction out of the name of the contracts in kernel space.
 - `txType`: 255. It is a transaction that comes from L1. There are almost no restrictions explicitly imposed upon this type of transaction, since the bootloader at the end of its execution sends the rolling hash of the executed priority transactions. The L1 contract ensures that the hash did indeed match the [hashes of the priority transactions on L1](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L376).
 
-You can also read more on L1->L2 transactions and upgrade transactions [here](./Handling%20L1→L2%20ops%20on%20zkSync.md).
+You can also read more on L1->L2 transactions and upgrade transactions [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
 
 However, as already stated, the bootloader’s memory is not deterministic and the operator is free to put anything it wants there. For all of the transaction types above the restrictions are imposed in the following ([method](../../system-contracts/bootloader/bootloader.yul#L3048)), which is called before starting processing the transaction.
 
@@ -288,12 +288,12 @@ The first 8 words are reserved for the batch information provided by the operato
 - `1` word — the hash of the previous batch. Its validation will be explained later on.
 - `2` word — the timestamp of the current batch. Its validation will be explained later on.
 - `3` word — the number of the new batch.
-- `4` word — the fair pubdata price. More on how our pubdata is calculated can be read [here](../l2_system_contracts/zksync_fee_model.md).
+- `4` word — the fair pubdata price. More on how our pubdata is calculated can be read [here](./zksync_fee_model.md).
 - `5` word — the “fair” price for L2 gas, i.e. the price below which the `baseFee` of the batch should not fall. For now, it is provided by the operator, but it in the future it may become hardcoded.
 - `6` word — the base fee for the batch that is expected by the operator. While the base fee is deterministic, it is still provided to the bootloader just to make sure that the data that the operator has coincides with the data provided by the bootloader.
 - `7` word — reserved word. Unused on proved batch.
 
-The batch information slots [are used at the beginning of the batch](../../system-contracts/bootloader/bootloader.yul#L3858). Once read, these slots can be used for temporary data.
+The batch information slots [are used at the beginning of the batch](../../system-contracts/bootloader/bootloader.yul#2857). Once read, these slots can be used for temporary data.
 
 #### **Temporary data for debug & transaction processing purposes**
 
@@ -304,12 +304,12 @@ The batch information slots [are used at the beginning of the batch](../../syste
 - `[143..10142]` – 10000 slots for the refunds for the transactions.
 - `[10143..20142]` – 10000 slots for the overhead for batch for the transactions. This overhead is suggested by the operator, i.e. the bootloader will still double-check that the operator does not overcharge the user.
 - `[20143..30142]` – slots for the “trusted” gas limits by the operator. The user’s transaction will have at its disposal `min(MAX_TX_GAS(), trustedGasLimit)`, where `MAX_TX_GAS` is a constant guaranteed by the system. Currently, it is equal to 80 million gas. In the future, this feature will be removed.
-- `[30143..70146]` – slots for storing L2 block info for each transaction. You can read more on the difference L2 blocks and batches [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md).
+- `[30143..70146]` – slots for storing L2 block info for each transaction. You can read more on the difference L2 blocks and batches [here](./batches_and_blocks_on_zksync.md).
 - `[70147..266754]` – slots used for compressed bytecodes each in the following format:
   - 32 bytecode hash
   - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the `publishCompressedBytecode` function of the `BytecodeCompressor`)
   - The calldata to the bytecode compressor (without the selector).
-- `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](./Handling%20L1→L2%20ops%20on%20zkSync.md).
+- `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
 
 #### L1Messenger Pubdata
 
@@ -376,7 +376,7 @@ These are memory slots that are used to track the success status of a transactio
 
 ### General flow of the bootloader’s execution
 
-1. At the start of the batch it [reads the initial batch information](../..å/system-contracts/bootloader/bootloader.yul#L3858) and [sends the information](../../system-contracts/bootloader/bootloader.yul#L3912) about the current batch to the SystemContext system contract.
+1. At the start of the batch it [reads the initial batch information](../../system-contracts/bootloader/bootloader.yul#2857) and [sends the information](../../system-contracts/bootloader/bootloader.yul#L3912) about the current batch to the SystemContext system contract.
 2. It goes through each of [transaction’s descriptions](../../system-contracts/bootloader/bootloader.yul#L3954) and checks whether the `execute` field is set. If not, it ends processing of the transactions and ends execution of the batch. If the execute field is non-zero, the transaction will be executed and it goes to step 3.
 3. Based on the transaction’s type it decides whether the transaction is an L1 or L2 transaction and processes them accordingly. More on the processing of the L1 transactions can be read [here](#l1-l2-transactions). More on L2 transactions can be read [here](#l2-transactions).
 
@@ -388,7 +388,7 @@ Note, that if you call an account that is in kernel space and does not have any 
 
 We process the L2 transactions according to our account abstraction protocol: [https://docs.zksync.io/build/developer-reference/account-abstraction](https://docs.zksync.io/build/developer-reference/account-abstraction).
 
-1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1163) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zkSync%20fee%20model.md).
+1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1163) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zksync_fee_model.md).
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
 3. We [conduct the validation step](../../system-contracts/bootloader/bootloader.yul#L1278) of the AA protocol:
 
@@ -400,7 +400,7 @@ We process the L2 transactions according to our account abstraction protocol: [h
 5. We [refund](../../system-contracts/bootloader/bootloader.yul#L1553) the user for any excess funds he spent on the transaction:
 
    - Firstly, the `postTransaction` operation is called to the paymaster.
-   - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zkSync%20fee%20model.md) of the fee model.
+   - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zksync_fee_model.md) of the fee model.
    - The bootloader refunds the user.
 
 6. We notify the operator about the [refund](../../system-contracts/bootloader/bootloader.yul#L1211) that was granted to the user. It will be used for the correct displaying of gasUsed for the transaction in explorer.
@@ -418,17 +418,17 @@ There are two kinds of L1->L2 transactions:
 - Priority operations, initiated by users (they have type `255`).
 - Upgrade transactions, that can be initiated during system upgrade (they have type `254`).
 
-You can read more about differences between those in the corresponding [document](./Handling%20L1%E2%86%92L2%20ops%20on%20zkSync.md).
+You can read more about differences between those in the corresponding [document](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
 
 ### End of the batch
 
 At the end of the batch we set `tx.origin` and `tx.gasprice` context variables to zero to save L1 gas on calldata and send the entire bootloader balance to the operator, effectively sending fees to him.
 
-Also, we [set](../../system-contracts/bootloader/bootloader.yul#L4047) the fictive L2 block’s data. Then, we call the system context to ensure that it publishes the timestamp of the L2 block as well as L1 batch. We also reset the `txNumberInBlock` counter to avoid its state diffs from being published on L1. You can read more about block processing on zkSync [here](./Batches%20&%20L2%20blocks%20on%20zkSync.md).
+Also, we [set](../../system-contracts/bootloader/bootloader.yul#L4047) the fictive L2 block’s data. Then, we call the system context to ensure that it publishes the timestamp of the L2 block as well as L1 batch. We also reset the `txNumberInBlock` counter to avoid its state diffs from being published on L1. You can read more about block processing on zkSync [here](./batches_and_blocks_on_zksync.md).
 
-After that, we publish the hash as well as the number of priority operations in this batch. More on it [here](./Handling%20L1%E2%86%92L2%20ops%20on%20zkSync.md).
+After that, we publish the hash as well as the number of priority operations in this batch. More on it [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
 
-Then, we call the L1Messenger system contract for it to compose the pubdata to be published on L1. You can read more about the pubdata processing [here](./Handling%20pubdata.md).
+Then, we call the L1Messenger system contract for it to compose the pubdata to be published on L1. You can read more about the pubdata processing [here](../settlement_contracts/data_availability/standard_pubdata_format.md).
 
 ## System contracts
 
@@ -442,7 +442,7 @@ This contract is used to support various system parameters not included in the V
 
 It is important to note that the constructor is **not** run for this contract upon genesis, i.e. the constant context values are set on genesis explicitly. Notably, if in the future we want to upgrade the contracts, we will do it via [ContractDeployer](#contractdeployer--immutablesimulator) and so the constructor will be run.
 
-This contract is also responsible for ensuring validity and consistency of batches, L2 blocks. The implementation itself is rather straightforward, but to better understand this contract, please take a look at the [page](./Batches%20&%20L2%20blocks%20on%20zkSync.md) about the block processing on zkSync.
+This contract is also responsible for ensuring validity and consistency of batches, L2 blocks. The implementation itself is rather straightforward, but to better understand this contract, please take a look at the [page](./batches_and_blocks_on_zksync.md) about the block processing on zkSync.
 
 ### AccountCodeStorage
 
@@ -496,7 +496,7 @@ It's important to note that the crypto part of the `sha256` precompile expects t
 
 ### EcAdd & EcMul
 
-These precompiles simulate the behaviour of the EVM's EcAdd and EcMul precompiles and are fully implemented in Yul without circuit counterparts. You can read more about them [here](./Elliptic%20curve%20precompiles.md).
+These precompiles simulate the behaviour of the EVM's EcAdd and EcMul precompiles and are fully implemented in Yul without circuit counterparts. You can read more about them [here](./elliptic_curve_precompiles.md).
 
 ### L2BaseToken & MsgValueSimulator
 
@@ -655,7 +655,7 @@ You can read more about how custom DA is handled [here](../settlement_contracts/
 
 ### Pubdata Chunk Publisher
 
-This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](./Rollup%20DA.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes as the circuits will require that the chunk is of exact size.
+This contract is responsible for separating pubdata into chunks that each fit into a [4844 blob](../settlement_contracts/data_availability/rollup_da.md) and calculating the hash of the preimage of said blob. If a chunk's size is less than the total number of bytes for a blob, we pad it on the right with zeroes as the circuits will require that the chunk is of exact size.
 
 This contract can be utilized by L2DAValidators, e.g. [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol) uses it to compress the pubdata into blobs.
 
@@ -678,7 +678,7 @@ This contract exerts the same behavior as the P256Verify precompile from [RIP-72
 
 ### GasBoundCaller
 
-This is not a system contract, but it will be predeployed on a fixed user space address. This contract allows users to set an upper bound of how much pubdata can a subcall take, regardless of the gas per pubdata. More on how pubdata works on zkSync can be read [here](./zkSync%20fee%20model.md).
+This is not a system contract, but it will be predeployed on a fixed user space address. This contract allows users to set an upper bound of how much pubdata can a subcall take, regardless of the gas per pubdata. More on how pubdata works on zkSync can be read [here](./zksync_fee_model.md).
 
 Note, that it is a deliberate decision not to deploy this contract in the kernel space, since it can relay calls to any contracts and so may break the assumption that all system contracts can be trusted.
 

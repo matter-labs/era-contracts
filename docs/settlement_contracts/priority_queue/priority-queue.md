@@ -110,11 +110,11 @@ corresponding to the already executed operations.
 
 We will only cache some prefix of the tree, meaning nodes in the interval [0; N) where N is the number of executed priority operations. The cache will store the rightmost cached left-child node on each level of the tree (see diagrams).
 
-![Untitled](./PQ1.png)
+![Untitled](./img/PQ1.png)
 
-![Untitled](./PQ2.png)
+![Untitled](./img/PQ2.png)
 
-![Untitled](./PQ3.png)
+![Untitled](./img/PQ3.png)
 
 This means that we will not be able to generate merkle proofs for the cached nodes (and since they are already executed, we don't need to). This structure allows us to save a lot of space, since it only takes up `O(height)` space instead of linear space for all executed operations. This is a big optimization since there are currently 3.2M total operations but <10 non-executed operations in the mainnet priority queue, which means most of the tree will be cached.
 

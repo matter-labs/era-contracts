@@ -58,7 +58,7 @@ To put it shortly, the proofs for L2→L1 log inclusion will continue having exa
 
 ### Implementation of `L1Messenger`
 
-The L1Messenger contract will maintain a rolling hash of all the L2ToL1 logs `chainedLogsHash` as well as the rolling hashes of messages `chainedMessagesHash`. Whenever a contract wants to send an L2→L1 log, the following operation will be [applied](../../system-contracts/contracts/L1Messenger.sol#L106):
+The L1Messenger contract will maintain a rolling hash of all the L2ToL1 logs `chainedLogsHash` as well as the rolling hashes of messages `chainedMessagesHash`. Whenever a contract wants to send an L2→L1 log, the following operation will be [applied](../../../system-contracts/contracts/L1Messenger.sol#L73):
 
 `chainedLogsHash = keccak256(chainedLogsHash, hashedLog)`. L2→L1 logs have the same 88-byte format as in the current version of zkSync.
 
@@ -233,8 +233,8 @@ Note, that values like `initial_value`, `address` and `key` are not used in the 
 
 #### **L1**
 
-1. During committing the block, the standard DA protocol follows and the L1DAValidator is responsible to check that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./Rollup%20DA.md).
-2. The block commitment [includes](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) \*the hash of the `stateDiffs`. Thus, during ZKP verification will fail if the provided stateDiff hash is not correct.
+1. During committing the block, the standard DA protocol follows and the L1DAValidator is responsible to check that the operator has provided the preimage for the `_totalPubdata`. More on how this is checked can be seen [here](./rollup_da.md).
+2. The block commitment [includes](../../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L550) \*the hash of the `stateDiffs`. Thus, during ZKP verification will fail if the provided stateDiff hash is not correct.
 
 It is a secure construction because the proof can be verified only if both the execution was correct and the hash of the provided hash of the `stateDiffs` is correct. This means that the L2DAValidator indeed received the array of correct `stateDiffs` and, assuming the L2DAValidator is working correctly, double-checked that the compression is of the correct format, while L1 contracts on the commit stage double checked that the operator provided the preimage for the compressed state diffs.
 

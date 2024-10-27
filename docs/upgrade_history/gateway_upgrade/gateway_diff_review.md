@@ -10,7 +10,7 @@ To read the documentation about the current system, you can read [here](../../RE
 
 For more info about the previous one, you can reach out to the following documentation:
 
-[https://github.com/code-423n4/2024-03-zksync/tree/main/docs/Smart contract Section](https://github.com/code-423n4/2024-03-zksync/tree/main/docs/Smart%20contract%20Section)
+[Code4rena Documentation Smart contract Section](https://github.com/code-423n4/2024-03-zksync/tree/main/docs/Smart%20contract%20Section)
 
 ## Changes from the shared bridge design
 

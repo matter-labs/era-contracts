@@ -6,8 +6,8 @@
 
 We introduced modularity into our contracts to support multiple DA layers, easier support for Validium and Rollup mode, and to settlement via the Gateway.
 
-![The contracts for the rollup case](./Custom-da-contracts.png)
-![The general architecture](./Custom-da-external.png)
+![The contracts for the rollup case](./img/custom_da.png)
+![The general architecture](./img/Custom-da-external.png)
 
 ### Background
 

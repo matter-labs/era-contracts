@@ -15,7 +15,7 @@ Please read the full [article](../../l2_system_contracts/system_contracts_bootlo
 
 ### Initiation
 
-A new priority operation can be appended by calling the `requestL2TransactionDirect` or `requestL2TransactionTwoBridges` methods on `BridgeHub` smart contract. `BridgeHub` will ensure that the base token is deposited via `L1AssetRouter` and send transaction request to the specified state transition contract (selected by the chainID). State transition contract will perform several checks for the transaction, making sure that it is processable and provides enough fee to compensate the operator for this transaction. Then, this transaction will be [appended](../../l1-contracts/contracts/state-transition/chain-deps/facets/Mailbox.sol#569) to the priority tree (and optionally to the legacy priority queue).
+A new priority operation can be appended by calling the `requestL2TransactionDirect` or `requestL2TransactionTwoBridges` methods on `BridgeHub` smart contract. `BridgeHub` will ensure that the base token is deposited via `L1AssetRouter` and send transaction request to the specified state transition contract (selected by the chainID). State transition contract will perform several checks for the transaction, making sure that it is processable and provides enough fee to compensate the operator for this transaction. Then, this transaction will be [appended](../../../l1-contracts/contracts/state-transition/chain-deps/facets/Mailbox.sol#569) to the priority tree (and optionally to the legacy priority queue).
 
 > In the previous system, priority operations were structured in a queue. However, now they will be stored in an incremental merkle tree. The motivation for the tree structure can be read [here](./priority-queue.md).
 

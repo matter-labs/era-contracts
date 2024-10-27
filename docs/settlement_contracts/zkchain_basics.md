@@ -10,7 +10,7 @@ validity proof and data availability, handles L2 <-> L1 communication, finalizes
 There are also important contracts deployed on the L2 that can also execute logic called _system contracts_. Using L2
 <-> L1 communication can affect both the L1 and the L2.
 
-![diamondProxy.png](L1%20smart%20contracts/Diamond-scheme.png)
+![diamondProxy.png](./img/Diamond-scheme.png)
 
 ### DiamondProxy
 
@@ -49,7 +49,7 @@ Control over the AdminFacet is divided between two main entities:
 ### MailboxFacet
 
 The facet that handles L2 <-> L1 communication, an overview for which can be found in
-[docs](https://era.zksync.io/docs/dev/developer-guides/bridging/l1-l2-interop.html).
+[docs](https://docs.zksync.io/zk-stack/components/smart-contracts#mailboxfacet).
 
 The Mailbox performs three functions:
 
@@ -94,10 +94,10 @@ with the funds. To withdraw funds user should call `withdraw` function on the `L
 burn the funds on L2, allowing the user to reclaim them through the `finalizeWithdrawal` function on the
 `SharedBridge` (more in hyperchain section).
 
-More about L1->L2 operations can be found [here](./Handling%20L1→L2%20ops%20on%20zkSync.md).
+More about L1->L2 operations can be found [here](./priority_queue/processing_of_l1->l2_txs.md).
 
 L2 -> L1 communication, in contrast to L1 -> L2 communication, is based only on transferring the information, and not on
-the transaction execution on L1. The full description of the mechanism for sending information from L2 to L1 can be found [here](./Standard%20pubdata%20format.md).
+the transaction execution on L1. The full description of the mechanism for sending information from L2 to L1 can be found [here](./data_availability/standard_pubdata_format.md).
 
 The Mailbox facet also facilitates L1<>L3 communications for those chains that settle on top of Gateway. The user interfaces for those are identical to the L1<>L2 communication described above. To learn more about L1<>L3 communication works, check out [this document](../gateway/messaging_via_gateway.md) and [this one](../gateway/nested_l3_l1_messaging.md).
 
