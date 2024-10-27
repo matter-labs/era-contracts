@@ -22,7 +22,7 @@ The order of the files here only roughly represents the order of reading. A lot 
 - Bridging
   - Bridgehub
     - [Overview of the bridgehub functionality](./bridging/bridgehub/overview.md)
-  - [Asset Router](./bridging/asset_router/Overview.md)
+  - [Asset Router](./bridging/asset_router/overview.md)
 - L2 System Contracts
   - [System contracts bootloader description](./l2_system_contracts/system_contracts_bootloader_description.md)
   - [Batches and blocks on ZKsync](./l2_system_contracts/batches_and_blocks_on_zksync.md)
