@@ -22,7 +22,6 @@ interface IL2ContractDeployer {
     }
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
-    /// @param _deployParams the force deployments
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external;
 
     /// @notice Deploys a contract with similar address derivation rules to the EVM's `CREATE2` opcode.

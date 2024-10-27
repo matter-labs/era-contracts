@@ -85,7 +85,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
             if (IL2AssetRouter.setAssetHandlerAddress.selector == l2TxSelector) {
                 (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, address));
-                return _checkSTMAssetId(decodedAssetId);
+                return _checkCTMAssetId(decodedAssetId);
             }
 
             if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
