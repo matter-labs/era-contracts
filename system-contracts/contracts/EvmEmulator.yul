@@ -550,6 +550,11 @@ object "EvmEmulator" {
             if returndatasize() {
                 isWarm := true
             }
+            if iszero(isWarm) {
+                if eq(addr, caller()) { // caller should be warm
+                    isWarm := true
+                }
+            }
         }
         
         function isSlotWarm(key) -> isWarm {
@@ -597,8 +602,9 @@ object "EvmEmulator" {
             // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
             // non-standard selector 0x04
             mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
+            mstore(1, caller())
         
-            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 1)
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
         
             let _returndatasize := returndatasize()
             if _returndatasize {
@@ -3543,6 +3549,11 @@ object "EvmEmulator" {
                 if returndatasize() {
                     isWarm := true
                 }
+                if iszero(isWarm) {
+                    if eq(addr, caller()) { // caller should be warm
+                        isWarm := true
+                    }
+                }
             }
             
             function isSlotWarm(key) -> isWarm {
@@ -3590,8 +3601,9 @@ object "EvmEmulator" {
                 // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
                 // non-standard selector 0x04
                 mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
+                mstore(1, caller())
             
-                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 1)
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
             
                 let _returndatasize := returndatasize()
                 if _returndatasize {
