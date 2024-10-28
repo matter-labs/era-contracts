@@ -779,14 +779,16 @@ object "EvmEmulator" {
         function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
             switch isEvmContract(addr)
             case 0 {
+                // zkEVM native call
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                 switch precompileCost
                 case 0 {
-                    success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                    // just smart contract
+                    success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
                 } 
                 default {
-                    // zkEVM native call
-                    success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                    // precompile
+                    success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
                 }
             }
             default {
@@ -3773,14 +3775,16 @@ object "EvmEmulator" {
             function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
                 switch isEvmContract(addr)
                 case 0 {
+                    // zkEVM native call
                     let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                     switch precompileCost
                     case 0 {
-                        success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                        // just smart contract
+                        success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
                     } 
                     default {
-                        // zkEVM native call
-                        success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                        // precompile
+                        success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
                     }
                 }
                 default {
