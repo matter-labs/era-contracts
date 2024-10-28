@@ -15,22 +15,22 @@ import {UnknownVerifierType, EmptyRecursiveAggregationInputLength} from "../../c
 /// needed for the smooth transition from PLONK based verifier to the FFLONK verifier.
 contract DualVerifier is IVerifier {
     /// @notice The latest FFLONK verifier contract.
-    IVerifierV2 public immutable fflonkVerifier;
+    IVerifierV2 public immutable FFLONK_VERIFIER;
 
     /// @notice PLONK verifier contract.
-    IVerifier public immutable plonkVerifier;
+    IVerifier public immutable PLONK_VERIFIER;
 
     /// @notice Type of verification for FFLONK verifier.
-    uint256 constant FFLONK_VERIFICATION_TYPE = 0;
+    uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
 
     /// @notice Type of verification for PLONK verifier.
-    uint256 constant PLONK_VERIFICATION_TYPE = 1;
+    uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
 
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
     constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
-        fflonkVerifier = _fflonkVerifier;
-        plonkVerifier = _plonkVerifier;
+        FFLONK_VERIFIER = _fflonkVerifier;
+        PLONK_VERIFIER = _plonkVerifier;
     }
 
     /// @notice Routes zk-SNARK proof verification to the appropriate verifier (FFLONK or PLONK) based on the proof type.
@@ -55,10 +55,10 @@ contract DualVerifier is IVerifier {
         // The first element of `_recursiveAggregationInput` determines the verifier type (either FFLONK or PLONK).
         uint256 verifierType = _recursiveAggregationInput[0];
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
-            return fflonkVerifier.verify(_publicInputs, _proof);
+            return FFLONK_VERIFIER.verify(_publicInputs, _proof);
         } else if (_recursiveAggregationInput[1] == PLONK_VERIFICATION_TYPE) {
             return
-                plonkVerifier.verify(
+                PLONK_VERIFIER.verify(
                     _publicInputs,
                     _proof,
                     _extractRecursiveAggregationInput(_recursiveAggregationInput)
@@ -89,16 +89,16 @@ contract DualVerifier is IVerifier {
 
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view returns (bytes32) {
-        return plonkVerifier.verificationKeyHash();
+        return PLONK_VERIFIER.verificationKeyHash();
     }
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys from the selected verifier.
     /// @return The keccak256 hash of the loaded verification keys based on the verifier.
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
         if (_verifierType == FFLONK_VERIFICATION_TYPE) {
-            return fflonkVerifier.verificationKeyHash();
+            return FFLONK_VERIFIER.verificationKeyHash();
         } else if (_verifierType == PLONK_VERIFICATION_TYPE) {
-            return plonkVerifier.verificationKeyHash();
+            return PLONK_VERIFIER.verificationKeyHash();
         }
         // If the verifier type is unknown, revert with an error.
         else {
