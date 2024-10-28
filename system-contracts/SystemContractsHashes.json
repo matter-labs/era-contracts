@@ -122,15 +122,15 @@
     "contractName": "EvmEmulator",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmEmulator.yul/EvmEmulator.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmEmulator.yul",
-    "bytecodeHash": "0x01000c17a11dbdb15973a96a4ddd5b95f19843ea7e7affa8f63fe0e5e4ef5b7c",
-    "sourceCodeHash": "0x5b6098d09a93c5a55cc119d6a30a6e8e446db778af4a4350deb1b5d8ba5c764a"
+    "bytecodeHash": "0x01000c17f157cd87a1e8d9d8c0e9fb8a1b3ecd0409e68769365f5014e4b053ff",
+    "sourceCodeHash": "0xd17982c310a48c4edc2c5351b2a4372a0c161719f09c73de8aa8a960a2eae1a5"
   },
   {
     "contractName": "EvmGasManager",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmGasManager.yul/EvmGasManager.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmGasManager.yul",
-    "bytecodeHash": "0x01000059d5a1736d5865f592c5dcf2e301697b83d4abfdc4a8fa2b5cfe88de8d",
-    "sourceCodeHash": "0xad51904bf2b8cd81cb66962c3211c9514e6ccd0c5bd30288d1f5697b29639fcb"
+    "bytecodeHash": "0x010000610462e7b494ad4db402ee0ca6369f20d9267aa2b5aa51886d869d16a2",
+    "sourceCodeHash": "0x5d683d77785f928d62a6b876cec35e4fb057db809e2328ad3df329a5d88a32c3"
   },
   {
     "contractName": "CodeOracle",
