@@ -488,11 +488,6 @@ function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
     if returndatasize() {
         isWarm := true
     }
-    if iszero(isWarm) {
-        if eq(addr, caller()) { // caller should be warm
-            isWarm := true
-        }
-    }
 }
 
 function isSlotWarm(key) -> isWarm {

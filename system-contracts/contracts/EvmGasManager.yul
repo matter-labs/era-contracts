@@ -213,21 +213,16 @@ object "EvmGasManager" {
                     return(0x0, 0x20)
                 }
 
-                // EVM contract was called from EraVm environment
-                // mark caller and txorigin as warm
-                if iszero(isFrameActive) {
-                    let _msgsender := calldataload(1)
-                    let _origin := origin()
-                    warmAccount(_msgsender)
-                    if iszero(eq(_msgsender, _origin)) {
-                        warmAccount(_origin)
-                    }
-                }
-
                 // We do not have active frame. This means that the EVM contract was called from the EraVM contract.
-                // We should mark the EVM contract as warm.
-                let isSenderWarmSlot := or(IS_ACCOUNT_WARM_PREFIX(), caller())
-                tstore(isSenderWarmSlot, 1)
+                // mark caller and txorigin as warm
+                let _msgsender := calldataload(1)
+                let _origin := origin()
+                warmAccount(_msgsender)
+                if iszero(eq(_msgsender, _origin)) {
+                    warmAccount(_origin)
+                }
+                // We should mark the EVM contract as warm too.
+                warmAccount(caller())
                 return(0x0, 0x0)
             }
             default {

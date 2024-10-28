@@ -550,11 +550,6 @@ object "EvmEmulator" {
             if returndatasize() {
                 isWarm := true
             }
-            if iszero(isWarm) {
-                if eq(addr, caller()) { // caller should be warm
-                    isWarm := true
-                }
-            }
         }
         
         function isSlotWarm(key) -> isWarm {
@@ -3548,11 +3543,6 @@ object "EvmEmulator" {
             
                 if returndatasize() {
                     isWarm := true
-                }
-                if iszero(isWarm) {
-                    if eq(addr, caller()) { // caller should be warm
-                        isWarm := true
-                    }
                 }
             }
             
