@@ -1,8 +1,8 @@
-# Handling L1→L2 ops on zkSync
+# Handling L1→L2 ops on ZKsync
 
 [back to readme](../../README.md)
 
-The transactions on zkSync can be initiated not only on L2, but also on L1. There are two types of transactions that can be initiated on L1:
+The transactions on ZKsync can be initiated not only on L2, but also on L1. There are two types of transactions that can be initiated on L1:
 
 - Priority operations. These are the kind of operations that any user can create.
 - Upgrade transactions. These can be created only during upgrades.
@@ -72,7 +72,7 @@ We also remember that the upgrade transaction has been processed in this batch (
 
 ### Revert
 
-In a very rare event when the team needs to revert the batch with the upgrade on zkSync, the `l2SystemContractsUpgradeBatchNumber` is reset.
+In a very rare event when the team needs to revert the batch with the upgrade on ZKsync, the `l2SystemContractsUpgradeBatchNumber` is reset.
 
 Note, however, that we do not “remember” that certain batches had a version before the upgrade, i.e. if the reverted batches will have to be reexecuted, the upgrade transaction must still be present there, even if some of the deleted batches were committed before the upgrade and thus didn’t contain the transaction.
 

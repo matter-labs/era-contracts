@@ -14,6 +14,8 @@ The order of the files here only roughly represents the order of reading. A lot 
   - L1->L2 transaction handling
     - [Processing of L1->L2 transactions](./settlement_contracts/priority_queue/processing_of_l1->l2_txs.md)
     - [Priority queue](./settlement_contracts/priority_queue/priority-queue.md)
+  - Consensus
+    - [Consensus Registry](./consensus/consensus-registry.md)
 - Chain Management
   - [Chain type manager](./chain_management/chain_type_manager.md)
   - [Admin role](./chain_management/admin_role.md)

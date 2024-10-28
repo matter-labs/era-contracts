@@ -2,7 +2,7 @@
 
 [back to readme](../README.md)
 
-> If someone is already familiar with the [previous version](https://github.com/code-423n4/2024-03-zksync) of zkSync architecture, this contract was previously known as "State Transition Manager (CTM)".
+> If someone is already familiar with the [previous version](https://github.com/code-423n4/2024-03-zksync) of ZKsync architecture, this contract was previously known as "State Transition Manager (CTM)".
 
 Currently bridging between different zk rollups requires the funds to pass through L1. This is slow & expensive.
 
@@ -23,7 +23,7 @@ In the long term vision STs deployment will be permissionless, however CTM will 
 
 ## Configurability in the current release
 
-For now, only one CTM will be supported — the one that deploys instances of zkSync Era, possibly using other DA layers. To read more about different DA layers, check out [this document](../settlement_contracts/data_availability/custom_da.md).
+For now, only one CTM will be supported — the one that deploys instances of ZKsync Era, possibly using other DA layers. To read more about different DA layers, check out [this document](../settlement_contracts/data_availability/custom_da.md).
 
 The exact process of deploying & registering a ST can be [read here](./chain_genesis.md). Overall, each ST in the current release will have the following parameters:
 
@@ -45,7 +45,7 @@ The exact process of deploying & registering a ST can be [read here](./chain_gen
 
 ## Upgradability in the current release
 
-In the current release, each chain will be an instance of zkSync Era and so the upgrade process of each individual ST will be similar to that of zkSync Era.
+In the current release, each chain will be an instance of ZKsync Era and so the upgrade process of each individual ST will be similar to that of ZKsync Era.
 
 1. Firstly, the governance of the CTM will publish the server (including sequencer, prover, etc) that support the new version . This is done offchain. Enough time should be given to various zkStack devs to update their version.
 2. The governance of the CTM will publish the upgrade onchain by automatically executing the following three transactions:

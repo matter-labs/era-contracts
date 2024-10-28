@@ -14,7 +14,7 @@ On top of having a set of opcodes to choose from, the EVM also offers a set of m
 
 For Go-Ethereum, the code being run is written in Go, and the gas costs are defined in each precompile spec.
 
-In the case of zkSync Era, ecAdd and ecMul precompiles are written as a smart contract for two reasons:
+In the case of ZKsync Era, ecAdd and ecMul precompiles are written as a smart contract for two reasons:
 
 - zkEVM needs to be able to prove their execution (and at the moment it cannot do that if the code being run is executed outside the VM)
 - Writing custom circuits for Elliptic curve operations is hard, and time-consuming, and after all such code is harder to maintain and audit.
@@ -25,7 +25,7 @@ The BN254 (also known as alt-BN128) is an elliptic curve defined by the equation
 
 The arithmetic is carried out with the field elements encoded in the Montgomery form. This is done not only because operating in the Montgomery form speeds up the computation but also because the native modular multiplication, which is carried out by Yul's `mulmod` opcode, is very inefficient.
 
-Instructions set on zkSync and EVM are different, so the performance of the same Yul/Solidity code can be efficient on EVM, but not on zkEVM and opposite.
+Instructions set on ZKsync and EVM are different, so the performance of the same Yul/Solidity code can be efficient on EVM, but not on zkEVM and opposite.
 
 One such very inefficient command is `mulmod`. On EVM there is a native opcode that makes modulo multiplication and it costs only 8 gas, which compared to the other opcodes costs is only 2-3 times more expensive. On zkEVM we don’t have native `mulmod` opcode, instead, the compiler does full-with multiplication (e.g. it multiplies two `uint256`s and gets as a result an `uint512`). Then the compiler performs long division for reduction (but only the remainder is kept), in the generic form it is an expensive operation and costs many opcode executions, which can’t be compared to the cost of one opcode execution. The worst thing is that `mulmod` is used a lot for the modulo inversion, so optimizing this one opcode gives a huge benefit to the precompiles.
 

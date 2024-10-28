@@ -10,7 +10,7 @@ On standard Ethereum clients, the workflow for executing blocks is the following
 2. Gather the state changes (if the transaction has not reverted), apply them to the state.
 3. Go back to step (1) if the block gas limit has not been yet exceeded.
 
-However, having such flow on zkSync (i.e. processing transaction one-by-one) would be too inefficient, since we have to run the entire proving workflow for each individual transaction. That’s what we need the _bootloader_ for: instead of running N transactions separately, we run the entire batch (set of blocks, more can be found [here](./batches_and_blocks_on_zksync.md)) as a single program that accepts the array of transactions as well as some other batch metadata and processes them inside a single big “transaction”. The easiest way to think about bootloader is to think in terms of EntryPoint from EIP4337: it also accepts the array of transactions and facilitates the Account Abstraction protocol.
+However, having such flow on ZKsync (i.e. processing transaction one-by-one) would be too inefficient, since we have to run the entire proving workflow for each individual transaction. That’s what we need the _bootloader_ for: instead of running N transactions separately, we run the entire batch (set of blocks, more can be found [here](./batches_and_blocks_on_zksync.md)) as a single program that accepts the array of transactions as well as some other batch metadata and processes them inside a single big “transaction”. The easiest way to think about bootloader is to think in terms of EntryPoint from EIP4337: it also accepts the array of transactions and facilitates the Account Abstraction protocol.
 
 The hash of the code of the bootloader is stored on L1 and can only be changed as a part of a system upgrade. Note, that unlike system contracts, the bootloader’s code is not stored anywhere on L2. That’s why we may sometimes refer to the bootloader’s address as formal. It only exists for the sake of providing some value to `this` / `msg.sender`/etc. When someone calls the bootloader address (e.g. to pay fees) the EmptyContract’s code is actually invoked.
 
@@ -54,7 +54,7 @@ For each frame, the following memory areas are allocated:
 
 - _Heap_ (plays the same role as `memory` on Ethereum).
 - _AuxHeap_ (auxiliary heap). It has the same properties as Heap, but it is used for the compiler to encode calldata/copy the returndata from the calls to system contracts to not interfere with the standard Solidity memory alignment.
-- _Stack_. Unlike Ethereum, stack is not the primary place to get arguments for opcodes. The biggest difference between stack on zkEVM and EVM is that on zkSync stack can be accessed at any location (just like memory). While users do not pay for the growth of stack, the stack can be fully cleared at the end of the frame, so the overhead is minimal.
+- _Stack_. Unlike Ethereum, stack is not the primary place to get arguments for opcodes. The biggest difference between stack on zkEVM and EVM is that on ZKsync stack can be accessed at any location (just like memory). While users do not pay for the growth of stack, the stack can be fully cleared at the end of the frame, so the overhead is minimal.
 - _Code_. The memory area from which the VM executes the code of the contract. The contract itself can not read the code page, it is only done implicitly by the VM.
 
 Also, as mentioned in the previous section, the contract receives the pointer to the calldata.
@@ -87,7 +87,7 @@ Some of these memory optimizations can be seen utilized in the [EfficientCall](.
 
 #### Returndata & precompiles
 
-Some of the operations which are opcodes on Ethereum, have become calls to some of the system contracts. The most notable examples are `Keccak256`, `SystemContext`, etc. Note, that, if done naively, the following lines of code would work differently on zkSync and Ethereum:
+Some of the operations which are opcodes on Ethereum, have become calls to some of the system contracts. The most notable examples are `Keccak256`, `SystemContext`, etc. Note, that, if done naively, the following lines of code would work differently on ZKsync and Ethereum:
 
 ```solidity
 pop(call(...))
@@ -97,7 +97,7 @@ returndatacopy(...)
 
 Since the call to keccak precompile would modify the `returndata`. To avoid this, our compiler does not override the latest `returndata` pointer after calls to such opcode-like precompiles.
 
-### zkSync specific opcodes
+### ZKsync specific opcodes
 
 While some Ethereum opcodes are not supported out of the box, some of the new opcodes were added to facilitate the development of the system contracts.
 
@@ -109,7 +109,7 @@ These opcodes are allowed only for contracts in kernel space (i.e. system contr
 
 - `mimic_call`. The same as a normal `call`, but it can alter the `msg.sender` field of the transaction.
 - `to_l1`. Sends a system L2→L1 log to Ethereum. The structure of this log can be seen [here](../../l1-contracts/contracts/common/Messaging.sol#L23).
-- `event`. Emits an L2 log to zkSync. Note, that L2 logs are not equivalent to Ethereum events. Each L2 log can emit 64 bytes of data (the actual size is 88 bytes, because it includes the emitter address, etc). A single Ethereum event is represented with multiple `event` logs constitute. This opcode is only used by `EventWriter` system contract.
+- `event`. Emits an L2 log to ZKsync. Note, that L2 logs are not equivalent to Ethereum events. Each L2 log can emit 64 bytes of data (the actual size is 88 bytes, because it includes the emitter address, etc). A single Ethereum event is represented with multiple `event` logs constitute. This opcode is only used by `EventWriter` system contract.
 - `precompile_call`. This is an opcode that accepts two parameters: the uint256 representing the packed parameters for it as well as the ergs to burn. Besides the price for the precompile call itself, it burns the provided ergs and executes the precompile. The action that it does depend on `this` during execution:
   - If it is the address of the `ecrecover` system contract, it performs the ecrecover operation
   - If it is the address of the `sha256`/`keccak256` system contracts, it performs the corresponding hashing operation.
@@ -152,7 +152,7 @@ The `onlySystemCall` flag checks that the call was either done with the “isSys
 
 #### Simulations via our compiler
 
-In the future, we plan to introduce our “extended” version of Solidity with more supported opcodes than the original one. However, right now it was beyond the capacity of the team to do, so in order to represent accessing zkSync-specific opcodes, we use `call` opcode with certain constant parameters that will be automatically replaced by the compiler with zkEVM native opcode.
+In the future, we plan to introduce our “extended” version of Solidity with more supported opcodes than the original one. However, right now it was beyond the capacity of the team to do, so in order to represent accessing ZKsync-specific opcodes, we use `call` opcode with certain constant parameters that will be automatically replaced by the compiler with zkEVM native opcode.
 
 Example:
 
@@ -169,7 +169,7 @@ In the example above, the compiler will detect that the static call is done to t
 
 Full list of opcode simulations can be found [here](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/VM%20Section/How%20compiler%20works/instructions/extensions/call.md).
 
-We also use [verbatim-like](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/VM%20Section/How%20compiler%20works/instructions/extensions/verbatim.md) statements to access zkSync-specific opcodes in the bootloader.
+We also use [verbatim-like](https://github.com/code-423n4/2024-03-zksync/blob/main/docs/VM%20Section/How%20compiler%20works/instructions/extensions/verbatim.md) statements to access ZKsync-specific opcodes in the bootloader.
 
 All the usages of the simulations in our Solidity code are implemented in the [SystemContractHelper](../../system-contracts/contracts/libraries//SystemContractHelper.sol) library and the [SystemContractsCaller](../../system-contracts/contracts//libraries/SystemContractsCaller.sol) library.
 
@@ -193,7 +193,7 @@ To prevent unintended substitution, the compiler requires `--system-mode` flag t
 
 ### Bytecode hashes
 
-On zkSync the bytecode hashes are stored in the following format:
+On ZKsync the bytecode hashes are stored in the following format:
 
 - The 0th byte denotes the version of the format. Currently the only version that is used is “1”.
 - The 1st byte is `0` for deployed contracts’ code and `1` for the contract code [that is being constructed](#constructing-vs-non-constructing-code-hash).
@@ -212,11 +212,11 @@ A bytecode is valid if it:
 
 Note, that it does not have to consist of only correct opcodes. In case the VM encounters an invalid opcode, it will simply revert (similar to how EVM would treat them).
 
-A call to a contract with invalid bytecode can not be proven. That is why it is **essential** that no contract with invalid bytecode is ever deployed on zkSync. It is the job of the [KnownCodesStorage](#knowncodestorage) to ensure that all allowed bytecodes in the system are valid.
+A call to a contract with invalid bytecode can not be proven. That is why it is **essential** that no contract with invalid bytecode is ever deployed on ZKsync. It is the job of the [KnownCodesStorage](#knowncodestorage) to ensure that all allowed bytecodes in the system are valid.
 
 ## Account abstraction
 
-One of the other important features of zkSync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zk-stack/concepts/account-abstraction](https://docs.zksync.io/zk-stack/concepts/account-abstraction)
+One of the other important features of ZKsync is the support of account abstraction. It is highly recommended to read the documentation on our AA protocol here: [https://docs.zksync.io/zk-stack/concepts/account-abstraction](https://docs.zksync.io/zk-stack/concepts/account-abstraction)
 
 #### Account versioning
 
@@ -242,7 +242,7 @@ Generally, the accounts are recommended to perform as many operations as during 
 
 ## Bootloader
 
-Bootloader is the program that accepts an array of transactions and executes the entire zkSync batch. This section will expand on its invariants and methods.
+Bootloader is the program that accepts an array of transactions and executes the entire ZKsync batch. This section will expand on its invariants and methods.
 
 ### Playground bootloader vs proved bootloader
 
@@ -266,9 +266,9 @@ The exact type of the transaction is marked by the `txType` field of the transac
 - `maxFeePerErgs=getMaxPriorityFeePerErg` since it is pre-EIP1559 tx type.
 - `reserved1..reserved4` as well as `paymaster` are 0. `paymasterInput` is zero.
 - Note, that unlike type 1 and type 2 transactions, `reserved0` field can be set to a non-zero value, denoting that this legacy transaction is EIP-155-compatible and its RLP encoding (as well as signature) should contain the `chainId` of the system.
-- `txType`: 1. It means that the transaction is of type 1, i.e. transactions access list. zkSync does not support access lists in any way, so no benefits of fulfilling this list will be provided. The access list is assumed to be empty. The same restrictions as for type 0 are enforced, but also `reserved0` must be 0.
+- `txType`: 1. It means that the transaction is of type 1, i.e. transactions access list. ZKsync does not support access lists in any way, so no benefits of fulfilling this list will be provided. The access list is assumed to be empty. The same restrictions as for type 0 are enforced, but also `reserved0` must be 0.
 - `txType`: 2. It is EIP1559 transactions. The same restrictions as for type 1 apply, but now `maxFeePerErgs` may not be equal to `getMaxPriorityFeePerErg`.
-- `txType`: 113. It is zkSync transaction type. This transaction type is intended for AA support. The only restriction that applies to this transaction type: fields `reserved0..reserved4` must be equal to 0.
+- `txType`: 113. It is ZKsync transaction type. This transaction type is intended for AA support. The only restriction that applies to this transaction type: fields `reserved0..reserved4` must be equal to 0.
 - `txType`: 254. It is a transaction type that is used for upgrading the L2 system. This is the only type of transaction is allowed to start a transaction out of the name of the contracts in kernel space.
 - `txType`: 255. It is a transaction that comes from L1. There are almost no restrictions explicitly imposed upon this type of transaction, since the bootloader at the end of its execution sends the rolling hash of the executed priority transactions. The L1 contract ensures that the hash did indeed match the [hashes of the priority transactions on L1](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L376).
 
@@ -382,7 +382,7 @@ These are memory slots that are used to track the success status of a transactio
 
 ### L2 transactions
 
-On zkSync, every address is a contract. Users can start transactions from their EOA accounts, because every address that does not have any contract deployed on it implicitly contains the code defined in the [DefaultAccount.sol](../../system-contracts/contracts/DefaultAccount.sol) file. Whenever anyone calls a contract that is not in kernel space (i.e. the address is ≥ 2^16) and does not have any contract code deployed on it, the code for `DefaultAccount` will be used as the contract’s code.
+On ZKsync, every address is a contract. Users can start transactions from their EOA accounts, because every address that does not have any contract deployed on it implicitly contains the code defined in the [DefaultAccount.sol](../../system-contracts/contracts/DefaultAccount.sol) file. Whenever anyone calls a contract that is not in kernel space (i.e. the address is ≥ 2^16) and does not have any contract code deployed on it, the code for `DefaultAccount` will be used as the contract’s code.
 
 Note, that if you call an account that is in kernel space and does not have any code deployed there, right now, the transaction will revert.
 
@@ -424,7 +424,7 @@ You can read more about differences between those in the corresponding [document
 
 At the end of the batch we set `tx.origin` and `tx.gasprice` context variables to zero to save L1 gas on calldata and send the entire bootloader balance to the operator, effectively sending fees to him.
 
-Also, we [set](../../system-contracts/bootloader/bootloader.yul#L4110) the fictive L2 block’s data. Then, we call the system context to ensure that it publishes the timestamp of the L2 block as well as L1 batch. We also reset the `txNumberInBlock` counter to avoid its state diffs from being published on L1. You can read more about block processing on zkSync [here](./batches_and_blocks_on_zksync.md).
+Also, we [set](../../system-contracts/bootloader/bootloader.yul#L4110) the fictive L2 block’s data. Then, we call the system context to ensure that it publishes the timestamp of the L2 block as well as L1 batch. We also reset the `txNumberInBlock` counter to avoid its state diffs from being published on L1. You can read more about block processing on ZKsync [here](./batches_and_blocks_on_zksync.md).
 
 After that, we publish the hash as well as the number of priority operations in this batch. More on it [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
 
@@ -442,7 +442,7 @@ This contract is used to support various system parameters not included in the V
 
 It is important to note that the constructor is **not** run for this contract upon genesis, i.e. the constant context values are set on genesis explicitly. Notably, if in the future we want to upgrade the contracts, we will do it via [ContractDeployer](#contractdeployer--immutablesimulator) and so the constructor will be run.
 
-This contract is also responsible for ensuring validity and consistency of batches, L2 blocks. The implementation itself is rather straightforward, but to better understand this contract, please take a look at the [page](./batches_and_blocks_on_zksync.md) about the block processing on zkSync.
+This contract is also responsible for ensuring validity and consistency of batches, L2 blocks. The implementation itself is rather straightforward, but to better understand this contract, please take a look at the [page](./batches_and_blocks_on_zksync.md) about the block processing on ZKsync.
 
 ### AccountCodeStorage
 
@@ -488,7 +488,7 @@ For these contracts, we insert the `EmptyContract` code upon genesis. It is basi
 
 ### SHA256 & Keccak256
 
-Note that, unlike Ethereum, keccak256 is a precompile (_not an opcode_) on zkSync.
+Note that, unlike Ethereum, keccak256 is a precompile (_not an opcode_) on ZKsync.
 
 These system contracts act as wrappers for their respective crypto precompile implementations. They are expected to be used frequently, especially keccak256, since Solidity computes storage slots for mapping and dynamic arrays with its help. That's why we wrote contracts on pure yul with optimizing the short input case. In the past both `sha256` and `keccak256` performed padding within the smart contracts, this is no longer true with `sha256` performing padding in the smart contracts and `keccak256` in the zk-circuits. Hashing is then completed for both within the zk-circuits.
 
@@ -516,7 +516,7 @@ More information on the extraAbiParams can be read [here](#flags-for-calls).
 
 On Ethereum, whenever a call with non-zero value is done, some additional gas is charged from the caller's frame and in return a `2300` gas stipend is given out to the callee frame. This stipend is usually enough to emit a small event, but it is enforced that it is not possible to change storage within these `2300` gas. This also means that in practice some users might opt to do `call` with 0 gas provided, relying on the `2300` stipend to be passed to the callee. This is the case for `.call/.transfer`.
 
-While using `.send/.transfer` is generally not recommended, as a step towards better EVM compatibility, since vm1.5.0 a _partial_ support of these functions is present with zkSync Era. It is the done via the following means:
+While using `.send/.transfer` is generally not recommended, as a step towards better EVM compatibility, since vm1.5.0 a _partial_ support of these functions is present with ZKsync Era. It is the done via the following means:
 
 - Whenever a call is done to the `MsgValueSimulator` system contract, `27000` gas is deducted from the caller's frame and it passed to the `MsgValueSimulator` on top of whatever gas the user has originally provided. The number was chosen to cover for the execution of the transferring of the balances as well as other constant size operations by the `MsgValueSimulator`. Note, that since it will be the frame of `MsgValueSimulator` that will actually call the callee, the constant must also include the cost for decommitting the code of the callee. Decoding bytecode of any size would be prohibitevely expensive and so we support only callees of size up to `100000` bytes.
 - `MsgValueSimulator` ensures that no more than `2300` out of the stipend above gets to the callee, ensuring the reentrancy protection invariant for these functions holds.
@@ -537,7 +537,7 @@ As a conclusion, using `.send/.transfer` should be generally avoided, but when a
 
 ### KnownCodeStorage
 
-This contract is used to store whether a certain code hash is “known”, i.e. can be used to deploy contracts. On zkSync, the L2 stores the contract’s code _hashes_ and not the codes themselves. Therefore, it must be part of the protocol to ensure that no contract with unknown bytecode (i.e. hash with an unknown preimage) is ever deployed.
+This contract is used to store whether a certain code hash is “known”, i.e. can be used to deploy contracts. On ZKsync, the L2 stores the contract’s code _hashes_ and not the codes themselves. Therefore, it must be part of the protocol to ensure that no contract with unknown bytecode (i.e. hash with an unknown preimage) is ever deployed.
 
 The factory dependencies field provided by the user for each transaction contains the list of the contract’s bytecode hashes to be marked as known. We can not simply trust the operator to “know” these bytecodehashes as the operator might be malicious and hide the preimage. We ensure the availability of the bytecode in the following way:
 
@@ -550,7 +550,7 @@ The KnownCodesStorage contract is also responsible for ensuring that all the “
 
 ### ContractDeployer & ImmutableSimulator
 
-`ContractDeployer` is a system contract responsible for deploying contracts on zkSync. It is better to understand how it works in the context of how the contract deployment works on zkSync. Unlike Ethereum, where `create`/`create2` are opcodes, on zkSync these are implemented by the compiler via calls to the ContractDeployer system contract.
+`ContractDeployer` is a system contract responsible for deploying contracts on ZKsync. It is better to understand how it works in the context of how the contract deployment works on ZKsync. Unlike Ethereum, where `create`/`create2` are opcodes, on ZKsync these are implemented by the compiler via calls to the ContractDeployer system contract.
 
 For additional security, we also distinguish the deployment of normal contracts and accounts. That’s why the main methods that will be used by the user are `create`, `create2`, `createAccount`, `create2Account`, which simulate the CREATE-like and CREATE2-like behavior for deploying normal and account contracts respectively.
 
@@ -559,7 +559,7 @@ For additional security, we also distinguish the deployment of normal contracts 
 Each rollup that supports L1→L2 communications needs to make sure that the addresses of contracts on L1 and L2 do not overlap during such communication (otherwise it would be possible that some evil proxy on L1 could mutate the state of the L2 contract). Generally, rollups solve this issue in two ways:
 
 - XOR/ADD some kind of constant to addresses during L1→L2 communication. That’s how rollups closer to full EVM-equivalence solve it, since it allows them to maintain the same derivation rules on L1 at the expense of contract accounts on L1 having to redeploy on L2.
-- Have different derivation rules from Ethereum. That is the path that zkSync has chosen, mainly because since we have different bytecode than on EVM, CREATE2 address derivation would be different in practice anyway.
+- Have different derivation rules from Ethereum. That is the path that ZKsync has chosen, mainly because since we have different bytecode than on EVM, CREATE2 address derivation would be different in practice anyway.
 
 You can see the rules for our address derivation in `getNewAddressCreate2`/ `getNewAddressCreate` methods in the ContractDeployer.
 
@@ -567,7 +567,7 @@ Note, that we still add a certain constant to the addresses during L1→L2 commu
 
 #### **Deployment nonce**
 
-On Ethereum, the same nonce is used for CREATE for accounts and EOA wallets. On zkSync this is not the case, we use a separate nonce called “deploymentNonce” to track the nonces for accounts. This was done mostly for consistency with custom accounts and for having multicalls feature in the future.
+On Ethereum, the same nonce is used for CREATE for accounts and EOA wallets. On ZKsync this is not the case, we use a separate nonce called “deploymentNonce” to track the nonces for accounts. This was done mostly for consistency with custom accounts and for having multicalls feature in the future.
 
 #### **General process of deployment**
 
@@ -578,11 +578,11 @@ On Ethereum, the same nonce is used for CREATE for accounts and EOA wallets. On 
 - It parses the array of immutables returned by the constructor (we’ll talk about immutables in more details later).
 - Calls `ImmutableSimulator` to set the immutables that are to be used for the deployed contract.
 
-Note how it is different from the EVM approach: on EVM when the contract is deployed, it executes the initCode and returns the deployedCode. On zkSync, contracts only have the deployed code and can set immutables as storage variables returned by the constructor.
+Note how it is different from the EVM approach: on EVM when the contract is deployed, it executes the initCode and returns the deployedCode. On ZKsync, contracts only have the deployed code and can set immutables as storage variables returned by the constructor.
 
 #### **Constructor**
 
-On Ethereum, the constructor is only part of the initCode that gets executed during the deployment of the contract and returns the deployment code of the contract. On zkSync, there is no separation between deployed code and constructor code. The constructor is always a part of the deployment code of the contract. In order to protect it from being called, the compiler-generated contracts invoke constructor only if the `isConstructor` flag provided (it is only available for the system contracts). You can read more about flags [here](#flags-for-calls).
+On Ethereum, the constructor is only part of the initCode that gets executed during the deployment of the contract and returns the deployment code of the contract. On ZKsync, there is no separation between deployed code and constructor code. The constructor is always a part of the deployment code of the contract. In order to protect it from being called, the compiler-generated contracts invoke constructor only if the `isConstructor` flag provided (it is only available for the system contracts). You can read more about flags [here](#flags-for-calls).
 
 After execution, the constructor must return an array of:
 
@@ -599,7 +599,7 @@ basically denoting an array of immutables passed to the contract.
 
 Immutables are stored in the `ImmutableSimulator` system contract. The way how `index` of each immutable is defined is part of the compiler specification. This contract treats it simply as mapping from index to value for each particular address.
 
-Whenever a contract needs to access a value of some immutable, they call the `ImmutableSimulator.getImmutable(getCodeAddress(), index)`. Note that on zkSync it is possible to get the current execution address (you can read more about `getCodeAddress()` [here](#zksync-specific-opcodes).
+Whenever a contract needs to access a value of some immutable, they call the `ImmutableSimulator.getImmutable(getCodeAddress(), index)`. Note that on ZKsync it is possible to get the current execution address (you can read more about `getCodeAddress()` [here](#zksync-specific-opcodes).
 
 #### **Return value of the deployment methods**
 
@@ -614,7 +614,7 @@ The implementation of the default account abstraction. This is the code that is 
 
 ### L1Messenger
 
-A contract used for sending arbitrary length L2→L1 messages from zkSync to L1. While zkSync natively supports a rather limited number of L1→L2 logs, which can transfer only roughly 64 bytes of data a time, we allowed sending nearly-arbitrary length L2→L1 messages with the following trick:
+A contract used for sending arbitrary length L2→L1 messages from ZKsync to L1. While ZKsync natively supports a rather limited number of L1→L2 logs, which can transfer only roughly 64 bytes of data a time, we allowed sending nearly-arbitrary length L2→L1 messages with the following trick:
 
 The L1 messenger receives a message, hashes it and sends only its hash as well as the original sender via L2→L1 log. Then, it is the duty of the L1 smart contracts to make sure that the operator has provided full preimage of this hash in the commitment of the batch.
 
@@ -678,7 +678,7 @@ This contract exerts the same behavior as the P256Verify precompile from [RIP-72
 
 ### GasBoundCaller
 
-This is not a system contract, but it will be predeployed on a fixed user space address. This contract allows users to set an upper bound of how much pubdata can a subcall take, regardless of the gas per pubdata. More on how pubdata works on zkSync can be read [here](./zksync_fee_model.md).
+This is not a system contract, but it will be predeployed on a fixed user space address. This contract allows users to set an upper bound of how much pubdata can a subcall take, regardless of the gas per pubdata. More on how pubdata works on ZKsync can be read [here](./zksync_fee_model.md).
 
 Note, that it is a deliberate decision not to deploy this contract in the kernel space, since it can relay calls to any contracts and so may break the assumption that all system contracts can be trusted.
 
