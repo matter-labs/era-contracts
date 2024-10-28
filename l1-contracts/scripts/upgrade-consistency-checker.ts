@@ -23,47 +23,49 @@ const EXECUTE_UPGRADE_DATA = fs.readFileSync("./scripts/execute-upgrade.txt");
 const WETH_L1_ADDRESS = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
 
 // List the contracts that should become the upgrade targets
-const genesisUpgrade = "0x7BF68E0BB44Cf263Dbb809F252B723F08A86F123";
+const genesisUpgrade = "0x6e2BC597F1e83F9fC7c1f69157F2C12476873971";
 const validatorTimelock = "";
-const defaultUpgradeAddress = "0x534AF884A80fe457d1184DDD932474BEC9207470";
+const defaultUpgradeAddressDeployTxn = "0x1a5c2946fe23a146b0572ae27829781cc196f13841c389522dacf9e99e636864";
+const defaultUpgradeAddress = "0xA7Cc1Bf4d8404d14caB00d2b2F0b2F4198CddDfF";
 
-const diamondProxyAddress = "0x5BBdEDe0F0bAc61AA64068b60379fe32ecc0F96C";
+const diamondProxyAddress = "0x6d6e010a2680e2e5a3b097ce411528b36d880ef6";
 
-const verifier = "0xCcB73Fdd0E3A3B9522631A1d8A168b5d9C532ceA";
+const verifierDeployTxn = "0xeeb8ef046c40f8613f3bd5c1aeb0cb66c4d4568d824eec5985f707477fcc8416";
+const verifier = "0x9A2eBeb3676d4c593443Fd0bb1bb9977C73b4118";
 const proxyAdmin = "0x93aeee8d98fb0873f8ff595fdd534a1f288786d2";
 
-const bridgeHubImplDeployTxn = "0x4bfe72902267228247b9fb05850e9918214f95ddd1b27e0ad76aaba7028a68cd";
-const bridgeHubImpl = "0xcBb9F1B9Ae8A80DAD53fFe3368DFEE4fBA02D50F";
-const bridgeHub = "0x7bdf7970f17278a6ff75fdbc671e870b0728ae41";
+const bridgeHubImplDeployTxn = "0x86fc36669a5076a69167748da3ecfdb1877ee751d8ced6fdf601bce3ce05db29";
+const bridgeHubImpl = "0x0029e562c0b54C0b88cB22adF4346DbfEC87400c";
+const bridgeHub = "0x35A54c8C757806eB6820629bc82d90E056394C92";
 
 const executorFacet = "0xBB13642F795014E0EAC2b0d52ECD5162ECb66712";
 const adminFacet = "0x90C0A0a63d7ff47BfAA1e9F8fa554dabc986504a";
-const mailboxFacetDeployTx = "0x07d150e5e96949fd816db58ca6c3cf935d3426a4ef4c78759d7bbe1b185fc473";
-const mailboxFacet = "0xf2677CF5ad53aE8D8612E2eeA0f2aa6191eb9c21";
+const mailboxFacetDeployTx = "0x21b419732e89130db231ab7170e744e1cece8810d2837261307b81b48cb6987a";
+const mailboxFacet = "0xb2D1Ca55203E96B1D1E6f034805431b7AC983185";
 const gettersFacet = "0x81754d2E48e3e553ba6Dfd193FC72B3A0c6076d9"!;
 
-const diamondInit = "0x4c17c0A1da9665D59EbE3a9e58459Ebe77041C64";
+const diamondInit = "0xD43b0b525E2CB6005f39CED7B69D3437F0Fb840F";
 
-const stmImplDeployTx = "0x5f427ef61519d613b2362ec0b638c62c93f91a5aa485fdc39bee6414a4a8eb43";
-const stmImpl = "0xD306aB758F92B7f42180E14866FCd72a2E9AbD13";
-const stmDeployTx = "0xbad873087e897f8ad3b3a7611bd686adebaafcaa52fc778a87036b0c444ab3cb";
-const stm = "0x925dd0bc14552b0b261ca8a23ad26df9c6f2c8ba";
+const stmImplDeployTx = "0x6022d76841230a1b149b5583a290edfa16e2a836da3f33ba75ebdbe42317b2c2";
+const stmImpl = "0x2bC975Ad0aa568767C188d32031142c372251C93";
+const stmDeployTx = "0x2305f3cd727b254a4e08d702600d10304433b3353bef2c9da6f8b475d0447680";
+const stm = "0x4e39E90746A9ee410A8Ce173C7B96D3AfEd444a5";
 
-const sharedBridgeImplDeployTx = "0x4338dc6ed82131d02f136f8d66f3f5187e443b120c8cd2511ac8b04af00eebea";
-const sharedBridgeImpl = "0xB4a56f82369366cad1a2747F1571BB306dFe48ee";
-const sharedBridgeProxy = "0xc488a65b400769295f8c4b762adcb3e6a036220b";
+const sharedBridgeImplDeployTx = "0x0c090eb6e1372ce7d4e8c4ff174c9cf1187c2f04bec4a5b1f44b2a13b7398e8c";
+const sharedBridgeImpl = "0xc990754cC43906EF1E62F1D510D3E666D02a60AF";
+const sharedBridgeProxy = "0x3E8b2fe58675126ed30d0d12dea2A9bda72D18Ae";
 
-const legacyBridgeImplDeployTx = "0x621e5cea3b4b0544283d25f3aa1d849ace2555f07f45372b7feb2a535ba00273";
-const legacyBridgeImpl = "0xCA48598aA0EdaF0FD9Eb1304041b87b0Daa1F648";
+const legacyBridgeImplDeployTx = "0xb1e2ff0db7d858809d0fc2abdd1ad0fae40794f307a9050b652b5b9fdd11d7a3";
+const legacyBridgeImpl = "0xda02F71a354f15DB7DA63738f1Aa37609F1b640b";
 
-const expectedL1WethAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+const expectedL1WethAddress = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
 const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
-const expectedOwner = "0xbD36971E336914167C6BD3A1Fc9B0960860AB1C7"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
+const expectedOwner = "0x9B956d242e6806044877C7C1B530D475E371d544"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
 const expectedDelay = "75600";
-const eraChainId: string = "271";
-const eraDiamondProxyAddress = "0x5BBdEDe0F0bAc61AA64068b60379fe32ecc0F96C";
+const eraChainId: string = "300";
+const eraDiamondProxyAddress = "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9";
 // const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
-const expectedHyperchainAddr = "0x5bbdede0f0bac61aa64068b60379fe32ecc0f96c";
+const expectedHyperchainAddr = "0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9";
 const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
 const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
@@ -85,8 +87,8 @@ const validatorTwo = process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR!;
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
 const EXPECTED_OLD_PROTOCOL_VERSION = "0x0000000000000000000000000000000000000000000000000000001800000002";
-const EXPECTED_OLD_VERSION_DEADLINE = "0x672797ed";
-const EXPECTED_UPGRADE_TIMESTAMP = "0x671522ed";
+const EXPECTED_OLD_VERSION_DEADLINE = "0x673DCF40";
+const EXPECTED_UPGRADE_TIMESTAMP = "0x671A8EE8";
 const EXPECTED_NEW_PROTOCOL_VERSION = "0x0000000000000000000000000000000000000000000000000000001900000000";
 const EXPECTED_MAJOR_VERSION = "0x19";
 
@@ -740,7 +742,7 @@ async function checkDefaultUpgradeCalldata(initCalldata: any) {
     throw new Error("Bad upgrade timestamp");
   }
   if (!BigNumber.from(EXPECTED_NEW_PROTOCOL_VERSION).eq(upgradeStruct.newProtocolVersion)) {
-    throw new Error("Bad upgrade timestamp");
+    throw new Error("Bad new protovol version");
   }
   if (upgradeStruct.postUpgradeCalldata !== "0x") {
     throw new Error("post upgrade calldata");
@@ -807,7 +809,7 @@ async function checkScheduleData() {
 
   const { facetCuts, initAddress, initCalldata } = cutData;
 
-  if (initAddress !== defaultUpgradeAddress) {
+  if (initAddress.toLowerCase() !== defaultUpgradeAddress.toLowerCase()) {
     throw new Error("Bad default upgrade " + initAddress + " " + defaultUpgradeAddress);
   }
 
@@ -919,8 +921,8 @@ async function main() {
     .description("upgrade shared bridge for era diamond proxy");
 
   program.action(async () => {
-    await checkIdenticalBytecode(defaultUpgradeAddress, "DefaultUpgrade", "DefaultUpgrade");
-    await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade", "GenesisUpgrade");
+    await checkIdenticalBytecode(defaultUpgradeAddress, "DefaultUpgrade");
+    await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade",);
 
     await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
@@ -929,10 +931,9 @@ async function main() {
 
     await checkIdenticalBytecode(
       verifier,
-      eraChainId == "324" ? "Verifier" : "TestnetVerifier",
       eraChainId == "324" ? "Verifier" : "TestnetVerifier"
     );
-    await checkIdenticalBytecode(diamondInit, "DiamondInit", "DiamondInit");
+    await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
     await checkScheduleData();
     console.log("Schedule data is correct");
@@ -941,15 +942,8 @@ async function main() {
 
     await checkChainCreationParams();
 
-    await checkImpl("StateTransitionManager", [bridgeHub, maxNumberOfHyperchains], stmImpl, stmImplDeployTx);
-    await checkImpl("Bridgehub", [], bridgeHubImpl, bridgeHubImplDeployTxn);
-    await checkImpl(
-      "L1SharedBridge",
-      [WETH_L1_ADDRESS, bridgeHub, eraChainId, eraDiamondProxyAddress],
-      sharedBridgeImpl,
-      sharedBridgeImplDeployTx
-    );
-    await checkImpl("L1ERC20Bridge", [sharedBridgeProxy], legacyBridgeImpl, legacyBridgeImplDeployTx);
+    await checkSTMImpl();
+    await checkL1SharedBridgeImpl();
 
     await checkBridgehub();
   });
