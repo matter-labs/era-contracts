@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehub {
-    function setAddresses(address _assetRouter, address _ctmDeployer, address _messageRoot) external;
+    function setAddresses(address _assetRouter, address _ctmDeployer, address _messageRoot, address _interopCenter) external;
 
     function owner() external view returns (address);
 }

@@ -65,7 +65,8 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @dev This method is only callable by the bootloader.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
-    function mint(address _account, uint256 _amount) external override onlyCallFromBootloader {
+    function mint(address _account, uint256 _amount) external override {
+        //onlyCallFromBootloader {
         totalSupply += _amount;
         balance[_account] += _amount;
         emit Mint(_account, _amount);

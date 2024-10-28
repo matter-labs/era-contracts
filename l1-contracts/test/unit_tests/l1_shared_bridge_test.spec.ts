@@ -80,7 +80,7 @@ describe("Shared Bridge tests", () => {
 
     l1SharedBridge = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    interopCenter = InteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet)
+    interopCenter = InteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
     l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet

@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
+// import {console} from "forge-std/console.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
@@ -212,7 +213,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyInteropCenterOrEra(_chainId) whenNotPaused {
+    )
+        public
+        payable
+        virtual
+        override(AssetRouterBase, IAssetRouterBase)
+        onlyInteropCenterOrEra(_chainId)
+        whenNotPaused
+    {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -241,6 +249,16 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _txHash
     ) external override onlyInteropCenter whenNotPaused {
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
+    }
+
+    function bridgehubAddCallToBundle( 
+        uint256 _chainId,
+        bytes32 _bundleId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable {
+        _bridgehubAddCallToBundle(_chainId, _bundleId, _originalCaller, _value, _data, address(nativeTokenVault));
     }
 
     /*//////////////////////////////////////////////////////////////

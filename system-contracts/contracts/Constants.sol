@@ -17,6 +17,7 @@ import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
+import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -78,7 +79,7 @@ address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
 address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
-address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);
+IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACTS_OFFSET + 0x06));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
@@ -101,7 +102,7 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
 
-IInteropHandler constant INTEROP_HANDLER_SYSTEM_CONTRACT = IInteropHandler(address(SYSTEM_CONTRACTS_OFFSET + 0x12));
+IInteropHandler constant INTEROP_HANDLER_SYSTEM_CONTRACT = IInteropHandler(address(SYSTEM_CONTRACTS_OFFSET + 0x13));
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

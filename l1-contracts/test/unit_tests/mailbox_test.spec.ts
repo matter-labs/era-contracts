@@ -3,7 +3,14 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet, InteropCenter, InteropCenterFactory } from "../../typechain";
+import {
+  Bridgehub,
+  Forwarder,
+  MailboxFacetTest,
+  MockExecutorFacet,
+  InteropCenter,
+  InteropCenterFactory,
+} from "../../typechain";
 import {
   BridgehubFactory,
   ForwarderFactory,
@@ -64,7 +71,7 @@ describe("Mailbox tests", function () {
     const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
     chainId = deployer.chainId;
-    
+
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     interopCenter = InteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
@@ -334,7 +341,7 @@ describe("Mailbox tests", function () {
   });
 
   it("Should only alias externally-owned addresses", async () => {
-    const indirections = [callDirectly]//, callViaForwarder, callViaConstructorForwarder];
+    const indirections = [callDirectly]; //, callViaForwarder, callViaConstructorForwarder];
     const refundRecipients = [
       [bridgehub.address, false],
       [await bridgehub.signer.getAddress(), true],

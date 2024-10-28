@@ -138,6 +138,10 @@ contract DefaultAccount is IAccount {
         uint128 value = Utils.safeCastToU128(_transaction.value);
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
+        if (to == (address((INTEROP_HANDLER_SYSTEM_CONTRACT)))) {
+            INTEROP_HANDLER_SYSTEM_CONTRACT.executeInteropBundle(_transaction);
+            return;
+        }
 
         // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
         bool isSystemCall;
@@ -215,7 +219,7 @@ contract DefaultAccount is IAccount {
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
-        if (_transaction.to == address(INTEROP_HANDLER_SYSTEM_CONTRACT)) {
+        if (_transaction.to == uint256(uint160(address(INTEROP_HANDLER_SYSTEM_CONTRACT)))) {
             INTEROP_HANDLER_SYSTEM_CONTRACT.executePaymasterBundle(_transaction);
         }
         bool success = _transaction.payToTheBootloader();

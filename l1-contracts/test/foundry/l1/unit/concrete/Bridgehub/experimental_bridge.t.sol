@@ -1475,6 +1475,12 @@ contract ExperimentalBridgeTest is Test {
             );
         }
 
+        // kl todo this was copied up. 
+        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
+        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
+        vm.prank(randomCaller);
+        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
+
         if (msgValue != secondBridgeValue) {
             vm.deal(randomCaller, msgValue);
             vm.expectRevert(
@@ -1483,11 +1489,6 @@ contract ExperimentalBridgeTest is Test {
             vm.prank(randomCaller);
             interopCenter.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
         }
-
-        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
-        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
-        vm.prank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
 
         vm.deal(randomCaller, l2TxnReq2BridgeOut.secondBridgeValue);
         vm.prank(randomCaller);

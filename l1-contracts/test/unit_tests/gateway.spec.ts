@@ -56,7 +56,10 @@ describe("Gateway", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    interopCenter = InteropCenterFactory.connect(migratingDeployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
+    interopCenter = InteropCenterFactory.connect(
+      migratingDeployer.addresses.Bridgehub.InteropCenterProxy,
+      deployWallet
+    );
 
     gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     gatewayDeployer.chainId = 10;

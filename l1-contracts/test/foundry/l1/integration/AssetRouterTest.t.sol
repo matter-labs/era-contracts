@@ -16,8 +16,9 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, INSERT_MSG_ADDRESS_ON_DESTINATION} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+import {InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -185,6 +186,63 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 secondBridgeValue: 0,
                 secondBridgeCalldata: secondBridgeCalldata
             })
+        );
+    }
+
+    function test_DepositDirect() public {
+        depositToL1(ETH_TOKEN_ADDRESS);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+        );
+        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
+        interopCenter.requestL2TransactionDirect{value: 250000000000100}(
+            L2TransactionRequestDirect({
+                chainId: eraZKChainId,
+                mintValue: 250000000000100,
+                l2Contract: address(sharedBridge),
+                l2Value: 0,
+                l2Calldata: secondBridgeCalldata,
+                l2GasLimit: 1000000,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: address(0)
+            })
+        );
+    }
+
+    function test_requestInterop() public {
+        depositToL1(ETH_TOKEN_ADDRESS);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+        );
+        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
+
+        InteropCallStarter[] memory feePaymentCallStarters = new InteropCallStarter[](0);
+        InteropCallRequest[] memory feePaymentDirectCalls = new InteropCallRequest[](1);
+        feePaymentDirectCalls[0] = InteropCallRequest({
+            to: INSERT_MSG_ADDRESS_ON_DESTINATION,
+            data: "",
+            value: 250000000000100
+        });
+        InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);
+        InteropCallRequest[] memory executionDirectCalls = new InteropCallRequest[](0);
+        executionCallStarters[0] = InteropCallStarter({
+            to: address(sharedBridge),
+            data: secondBridgeCalldata,
+            value: 0,
+            requestedInteropCallValue: 0
+        });
+
+        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
+        interopCenter.requestInterop{value: 250000000000100}(
+            eraZKChainId,
+            feePaymentCallStarters,
+            feePaymentDirectCalls,
+            executionCallStarters,
+            executionDirectCalls,
+            GasFields({gasLimit: uint256(1000000), gasPerPubdataByteLimit: uint256(REQUIRED_L2_GAS_PRICE_PER_PUBDATA), refundRecipient: address(0)})
         );
     }
 

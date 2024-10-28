@@ -138,6 +138,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         revert L2AssetRouter_LegacyDataNotImplemented();
     }
 
+    function bridgehubAddCallToBundle( 
+        uint256 _chainId,
+        bytes32 _bundleId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable {
+        _bridgehubAddCallToBundle(_chainId, _bundleId, _originalCaller, _value, _data, L2_NATIVE_TOKEN_VAULT_ADDR);
+    }
+
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,

@@ -152,6 +152,30 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data
     ) external payable virtual returns (L2TransactionRequestTwoBridgesInner memory request);
 
+    // todo we will probably have to create a new function for this to be backwards compatible
+    function _bridgehubAddCallToBundle( 
+        uint256 _chainId,
+        bytes32 _bundleId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data,
+        address _nativeTokenVault
+    ) internal virtual {
+        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit(_chainId, _originalCaller, _value, _data, _nativeTokenVault);
+        INTEROP_CENTER.addCallToBundleFromRequest(_bundleId, _value, request);
+    }
+
+    function _addCallToBundle(
+        uint256 _chainId,
+        bytes32 _bundleId,
+        uint256 _value,
+        bytes calldata _data,
+        address _nativeTokenVault
+    ) internal virtual {
+        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit(_chainId, msg.sender, _value, _data, _nativeTokenVault);
+        INTEROP_CENTER.addCallToBundleFromRequest(_bundleId, _value, request);
+    }
+
     function _bridgehubDeposit(
         uint256 _chainId,
         address _originalCaller,

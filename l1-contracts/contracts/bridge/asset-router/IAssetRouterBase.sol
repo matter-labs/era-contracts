@@ -95,6 +95,14 @@ interface IAssetRouterBase {
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
+    function bridgehubAddCallToBundle( 
+        uint256 _chainId,
+        bytes32 _bundleId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable;
+
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
     /// @param _chainId The chain ID of the ZK chain to which deposit.

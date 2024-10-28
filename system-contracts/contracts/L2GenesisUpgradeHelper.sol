@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -26,20 +26,37 @@ library L2GenesisUpgradeHelper {
 
         address bridgehubOwner = L2_BRIDGE_HUB.owner();
 
-        bytes memory data = abi.encodeCall(
+        bytes memory bridgehubConstructorData = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT))
+            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_INTEROP_CENTER))
         );
 
         (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
             address(L2_BRIDGE_HUB),
             bridgehubOwner,
-            data
+            bridgehubConstructorData
         );
         if (!success) {
             // Progapatate revert reason
             assembly {
                 revert(add(returnData, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory interopCenterConstructorData = abi.encodeCall(
+            L2_INTEROP_CENTER.setAddresses,
+            (L2_ASSET_ROUTER)
+        );
+
+        (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
+            address(L2_INTEROP_CENTER),
+            bridgehubOwner,
+            interopCenterConstructorData
+        );
+        if (!success2) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData2, 0x20), returndatasize())
             }
         }
     }
@@ -116,7 +133,7 @@ library L2GenesisUpgradeHelper {
 
         forceDeployments[4] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.interopCenterBytecodeHash,
-            newAddress: address(L2_INTEROP_CENTER_ADDR),
+            newAddress: address(L2_INTEROP_CENTER),
             callConstructor: true,
             value: 0,
             input: abi.encode(

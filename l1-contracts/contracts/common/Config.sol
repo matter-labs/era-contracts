@@ -159,3 +159,6 @@ struct ZKChainCommitment {
     /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
 }
+
+/// @dev The address that is used to signal that the provided msg.value should be sent to the msg.sender on the destination chain.
+address constant INSERT_MSG_ADDRESS_ON_DESTINATION = address(uint160(uint256(keccak256("INSERT_MSG_ADDRESS_ON_DESTINATION")) - 1));
