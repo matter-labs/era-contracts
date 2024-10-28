@@ -1047,9 +1047,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
                 gasLeft := _saveReturndataAfterEVMCall(0, 0)
             }
             default {
-                returndatacopy(0, 0, 32)
-                addr := mload(0)
-                gasLeft := _fetchConstructorReturnGas()
+                gasLeft, addr := _saveConstructorReturnGas()
             }
     
         let gasUsed := sub(gasForTheCall, gasLeft)
@@ -1076,9 +1074,18 @@ function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> succes
     }
 }
 
-function _fetchConstructorReturnGas() -> gasLeft {
-    mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
-    gasLeft := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 4)
+function _saveConstructorReturnGas() -> gasLeft, addr {
+    loadReturndataIntoActivePtr()
+
+    if gt(returndatasize(), 63) { // >= 64
+            // ContractDeployer returns (uint256 gasLeft, address createdContract)
+            returndatacopy(0, 0, 64)
+            gasLeft := mload(0)
+            addr := mload(32)
+    }
+    // else: unexpected return data after constructor succeeded, should never happen.
+
+    _eraseReturndataPointer()
 }
 
 ////////////////////////////////////////////////////////////////

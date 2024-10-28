@@ -27,7 +27,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     mapping(address => AccountInfo) internal accountInfo;
 
     uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
-    uint256 private constant CONSTRUCTOR_RETURN_GAS_TSLOT = 1;
     uint256 private constant ALLOWED_BYTECODE_TYPES_MODE_SLOT = 2;
 
     modifier onlySelf() {
@@ -44,12 +43,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Returns what types of bytecode are allowed to be deployed on this chain
     function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode) {
         mode = _getAllowedBytecodeTypesMode();
-    }
-
-    function constructorReturnGas() external view returns (uint256 returnGas) {
-        assembly {
-            returnGas := tload(CONSTRUCTOR_RETURN_GAS_TSLOT)
-        }
     }
 
     /// @notice Returns information about a certain account.
@@ -248,7 +241,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function createEvmFromEmulator(
         address newAddress,
         bytes calldata _initCode
-    ) external payable onlySystemCallFromEvmEmulator returns (address) {
+    ) external payable onlySystemCallFromEvmEmulator returns (uint256, address) {
         uint32 providedErgs;
         uint32 stipend = EVM_GAS_STIPEND;
         assembly {
@@ -257,8 +250,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 providedErgs := sub(_gas, stipend)
             }
         }
-        _evmDeployOnAddress(providedErgs, msg.sender, newAddress, _initCode);
-        return newAddress;
+        uint256 constructorReturnEvmGas = _evmDeployOnAddress(providedErgs, msg.sender, newAddress, _initCode);
+        return (constructorReturnEvmGas, newAddress);
     }
 
     /// @notice Deploys a contract account with similar address derivation rules to the EVM's `CREATE2` opcode.
@@ -423,7 +416,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _sender,
         address _newAddress,
         bytes calldata _initCode
-    ) internal {
+    ) internal returns (uint256 constructorReturnEvmGas) {
         if (_getAllowedBytecodeTypesMode() != AllowedBytecodeTypes.EraVmAndEVM) {
             revert EVMEmulationNotSupported();
         }
@@ -431,7 +424,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
-        _performDeployOnAddressEVM(_gasToPass, _sender, _newAddress, AccountAbstractionVersion.None, _initCode);
+        return _performDeployOnAddressEVM(_gasToPass, _sender, _newAddress, AccountAbstractionVersion.None, _initCode);
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -476,7 +469,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _newAddress,
         AccountAbstractionVersion _aaVersion,
         bytes calldata _input
-    ) internal {
+    ) internal returns (uint256 constructorReturnEvmGas) {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
         // Accounts have sequential nonces by default.
@@ -486,8 +479,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // Note, that for contracts the "nonce" is set as deployment nonce.
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
 
-        // When constructing they just get the intrepeter bytecode hash in consutrcting mode
-        _constructEVMContract(_gasToPass, _sender, _newAddress, _input);
+        // We will store dummy constructing bytecode hash to trigger EVM emulator in constructor call
+        return _constructEVMContract(_gasToPass, _sender, _newAddress, _input);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -564,7 +557,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _sender,
         address _newAddress,
         bytes calldata _input
-    ) internal {
+    ) internal returns (uint256 constructorReturnEvmGas) {
         uint256 value = msg.value;
         // 1. Transfer the balance to the new address on the constructor call.
         if (value > 0) {
@@ -594,10 +587,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             _isSystem: false
         });
 
-        uint256 constructorReturnGas;
         assembly {
             let dataLen := mload(paddedBytecode)
-            constructorReturnGas := mload(add(paddedBytecode, dataLen))
+            constructorReturnEvmGas := mload(add(paddedBytecode, dataLen))
             mstore(paddedBytecode, sub(dataLen, 0x20))
         }
 
@@ -612,11 +604,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         _setEvmCodeHash(_newAddress, evmBytecodeHash);
 
-        assembly {
-            tstore(CONSTRUCTOR_RETURN_GAS_TSLOT, constructorReturnGas)
-        }
-
-        emit ContractDeployed(_sender, evmBytecodeHash, _newAddress);
+        emit ContractDeployed(_sender, versionedCodeHash, _newAddress);
     }
 
     function _setEvmCodeHash(address _address, bytes32 _hash) internal {
