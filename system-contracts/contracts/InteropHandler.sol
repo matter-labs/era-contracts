@@ -9,7 +9,7 @@ import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol"
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {BASE_TOKEN_SYSTEM_CONTRACT, INTEROP_HANDLER_SYSTEM_CONTRACT} from "./Constants.sol";
 
-import {IInteropHandler, InteropCall} from "./interfaces/IInteropHandler.sol";
+import {IInteropHandler, InteropCall, InteropBundle} from "./interfaces/IInteropHandler.sol";
 
 event PaymasterBundleExecuted(address indexed where);
 event DataBytesExecuted(bytes data);
@@ -27,14 +27,16 @@ contract InteropHandler is IInteropHandler {
         (bytes memory paymasterBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
         // (, bytes memory paymasterProof) = abi.decode(_transaction.signature);
         // todo verify signature = merkleProof.
-        InteropCall memory interopCall = abi.decode(paymasterBundle, (InteropCall));
+        InteropBundle memory interopBundle = abi.decode(paymasterBundle, (InteropBundle));
+        InteropCall memory baseTokenCall = interopBundle.calls[0];
+
         // require(interopCall.to == address(BASE_TOKEN_SYSTEM_CONTRACT), "InteropHandler: Invalid interop call");
-        BASE_TOKEN_SYSTEM_CONTRACT.mint(msg.sender, interopCall.value);
-        require(msg.sender == interopCall.from, "InteropHandler: Invalid sender"); // todo add aliasing here.
+        BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), baseTokenCall.value);
+        require(msg.sender == baseTokenCall.from, "InteropHandler: Invalid sender"); // todo add aliasing here.
         // require(success, "InteropHandler: Interop call failed");
 
         // executeInteropBundle(paymasterBundle, paymasterProof)
-        emit PaymasterBundleExecuted(interopCall.to);
+        emit PaymasterBundleExecuted(baseTokenCall.to);
     }
 
     function executeInteropBundle(Transaction calldata _transaction) external {

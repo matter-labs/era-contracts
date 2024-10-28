@@ -138,6 +138,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         interopBundleHash = _finishAndSendBundle(_bundleId, _executionAddress, msg.value);
     }
 
+    event InteropBundleSent(
+        bytes32 interopBundleHash,
+        InteropBundle interopBundle
+    );
+
     function _finishAndSendBundle(
         bytes32 _bundleId,
         address _executionAddress,
@@ -176,6 +181,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             // when sending the trigger
             return interopBundleHash;
         } else {
+            emit InteropBundleSent(interopBundleHash, interopBundle);
             L2_MESSENGER.sendToL1(interopBundleBytes);
         }
     }
@@ -223,14 +229,18 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             // on L1 we need to send the tx via an old interface
             revert("InteropCenter: Cannot send trigger from L1");
         }
-        _sendInteropTrigger(_interopTrigger, bytes32(0), bytes32(0), new bytes[](0));
+        _sendInteropTrigger(_interopTrigger, bytes32(0), bytes32(0), new bytes[](0), address(0), address(0));
     }
+
+    event InteropTriggerSent(InteropTrigger _interopTrigger);
 
     function _sendInteropTrigger(
         InteropTrigger memory _interopTrigger,
         bytes32 _feeBundleId,
         bytes32 _executionBundleId,
-        bytes[] memory _factoryDeps
+        bytes[] memory _factoryDeps,
+        address _sender,
+        address _refundRecipient
     ) internal returns (bytes32 canonicalTxHash) {
         if (block.chainid == L1_CHAIN_ID) {
             // todo send L1->L2 txs here manually
@@ -240,10 +250,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 _interopTrigger,
                 _feeBundleId,
                 _executionBundleId,
-                _factoryDeps
+                _factoryDeps,
+                _refundRecipient
             );
             return IZKChain(zkChain).bridgehubRequestL2Transaction(request);
         } else {
+            emit InteropTriggerSent(_interopTrigger);
             return L2_MESSENGER.sendToL1(abi.encode(_interopTrigger));
         }
     }
@@ -252,7 +264,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropTrigger memory _interopTrigger,
         bytes32 _feeBundleId,
         bytes32 _executionBundleId,
-        bytes[] memory _factoryDeps
+        bytes[] memory _factoryDeps,
+        address _refundRecipient
     ) internal returns (BridgehubL2TransactionRequest memory request) {
         // InteropCall memory feeCall_0 = TransientInterop.getBundleCall(_interopTrigger.feeBundleHash, 0);
         InteropCall memory feeCall_1 = TransientInterop.getBundleCall(_feeBundleId, 1);
@@ -268,7 +281,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 l2GasLimit: _interopTrigger.gasFields.gasLimit,
                 l2GasPerPubdataByteLimit: _interopTrigger.gasFields.gasPerPubdataByteLimit,
                 factoryDeps: _factoryDeps,
-                refundRecipient: address(0) // todo
+                refundRecipient: AddressAliasHelper.actualRefundRecipient(_refundRecipient, _interopTrigger.sender)
             });
     }
     /*//////////////////////////////////////////////////////////////
@@ -277,6 +290,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     struct ExtraInputs {
         address sender;
+        address refundRecipient;
         bytes[] factoryDeps;
     }
 
@@ -296,7 +310,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 _executionCallStarters,
                 _executionDirectCalls,
                 _gasFields,
-                ExtraInputs({sender: msg.sender, factoryDeps: new bytes[](0)})
+                ExtraInputs({sender: msg.sender, factoryDeps: new bytes[](0), refundRecipient: address(0)})
             );
     }
 
@@ -375,7 +389,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         });
 
         return
-            _sendInteropTrigger(interopTrigger, viaIR.feeBundleId, viaIR.executionBundleId, _extraInputs.factoryDeps);
+            _sendInteropTrigger(
+                interopTrigger,
+                viaIR.feeBundleId,
+                viaIR.executionBundleId,
+                _extraInputs.factoryDeps,
+                _extraInputs.sender,
+                _extraInputs.refundRecipient
+            );
     }
 
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
@@ -415,7 +436,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                     refundRecipient: _request.refundRecipient
                 }),
-                ExtraInputs({sender: _sender, factoryDeps: new bytes[](0)})
+                ExtraInputs({sender: _sender, factoryDeps: new bytes[](0), refundRecipient: _request.refundRecipient})
             );
     }
 
@@ -455,7 +476,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                     refundRecipient: _request.refundRecipient
                 }),
-                ExtraInputs({sender: _sender, factoryDeps: _request.factoryDeps})
+                ExtraInputs({sender: _sender, factoryDeps: _request.factoryDeps, refundRecipient: _request.refundRecipient})
             );
     }
 

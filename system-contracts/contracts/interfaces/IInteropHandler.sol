@@ -11,6 +11,15 @@ struct InteropCall {
     uint256 value;
 }
 
+struct InteropBundle {
+    uint256 destinationChainId;
+    InteropCall[] calls;
+    // If not set - anyone can execute it.
+    address[] executionAddresses;
+    // Who can 'cancel' this bundle.
+    address cancellationAddress;
+}
+
 interface IInteropHandler {
     function executePaymasterBundle(Transaction calldata _transaction) external;
     function executeInteropBundle(Transaction calldata _transaction) external;
