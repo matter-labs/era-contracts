@@ -43,10 +43,7 @@ library L2GenesisUpgradeHelper {
             }
         }
 
-        bytes memory interopCenterConstructorData = abi.encodeCall(
-            L2_INTEROP_CENTER.setAddresses,
-            (L2_ASSET_ROUTER)
-        );
+        bytes memory interopCenterConstructorData = abi.encodeCall(L2_INTEROP_CENTER.setAddresses, (L2_ASSET_ROUTER));
 
         (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
             address(L2_INTEROP_CENTER),

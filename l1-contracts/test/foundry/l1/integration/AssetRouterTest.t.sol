@@ -242,7 +242,11 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             feePaymentDirectCalls,
             executionCallStarters,
             executionDirectCalls,
-            GasFields({gasLimit: uint256(1000000), gasPerPubdataByteLimit: uint256(REQUIRED_L2_GAS_PRICE_PER_PUBDATA), refundRecipient: address(0)})
+            GasFields({
+                gasLimit: uint256(1000000),
+                gasPerPubdataByteLimit: uint256(REQUIRED_L2_GAS_PRICE_PER_PUBDATA),
+                refundRecipient: address(0)
+            })
         );
     }
 

@@ -251,7 +251,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
     }
 
-    function bridgehubAddCallToBundle( 
+    function bridgehubAddCallToBundle(
         uint256 _chainId,
         bytes32 _bundleId,
         address _originalCaller,

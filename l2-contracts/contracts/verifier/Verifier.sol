@@ -375,7 +375,11 @@ contract Verifier is IVerifier {
             /// @dev Performs modular exponentiation using the formula (value ^ power) mod R_MOD.
             function modexp(value, power) -> res {
                 res := 1
-                for {} gt(power, 0) {} {
+                for {
+
+                } gt(power, 0) {
+
+                } {
                     if mod(power, 2) {
                         res := mulmod(res, value, R_MOD)
                     }

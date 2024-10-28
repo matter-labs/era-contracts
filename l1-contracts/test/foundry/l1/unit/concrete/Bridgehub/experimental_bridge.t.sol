@@ -1475,7 +1475,7 @@ contract ExperimentalBridgeTest is Test {
             );
         }
 
-        // kl todo this was copied up. 
+        // kl todo this was copied up.
         testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
         assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
         vm.prank(randomCaller);

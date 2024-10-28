@@ -138,7 +138,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         revert L2AssetRouter_LegacyDataNotImplemented();
     }
 
-    function bridgehubAddCallToBundle( 
+    function bridgehubAddCallToBundle(
         uint256 _chainId,
         bytes32 _bundleId,
         address _originalCaller,

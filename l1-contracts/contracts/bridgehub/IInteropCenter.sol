@@ -69,7 +69,6 @@ interface IInteropCenter {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
-
     function requestInterop(
         uint256 _destinationChainId,
         InteropCallStarter[] memory _feePaymentCallStarters,
@@ -79,5 +78,9 @@ interface IInteropCenter {
         GasFields memory _gasFields
     ) external payable returns (bytes32);
 
-    function addCallToBundleFromRequest(bytes32 _bundleId, uint256 _value, L2TransactionRequestTwoBridgesInner memory _request) external;
+    function addCallToBundleFromRequest(
+        bytes32 _bundleId,
+        uint256 _value,
+        L2TransactionRequestTwoBridgesInner memory _request
+    ) external;
 }

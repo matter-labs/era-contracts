@@ -95,7 +95,7 @@ interface IAssetRouterBase {
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
-    function bridgehubAddCallToBundle( 
+    function bridgehubAddCallToBundle(
         uint256 _chainId,
         bytes32 _bundleId,
         address _originalCaller,
