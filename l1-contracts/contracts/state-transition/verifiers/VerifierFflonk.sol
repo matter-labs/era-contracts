@@ -1326,7 +1326,7 @@ contract VerifierFflonk is IVerifierV2 {
                 // the identity check is reduced into following
                 // L(X) - W'(X)*Z_{T\S0}(y)(X-y) == 0
                 // verifier has commitments to the C_i(X) polynomials
-                // verifer also recomputed r_i(y)
+                // verifier also recomputed r_i(y)
                 // group constant and commitment parts
                 // first prepare L(X)/Z_{T\S0}(y)
                 // C(X) = C0(X) + ((alpha*Z_{T\S1}(y)/Z_{T\S0}(y))*C1(X)) + ((alpha^2*Z_{T\S2}(y)/Z_{T\S0}(y))*C2(X))
