@@ -769,7 +769,7 @@ function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffs
     let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
     let decommitZkVmGasCost := decommitmentCost(addr)
 
-    // we are going to charge decommit cost even if addres is already warm
+    // we are going to charge decommit cost even if address is already warm
     // decommit cost is subtracted from the callee frame
     switch gt(decommitZkVmGasCost, zkEvmGasToPass)
     case 0 {
