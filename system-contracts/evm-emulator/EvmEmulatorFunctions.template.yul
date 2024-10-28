@@ -1075,28 +1075,17 @@ function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> succes
 }
 
 function _saveConstructorReturnGas() -> gasLeft, addr {
-    let rtsz := returndatasize()
     loadReturndataIntoActivePtr()
 
-    // if (rtsz > 31)
-    switch gt(rtsz, 31)
-        case 0 {
-            // Unexpected return data after constructor succeeded.
-            // Should never happen.
-            _eraseReturndataPointer()
-        }
-        default {
+    if gt(returndatasize(), 63) { // >= 64
             // ContractDeployer returns (uint256 gasLeft, address createdContract)
             returndatacopy(0, 0, 64)
             gasLeft := mload(0)
             addr := mload(32)
+    }
+    // else: unexpected return data after constructor succeeded, should never happen.
 
-            //mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
-
-            // Skip the gasLeft, it should not be accessible via RETURNDATA from EVM context
-            //ptrAddIntoActive(32)
-            _eraseReturndataPointer()
-        }
+    _eraseReturndataPointer()
 }
 
 ////////////////////////////////////////////////////////////////

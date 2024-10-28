@@ -251,7 +251,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             }
         }
         uint256 constructorReturnEvmGas = _evmDeployOnAddress(providedErgs, msg.sender, newAddress, _initCode);
-        return(constructorReturnEvmGas, newAddress);
+        return (constructorReturnEvmGas, newAddress);
     }
 
     /// @notice Deploys a contract account with similar address derivation rules to the EVM's `CREATE2` opcode.
@@ -416,7 +416,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _sender,
         address _newAddress,
         bytes calldata _initCode
-    ) internal returns(uint256 constructorReturnEvmGas) {
+    ) internal returns (uint256 constructorReturnEvmGas) {
         if (_getAllowedBytecodeTypesMode() != AllowedBytecodeTypes.EraVmAndEVM) {
             revert EVMEmulationNotSupported();
         }
@@ -469,7 +469,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _newAddress,
         AccountAbstractionVersion _aaVersion,
         bytes calldata _input
-    ) internal returns(uint256 constructorReturnEvmGas) {
+    ) internal returns (uint256 constructorReturnEvmGas) {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
         // Accounts have sequential nonces by default.
@@ -557,7 +557,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _sender,
         address _newAddress,
         bytes calldata _input
-    ) internal returns(uint256 constructorReturnEvmGas) {
+    ) internal returns (uint256 constructorReturnEvmGas) {
         uint256 value = msg.value;
         // 1. Transfer the balance to the new address on the constructor call.
         if (value > 0) {
