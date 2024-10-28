@@ -21,7 +21,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate called by the upgrade proxy.
     function genesisUpgrade(
         address _l1GenesisUpgrade,
         uint256 _chainId,
