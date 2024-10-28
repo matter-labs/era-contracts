@@ -198,7 +198,7 @@ object "EvmEmulator" {
         
         function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
             mstore(0, 0)
-            revert(0, 0)
+            revert(0, 32)
         }
         
         function revertWithGas(evmGasLeft) {
@@ -3195,7 +3195,7 @@ object "EvmEmulator" {
             
             function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
                 mstore(0, 0)
-                revert(0, 0)
+                revert(0, 32)
             }
             
             function revertWithGas(evmGasLeft) {
