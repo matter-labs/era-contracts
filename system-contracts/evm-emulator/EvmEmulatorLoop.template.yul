@@ -1471,6 +1471,6 @@ for { } true { } {
     // We explicitly add unused opcodes to optimize the jump table by compiler.
     <!-- @include EvmEmulatorLoopUnusedOpcodes.template.yul -->
     default {
-        $llvm_NoInline_llvm$_revert()
+        $llvm_NoInline_llvm$_panic()
     }
 }

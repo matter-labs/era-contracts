@@ -134,8 +134,9 @@ function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
 //                  GENERAL FUNCTIONS
 ////////////////////////////////////////////////////////////////
 
-function $llvm_NoInline_llvm$_revert() {
-    revert(0, 0)
+function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
+    mstore(0, 0)
+    revert(0, 32)
 }
 
 function revertWithGas(evmGasLeft) {
