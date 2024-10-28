@@ -108,8 +108,6 @@ interface IContractDeployer {
 
     function evmCodeHash(address) external view returns (bytes32);
 
-    function constructorReturnGas() external view returns (uint256);
-
     /// @notice Changes what types of bytecodes are allowed to be deployed on the chain. Can be used only during upgrades.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
     function setAllowedBytecodeTypesToDeploy(uint256 newAllowedBytecodeTypes) external;

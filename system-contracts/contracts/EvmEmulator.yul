@@ -1109,9 +1109,9 @@ object "EvmEmulator" {
                         gasLeft := _saveReturndataAfterEVMCall(0, 0)
                     }
                     default {
+                        gasLeft := _saveConstructorReturnGas()
                         returndatacopy(0, 0, 32)
                         addr := mload(0)
-                        gasLeft := _fetchConstructorReturnGas()
                     }
             
                 let gasUsed := sub(gasForTheCall, gasLeft)
@@ -1138,9 +1138,28 @@ object "EvmEmulator" {
             }
         }
         
-        function _fetchConstructorReturnGas() -> gasLeft {
-            mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
-            gasLeft := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 4)
+        function _saveConstructorReturnGas() -> gasLeft {
+            let rtsz := returndatasize()
+            loadReturndataIntoActivePtr()
+        
+            // if (rtsz > 31)
+            switch gt(rtsz, 31)
+                case 0 {
+                    // Unexpected return data after constructor succeeded.
+                    // Should never happen.
+                    gasLeft := 0
+                    _eraseReturndataPointer()
+                }
+                default {
+                    // ContractDeployer returns (uint256 gasLeft, address createdContract)
+                    returndatacopy(0, 0, 32)
+                    gasLeft := mload(0)
+        
+                    //mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
+        
+                    // Skip the gasLeft, it should not be accessible via RETURNDATA from EVM context
+                    ptrAddIntoActive(32)
+                }
         }
         
         ////////////////////////////////////////////////////////////////
@@ -4103,9 +4122,9 @@ object "EvmEmulator" {
                             gasLeft := _saveReturndataAfterEVMCall(0, 0)
                         }
                         default {
+                            gasLeft := _saveConstructorReturnGas()
                             returndatacopy(0, 0, 32)
                             addr := mload(0)
-                            gasLeft := _fetchConstructorReturnGas()
                         }
                 
                     let gasUsed := sub(gasForTheCall, gasLeft)
@@ -4132,9 +4151,28 @@ object "EvmEmulator" {
                 }
             }
             
-            function _fetchConstructorReturnGas() -> gasLeft {
-                mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
-                gasLeft := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 4)
+            function _saveConstructorReturnGas() -> gasLeft {
+                let rtsz := returndatasize()
+                loadReturndataIntoActivePtr()
+            
+                // if (rtsz > 31)
+                switch gt(rtsz, 31)
+                    case 0 {
+                        // Unexpected return data after constructor succeeded.
+                        // Should never happen.
+                        gasLeft := 0
+                        _eraseReturndataPointer()
+                    }
+                    default {
+                        // ContractDeployer returns (uint256 gasLeft, address createdContract)
+                        returndatacopy(0, 0, 32)
+                        gasLeft := mload(0)
+            
+                        //mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
+            
+                        // Skip the gasLeft, it should not be accessible via RETURNDATA from EVM context
+                        ptrAddIntoActive(32)
+                    }
             }
             
             ////////////////////////////////////////////////////////////////
