@@ -23,7 +23,7 @@ object "EvmGasManager" {
             }
 
             function PRECOMPILES_END() -> value {
-                value := sub(0xffff, 1) // TODO should we exclude system contracts?
+                value := 0x0a // As in Cancun
             }
 
             function EVM_GAS_SLOT() -> value {
@@ -71,7 +71,9 @@ object "EvmGasManager" {
                 let notSystemCall := iszero(and(callFlags, 2))
 
                 if notSystemCall {
-                    revert(0, 0) // TODO errors?
+                    // error CallerMustBeEvmContract()
+                    mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
+                    revert(0, 32)
                 }
 
                 // SELFDESTRUCT is not supported, so it is ok to cache here
@@ -82,7 +84,9 @@ object "EvmGasManager" {
                     isEVM := eq(shr(248, versionedCodeHash), 2)
 
                     if iszero(isEVM) {
-                        revert(0, 0)
+                        // error CallerMustBeEvmContract()
+                        mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
+                        revert(0, 32)
                     }
 
                     // we will not cache contract if it is being constructed
@@ -118,7 +122,8 @@ object "EvmGasManager" {
 
                 let wasWarm := true
 
-                if gt(account, PRECOMPILES_END()) {
+                // precompiles are always warm
+                if or(iszero(account), gt(account, PRECOMPILES_END())) {
                     let transientSlot := or(IS_ACCOUNT_WARM_PREFIX(), account)
                     wasWarm := tload(transientSlot)
 
@@ -223,6 +228,7 @@ object "EvmGasManager" {
                 }
                 // We should mark the EVM contract as warm too.
                 warmAccount(caller())
+                warmAccount(coinbase()) // and the coinbase too
                 return(0x0, 0x0)
             }
             default {
