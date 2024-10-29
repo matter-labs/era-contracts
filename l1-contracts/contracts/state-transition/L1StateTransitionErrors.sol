@@ -104,12 +104,6 @@ error InvalidCommitment();
 // 0xc866ff2c
 error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 
-// 0xc84885d4
-error ZeroChainId();
-
-// 0x844da414
-error SettlementLayerNotRegistered();
-
 // 0xb325f767
 error AdminZero();
 
