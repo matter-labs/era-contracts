@@ -228,13 +228,10 @@ object "EvmEmulator" {
         }
         
         function getEvmGasFromContext() -> evmGas {
-            let gasStipend := shl(30, 1)  // TODO remove stipend
             // Caller must pass at least OVERHEAD() ergs
-            let requiredGas := add(gasStipend, OVERHEAD())
-        
             let _gas := gas()
-            if gt(_gas, requiredGas) {
-                evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+            if gt(_gas, OVERHEAD()) {
+                evmGas := div(sub(_gas, OVERHEAD()), GAS_DIVISOR())
             }
         }
         
@@ -3219,13 +3216,10 @@ object "EvmEmulator" {
             }
             
             function getEvmGasFromContext() -> evmGas {
-                let gasStipend := shl(30, 1)  // TODO remove stipend
                 // Caller must pass at least OVERHEAD() ergs
-                let requiredGas := add(gasStipend, OVERHEAD())
-            
                 let _gas := gas()
-                if gt(_gas, requiredGas) {
-                    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+                if gt(_gas, OVERHEAD()) {
+                    evmGas := div(sub(_gas, OVERHEAD()), GAS_DIVISOR())
                 }
             }
             
