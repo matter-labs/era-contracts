@@ -91,6 +91,14 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployMulticall3() public {
+        initializeConfig();
+
+        deployMulticall3();
+
+        saveOutput();
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
