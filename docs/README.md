@@ -43,6 +43,16 @@ The order of the files here only roughly represents the order of reading. A lot 
 
 ![Reading order](./img/reading_order.png)
 
+## Repo structure
+
+The repository contains the following sections:
+
+- [gas-bound-caller](../gas-bound-caller) that contains `GasBoundCaller` utility contract implementation. You can read more about it in its README.
+- [da-contracts](../da-contracts/). There are implementations for [DA validation](./settlement_contracts/data_availability/custom_da.md) contracts that should be deployed on L1 only.
+- [l1-contracts](../l1-contracts/). Despite the legacy name, it contains contracts that are deployed both on L1 and on L2. This folder encompasses bridging, ZK chain contracts, the contracts for chain admin, etc. The name is historical due to the fact that these contracts were usually deployed on L1 only. However with Gateway, settlement and bridging-related contracts will be deployed on both EVM and eraVM environment. Also, bridging has been unified between L1 and L2 in many places and so keeping everything in one project allows to avoid code duplication.
+- [l2-contracts](../l2-contracts/). Contains contracts that are deployed only on L2.
+- [system-contracts](../system-contracts/). Contains system contracts or predeployed L2 contracts.
+
 ## For auditors: Invariants/tricky places to look out for
 
 This section is for auditors of the codebase. It includes some of the important invariants that the system relies on and which if broken could have bad consequences.

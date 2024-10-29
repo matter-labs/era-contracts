@@ -17,7 +17,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
-import {InitialForceDeploymentMismatch, ZeroChainId, SettlementLayerNotRegistered, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -430,21 +430,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _chainId the chainId of the chain
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
         return IZKChain(getZKChain(_chainId)).getProtocolVersion();
-    }
-
-    /// @param _newSettlementLayerChainId the chainId of the chain
-    /// @param _isWhitelisted whether the chain is whitelisted
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
-        if (_newSettlementLayerChainId == 0) {
-            revert ZeroChainId();
-        }
-
-        // Currently, we require that the sync layer is deployed by the same CTM.
-        if (getZKChain(_newSettlementLayerChainId) == address(0)) {
-            revert SettlementLayerNotRegistered();
-        }
-
-        IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
