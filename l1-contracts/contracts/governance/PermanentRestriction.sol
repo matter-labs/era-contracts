@@ -54,6 +54,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     mapping(address adminAddress => bool isWhitelisted) public allowedL2Admins;
 
     constructor(IBridgehub _bridgehub, address _l2AdminFactory) {
+        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L2_ADMIN_FACTORY = _l2AdminFactory;
     }
