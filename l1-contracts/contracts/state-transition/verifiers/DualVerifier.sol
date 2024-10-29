@@ -56,7 +56,7 @@ contract DualVerifier is IVerifier {
         uint256 verifierType = _recursiveAggregationInput[0];
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
             return FFLONK_VERIFIER.verify(_publicInputs, _proof);
-        } else if (_recursiveAggregationInput[1] == PLONK_VERIFICATION_TYPE) {
+        } else if (verifierType == PLONK_VERIFICATION_TYPE) {
             return
                 PLONK_VERIFIER.verify(
                     _publicInputs,
