@@ -25,13 +25,8 @@ import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 /// @notice This contract should be used by chains that wish to guarantee that certain security
 /// properties are preserved forever.
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
-<<<<<<< HEAD
-/// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
-contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
-=======
 /// @dev One of the instances of such contract is enough to ensure that a ZkSyncHyperchain is a rollup forever.
-contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2StepUpgradeable {
->>>>>>> origin/vb-governance-n05
+contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
 
@@ -134,17 +129,10 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @param _call The call data.
     /// @dev Note that we do not need to validate the migration to the L1 layer as the admin
     /// is not changed in this case.
-<<<<<<< HEAD
-    function _validateMigrationToL2(Call calldata _call) internal view {
-        (address admin, bool isMigration) = _getNewAdminFromMigration(_call);
-        if(isMigration) {
-            if(!allowedL2Admins[admin]) {
-=======
     function _validateMigrationToL2(Call calldata _call) private view {
-        _ensureEnoughGas();
-        try this.tryGetNewAdminFromMigration(_call) returns (address admin) {
+        (address admin, bool isMigration) = _getNewAdminFromMigration(_call);
+        if (isMigration) {
             if (!allowedL2Admins[admin]) {
->>>>>>> origin/vb-governance-n03
                 revert NotAllowed(admin);
             }
         }
@@ -220,23 +208,9 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     }
 
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
+    /// @notice Function is internal for testing purposes only.
     /// @param _chain The address of the chain.
-<<<<<<< HEAD
     function _isAdminOfAChain(address _chain) internal view returns (bool) {
-=======
-    function _isAdminOfAChain(address _chain) private view returns (bool) {
-        _ensureEnoughGas();
-        (bool success, ) = address(this).staticcall(abi.encodeCall(this.tryCompareAdminOfAChain, (_chain, msg.sender)));
-        return success;
-    }
-
-    /// @notice Tries to compare the admin of a chain with the potential admin.
-    /// @param _chain The address of the chain.
-    /// @param _potentialAdmin The address of the potential admin.
-    /// @dev This function reverts if the `_chain` is not a ZkSyncHyperchain or the `_potentialAdmin` is not the
-    /// admin of the chain.
-    function tryCompareAdminOfAChain(address _chain, address _potentialAdmin) external view {
->>>>>>> origin/vb-governance-n03
         if (_chain == address(0)) {
             return false;
         }
@@ -252,7 +226,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         if (!chainIdQuerySuccess) {
             // It is not a hyperchain, so we can return `false` here.
             return false;
-        } 
+        }
 
         // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
         // is compatible with the legacy ones.
@@ -270,25 +244,18 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Tries to call `IGetters.getChainId()` function on the `_chain`.
     /// It ensures that the returndata is of correct format and if not, it returns false.
     /// @param _chain The address of the potential chain
-    /// @return chainId The chainId of the chain. 
+    /// @return chainId The chainId of the chain.
     /// @return success Whether the call was successful.
-    /// If the second item is `false`, the caller should ignore the first value. 
+    /// If the second item is `false`, the caller should ignore the first value.
     function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;
-        
+
         // Note, that we do use assembly here to ensure that the function does not panic in case of
         // either incorrect `_chain` address or in case the returndata is too large
         assembly {
             // We use scratch space here, so it is safe
             mstore(0, selector)
-            success := staticcall(
-                gas(),
-                _chain,
-                0,
-                4,
-                0,
-                0
-            )
+            success := staticcall(gas(), _chain, 0, 4, 0, 0)
 
             let isReturndataSizeCorrect := eq(returndatasize(), 32)
 
@@ -306,15 +273,15 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Tries to get the new admin from the migration.
     /// @param _call The call data.
     /// @return Returns a tuple of the new admin and whether the transaction is indeed the migration.
-    /// If the second item is `false`, the caller should ignore the first value. 
-    /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected 
+    /// If the second item is `false`, the caller should ignore the first value.
+    /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
         if (_call.target != address(BRIDGE_HUB)) {
             return (address(0), false);
         }
 
-        if(_call.data.length < 4) {
+        if (_call.data.length < 4) {
             return (address(0), false);
         }
 
@@ -325,7 +292,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         address sharedBridge = BRIDGE_HUB.sharedBridge();
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
-        // since the correct selector was checked before. 
+        // since the correct selector was checked before.
         L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
             _call.data[4:],
             (L2TransactionRequestTwoBridgesOuter)
@@ -349,10 +316,10 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         }
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
-        // supported only in the new protocol version with Gateway support, so we can assume 
+        // supported only in the new protocol version with Gateway support, so we can assume
         // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
 
-        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`. 
+        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`.
         // If it fails, it would mean that the data is not correct and the call would eventually fail anyway.
         (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
 
@@ -371,20 +338,10 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             return (address(0), false);
         }
 
-        // The asset handler of CTM is the bridgehub and so the following decoding should work 
+        // The asset handler of CTM is the bridgehub and so the following decoding should work
         BridgehubBurnCTMAssetData memory burnData = abi.decode(bridgehubData, (BridgehubBurnCTMAssetData));
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 
-<<<<<<< HEAD
         return (l2Admin, true);
-=======
-        return l2Admin;
-    }
-
-    function _ensureEnoughGas() private view {
-        if (gasleft() < MIN_GAS_FOR_FALLABLE_CALL) {
-            revert NotEnoughGas();
-        }
->>>>>>> origin/vb-governance-n03
     }
 }

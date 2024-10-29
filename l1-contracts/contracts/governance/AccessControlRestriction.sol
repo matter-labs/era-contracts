@@ -16,15 +16,9 @@ import {Call} from "./Common.sol";
 /// @dev An instance of this restriction should be deployed separately for each `ChainAdmin` contract.
 /// @dev IMPORTANT: this function does not validate the ability of the invoker to use `msg.value`. Thus,
 /// either all callers with access to functions should be trusted to not steal ETH from the `ChainAdmin` account
-<<<<<<< HEAD
-/// or not ETH should be passively stored in `ChainAdmin` account.
-contract AccessControlRestriction is Restriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
-    /// @notice Required roles to call a specific functions.
-=======
 /// or no ETH should be passively stored in `ChainAdmin` account.
-contract AccessControlRestriction is IRestriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
+contract AccessControlRestriction is Restriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
     /// @notice Required roles to call a specific function.
->>>>>>> origin/vb-governance-n05
     /// @dev Note, that the role 0 means the `DEFAULT_ADMIN_ROLE` from the `AccessControlDefaultAdminRules` contract.
     mapping(address target => mapping(bytes4 selector => bytes32 requiredRole)) public requiredRoles;
 
@@ -66,7 +60,7 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
     }
 
     /// @inheritdoc Restriction
-    function validateCall(Call calldata _call, address _invoker) external override view {
+    function validateCall(Call calldata _call, address _invoker) external view override {
         // Note, that since `DEFAULT_ADMIN_ROLE` is 0 and the default storage value for the
         // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
         // role for all the functions.

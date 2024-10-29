@@ -8,16 +8,16 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AdminFactory} from "contracts/governance/L2AdminFactory.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-<<<<<<< HEAD
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
 import {NotARestriction} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract L2AdminFactoryTest is Test {
     address validRestriction1;
     address validRestriction2;
 
     address invalidRestriction;
-    
+
     function setUp() public {
         validRestriction1 = address(new DummyRestriction(true));
         validRestriction2 = address(new DummyRestriction(true));
@@ -25,11 +25,6 @@ contract L2AdminFactoryTest is Test {
         invalidRestriction = address(new DummyRestriction(false));
     }
 
-    function test_invalidInitialRestriction() public {
-=======
-import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-
-contract L2AdminFactoryTest is Test {
     function testDeployL2AdminFactoryRevertZeroAddress() public {
         address[] memory requiredRestrictions = new address[](2);
         requiredRestrictions[0] = makeAddr("required");
@@ -41,20 +36,19 @@ contract L2AdminFactoryTest is Test {
 
     function testDeployL2AdminZeroAddress() public {
         address[] memory requiredRestrictions = new address[](1);
-        requiredRestrictions[0] = makeAddr("required");
+        requiredRestrictions[0] = validRestriction1;
 
         L2AdminFactory factory = new L2AdminFactory(requiredRestrictions);
 
         address[] memory additionalRestrictions = new address[](2);
-        additionalRestrictions[0] = makeAddr("additional");
+        additionalRestrictions[0] = validRestriction2;
         additionalRestrictions[1] = address(0);
 
         vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
         address admin = factory.deployAdmin(additionalRestrictions, bytes32(0));
     }
 
-    function testL2AdminFactory() public {
->>>>>>> origin/sb-governance-l02
+    function test_invalidInitialRestriction() public {
         address[] memory requiredRestrictions = new address[](1);
         requiredRestrictions[0] = invalidRestriction;
 
