@@ -25,8 +25,13 @@ import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 /// @notice This contract should be used by chains that wish to guarantee that certain security
 /// properties are preserved forever.
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
+<<<<<<< HEAD
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
+=======
+/// @dev One of the instances of such contract is enough to ensure that a ZkSyncHyperchain is a rollup forever.
+contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2StepUpgradeable {
+>>>>>>> origin/vb-governance-n05
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
 
