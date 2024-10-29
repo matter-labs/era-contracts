@@ -107,9 +107,15 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
     receive() external payable {}
 
+<<<<<<< HEAD
     /// @notice Function that ensures that the current admin can perform the call.
     /// @dev Reverts in case the call can not be performed. Successfully executes otherwise.
     function _validateCall(Call calldata _call) internal view {
+=======
+    /// @notice Function that returns the current admin can perform the call.
+    /// @dev By default it always returns true, but can be overridden in derived contracts.
+    function _validateCall(Call calldata _call) private view {
+>>>>>>> origin/vb-governance-n03
         address[] memory restrictions = getRestrictions();
 
         unchecked {
@@ -121,6 +127,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
+<<<<<<< HEAD
     function _addRestriction(address _restriction) internal {
 <<<<<<< HEAD
         RestrictionValidator.validateRestriction(_restriction);
@@ -130,6 +137,9 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
             revert ZeroAddress();
         }
 >>>>>>> origin/sb-governance-l02
+=======
+    function _addRestriction(address _restriction) private {
+>>>>>>> origin/vb-governance-n03
         if (!activeRestrictions.add(_restriction)) {
             revert RestrictionWasAlreadyPresent(_restriction);
         }
