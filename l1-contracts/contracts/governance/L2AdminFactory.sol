@@ -38,6 +38,7 @@ contract L2AdminFactory {
 
     /// @notice Deploys a new L2 admin contract.
     /// @return admin The address of the deployed admin contract.
+<<<<<<< HEAD
     // solhint-disable-next-line gas-calldata-parameters
     function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
         // Even though the chain admin will likely perform similar checks, 
@@ -49,13 +50,21 @@ contract L2AdminFactory {
 
 >>>>>>> origin/sb-governance-l02
         address[] memory restrictions = new address[](requiredRestrictions.length + _additionalRestrictions.length);
+=======
+    function deployAdmin(address[] calldata _additionalRestrictions, bytes32 _salt) external returns (address admin) {
+>>>>>>> origin/sb-governance-n01
         uint256 cachedRequired = requiredRestrictions.length;
-        for (uint256 i = 0; i < cachedRequired; ++i) {
-            restrictions[i] = requiredRestrictions[i];
-        }
         uint256 cachedAdditional = _additionalRestrictions.length;
-        for (uint256 i = 0; i < cachedAdditional; ++i) {
-            restrictions[requiredRestrictions.length + i] = _additionalRestrictions[i];
+        
+        address[] memory restrictions = new address[](cachedRequired + cachedRequired);
+
+        unchecked {
+            for (uint256 i = 0; i < cachedRequired; ++i) {
+                restrictions[i] = requiredRestrictions[i];
+            }
+            for (uint256 i = 0; i < cachedAdditional; ++i) {
+                restrictions[cachedRequired + i] = _additionalRestrictions[i];
+            }   
         }
 
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
