@@ -178,8 +178,6 @@ object "EvmEmulator" {
         // Each evm gas is 5 zkEVM one
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         
-        function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
-        
         // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
         function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
                 gas_stipend := 35000 // 27000 + a little bit more
@@ -195,6 +193,11 @@ object "EvmEmulator" {
         ////////////////////////////////////////////////////////////////
         //                  GENERAL FUNCTIONS
         ////////////////////////////////////////////////////////////////
+        
+        // abort the whole EVM execution environment, including parent frames
+        function abortEvmEnvironment() {
+            revert(0, 0)
+        }
         
         function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
             mstore(0, 0)
@@ -225,19 +228,13 @@ object "EvmEmulator" {
         }
         
         function getEvmGasFromContext() -> evmGas {
+            let gasStipend := shl(30, 1)  // TODO remove stipend
             // Caller must pass at least OVERHEAD() ergs
-            let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
+            let requiredGas := add(gasStipend, OVERHEAD())
         
             let _gas := gas()
             if gt(_gas, requiredGas) {
                 evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
-            }
-        }
-        
-        function providedErgs() -> ergs {
-            let _gas := gas()
-            if gt(_gas, EVM_GAS_STIPEND()) {
-                ergs := sub(_gas, EVM_GAS_STIPEND())
             }
         }
         
@@ -350,7 +347,7 @@ object "EvmEmulator" {
         
             if iszero(success) {
                 // This error should never happen
-                revert(0, 0)
+                abortEvmEnvironment()
             }
         
             returndatacopy(0, 0, 32)
@@ -443,7 +440,7 @@ object "EvmEmulator" {
         
             if iszero(success) {
                 // This error should never happen
-                revert(0, 0)
+                abortEvmEnvironment()
             }
         }
         
@@ -568,7 +565,7 @@ object "EvmEmulator" {
         
             if iszero(success) {
                 // This error should never happen
-                revert(0, 0)
+                abortEvmEnvironment()
             }
         
             if returndatasize() {
@@ -763,7 +760,7 @@ object "EvmEmulator" {
         
             pushEvmFrame(gasToPass, isStatic)
             let success := delegatecall(
-                providedErgs(),
+                gas(), // pass all remaining native gas
                 addr,
                 add(MEM_OFFSET(), argsOffset),
                 argsSize,
@@ -794,13 +791,8 @@ object "EvmEmulator" {
             }
             default {
                 pushEvmFrame(gasToPass, isStatic)
-                // VM will add EVM_GAS_STIPEND() to gas for this call, but if value != 0 we will firstly call MsgValueSimulator contract
-                // which is zkVM system contract. So we need to add some gas for MsgValueSimulator
-                let ergsToPass := providedErgs()
-                if value {
-                    ergsToPass := add(MSG_VALUE_SIMULATOR_STIPEND_GAS(), ergsToPass)
-                }
-                success := call(ergsToPass, addr, value, argsOffset, argsSize, 0, 0)
+                // pass all remaining native gas
+                success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
                 frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
             }
         }
@@ -954,8 +946,8 @@ object "EvmEmulator" {
             switch gt(rtsz, 31)
                 case 0 {
                     // Unexpected return data.
-                    _gasLeft := 0
-                    _eraseReturndataPointer()
+                    // Most likely out-of-ergs or unexpected error in the emulator or system contracts
+                    abortEvmEnvironment()
                 }
                 default {
                     returndatacopy(0, 0, 32)
@@ -1135,13 +1127,15 @@ object "EvmEmulator" {
         function _saveConstructorReturnGas() -> gasLeft, addr {
             loadReturndataIntoActivePtr()
         
-            if gt(returndatasize(), 63) { // >= 64
-                    // ContractDeployer returns (uint256 gasLeft, address createdContract)
-                    returndatacopy(0, 0, 64)
-                    gasLeft := mload(0)
-                    addr := mload(32)
+            if lt(returndatasize(), 64) {
+                // unexpected return data after constructor succeeded, should never happen.
+                abortEvmEnvironment()
             }
-            // else: unexpected return data after constructor succeeded, should never happen.
+        
+            // ContractDeployer returns (uint256 gasLeft, address createdContract)
+            returndatacopy(0, 0, 64)
+            gasLeft := mload(0)
+            addr := mload(32)
         
             _eraseReturndataPointer()
         }
@@ -3020,7 +3014,7 @@ object "EvmEmulator" {
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
         if isStatic {
-            revert(0, 0)
+            abortEvmEnvironment() // should never happen
         }
 
         getConstructorBytecode()
@@ -3175,8 +3169,6 @@ object "EvmEmulator" {
             // Each evm gas is 5 zkEVM one
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             
-            function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
-            
             // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
             function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
                     gas_stipend := 35000 // 27000 + a little bit more
@@ -3192,6 +3184,11 @@ object "EvmEmulator" {
             ////////////////////////////////////////////////////////////////
             //                  GENERAL FUNCTIONS
             ////////////////////////////////////////////////////////////////
+            
+            // abort the whole EVM execution environment, including parent frames
+            function abortEvmEnvironment() {
+                revert(0, 0)
+            }
             
             function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
                 mstore(0, 0)
@@ -3222,19 +3219,13 @@ object "EvmEmulator" {
             }
             
             function getEvmGasFromContext() -> evmGas {
+                let gasStipend := shl(30, 1)  // TODO remove stipend
                 // Caller must pass at least OVERHEAD() ergs
-                let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
+                let requiredGas := add(gasStipend, OVERHEAD())
             
                 let _gas := gas()
                 if gt(_gas, requiredGas) {
                     evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
-                }
-            }
-            
-            function providedErgs() -> ergs {
-                let _gas := gas()
-                if gt(_gas, EVM_GAS_STIPEND()) {
-                    ergs := sub(_gas, EVM_GAS_STIPEND())
                 }
             }
             
@@ -3347,7 +3338,7 @@ object "EvmEmulator" {
             
                 if iszero(success) {
                     // This error should never happen
-                    revert(0, 0)
+                    abortEvmEnvironment()
                 }
             
                 returndatacopy(0, 0, 32)
@@ -3440,7 +3431,7 @@ object "EvmEmulator" {
             
                 if iszero(success) {
                     // This error should never happen
-                    revert(0, 0)
+                    abortEvmEnvironment()
                 }
             }
             
@@ -3565,7 +3556,7 @@ object "EvmEmulator" {
             
                 if iszero(success) {
                     // This error should never happen
-                    revert(0, 0)
+                    abortEvmEnvironment()
                 }
             
                 if returndatasize() {
@@ -3760,7 +3751,7 @@ object "EvmEmulator" {
             
                 pushEvmFrame(gasToPass, isStatic)
                 let success := delegatecall(
-                    providedErgs(),
+                    gas(), // pass all remaining native gas
                     addr,
                     add(MEM_OFFSET(), argsOffset),
                     argsSize,
@@ -3791,13 +3782,8 @@ object "EvmEmulator" {
                 }
                 default {
                     pushEvmFrame(gasToPass, isStatic)
-                    // VM will add EVM_GAS_STIPEND() to gas for this call, but if value != 0 we will firstly call MsgValueSimulator contract
-                    // which is zkVM system contract. So we need to add some gas for MsgValueSimulator
-                    let ergsToPass := providedErgs()
-                    if value {
-                        ergsToPass := add(MSG_VALUE_SIMULATOR_STIPEND_GAS(), ergsToPass)
-                    }
-                    success := call(ergsToPass, addr, value, argsOffset, argsSize, 0, 0)
+                    // pass all remaining native gas
+                    success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
                     frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 }
             }
@@ -3951,8 +3937,8 @@ object "EvmEmulator" {
                 switch gt(rtsz, 31)
                     case 0 {
                         // Unexpected return data.
-                        _gasLeft := 0
-                        _eraseReturndataPointer()
+                        // Most likely out-of-ergs or unexpected error in the emulator or system contracts
+                        abortEvmEnvironment()
                     }
                     default {
                         returndatacopy(0, 0, 32)
@@ -4132,13 +4118,15 @@ object "EvmEmulator" {
             function _saveConstructorReturnGas() -> gasLeft, addr {
                 loadReturndataIntoActivePtr()
             
-                if gt(returndatasize(), 63) { // >= 64
-                        // ContractDeployer returns (uint256 gasLeft, address createdContract)
-                        returndatacopy(0, 0, 64)
-                        gasLeft := mload(0)
-                        addr := mload(32)
+                if lt(returndatasize(), 64) {
+                    // unexpected return data after constructor succeeded, should never happen.
+                    abortEvmEnvironment()
                 }
-                // else: unexpected return data after constructor succeeded, should never happen.
+            
+                // ContractDeployer returns (uint256 gasLeft, address createdContract)
+                returndatacopy(0, 0, 64)
+                gasLeft := mload(0)
+                addr := mload(32)
             
                 _eraseReturndataPointer()
             }

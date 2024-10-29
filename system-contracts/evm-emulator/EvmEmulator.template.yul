@@ -85,7 +85,7 @@ object "EvmEmulator" {
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
         if isStatic {
-            revert(0, 0)
+            abortEvmEnvironment() // should never happen
         }
 
         getConstructorBytecode()
