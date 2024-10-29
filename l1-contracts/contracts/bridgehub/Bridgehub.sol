@@ -465,8 +465,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
     /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
     function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
+        L2TransactionRequestDirect calldata _request // todo onlyL1
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         return interopCenter.requestL2TransactionDirectSender{value: msg.value}(msg.sender, _request);
     }
 
@@ -484,7 +484,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _request the request for the L2 transaction
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) { // todo onlyL1
         return interopCenter.requestL2TransactionTwoBridgesSender{value: msg.value}(msg.sender, _request);
     }
 

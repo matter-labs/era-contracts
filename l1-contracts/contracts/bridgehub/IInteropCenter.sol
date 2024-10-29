@@ -72,9 +72,7 @@ interface IInteropCenter {
     function requestInterop(
         uint256 _destinationChainId,
         InteropCallStarter[] memory _feePaymentCallStarters,
-        InteropCallRequest[] memory _feePaymentDirectCalls,
         InteropCallStarter[] memory _executionCallStarters,
-        InteropCallRequest[] memory _executionDirectCalls,
         GasFields memory _gasFields
     ) external payable returns (bytes32);
 

@@ -137,8 +137,21 @@ struct BridgehubL2TransactionRequest {
 
 struct InteropCallRequest {
     address to;
+    uint256 value;
+    bytes data;
+}
+
+struct InteropCallStarter {
+    bool directCall;
+    address to;
+    address from;
     bytes data;
     uint256 value;
+    // The value that is requested for the interop call.
+    // This has to be known beforehand, as the funds in the interop call belong to the user.
+    // This is because we cannot guarantee atomicity of xL2 txs (just the atimicity of calls on the destination chain)
+    // So contracts cannot send their own value, only stamp the value that belongs to the user.
+    uint256 requestedInteropCallValue;
 }
 
 struct InteropCall {
@@ -179,15 +192,4 @@ struct InteropTrigger {
     bytes32 feeBundleHash;
     bytes32 executionBundleHash;
     GasFields gasFields;
-}
-
-struct InteropCallStarter {
-    address to;
-    bytes data;
-    uint256 value;
-    // The value that is requested for the interop call.
-    // This has to be known beforehand, as the funds in the interop call belong to the user.
-    // This is because we cannot guarantee atomicity of xL2 txs (just the atimicity of calls on the destination chain)
-    // So contracts cannot send their own value, only stamp the value that belongs to the user.
-    uint256 requestedInteropCallValue;
 }
