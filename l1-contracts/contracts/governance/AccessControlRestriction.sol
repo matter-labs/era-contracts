@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {AccessToFallbackDenied, AccessToFunctionDenied} from "../common/L1ContractErrors.sol";
 import {IAccessControlRestriction} from "./IAccessControlRestriction.sol";
 import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/AccessControlDefaultAdminRules.sol";
-import {IRestriction} from "./IRestriction.sol";
+import {Restriction} from "./restriction/Restriction.sol";
 import {Call} from "./Common.sol";
 
 /// @author Matter Labs
@@ -17,7 +17,7 @@ import {Call} from "./Common.sol";
 /// @dev IMPORTANT: this function does not validate the ability of the invoker to use `msg.value`. Thus,
 /// either all callers with access to functions should be trusted to not steal ETH from the `ChainAdmin` account
 /// or not ETH should be passively stored in `ChainAdmin` account.
-contract AccessControlRestriction is IRestriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
+contract AccessControlRestriction is Restriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
     /// @notice Required roles to call a specific functions.
     /// @dev Note, that the role 0 means the `DEFAULT_ADMIN_ROLE` from the `AccessControlDefaultAdminRules` contract.
     mapping(address target => mapping(bytes4 selector => bytes32 requiredRole)) public requiredRoles;
@@ -53,8 +53,8 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
         emit FallbackRoleSet(_target, _requiredRole);
     }
 
-    /// @inheritdoc IRestriction
-    function validateCall(Call calldata _call, address _invoker) external view {
+    /// @inheritdoc Restriction
+    function validateCall(Call calldata _call, address _invoker) external override view {
         // Note, that since `DEFAULT_ADMIN_ROLE` is 0 and the default storage value for the
         // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
         // role for all the functions.
