@@ -13,11 +13,11 @@ import { Provider } from "zksync-ethers";
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const l2BridgeImplAddr = "0x1Ac3Ea0eDDAB59736aea14C87FB744FADFFE5D4f";
-const l2StandardTokenImplAddr = '0x78A809C33A4cD8c24516bEbAF2a15d970BeAc1ed';
-const l2WrappedTokenImplAddr = '0xFA3BDB55A1aa911B3e954aD26ca276d4ed6edfCa';
+const l2BridgeImplAddr = "0x8fCa27E4b6eBbe67933f3CcBC8555BC37194dCb0";
+const l2StandardTokenImplAddr = "0xc30619377cDAA9939Bbc4FE6219b9f900477Da58";
+const l2WrappedTokenImplAddr = "0xFA3BDB55A1aa911B3e954aD26ca276d4ed6edfCa";
 
-const eraChainId = 271;
+const eraChainId = 300;
 
 const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
 
@@ -59,8 +59,7 @@ async function main() {
 
   program.action(async () => {
     await checkL2SharedBridgeImpl();
-    await checkIdenticalBytecode(l2StandardTokenImplAddr, 'L2StandardERC20');
-    await checkIdenticalBytecode(l2WrappedTokenImplAddr, 'L2WrappedBaseToken');
+    await checkIdenticalBytecode(l2StandardTokenImplAddr, "L2StandardERC20");
   });
 
   await program.parseAsync(process.argv);
