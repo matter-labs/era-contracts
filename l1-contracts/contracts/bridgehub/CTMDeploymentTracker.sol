@@ -43,10 +43,10 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IAssetRouterBase _sharedBridge) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, IAssetRouterBase _l1AssetRouter) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
-        L1_ASSET_ROUTER = _sharedBridge;
+        L1_ASSET_ROUTER = _l1AssetRouter;
     }
 
     /// @notice used to initialize the contract
