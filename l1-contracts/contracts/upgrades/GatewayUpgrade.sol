@@ -50,9 +50,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
             l2TxDataFinish
         );
         // slither-disable-next-line controlled-delegatecall
-        (bool success, ) = THIS_ADDRESS.delegatecall(
-            abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade)
-        );
+        (bool success, ) = THIS_ADDRESS.delegatecall(abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade));
         // solhint-disable-next-line gas-custom-errors
         require(success, "GatewayUpgrade: upgrade failed");
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

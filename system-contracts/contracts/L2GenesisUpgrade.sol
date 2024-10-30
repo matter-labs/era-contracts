@@ -12,7 +12,7 @@ import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 /// @author Matter Labs
 /// @notice The l2 component of the genesis upgrade.
 contract L2GenesisUpgrade is IL2GenesisUpgrade {
-    /// @notice The funciton that is delegateCalled from the complex upgrader.
+    /// @notice The function that is delegateCalled from the complex upgrader.
     /// @dev It is used to set the chainId and to deploy the force deployments.
     /// @param _chainId the chain id
     /// @param _ctmDeployer the address of the ctm deployer

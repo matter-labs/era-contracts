@@ -21,21 +21,13 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
-<<<<<<< HEAD
-<<<<<<< HEAD
-    /// @notice The main function that will be called by the Admin facet.
+    /// @notice The main function that will be delegate-called by the chain Admin facet.
     /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
     /// @param _chainId the chain id
     /// @param _protocolVersion the current protocol version
     /// @param _l1CtmDeployerAddress the address of the l1 ctm deployer
     /// @param _forceDeploymentsData the force deployments data
     /// @param _factoryDeps the factory dependencies
-=======
-    /// @notice The main function that will be delegate called by the upgrade proxy.
->>>>>>> origin/kl/n04-library
-=======
-    /// @notice The main function that will be delegate-called by the chain.
->>>>>>> origin/sb-n07-library-fix-review
     function genesisUpgrade(
         address _l1GenesisUpgrade,
         uint256 _chainId,
