@@ -179,7 +179,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the zkChain diamond contract, not delegatecalled!
     function _propagateToZKChain(uint256 _chainId) internal {
-        address contractAddress = chainTypeManager.getZKChain(_chainId);
+        address contractAddress = chainTypeManager.getHyperchain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
