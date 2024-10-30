@@ -456,14 +456,23 @@ for { } true { } {
         }
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-    
-        $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, len)
-    
-        // Gets the code from the addr
-        if and(iszero(iszero(getRawCodeHash(addr))), gt(len, 0)) {
-            pop(fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len))  
-        }
 
+        if gt(srcOffset, MAX_UINT64()) {
+            srcOffset := MAX_UINT64()
+        } 
+        
+        if gt(len, 0) {
+            let realCodeLen
+            if getRawCodeHash(addr) {
+                 // Gets the code from the addr
+                realCodeLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
+            }
+
+            if lt(realCodeLen, len) {
+                $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, realCodeLen), sub(len, realCodeLen))
+            }
+        }
+    
         ip := add(ip, 1)
     }
     case 0x3D { // OP_RETURNDATASIZE

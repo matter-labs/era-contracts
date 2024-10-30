@@ -113,6 +113,10 @@ function MAX_UINT() -> max_uint {
     max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 }
 
+function MAX_UINT64() -> max {
+    max := sub(shl(64, 1), 1)
+}
+
 // Each evm gas is 5 zkEVM one
 function GAS_DIVISOR() -> gas_div { gas_div := 5 }
 
