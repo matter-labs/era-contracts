@@ -557,6 +557,14 @@ function consumeEvmFrame() -> passGas, isStatic, callerEVM {
     }
 }
 
+function resetEvmFrame() {
+    // function resetEvmFrame()
+    // non-standard selector 0x05
+    mstore(0, 0x0500000000000000000000000000000000000000000000000000000000000000)
+
+    performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 1)
+}
+
 ////////////////////////////////////////////////////////////////
 //               CALLS FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
@@ -710,6 +718,9 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
     )
 
     let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
+    if iszero(success) {
+        resetEvmFrame()
+    }
 
     newGasLeft := add(evmGasLeft, frameGasLeft)
     stackHead := success
@@ -740,6 +751,9 @@ function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, r
         }
         success := call(ergsToPass, addr, value, argsOffset, argsSize, 0, 0)
         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+        if iszero(success) {
+            resetEvmFrame()
+        }
     }
 }
 
@@ -1041,6 +1055,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
             case 0 {
                 addr := 0
                 gasLeft := _saveReturndataAfterEVMCall(0, 0)
+                resetEvmFrame()
             }
             default {
                 gasLeft, addr := _saveConstructorReturnGas()
