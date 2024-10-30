@@ -6,7 +6,7 @@ import {CalldataDA, BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES} from "./CalldataDA.so
 
 // solhint-disable gas-custom-errors, reason-string
 
-/// @notice Contract that contains the functionality for process the calldata DA.
+/// @notice Contract that contains the functionality for processing the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
 abstract contract CalldataDAGateway is CalldataDA {
     /// @inheritdoc CalldataDA
