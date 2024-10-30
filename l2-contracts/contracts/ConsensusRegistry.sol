@@ -213,7 +213,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     /// @notice Changes the validator's public key and proof-of-possession in the registry.
-    /// @dev Only callable by the contract owner or the node owner.
+    /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose validator key and PoP will be changed.
     /// @param _pubKey The new BLS12-381 public key to assign to the node's validator.
@@ -222,7 +222,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         address _nodeOwner,
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
-    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    ) external onlyOwner {
         _verifyInputBLS12_381PublicKey(_pubKey);
         _verifyInputBLS12_381Signature(_pop);
         _verifyNodeOwnerExists(_nodeOwner);
@@ -244,14 +244,14 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     /// @notice Changes the attester's public key of a node in the registry.
-    /// @dev Only callable by the contract owner or the node owner.
+    /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
     function changeAttesterKey(
         address _nodeOwner,
         Secp256k1PublicKey calldata _pubKey
-    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    ) external onlyOwner {
         _verifyInputSecp256k1PublicKey(_pubKey);
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
