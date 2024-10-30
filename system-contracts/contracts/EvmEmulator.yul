@@ -619,6 +619,14 @@ object "EvmEmulator" {
             }
         }
         
+        function resetEvmFrame() {
+            // function resetEvmFrame()
+            // non-standard selector 0x05
+            mstore(0, 0x0500000000000000000000000000000000000000000000000000000000000000)
+        
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 1)
+        }
+        
         ////////////////////////////////////////////////////////////////
         //               CALLS FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
@@ -772,6 +780,9 @@ object "EvmEmulator" {
             )
         
             let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
+            if iszero(success) {
+                resetEvmFrame()
+            }
         
             newGasLeft := add(evmGasLeft, frameGasLeft)
             stackHead := success
@@ -802,6 +813,9 @@ object "EvmEmulator" {
                 }
                 success := call(ergsToPass, addr, value, argsOffset, argsSize, 0, 0)
                 frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                if iszero(success) {
+                    resetEvmFrame()
+                }
             }
         }
         
@@ -1103,6 +1117,7 @@ object "EvmEmulator" {
                     case 0 {
                         addr := 0
                         gasLeft := _saveReturndataAfterEVMCall(0, 0)
+                        resetEvmFrame()
                     }
                     default {
                         gasLeft, addr := _saveConstructorReturnGas()
@@ -3616,6 +3631,14 @@ object "EvmEmulator" {
                 }
             }
             
+            function resetEvmFrame() {
+                // function resetEvmFrame()
+                // non-standard selector 0x05
+                mstore(0, 0x0500000000000000000000000000000000000000000000000000000000000000)
+            
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 1)
+            }
+            
             ////////////////////////////////////////////////////////////////
             //               CALLS FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
@@ -3769,6 +3792,9 @@ object "EvmEmulator" {
                 )
             
                 let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
+                if iszero(success) {
+                    resetEvmFrame()
+                }
             
                 newGasLeft := add(evmGasLeft, frameGasLeft)
                 stackHead := success
@@ -3799,6 +3825,9 @@ object "EvmEmulator" {
                     }
                     success := call(ergsToPass, addr, value, argsOffset, argsSize, 0, 0)
                     frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                    if iszero(success) {
+                        resetEvmFrame()
+                    }
                 }
             }
             
@@ -4100,6 +4129,7 @@ object "EvmEmulator" {
                         case 0 {
                             addr := 0
                             gasLeft := _saveReturndataAfterEVMCall(0, 0)
+                            resetEvmFrame()
                         }
                         default {
                             gasLeft, addr := _saveConstructorReturnGas()

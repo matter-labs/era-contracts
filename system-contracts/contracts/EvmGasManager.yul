@@ -231,6 +231,13 @@ object "EvmGasManager" {
                 warmAccount(coinbase()) // and the coinbase too
                 return(0x0, 0x0)
             }
+            case 5 { // function resetEVMFrame()
+                // Reset EVM frame context data
+                // This method is used by EvmEmulator to clean frame data after failed EVM call.
+                $llvm_AlwaysInline_llvm$_onlyEvmSystemCall()
+
+                tstore(EVM_AUX_DATA_SLOT(), 0) // mark as consumed (clean it)
+            }
             default {
                 revert(0, 0)
             }
