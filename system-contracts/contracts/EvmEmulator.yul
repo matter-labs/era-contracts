@@ -393,18 +393,33 @@ object "EvmEmulator" {
             isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
         }
         
-        // Basically performs an extcodecopy, while returning the length of the bytecode.
-        function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> codeLen {
+        // Basically performs an extcodecopy, while returning the length of the copied bytecode.
+        function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
             let codeHash := getRawCodeHash(addr)
             mstore(0, codeHash)
             // The first word of returndata is the true length of the bytecode
-            codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
+            let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
         
             if gt(len, codeLen) {
                 len := codeLen
             }
         
-            returndatacopy(dstOffset, add(32, srcOffset), len)
+            let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
+        
+            let _returndatasize := returndatasize()
+            if gt(shiftedSrcOffset, _returndatasize) {
+                shiftedSrcOffset := _returndatasize
+            }
+        
+            if gt(add(len, shiftedSrcOffset), _returndatasize) {
+                len := sub(_returndatasize, shiftedSrcOffset)
+            }
+        
+            if len {
+                returndatacopy(dstOffset, shiftedSrcOffset, len)
+            }
+        
+            copiedLen := len
         }
         
         // Returns the length of the EVM bytecode.
@@ -1571,6 +1586,10 @@ object "EvmEmulator" {
             
                     checkMemIsAccessible(destOffset, size)
             
+                    if gt(offset, MAX_UINT64()) {
+                        offset := MAX_UINT64()
+                    } 
+            
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
                     let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
@@ -1607,17 +1626,20 @@ object "EvmEmulator" {
             
                     dstOffset := add(dstOffset, MEM_OFFSET())
             
-                    checkOverflow(sourceOffset, BYTECODE_OFFSET())
+                    if gt(sourceOffset, MAX_UINT64()) {
+                        sourceOffset := MAX_UINT64()
+                    } 
+            
                     sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
             
-                    checkOverflow(sourceOffset, len)
+                    if gt(sourceOffset, MEM_LEN_OFFSET()) {
+                        sourceOffset := MEM_LEN_OFFSET()
+                    }
+            
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
                     if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
                         truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
-                        if gt(truncatedLen, MEM_LEN_OFFSET()) { // if sourceOffset > MEM_LEN_OFFSET()
-                            truncatedLen := 0
-                        }
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -1682,14 +1704,14 @@ object "EvmEmulator" {
                     } 
                     
                     if gt(len, 0) {
-                        let realCodeLen
+                        let copiedLen
                         if getRawCodeHash(addr) {
                              // Gets the code from the addr
-                            realCodeLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
+                             copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
                         }
             
-                        if lt(realCodeLen, len) {
-                            $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, realCodeLen), sub(len, realCodeLen))
+                        if lt(copiedLen, len) {
+                            $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))
                         }
                     }
                 
@@ -3419,18 +3441,33 @@ object "EvmEmulator" {
                 isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
             }
             
-            // Basically performs an extcodecopy, while returning the length of the bytecode.
-            function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> codeLen {
+            // Basically performs an extcodecopy, while returning the length of the copied bytecode.
+            function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
                 let codeHash := getRawCodeHash(addr)
                 mstore(0, codeHash)
                 // The first word of returndata is the true length of the bytecode
-                codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
+                let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
             
                 if gt(len, codeLen) {
                     len := codeLen
                 }
             
-                returndatacopy(dstOffset, add(32, srcOffset), len)
+                let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
+            
+                let _returndatasize := returndatasize()
+                if gt(shiftedSrcOffset, _returndatasize) {
+                    shiftedSrcOffset := _returndatasize
+                }
+            
+                if gt(add(len, shiftedSrcOffset), _returndatasize) {
+                    len := sub(_returndatasize, shiftedSrcOffset)
+                }
+            
+                if len {
+                    returndatacopy(dstOffset, shiftedSrcOffset, len)
+                }
+            
+                copiedLen := len
             }
             
             // Returns the length of the EVM bytecode.
@@ -4597,6 +4634,10 @@ object "EvmEmulator" {
                 
                         checkMemIsAccessible(destOffset, size)
                 
+                        if gt(offset, MAX_UINT64()) {
+                            offset := MAX_UINT64()
+                        } 
+                
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
                         let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
@@ -4633,17 +4674,20 @@ object "EvmEmulator" {
                 
                         dstOffset := add(dstOffset, MEM_OFFSET())
                 
-                        checkOverflow(sourceOffset, BYTECODE_OFFSET())
+                        if gt(sourceOffset, MAX_UINT64()) {
+                            sourceOffset := MAX_UINT64()
+                        } 
+                
                         sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
                 
-                        checkOverflow(sourceOffset, len)
+                        if gt(sourceOffset, MEM_LEN_OFFSET()) {
+                            sourceOffset := MEM_LEN_OFFSET()
+                        }
+                
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
                         if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
                             truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
-                            if gt(truncatedLen, MEM_LEN_OFFSET()) { // if sourceOffset > MEM_LEN_OFFSET()
-                                truncatedLen := 0
-                            }
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
@@ -4708,14 +4752,14 @@ object "EvmEmulator" {
                         } 
                         
                         if gt(len, 0) {
-                            let realCodeLen
+                            let copiedLen
                             if getRawCodeHash(addr) {
                                  // Gets the code from the addr
-                                realCodeLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
+                                 copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
                             }
                 
-                            if lt(realCodeLen, len) {
-                                $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, realCodeLen), sub(len, realCodeLen))
+                            if lt(copiedLen, len) {
+                                $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))
                             }
                         }
                     
