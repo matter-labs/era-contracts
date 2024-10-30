@@ -820,7 +820,15 @@ library Utils {
         return bytecode;
     }
 
-    function readZKFoundryBytecode(
+    function readFoundryBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
+        return readFoundryBytecode(path);
+    }
+
+    function readZKFoundryBytecodeL1(
         string memory fileName,
         string memory contractName
     ) internal view returns (bytes memory) {
@@ -828,6 +836,16 @@ library Utils {
         bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }
+
+    function readZKFoundryBytecodeL2(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l2-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
 
     /**
      * @dev Read hardhat bytecodes
