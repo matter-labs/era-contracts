@@ -90,10 +90,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function setAssetHandlerAddress(
         uint256 _originChainId,
         bytes32 _assetId,
-        address _assetAddress
+        address _assetHandlerAddress
     ) external override onlyAssetRouterCounterpart(_originChainId) {
-        assetHandlerAddress[_assetId] = _assetAddress;
-        emit AssetHandlerRegistered(_assetId, _assetAddress);
+        assetHandlerAddress[_assetId] = _assetHandlerAddress;
+        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
     }
 
     /// @inheritdoc IAssetRouterBase
