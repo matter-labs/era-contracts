@@ -148,9 +148,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _ensureAttesterSnapshot(node);
+        _snapshotAttesterIfOutdated(node);
         node.attesterLatest.active = false;
-        _ensureValidatorSnapshot(node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.active = false;
 
         emit NodeDeactivated(_nodeOwner);
@@ -167,9 +167,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _ensureAttesterSnapshot(node);
+        _snapshotAttesterIfOutdated(node);
         node.attesterLatest.active = true;
-        _ensureValidatorSnapshot(node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.active = true;
 
         emit NodeActivated(_nodeOwner);
@@ -186,9 +186,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _ensureAttesterSnapshot(node);
+        _snapshotAttesterIfOutdated(node);
         node.attesterLatest.removed = true;
-        _ensureValidatorSnapshot(node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.removed = true;
 
         emit NodeRemoved(_nodeOwner);
@@ -209,7 +209,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _ensureValidatorSnapshot(node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.weight = _weight;
 
         emit NodeValidatorWeightChanged(_nodeOwner, _weight);
@@ -230,7 +230,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _ensureAttesterSnapshot(node);
+        _snapshotAttesterIfOutdated(node);
         node.attesterLatest.weight = _weight;
 
         emit NodeAttesterWeightChanged(_nodeOwner, _weight);
@@ -260,7 +260,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         bytes32 newHash = _hashValidatorPubKey(_pubKey);
         _verifyValidatorPubKeyDoesNotExist(newHash);
         validatorPubKeyHashes[newHash] = true;
-        _ensureValidatorSnapshot(node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.pubKey = _pubKey;
         node.validatorLatest.proofOfPossession = _pop;
 
@@ -289,7 +289,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _verifyAttesterPubKeyDoesNotExist(newHash);
         attesterPubKeyHashes[newHash] = true;
 
-        _ensureAttesterSnapshot(node);
+        _snapshotAttesterIfOutdated(node);
         node.attesterLatest.pubKey = _pubKey;
 
         emit NodeAttesterKeyChanged(_nodeOwner, _pubKey);
@@ -410,21 +410,21 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit NodeDeleted(_nodeOwner);
     }
 
-    function _ensureAttesterSnapshot(Node storage _node) private {
+    function _snapshotAttesterIfOutdated(Node storage _node) private {
         if (_node.attesterLastUpdateCommit < attestersCommit) {
             _node.attesterSnapshot = _node.attesterLatest;
             _node.attesterLastUpdateCommit = attestersCommit;
         }
     }
 
-    function _ensureValidatorSnapshot(Node storage _node) private {
+    function _snapshotValidatorIfOutdated(Node storage _node) private {
         if (_node.validatorLastUpdateCommit < validatorsCommit) {
             _node.validatorSnapshot = _node.validatorLatest;
             _node.validatorLastUpdateCommit = validatorsCommit;
         }
     }
 
-    function _isNodeOwnerExists(address _nodeOwner) private view returns (bool) {
+    function _doesNodeOwnerExist(address _nodeOwner) private view returns (bool) {
         BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorLatest.pubKey;
         if (pubKey.a == bytes32(0) && pubKey.b == bytes32(0) && pubKey.c == bytes32(0)) {
             return false;
@@ -433,13 +433,13 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _verifyNodeOwnerExists(address _nodeOwner) private view {
-        if (!_isNodeOwnerExists(_nodeOwner)) {
+        if (!_doesNodeOwnerExist(_nodeOwner)) {
             revert NodeOwnerDoesNotExist();
         }
     }
 
     function _verifyNodeOwnerDoesNotExist(address _nodeOwner) private view {
-        if (_isNodeOwnerExists(_nodeOwner)) {
+        if (_doesNodeOwnerExist(_nodeOwner)) {
             revert NodeOwnerExists();
         }
     }
