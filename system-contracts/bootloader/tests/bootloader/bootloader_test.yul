@@ -109,3 +109,68 @@ function TEST_systemLogKeys() {
     testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
     testing_assertEq(protocolUpgradeTxHashKey, 13, "Invalid protocol upgrade txn hash log key")
 }
+
+function TEST_setTxOrigin() {
+    let newTxOrigin := 0 
+    setTxOrigin(newTxOrigin)
+}
+
+function TEST_setGasPrice() {
+    let newGasPrice := 10
+    setGasPrice(newGasPrice)
+}
+
+function TEST_setPubdataInfo() {
+    let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
+    let txDataOffset := mload(add(txPtr, 32))
+    let innerTxDataOffset := add(txDataOffset, 32)
+    let newGasPerPubdata := getGasPerPubdataByteLimit(innerTxDataOffset)
+    let basePubdataSpent := getPubdataCounter()
+
+    setPubdataInfo(newGasPerPubdata, basePubdataSpent)
+}
+
+function TEST_setNewBatch() {
+    let prevBatchHash := mload(32)
+    let newTimestamp := mload(64)
+    let newBatchNumber := mload(96)
+    let baseFee := 10
+
+    setNewBatch(prevBatchHash, newTimestamp, newBatchNumber, baseFee)
+
+    assertEq(baseFee, basefee(), "Invalid base fee")
+}
+
+function TEST_setL2Block() {
+    let txId := 0
+
+    setL2Block(txId)
+}
+
+function TEST_setL2BlockRevert() {
+    let txId := 1
+
+    testing_testWillFailWith(25)
+    setL2Block(txId)
+}
+
+function TEST_setContextVal() {
+    let selector := {{RIGHT_PADDED_SET_GAS_PRICE}} 
+    let value := 10
+    mstore(0, selector)
+    mstore(4, value)
+
+    let expected := call(
+        gas(),
+        SYSTEM_CONTEXT_ADDR(),
+        0,
+        0,
+        36,
+        0,
+        0
+    )
+
+    let returnValue := setContextVal(selector, value)
+
+    testing_assertEq(expected, returnValue, "Invalid context value")
+}
