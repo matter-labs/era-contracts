@@ -158,4 +158,6 @@ interface IConsensusRegistry {
     function getAttesterCommittee() external view returns (CommitteeAttester[] memory);
 
     function getValidatorCommittee() external view returns (CommitteeValidator[] memory);
+
+    function numNodes() external view returns (uint256);
 }
