@@ -251,7 +251,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
-    /// @dev Calls the internal `_encodeTxDataHash`. Used as a wrapped for try / catch case.
+    /// @dev Calls the library `encodeTxDataHash`. Used as a wrapped for try / catch case.
     /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
     /// @param _encodingVersion EncodingVersion.
     /// @param _originalCaller The address of the entity that initiated the deposit.
@@ -392,10 +392,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
         isWithdrawalFinalized[chainId][l2BatchNumber][l2MessageIndex] = true;
 
-        // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         (bytes32 assetId, bytes memory transferData) = _verifyWithdrawal(_finalizeWithdrawalParams);
-
-        // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
+        
+        // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         if (_isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber)) {
             // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex);
