@@ -77,8 +77,6 @@ library DataEncoding {
 
     /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and asset data.
     /// @param _chainId The id of the chain token is native to.
-<<<<<<< HEAD
-=======
     /// @param _assetData The asset data that has to be encoded.
     /// @return The encoded asset data.
     function encodeNTVAssetId(uint256 _chainId, bytes32 _assetData) internal pure returns (bytes32) {
@@ -87,7 +85,6 @@ library DataEncoding {
 
     /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and token address.
     /// @param _chainId The id of the chain token is native to.
->>>>>>> origin/kl/l06-2gw
     /// @param _tokenAddress The address of token that has to be encoded (asset data is the address itself).
     /// @return The encoded asset data.
     function encodeNTVAssetId(uint256 _chainId, address _tokenAddress) internal pure returns (bytes32) {

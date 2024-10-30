@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {Unauthorized, UnimplementedMessage, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
 
 contract WethTest is Test {
     L2WrappedBaseToken internal weth;

@@ -37,7 +37,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
-    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy. 
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
@@ -129,8 +129,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
-<<<<<<< HEAD
-    /// @notice Ensures that the token is deployed inner for legacy tokens. 
+    /// @notice Ensures that the token is deployed inner for legacy tokens.
     function _ensureAndSaveTokenDeployedInnerLegacyToken(
         bytes32 _assetId,
         address _originToken,
@@ -148,11 +147,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract or the legacy shared bridge.
-    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
-=======
-    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
->>>>>>> origin/kl/n05-2gw
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
     /// @param _tokenOriginChainId The origin chain id of the token.
@@ -200,31 +195,18 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
-<<<<<<< HEAD
     /// @param _tokenOriginChainId The chain id of the origin token.
-    /// @param _l1Token The address of token on L1.
+    /// @param _nonNativeToken The address of token on its origin chain.
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,
-        address _l1Token
-    ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
-            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
-=======
-    /// @param _nonNativeToken The address of token on its origin chain..
-    /// @return Address of an L2 token counterpart.
-    function calculateCreate2TokenAddress(
-        uint256 _originChainId,
         address _nonNativeToken
     ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-        bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
->>>>>>> origin/kl/l01-2gw
         } else {
             bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-            bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _l1Token);
+            bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _nonNativeToken);
             return
                 L2ContractHelper.computeCreate2Address(
                     address(this),

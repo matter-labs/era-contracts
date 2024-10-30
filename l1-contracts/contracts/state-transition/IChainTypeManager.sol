@@ -86,6 +86,8 @@ interface IChainTypeManager {
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
+    function getHyperchain(uint256 _chainId) external view returns (address);
+
     function getZKChainLegacy(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);

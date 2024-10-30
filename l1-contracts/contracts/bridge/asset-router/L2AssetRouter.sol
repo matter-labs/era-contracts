@@ -69,14 +69,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /// @dev Disable the initialization to prevent Parity hack.
-    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy. 
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
     constructor(
         uint256 _l1ChainId,
         uint256 _eraChainId,
         address _l1AssetRouter,
         address _legacySharedBridge,
-        bytes32 _baseTokenAssetId
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
     ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
@@ -86,6 +87,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         assetHandlerAddress[_baseTokenAssetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
+        _transferOwnership(_aliasedOwner);
     }
 
     /// @inheritdoc IL2AssetRouter
@@ -143,12 +145,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /*//////////////////////////////////////////////////////////////
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc AssetRouterBase
-    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
-        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        nativeTokenVault.ensureTokenIsRegistered(_token);
-    }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
