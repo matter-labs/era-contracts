@@ -331,18 +331,33 @@ function isEvmContract(addr) -> isEVM {
     isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 
-// Basically performs an extcodecopy, while returning the length of the bytecode.
-function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> codeLen {
+// Basically performs an extcodecopy, while returning the length of the copied bytecode.
+function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
     let codeHash := getRawCodeHash(addr)
     mstore(0, codeHash)
     // The first word of returndata is the true length of the bytecode
-    codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
+    let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
 
     if gt(len, codeLen) {
         len := codeLen
     }
 
-    returndatacopy(dstOffset, add(32, srcOffset), len)
+    let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
+
+    let _returndatasize := returndatasize()
+    if gt(shiftedSrcOffset, _returndatasize) {
+        shiftedSrcOffset := _returndatasize
+    }
+
+    if gt(add(len, shiftedSrcOffset), _returndatasize) {
+        len := sub(_returndatasize, shiftedSrcOffset)
+    }
+
+    if len {
+        returndatacopy(dstOffset, shiftedSrcOffset, len)
+    }
+
+    copiedLen := len
 }
 
 // Returns the length of the EVM bytecode.

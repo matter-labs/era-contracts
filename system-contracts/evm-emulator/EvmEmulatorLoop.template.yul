@@ -361,6 +361,10 @@ for { } true { } {
 
         checkMemIsAccessible(destOffset, size)
 
+        if gt(offset, MAX_UINT64()) {
+            offset := MAX_UINT64()
+        } 
+
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
         let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
@@ -396,15 +400,28 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         dstOffset := add(dstOffset, MEM_OFFSET())
+
+        if gt(sourceOffset, MAX_UINT64()) {
+            sourceOffset := MAX_UINT64()
+        } 
+
         sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
 
-        checkOverflow(sourceOffset, len)
-        // Check bytecode overflow
-        if gt(add(sourceOffset, len), sub(MEM_LEN_OFFSET(), 1)) {
-            panic()
+        if gt(sourceOffset, MEM_LEN_OFFSET()) {
+            sourceOffset := MEM_LEN_OFFSET()
         }
 
-        $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, len)
+        // Check bytecode out-of-bounds access
+        let truncatedLen := len
+        if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
+            truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+            $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
+        }
+
+        if truncatedLen {
+            $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+        }
+        
         ip := add(ip, 1)
     }
     case 0x3A { // OP_GASPRICE
@@ -462,14 +479,14 @@ for { } true { } {
         } 
         
         if gt(len, 0) {
-            let realCodeLen
+            let copiedLen
             if getRawCodeHash(addr) {
                  // Gets the code from the addr
-                realCodeLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
+                 copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
             }
 
-            if lt(realCodeLen, len) {
-                $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, realCodeLen), sub(len, realCodeLen))
+            if lt(copiedLen, len) {
+                $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))
             }
         }
     
