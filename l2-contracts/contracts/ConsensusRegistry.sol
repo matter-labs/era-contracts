@@ -22,8 +22,14 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev A mapping of node owners => nodes.
     mapping(address => Node) public nodes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given attester public key exists.
+    /// @dev Initially, the mappings mark the public keys used by the attesters in the current committee. However,
+    /// @dev after calling the changeAttesterKey functions, the mappings might also contain public keys of attesters
+    /// @dev that will only be part of the committee once the contract owner updates the attestersCommit state variable.
     mapping(bytes32 => bool) public attesterPubKeyHashes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
+    /// @dev Initially, the mappings mark the public keys used by the validators in the current committee. However,
+    /// @dev after calling the changeValidatorKey functions, the mappings might also contain public keys of validators
+    /// @dev that will only be part of the committee once the contract owner updates the validatorsCommit state variable.
     mapping(bytes32 => bool) public validatorPubKeyHashes;
     /// @dev Counter that increments with each new commit to the attester committee.
     uint32 public attestersCommit;
@@ -311,7 +317,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorsCommitted(validatorsCommit);
     }
 
-    /// @notice Returns an array of `AttesterAttr` structs representing the current attester committee.
+    /// @notice Returns an array of `CommitteeAttester` structs representing the current attester committee.
     /// @dev Collects active and non-removed attesters based on the latest commit to the committee.
     function getAttesterCommittee() external view returns (CommitteeAttester[] memory) {
         uint256 len = nodeOwners.length;
@@ -336,7 +342,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         return committee;
     }
 
-    /// @notice Returns an array of `ValidatorAttr` structs representing the current attester committee.
+    /// @notice Returns an array of `CommitteeValidator` structs representing the current attester committee.
     /// @dev Collects active and non-removed validators based on the latest commit to the committee.
     function getValidatorCommittee() external view returns (CommitteeValidator[] memory) {
         uint256 len = nodeOwners.length;
