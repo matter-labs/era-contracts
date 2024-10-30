@@ -46,7 +46,7 @@ contract ValidatorTimelockTest is Test {
         executionDelay = 10;
 
         chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, zkSync);
-        validator = new ValidatorTimelock(owner, executionDelay, eraChainId);
+        validator = new ValidatorTimelock(owner, executionDelay);
         vm.prank(owner);
         validator.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
         vm.prank(owner);

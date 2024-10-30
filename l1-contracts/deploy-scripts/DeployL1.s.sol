@@ -797,7 +797,6 @@ contract DeployL1Script is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
-                config.eraChainId,
                 addresses.bridges.l1NullifierProxy
             )
         );
