@@ -55,6 +55,7 @@
   "scripts": {
     "build": "hardhat compile && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
     "build-l1": "hardhat compile",
+    "build:zkfoundry": "forge build --zksync --zk-avoid-contracts '*/l1-contracts/test/*'",
     "clean": "hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean",
     "clean:foundry": "forge clean",
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
