@@ -1606,15 +1606,25 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     dstOffset := add(dstOffset, MEM_OFFSET())
+            
+                    checkOverflow(sourceOffset, BYTECODE_OFFSET())
                     sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
             
                     checkOverflow(sourceOffset, len)
-                    // Check bytecode overflow
-                    if gt(add(sourceOffset, len), sub(MEM_LEN_OFFSET(), 1)) {
-                        panic()
+                    // Check bytecode out-of-bounds access
+                    let truncatedLen := len
+                    if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
+                        truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+                        if gt(truncatedLen, MEM_LEN_OFFSET()) { // if sourceOffset > MEM_LEN_OFFSET()
+                            truncatedLen := 0
+                        }
+                        $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
-                    $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, len)
+                    if truncatedLen {
+                        $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+                    }
+                    
                     ip := add(ip, 1)
                 }
                 case 0x3A { // OP_GASPRICE
@@ -4622,15 +4632,25 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
                         dstOffset := add(dstOffset, MEM_OFFSET())
+                
+                        checkOverflow(sourceOffset, BYTECODE_OFFSET())
                         sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
                 
                         checkOverflow(sourceOffset, len)
-                        // Check bytecode overflow
-                        if gt(add(sourceOffset, len), sub(MEM_LEN_OFFSET(), 1)) {
-                            panic()
+                        // Check bytecode out-of-bounds access
+                        let truncatedLen := len
+                        if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
+                            truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+                            if gt(truncatedLen, MEM_LEN_OFFSET()) { // if sourceOffset > MEM_LEN_OFFSET()
+                                truncatedLen := 0
+                            }
+                            $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
-                        $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, len)
+                        if truncatedLen {
+                            $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+                        }
+                        
                         ip := add(ip, 1)
                     }
                     case 0x3A { // OP_GASPRICE
