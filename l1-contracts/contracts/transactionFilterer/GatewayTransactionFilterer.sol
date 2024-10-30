@@ -8,7 +8,6 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IL2Bridge} from "../bridge/interfaces/IL2Bridge.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
@@ -82,10 +81,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
     ) external view returns (bool) {
         if (sender == L1_ASSET_ROUTER) {
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
-            if (
-                (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) &&
-                (IL2Bridge.finalizeDeposit.selector != l2TxSelector)
-            ) {
+            if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 
