@@ -86,6 +86,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev asset info used to identify chains in the Shared Bridge
     mapping(bytes32 ctmAssetId => address ctmAddress) public ctmAssetIdToAddress;
 
+    /// @dev ctmAddress to ctmAssetId
+    mapping(address ctmAddress => bytes32 ctmAssetId) public ctmAssetIdFromAddress;
+
     /// @dev used to indicate the currently active settlement layer for a given chainId
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
 
@@ -320,6 +323,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
         ctmAssetIdToAddress[assetInfo] = _assetAddress;
+        ctmAssetIdFromAddress[_assetAddress] = assetInfo;
         emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
     }
 
@@ -422,11 +426,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (ctmAddress == address(0)) {
             revert ChainIdNotRegistered(_chainId);
         }
-        return ctmAssetId(chainTypeManager[_chainId]);
-    }
-
-    function ctmAssetId(address _ctmAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(L1_CHAIN_ID, address(l1CtmDeployer), bytes32(uint256(uint160(_ctmAddress)))));
+        return ctmAssetIdFromAddress[ctmAddress];
     }
 
     /*//////////////////////////////////////////////////////////////
