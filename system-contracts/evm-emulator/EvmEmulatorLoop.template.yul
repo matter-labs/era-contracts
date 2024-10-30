@@ -457,6 +457,10 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
+        if gt(srcOffset, MAX_UINT64()) {
+            srcOffset := MAX_UINT64()
+        } 
+        
         if gt(len, 0) {
             let realCodeLen
             if getRawCodeHash(addr) {

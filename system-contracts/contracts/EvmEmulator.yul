@@ -175,6 +175,10 @@ object "EvmEmulator" {
             max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
         }
         
+        function MAX_UINT64() -> max {
+            max := sub(shl(64, 1), 1)
+        }
+        
         // Each evm gas is 5 zkEVM one
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         
@@ -1657,6 +1661,10 @@ object "EvmEmulator" {
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
+                    if gt(srcOffset, MAX_UINT64()) {
+                        srcOffset := MAX_UINT64()
+                    } 
+                    
                     if gt(len, 0) {
                         let realCodeLen
                         if getRawCodeHash(addr) {
@@ -3177,6 +3185,10 @@ object "EvmEmulator" {
                 max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
             }
             
+            function MAX_UINT64() -> max {
+                max := sub(shl(64, 1), 1)
+            }
+            
             // Each evm gas is 5 zkEVM one
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             
@@ -4659,6 +4671,10 @@ object "EvmEmulator" {
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
+                        if gt(srcOffset, MAX_UINT64()) {
+                            srcOffset := MAX_UINT64()
+                        } 
+                        
                         if gt(len, 0) {
                             let realCodeLen
                             if getRawCodeHash(addr) {
