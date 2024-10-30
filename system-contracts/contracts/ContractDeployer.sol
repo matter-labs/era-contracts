@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SYSTEM_CONTEXT_CONTRACT, EVM_GAS_STIPEND} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -191,7 +191,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
 
-        _evmDeployOnAddress(uint32(gasleft()), msg.sender, newAddress, _initCode);
+        _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
         return newAddress;
     }
@@ -209,7 +209,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         bytes32 bytecodeHash = EfficientCall.keccak(_initCode);
         address newAddress = Utils.getNewAddressCreate2EVM(msg.sender, _salt, bytecodeHash);
 
-        _evmDeployOnAddress(uint32(gasleft()), msg.sender, newAddress, _initCode);
+        _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
         return newAddress;
     }
@@ -245,15 +245,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address newAddress,
         bytes calldata _initCode
     ) external payable onlySystemCallFromEvmEmulator returns (uint256, address) {
-        uint32 providedErgs;
-        uint32 stipend = EVM_GAS_STIPEND;
-        assembly {
-            let _gas := gas()
-            if gt(_gas, stipend) {
-                providedErgs := sub(_gas, stipend)
-            }
-        }
-        uint256 constructorReturnEvmGas = _evmDeployOnAddress(providedErgs, msg.sender, newAddress, _initCode);
+        uint256 constructorReturnEvmGas = _evmDeployOnAddress(msg.sender, newAddress, _initCode);
         return (constructorReturnEvmGas, newAddress);
     }
 
@@ -415,7 +407,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     function _evmDeployOnAddress(
-        uint32 _gasToPass,
         address _sender,
         address _newAddress,
         bytes calldata _initCode
@@ -427,7 +418,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
-        return _performDeployOnAddressEVM(_gasToPass, _sender, _newAddress, AccountAbstractionVersion.None, _initCode);
+        return _performDeployOnAddressEVM(_sender, _newAddress, AccountAbstractionVersion.None, _initCode);
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -461,13 +452,11 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Deploy a certain bytecode on the address.
-    /// @param _gasToPass The amount of gas to be passed in constructor
     /// @param _sender The deployer address
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _aaVersion The version of the account abstraction protocol to use.
     /// @param _input The constructor calldata.
     function _performDeployOnAddressEVM(
-        uint32 _gasToPass,
         address _sender,
         address _newAddress,
         AccountAbstractionVersion _aaVersion,
@@ -483,7 +472,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
 
         // We will store dummy constructing bytecode hash to trigger EVM emulator in constructor call
-        return _constructEVMContract(_gasToPass, _sender, _newAddress, _input);
+        return _constructEVMContract(_sender, _newAddress, _input);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -556,7 +545,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     function _constructEVMContract(
-        uint32 gasToPass,
         address _sender,
         address _newAddress,
         bytes calldata _input
@@ -582,7 +570,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
 
         bytes memory paddedBytecode = EfficientCall.mimicCall({
-            _gas: gasToPass, // ergs, not EVM gas
+            _gas: gasleft(), // note: native gas, not EVM gas
             _address: _newAddress,
             _data: _input,
             _whoToMimic: _sender,

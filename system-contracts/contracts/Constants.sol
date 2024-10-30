@@ -164,7 +164,5 @@ uint256 constant BLOB_SIZE_BYTES = 126_976;
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 
-uint32 constant EVM_GAS_STIPEND = 1 << 30;
-
 uint8 constant ERA_VM_BYTECODE_FLAG = 1;
 uint8 constant EVM_BYTECODE_FLAG = 2;
