@@ -7,6 +7,6 @@ interface ITimestampAsserter {
 
 contract TimestampAsserter is ITimestampAsserter {
     function assertTimestampInRange(uint256 start, uint256 end) public view {
-        require(start < block.timestamp && end > block.timestamp, "Timestamp is out of range");
+        require(start < block.timestamp && end > block.timestamp, "Block timestamp is out of range");
     }
 }
