@@ -39,21 +39,7 @@ contract TransientInteropTest is Test {
 
     function test_addCallToBundle() public {
         InteropCall memory interopCall = InteropCall({to: address(1), from: address(2), value: 1, data: "test"});
-        TransientInterop.addCallToBundle(bundleId, interopCall);
-        InteropCall memory bundleCall = TransientInterop.getBundleCall(bundleId, 0);
-        assertEq(bundleCall.to, address(1));
-        assertEq(bundleCall.from, address(2));
-        assertEq(bundleCall.value, 1);
-        assertEq(bundleCall.data, "test");
-
-        BundleMetadata memory bundleMetadata = TransientInterop.getBundleMetadata(bundleId);
-        assertEq(bundleMetadata.callCount, 1);
-        assertEq(bundleMetadata.totalValue, 1);
-    }
-
-    function test_add2CallsToBundle() public {
-        InteropCall memory interopCall = InteropCall({to: address(1), from: address(2), value: 1, data: "test"});
-        TransientInterop.addCallToBundle(bundleId, interopCall);
+        TransientInterop.addBaseTokenCallToBundle(bundleId);
         TransientInterop.addCallToBundle(bundleId, interopCall);
         InteropCall memory bundleCall = TransientInterop.getBundleCall(bundleId, 1);
         assertEq(bundleCall.to, address(1));
@@ -63,6 +49,22 @@ contract TransientInteropTest is Test {
 
         BundleMetadata memory bundleMetadata = TransientInterop.getBundleMetadata(bundleId);
         assertEq(bundleMetadata.callCount, 2);
+        assertEq(bundleMetadata.totalValue, 1);
+    }
+
+    function test_add2CallsToBundle() public {
+        InteropCall memory interopCall = InteropCall({to: address(1), from: address(2), value: 1, data: "test"});
+        TransientInterop.addBaseTokenCallToBundle(bundleId);
+        TransientInterop.addCallToBundle(bundleId, interopCall);
+        TransientInterop.addCallToBundle(bundleId, interopCall);
+        InteropCall memory bundleCall = TransientInterop.getBundleCall(bundleId, 1);
+        assertEq(bundleCall.to, address(1));
+        assertEq(bundleCall.from, address(2));
+        assertEq(bundleCall.value, 1);
+        assertEq(bundleCall.data, "test");
+
+        BundleMetadata memory bundleMetadata = TransientInterop.getBundleMetadata(bundleId);
+        assertEq(bundleMetadata.callCount, 3);
         assertEq(bundleMetadata.totalValue, 2);
     }
 }

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER, INTEROP_HANDLER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -54,6 +54,20 @@ library L2GenesisUpgradeHelper {
             // Progapatate revert reason
             assembly {
                 revert(add(returnData2, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory interopHandlerConstructorData = abi.encodeCall(INTEROP_HANDLER_SYSTEM_CONTRACT.setInteropAccountBytecode, ());
+
+        (bool success3, bytes memory returnData3) = SystemContractHelper.mimicCall(
+            address(INTEROP_HANDLER_SYSTEM_CONTRACT),
+            bridgehubOwner,
+            interopHandlerConstructorData
+        );
+        if (!success3) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData3, 0x20), returndatasize())
             }
         }
     }

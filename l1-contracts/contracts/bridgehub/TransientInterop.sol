@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {console} from "forge-std/console.sol";
+// import {console} from "forge-std/console.sol";
 import {InteropCall, BundleMetadata} from "../common/Messaging.sol";
 import {TransientPrimitivesLib, tuint256, tbytes32, taddress} from "../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 import {TransientBytesLib} from "../common/libraries/TransientPrimitves/TransientBytesLib.sol";
@@ -41,8 +41,8 @@ library TransientInterop {
 
     function addBaseTokenCallToBundle(bytes32 _bundleId) internal {
         BundleMetadata memory bundleMetadata = getBundleMetadata(_bundleId);
-        console.log("addBTcallToBundle 1", bundleMetadata.initiator);
-        console.logBytes32(_bundleId);
+        // console.log("addBTcallToBundle 1", bundleMetadata.initiator);
+        // console.logBytes32(_bundleId);
 
         uint256 callCount = bundleMetadata.callCount;
         require(callCount == 0, "TransientInterop: callCount is not 0");//this function is only called at the start of the bundle
@@ -62,8 +62,8 @@ library TransientInterop {
 
     function addCallToBundle(bytes32 _bundleId, InteropCall memory _interopCall) internal {
         BundleMetadata memory bundleMetadata = getBundleMetadata(_bundleId);
-        console.log("addCallToBundle 2", bundleMetadata.initiator);
-        console.logBytes32(_bundleId);
+        // console.log("addCallToBundle 2", bundleMetadata.initiator);
+        // console.logBytes32(_bundleId);
 
         uint256 callCount = bundleMetadata.callCount;
         require(callCount > 0, "TransientInterop: callCount is 0");//

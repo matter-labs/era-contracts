@@ -7,8 +7,8 @@ import {Transaction} from "../libraries/TransactionHelper.sol";
 struct InteropCall {
     address to;
     address from;
-    bytes data;
     uint256 value;
+    bytes data;
 }
 
 struct InteropBundle {
@@ -21,6 +21,7 @@ struct InteropBundle {
 }
 
 interface IInteropHandler {
+    function setInteropAccountBytecode() external;
     function executePaymasterBundle(Transaction calldata _transaction) external;
     function executeInteropBundle(Transaction calldata _transaction) external;
 }

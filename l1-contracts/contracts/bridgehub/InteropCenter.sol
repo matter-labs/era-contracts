@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {console} from "forge-std/console.sol";
+// import {console} from "forge-std/console.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
@@ -125,7 +125,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external {
-        console.log("addCallToBundle external", msg.sender);
+        // console.log("addCallToBundle external", msg.sender);
         _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
     }
 
@@ -350,8 +350,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             executionBundleHash: bytes32(0)
         });
         viaIR.feeBundleId = _startBundle(_destinationChainId, _extraInputs.sender);
-        console.log("feeBundleId");
-        console.logBytes32(viaIR.feeBundleId);
+        // console.log("feeBundleId");
+        // console.logBytes32(viaIR.feeBundleId);
         uint256 feeValue = 0;
         uint256 ethIsBaseTokenMultiplier;
         {
@@ -362,7 +362,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             InteropCallStarter memory callStarter = _feePaymentCallStarters[i];
             if (!callStarter.directCall) {
                 feeValue += callStarter.value;
-                console.log("fee indirect call");
+                // console.log("fee indirect call");
                 IL1AssetRouter(callStarter.from).bridgehubAddCallToBundle{value: callStarter.value}(
                     _destinationChainId,
                     viaIR.feeBundleId,
@@ -372,7 +372,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 );
             } else {
                 feeValue += callStarter.value * ethIsBaseTokenMultiplier;
-                console.log("fee direct call");
+                // console.log("fee direct call");
                 _addCallToBundle(viaIR.feeBundleId, _requestFromStarter(callStarter), _extraInputs.sender);
             }
         }
@@ -383,7 +383,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         for (uint256 i = 0; i < _executionCallStarters.length; i++) {
             InteropCallStarter memory callStarter = _executionCallStarters[i];
             if (!callStarter.directCall) {
-                console.log("execution indirect call");
+                // console.log("execution indirect call");
                 IL1AssetRouter(callStarter.from).bridgehubAddCallToBundle{value: callStarter.value}(
                     _destinationChainId,
                     viaIR.executionBundleId,
@@ -392,7 +392,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     callStarter.data
                 );
             } else {
-                console.log("executiondirect call");
+                // console.log("executiondirect call");
                 _addCallToBundle(viaIR.executionBundleId, _requestFromStarter(callStarter), _extraInputs.sender);
             }
         }
@@ -519,7 +519,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _value,
         L2TransactionRequestTwoBridgesInner memory _request
     ) public {
-        console.log("addCallToBundleFromRequest", msg.sender);
+        // console.log("addCallToBundleFromRequest", msg.sender);
         _addCallToBundle(
             _bundleId,
             InteropCallRequest({to: _request.l2Contract, value: _value, data: _request.l2Calldata}),

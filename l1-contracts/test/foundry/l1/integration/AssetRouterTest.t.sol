@@ -219,17 +219,21 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         );
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
 
-        InteropCallStarter[] memory feePaymentCallStarters = new InteropCallStarter[](0);
-        InteropCallRequest[] memory feePaymentDirectCalls = new InteropCallRequest[](1);
-        feePaymentDirectCalls[0] = InteropCallRequest({
+        InteropCallStarter[] memory feePaymentCallStarters = new InteropCallStarter[](1);
+        uint256 value = 250000000000100;
+        feePaymentCallStarters[0] = InteropCallStarter({
+            directCall: true,
             to: INSERT_MSG_ADDRESS_ON_DESTINATION,
+            from: address(this),
             data: "",
-            value: 250000000000100
+            value: value,
+            requestedInteropCallValue: value
         });
         InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);
-        InteropCallRequest[] memory executionDirectCalls = new InteropCallRequest[](0);
         executionCallStarters[0] = InteropCallStarter({
-            to: address(sharedBridge),
+            directCall: false,
+            to: address(0), // to address determined by bridge
+            from: address(sharedBridge),
             data: secondBridgeCalldata,
             value: 0,
             requestedInteropCallValue: 0
@@ -239,9 +243,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         interopCenter.requestInterop{value: 250000000000100}(
             eraZKChainId,
             feePaymentCallStarters,
-            feePaymentDirectCalls,
             executionCallStarters,
-            executionDirectCalls,
             GasFields({
                 gasLimit: uint256(1000000),
                 gasPerPubdataByteLimit: uint256(REQUIRED_L2_GAS_PRICE_PER_PUBDATA),

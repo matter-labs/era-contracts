@@ -6,7 +6,7 @@ import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
+import {InteropCenter, IInteropCenter} from "contracts/bridgehub/InteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -17,12 +17,13 @@ import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
+import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -92,6 +93,17 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             L2_INTEROP_CENTER_ADDR
         );
+        vm.prank(_args.aliasedOwner);
+        vm.chainId(_args.l1ChainId);
+        Bridgehub(L2_INTEROP_CENTER_ADDR).initialize(_args.aliasedOwner);
+        vm.chainId(prevChainId);
+        vm.prank(_args.aliasedOwner);
+        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(
+            L2_ASSET_ROUTER_ADDR
+        );
+
+        DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
+        vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
         stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
