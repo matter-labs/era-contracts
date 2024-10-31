@@ -47,6 +47,11 @@ jobs:
         run: |
           yarn build:foundry
 
+      - name: Build system contracts
+        working-directory: system-contracts
+        run: |
+          yarn build:foundry
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
@@ -58,6 +63,7 @@ jobs:
             l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
+            system-contracts/zkout
 
   lint:
     runs-on: ubuntu-latest
@@ -119,6 +125,7 @@ jobs:
             l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -158,6 +165,7 @@ jobs:
             l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Install foundry zksync
         run: |
@@ -210,6 +218,7 @@ jobs:
             l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Build L2 contracts
         run: yarn l2 build
@@ -280,6 +289,7 @@ jobs:
             l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
@@ -351,6 +361,7 @@ jobs:
             l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
+            system-contracts/zkout
 
       # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
       - name: Run tests
