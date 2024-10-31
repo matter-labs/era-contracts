@@ -44,6 +44,15 @@ library L2Utils {
         return bytecode;
     }
 
+    function readZKFoundryBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
     function readZKFoundryBytecodeSystemContracts(
         string memory fileName,
         string memory contractName
@@ -52,6 +61,7 @@ library L2Utils {
         bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }
+
 
     /// @notice Returns the bytecode of a given system contract.
     function readSystemContractsBytecode(string memory _filename) internal view returns (bytes memory) {
@@ -193,7 +203,7 @@ library L2Utils {
         address _address,
         bytes memory _constructorArgs
     ) public {
-        bytes memory bytecode = readSystemContractsBytecode(_contractName);
+        bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
