@@ -200,18 +200,9 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
-            string.concat(
-                "../system-contracts/artifacts-zk/contracts-preprocessed/",
-                filename,
-                ".sol/",
-                filename,
-                ".json"
-            )
+        return Utils.readZKFoundryBytecodeSystemContracts(
+            string.concat(filename, ".sol"), filename
         );
-        bytes memory bytecode = vm.parseJsonBytes(file, "$.bytecode");
-        return bytecode;
     }
 
     /**
@@ -846,6 +837,14 @@ library Utils {
         return bytecode;
     }
 
+    function readZKFoundryBytecodeSystemContracts(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
 
     /**
      * @dev Read hardhat bytecodes

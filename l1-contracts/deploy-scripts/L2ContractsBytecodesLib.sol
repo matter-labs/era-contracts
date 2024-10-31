@@ -58,8 +58,9 @@ library L2ContractsBytecodesLib {
     /// @return The bytecode of the TransparentUpgradeableProxy contract.
     function readTransparentUpgradeableProxyBytecodeFromSystemContracts() internal view returns (bytes memory) {
         return
-            Utils.readHardhatBytecode(
-                "/../system-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+            Utils.readZKFoundryBytecodeSystemContracts(
+                "TransparentUpgradeableProxy.sol",
+                "TransparentUpgradeableProxy"
             );
     }
 
@@ -213,8 +214,9 @@ library L2ContractsBytecodesLib {
     /// @return The bytecode of the L2GatewayUpgrade contract.
     function readGatewayUpgradeBytecode() internal view returns (bytes memory) {
         return
-            Utils.readHardhatBytecode(
-                "/../system-contracts/artifacts-zk/contracts-preprocessed/L2GatewayUpgrade.sol/L2GatewayUpgrade.json"
+            Utils.readZKFoundryBytecodeSystemContracts(
+                "L2GatewayUpgrade.sol",
+                "L2GatewayUpgrade"
             );
     }
 
