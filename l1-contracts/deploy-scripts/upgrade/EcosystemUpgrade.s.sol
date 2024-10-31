@@ -717,7 +717,7 @@ contract EcosystemUpgrade is Script {
 
     function deployBlobVersionedHashRetriever() internal {
         bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-        address contractAddress = deployViaCreate2(bytecode, "");
+        address contractAddress = deployViaCreate2(bytecode);
         console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
         addresses.blobVersionedHashRetriever = contractAddress;
     }
