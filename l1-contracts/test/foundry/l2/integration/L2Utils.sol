@@ -55,9 +55,7 @@ library L2Utils {
 
     /// @notice Returns the bytecode of a given system contract.
     function readSystemContractsBytecode(string memory _filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(
-            string.concat(_filename, ".sol"), _filename
-        );
+        return readZKFoundryBytecodeSystemContracts(string.concat(_filename, ".sol"), _filename);
     }
 
     /**

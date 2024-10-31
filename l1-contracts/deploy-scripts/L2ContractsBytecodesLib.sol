@@ -67,30 +67,19 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the ForceDeployUpgrader contract.
     /// @return The bytecode of the ForceDeployUpgrader contract.
     function readForceDeployUpgraderBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readZKFoundryBytecodeL2(
-                "ForceDeployUpgrader.sol", "ForceDeployUpgrader"
-            );
+        return Utils.readZKFoundryBytecodeL2("ForceDeployUpgrader.sol", "ForceDeployUpgrader");
     }
 
     /// @notice Reads the bytecode of the RollupL2DAValidator contract.
     /// @return The bytecode of the RollupL2DAValidator contract.
     function readRollupL2DAValidatorBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readZKFoundryBytecodeL2(
-                "RollupL2DAValidator.sol",
-                "RollupL2DAValidator"
-            );
+        return Utils.readZKFoundryBytecodeL2("RollupL2DAValidator.sol", "RollupL2DAValidator");
     }
 
     /// @notice Reads the bytecode of the ValidiumL2DAValidator contract.
     /// @return The bytecode of the ValidiumL2DAValidator contract.
     function readValidiumL2DAValidatorBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readZKFoundryBytecodeL2(
-                "ValidiumL2DAValidator.sol",
-                "ValidiumL2DAValidator"
-            );
+        return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
     }
 
     /// @notice Reads the bytecode of the ChainTypeManager contract.
@@ -132,30 +121,19 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the L2 Verifier contract.
     /// @return The bytecode of the Verifier contract.
     function readL2VerifierBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2(
-            "Verifier.sol",
-            "Verifier"
-        );
+        return Utils.readZKFoundryBytecodeL2("Verifier.sol", "Verifier");
     }
 
     /// @notice Reads the bytecode of the ConsensusRegistry contract.
     /// @return The bytecode of the ConsensusRegistry contract.
     function readConsensusRegistryBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readZKFoundryBytecodeL2(
-                "ConsensusRegistry.sol",
-                "ConsensusRegistry"
-            );
+        return Utils.readZKFoundryBytecodeL2("ConsensusRegistry.sol", "ConsensusRegistry");
     }
 
     /// @notice Reads the bytecode of the TestnetVerifier contract.
     /// @return The bytecode of the TestnetVerifier contract.
     function readL2TestnetVerifierBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readZKFoundryBytecodeL2(
-                "TestnetVerifier.sol",
-                "TestnetVerifier"
-            );
+        return Utils.readZKFoundryBytecodeL2("TestnetVerifier.sol", "TestnetVerifier");
     }
 
     /// @notice Reads the bytecode of the ValidatorTimelock contract.
@@ -213,11 +191,7 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the L2GatewayUpgrade contract.
     /// @return The bytecode of the L2GatewayUpgrade contract.
     function readGatewayUpgradeBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readZKFoundryBytecodeSystemContracts(
-                "L2GatewayUpgrade.sol",
-                "L2GatewayUpgrade"
-            );
+        return Utils.readZKFoundryBytecodeSystemContracts("L2GatewayUpgrade.sol", "L2GatewayUpgrade");
     }
 
     /// @notice Reads the bytecode of the L2AdminFactory contract.

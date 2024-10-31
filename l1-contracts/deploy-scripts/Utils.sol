@@ -182,7 +182,11 @@ library Utils {
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts("proved_batch.yul/contracts-preprocessed/bootloader", "proved_batch.yul");
+        return
+            readZKFoundryBytecodeSystemContracts(
+                "proved_batch.yul/contracts-preprocessed/bootloader",
+                "proved_batch.yul"
+            );
     }
 
     /**
@@ -200,9 +204,7 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(
-            string.concat(filename, ".sol"), filename
-        );
+        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
     }
 
     /**

@@ -45,7 +45,7 @@ contract DeployPaymaster is Script {
 
     function deploy() internal {
         bytes memory testnetPaymasterBytecode = Utils.readZKFoundryBytecodeL2(
-            "TestnetPaymaster.sol", 
+            "TestnetPaymaster.sol",
             "TestnetPaymaster"
         );
 
