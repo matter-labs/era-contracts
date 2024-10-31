@@ -80,6 +80,7 @@ IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0
 address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACTS_OFFSET + 0x06));
+IInteropHandler constant INTEROP_HANDLER_SYSTEM_CONTRACT = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x07));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
@@ -101,8 +102,6 @@ IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(S
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
-
-IInteropHandler constant INTEROP_HANDLER_SYSTEM_CONTRACT = IInteropHandler(address(SYSTEM_CONTRACTS_OFFSET + 0x13));
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

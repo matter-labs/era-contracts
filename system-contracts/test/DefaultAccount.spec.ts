@@ -32,7 +32,7 @@ describe("DefaultAccount tests", function () {
   let ERC20Iface: ethers.utils.Interface;
   let interopTxData: string;
   const RANDOM_ADDRESS = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
-  const INTEROP_ACCOUNT_ADDRESS = ethers.utils.getAddress("0x0000000000000000000000000000000000011013");
+  const INTEROP_ACCOUNT_ADDRESS = ethers.utils.getAddress("0x0000000000000000000000000000000000011008");
   const INTEROP_HANDLER_ARTIFACT = readContract("../l1-contracts/artifacts-zk/contracts/bridgehub", "InteropHandler") // todo fix path
   const INTEROP_ACCOUNT_ARTIFACT = readContract("../l1-contracts/artifacts-zk/contracts/bridgehub", "InteropAccount") // todo fix path
 
