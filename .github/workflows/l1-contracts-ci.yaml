@@ -109,13 +109,12 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -150,13 +149,11 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
       - name: Install foundry zksync
         run: |
@@ -193,6 +190,10 @@ jobs:
         working-directory: ./l1-contracts
         run: yarn
 
+      - name: Build contracts with hardhat
+        working-directory: ./l1-contracts
+        run: yarn build
+
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
         with:
@@ -200,13 +201,11 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
       - name: Build L2 contracts
         run: yarn l2 build

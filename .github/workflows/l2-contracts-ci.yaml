@@ -46,7 +46,7 @@ jobs:
       - name: Create cache
         uses: actions/cache/save@v3
         with:
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l2-${{ github.sha }}
           path: |
             l1-contracts/cache-forge
             l1-contracts/out
@@ -116,15 +116,12 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l2-${{ github.sha }}
           path: |
-            l1-contracts/artifacts
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
-            system-contracts/artifacts-zk
-            system-contracts/cache-zk
-            system-contracts/typechain
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
       - name: Install foundry zksync
         run: |
