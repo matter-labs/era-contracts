@@ -65,7 +65,6 @@ contract AcceptAdmin is Script {
     // This function should be called by the owner to accept the admin role
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
         IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
-        bool adminIsDifferent = false;
         address currentAdmin;
 
         // Attempt to call admin() using a low-level call
@@ -83,13 +82,8 @@ contract AcceptAdmin is Script {
             currentAdmin = abi.decode(result, (address));
         }
 
-        // Check if the current admin is different from the expected chainAdmin
-        if (currentAdmin != address(chainAdmin)) {
-            adminIsDifferent = true;
-        }
-
         // Proceed with multicall if the admin is different
-        if (adminIsDifferent) {
+        if (currentAdmin != address(chainAdmin)) {
             IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
             calls[0] = IChainAdmin.Call({
                 target: target,
