@@ -33,12 +33,12 @@ jobs:
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
-          forge build
+          yarn build:foundry
 
       - name: Build l2 contracts
         working-directory: l2-contracts
         run: |
-          forge build --zksync --zk-enable-eravm-extensions
+          yarn build:foundry
 
       - name: Build system contract artifacts
         run: yarn sc build
