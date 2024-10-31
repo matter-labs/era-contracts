@@ -20,9 +20,9 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, INTEROP_OPERATION_TX_TYPE} from "../common/Config.sol";
-import {L2_MESSENGER} from "../common/L2ContractAddresses.sol";
+import {L2_MESSENGER} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";

@@ -14,7 +14,7 @@ import {
 } from "./shared/constants";
 import { getMock } from "./shared/mocks";
 import { signedTxToTransactionData } from "./shared/transactions";
-import { deployContract, deployContractOnAddress, getWallets, loadArtifact } from "./shared/utils";
+import { deployContract, deployContractOnAddress, getWallets, loadArtifact, readContract } from "./shared/utils";
 
 
 // TODO: more test cases can be added.
@@ -33,7 +33,7 @@ describe("DefaultAccount tests", function () {
   let interopTxData: string;
   const RANDOM_ADDRESS = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
   const INTEROP_ACCOUNT_ADDRESS = ethers.utils.getAddress("0x0000000000000000000000000000000000011013");
-
+  const INTEROP_HANDLER_ARTIFACT = readContract("../l1-contracts/artifacts-zk/contracts/bridgehub", "InteropHandler") // todo fix path
 
   before(async () => {
     wallet = getWallets()[0];

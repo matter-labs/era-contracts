@@ -18,8 +18,8 @@ import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
-import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EmptyAddress, L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented, L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported, L2AssetRouter_LegacyDataNotImplemented} from "../../common/L1ContractErrors.sol";
 

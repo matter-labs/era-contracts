@@ -10,7 +10,7 @@ import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice The DA validator intended to be used in Era-environment.
 /// @dev For compatibility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it

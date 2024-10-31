@@ -4,7 +4,7 @@
 
 pragma solidity 0.8.24;
 
-import {MSG_VALUE_SYSTEM_CONTRACT} from "../L2ContractAddresses.sol";
+import {MSG_VALUE_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";
 
 address constant SYSTEM_CALL_CALL_ADDRESS = address((1 << 16) - 11);
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR

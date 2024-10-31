@@ -3,18 +3,18 @@
 pragma solidity 0.8.24;
 
 // import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
-import {Utils} from "./libraries/Utils.sol";
-import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol";
-import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
+// import {Utils} from "./libraries/Utils.sol";
+import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
+import {IAccountCodeStorage} from "../common/l2-helpers/IAccountCodeStorage.sol";
 // import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
-import {IAccount} from "./interfaces/IAccount.sol";
+// import {IAccount} from "./interfaces/IAccount.sol";
 import {InteropAccount} from "./InteropAccount.sol";
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {DefaultAccount} from "./DefaultAccount.sol";
-import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BASE_TOKEN_SYSTEM_CONTRACT, INTEROP_HANDLER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
+// import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+// import {DefaultAccount} from "./DefaultAccount.sol";
+// import {EfficientCall} from "./libraries/EfficientCall.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IInteropHandler, InteropCall, InteropBundle} from "./interfaces/IInteropHandler.sol";
+import {IInteropHandler, InteropCall, InteropBundle} from "./IInteropHandler.sol";
 
 
 enum BytecodeError {
@@ -40,7 +40,7 @@ error LengthIsNotDivisibleBy32(uint256 length);
  * @notice The contract that handles the interop bundles.
  */
 contract InteropHandler is IInteropHandler {
-    address public constant L2_INTEROP_HANDLER = address(INTEROP_HANDLER_SYSTEM_CONTRACT);
+    // address public constant L2_INTEROP_HANDLER = address(INTEROP_HANDLER_SYSTEM_CONTRACT);
     address public constant L2_BASE_TOKEN = address(BASE_TOKEN_SYSTEM_CONTRACT);
 
     uint256 public feeCounter;
