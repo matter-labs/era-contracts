@@ -475,4 +475,27 @@ library Utils {
             vm.stopBroadcast();
         }
     }
+
+    function governanceOperationExists(
+        address _governance,
+        address _target,
+        uint256 _value,
+        bytes memory _data,
+        bytes32 _predecessor,
+        bytes32 _salt
+    ) internal view returns (bool) {
+        IGovernance governance = IGovernance(_governance);
+
+        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
+        calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: _predecessor,
+            salt: _salt
+        });
+
+        bytes32 operationHash = governance.hashOperation(operation);
+        return governance.isOperation(operationHash);
+    }
 }
