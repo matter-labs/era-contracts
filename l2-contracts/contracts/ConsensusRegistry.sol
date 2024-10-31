@@ -81,7 +81,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
         _verifyInputSecp256k1PublicKey(_attesterPubKey);
-        if ( _attesterWeight == 0) {
+        if (_attesterWeight == 0) {
             revert ZeroAttesterWeight();
         }
         if (_validatorWeight == 0) {
@@ -170,10 +170,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         if (deleted) {
             return;
         }
-    
-        _snapshotValidatorIfOutdated(_node);
+
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.active = false;
-    
+
         emit ValidatorDeactivated(_nodeOwner);
     }
 
@@ -205,7 +205,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _snapshotValidatorIfOutdated(_node);
+        _snapshotValidatorIfOutdated(node);
         node.validatorLatest.active = true;
 
         emit ValidatorActivated(_nodeOwner);
@@ -308,10 +308,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
-    function changeAttesterKey(
-        address _nodeOwner,
-        Secp256k1PublicKey calldata _pubKey
-    ) external onlyOwner {
+    function changeAttesterKey(address _nodeOwner, Secp256k1PublicKey calldata _pubKey) external onlyOwner {
         _verifyInputSecp256k1PublicKey(_pubKey);
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
