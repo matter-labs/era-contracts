@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "./ITimestampAsserter.sol";
+import {ITimestampAsserter} from "./ITimestampAsserter.sol";
 
 error TimestampOutOfRange(uint256 currentTimestamp, uint256 start, uint256 end);
 
