@@ -114,7 +114,6 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
             l1-contracts/zkout
@@ -276,13 +275,11 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
@@ -348,9 +345,12 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
-            l1-contracts/artifacts
-            l1-contracts/cache
-            l1-contracts/typechain
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
       # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
       - name: Run tests
