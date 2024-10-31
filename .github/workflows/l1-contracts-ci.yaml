@@ -50,6 +50,7 @@ jobs:
       - name: Build system contracts
         working-directory: system-contracts
         run: |
+          yarn install
           yarn build:foundry
 
       - name: Create cache
