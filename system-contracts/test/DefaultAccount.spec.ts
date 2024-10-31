@@ -34,15 +34,16 @@ describe("DefaultAccount tests", function () {
   const RANDOM_ADDRESS = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
   const INTEROP_ACCOUNT_ADDRESS = ethers.utils.getAddress("0x0000000000000000000000000000000000011013");
   const INTEROP_HANDLER_ARTIFACT = readContract("../l1-contracts/artifacts-zk/contracts/bridgehub", "InteropHandler") // todo fix path
+  const INTEROP_ACCOUNT_ARTIFACT = readContract("../l1-contracts/artifacts-zk/contracts/bridgehub", "InteropAccount") // todo fix path
 
   before(async () => {
     wallet = getWallets()[0];
     account = getWallets()[2];
 
-    await deployContractOnAddress(INTEROP_ACCOUNT_ADDRESS, "InteropAccount");
+    await deployContractOnAddress(INTEROP_ACCOUNT_ADDRESS, "InteropAccount",undefined, INTEROP_ACCOUNT_ARTIFACT);
     await deployContractOnAddress(account.address, "DefaultAccount");
-    await deployContractOnAddress(TEST_L2_INTEROP_HANDLER_ADDRESS, "InteropHandler");
-    let interop_handler = InteropHandlerFactory.connect(TEST_L2_INTEROP_HANDLER_ADDRESS, wallet);
+    await deployContractOnAddress(TEST_L2_INTEROP_HANDLER_ADDRESS, "InteropHandler", undefined, INTEROP_HANDLER_ARTIFACT);
+    let interop_handler = new zksync.Contract(TEST_L2_INTEROP_HANDLER_ADDRESS, INTEROP_HANDLER_ARTIFACT.abi,  wallet);
     await interop_handler.setInteropAccountBytecode();
     await deployContractOnAddress(TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS, "L2BaseToken");
     await deployContractOnAddress(
