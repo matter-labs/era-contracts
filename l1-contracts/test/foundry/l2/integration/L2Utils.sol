@@ -55,8 +55,8 @@ library L2Utils {
 
     /// @notice Returns the bytecode of a given system contract.
     function readSystemContractsBytecode(string memory _filename) internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeSystemContracts(
-            string.concat(filename, ".sol"), filename
+        return readZKFoundryBytecodeSystemContracts(
+            string.concat(_filename, ".sol"), _filename
         );
     }
 
@@ -195,7 +195,7 @@ library L2Utils {
         address _address,
         bytes memory _constructorArgs
     ) public {
-        bytes memory bytecode = readEraBytecode(_contractName);
+        bytes memory bytecode = readSystemContractsBytecode(_contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 

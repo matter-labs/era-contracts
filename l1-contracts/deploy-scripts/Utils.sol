@@ -200,7 +200,7 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeSystemContracts(
+        return readZKFoundryBytecodeSystemContracts(
             string.concat(filename, ".sol"), filename
         );
     }
