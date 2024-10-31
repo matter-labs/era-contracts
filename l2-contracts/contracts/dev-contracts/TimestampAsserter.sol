@@ -12,7 +12,7 @@ error TimestampOutOfRange(uint256 currentTimestamp, uint256 start, uint256 end);
 /// This is useful for custom account abstraction where time-bound checks are needed but accessing block.timestamp
 /// directly is not possible.
 contract TimestampAsserter is ITimestampAsserter {
-    function assertTimestampInRange(uint256 _start, uint256 _end) public view {
+    function assertTimestampInRange(uint256 _start, uint256 _end) external view {
         if (block.timestamp < _start || block.timestamp > _end) {
             revert TimestampOutOfRange(block.timestamp, _start, _end);
         }
