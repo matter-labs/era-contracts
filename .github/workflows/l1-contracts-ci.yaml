@@ -32,6 +32,11 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
+      - name: Build da contracts
+        working-directory: da-contracts
+        run: |
+          yarn build:foundry
+
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
