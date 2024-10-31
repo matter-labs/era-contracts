@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import * as fs from "fs";
 
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
@@ -88,7 +88,7 @@ export function loadZasmBytecode(codeName: string, path: string): string {
 // Read contract artifacts
 export function readContract(path: string, fileName: string, contractName?: string) {
   contractName = contractName || fileName;
-  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${contractName}.json`, { encoding: 'utf-8' }));
+  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${contractName}.json`, { encoding: "utf-8" }));
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,8 +125,13 @@ async function deployBytecode(bytecode: string): Promise<Contract> {
   );
 }
 
-export async function deployContractOnAddress(address: string, name: string, constructorData?: string, artifact?: ZkSyncArtifact) {
-  artifact = artifact || await loadArtifact(name);
+export async function deployContractOnAddress(
+  address: string,
+  name: string,
+  constructorData?: string,
+  artifact?: ZkSyncArtifact
+) {
+  artifact = artifact || (await loadArtifact(name));
   await setCode(address, artifact.bytecode, true, constructorData);
 }
 

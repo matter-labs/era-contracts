@@ -98,9 +98,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         Bridgehub(L2_INTEROP_CENTER_ADDR).initialize(_args.aliasedOwner);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
-        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(
-            L2_ASSET_ROUTER_ADDR
-        );
+        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(L2_ASSET_ROUTER_ADDR);
 
         DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);

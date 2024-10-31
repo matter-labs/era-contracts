@@ -3,7 +3,6 @@
 pragma solidity 0.8.24;
 
 contract InteropAccount {
-
     event Hello(uint256 indexed);
     event ReturnMessage(bytes indexed error);
     function hello() external payable {

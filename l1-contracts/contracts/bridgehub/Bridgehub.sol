@@ -484,7 +484,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _request the request for the L2 transaction
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) { // todo onlyL1
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        // todo onlyL1
         return interopCenter.requestL2TransactionTwoBridgesSender{value: msg.value}(msg.sender, _request);
     }
 

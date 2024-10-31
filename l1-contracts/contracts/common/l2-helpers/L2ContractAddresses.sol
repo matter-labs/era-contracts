@@ -71,6 +71,8 @@ IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSE
 /// @dev the address of the msg value system contract
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
-IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(address(SYSTEM_CONTRACTS_OFFSET + 0x02));
+IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x02)
+);
 
-IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address( SYSTEM_CONTRACTS_OFFSET + 0x0a));
+IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));

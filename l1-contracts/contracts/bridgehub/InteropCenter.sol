@@ -112,12 +112,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bundleCount++;
         TransientInterop.setBundleMetadata(
             bundleId,
-            BundleMetadata({
-                destinationChainId: _destinationChainId,
-                initiator: _sender,
-                callCount: 0,
-                totalValue: 0
-            })
+            BundleMetadata({destinationChainId: _destinationChainId, initiator: _sender, callCount: 0, totalValue: 0})
         );
         TransientInterop.addBaseTokenCallToBundle(
             bundleId // minting here to interopCaller
@@ -129,7 +124,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
     }
 
-    function _addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest, address _sender) internal {
+    function _addCallToBundle(
+        bytes32 _bundleId,
+        InteropCallRequest memory _interopCallRequest,
+        address _sender
+    ) internal {
         InteropCall memory interopCall;
         interopCall.to = _interopCallRequest.to;
         interopCall.data = _interopCallRequest.data;
@@ -153,10 +152,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         interopBundleHash = _finishAndSendBundle(_bundleId, _executionAddress, msg.value, msg.sender);
     }
 
-    event InteropBundleSent(
-        bytes32 interopBundleHash,
-        InteropBundle interopBundle
-    );
+    event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
 
     function _finishAndSendBundle(
         bytes32 _bundleId,
@@ -377,7 +373,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             }
         }
 
-        viaIR.feeBundleHash = _finishAndSendBundle(viaIR.feeBundleId, _extraInputs.sender, feeValue, _extraInputs.sender);
+        viaIR.feeBundleHash = _finishAndSendBundle(
+            viaIR.feeBundleId,
+            _extraInputs.sender,
+            feeValue,
+            _extraInputs.sender
+        );
 
         viaIR.executionBundleId = _startBundle(_destinationChainId, _extraInputs.sender);
         for (uint256 i = 0; i < _executionCallStarters.length; i++) {
@@ -397,7 +398,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             }
         }
 
-        bytes32 executionBundleHash = _finishAndSendBundle(viaIR.executionBundleId, address(0), msg.value - feeValue, _extraInputs.sender);
+        bytes32 executionBundleHash = _finishAndSendBundle(
+            viaIR.executionBundleId,
+            address(0),
+            msg.value - feeValue,
+            _extraInputs.sender
+        );
         InteropTrigger memory interopTrigger = InteropTrigger({
             sender: _extraInputs.sender,
             destinationChainId: _destinationChainId,
@@ -418,11 +424,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     function _requestFromStarter(InteropCallStarter memory callStarter) internal returns (InteropCallRequest memory) {
-        return InteropCallRequest({
-            to: callStarter.to,
-            data: callStarter.data,
-            value: callStarter.value
-        });
+        return InteropCallRequest({to: callStarter.to, data: callStarter.data, value: callStarter.value});
     }
 
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
@@ -441,7 +443,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         feePaymentCallStarters[0] = InteropCallStarter({
             directCall: true,
             to: INSERT_MSG_ADDRESS_ON_DESTINATION,
-            from: _sender, 
+            from: _sender,
             data: "",
             value: _request.mintValue - _request.l2Value,
             requestedInteropCallValue: _request.l2Value
@@ -510,7 +512,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                     refundRecipient: _request.refundRecipient
                 }),
-                ExtraInputs({sender: _sender, factoryDeps: _request.factoryDeps, refundRecipient: _request.refundRecipient})
+                ExtraInputs({
+                    sender: _sender,
+                    factoryDeps: _request.factoryDeps,
+                    refundRecipient: _request.refundRecipient
+                })
             );
     }
 

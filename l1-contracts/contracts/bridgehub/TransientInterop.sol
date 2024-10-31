@@ -45,11 +45,11 @@ library TransientInterop {
         // console.logBytes32(_bundleId);
 
         uint256 callCount = bundleMetadata.callCount;
-        require(callCount == 0, "TransientInterop: callCount is not 0");//this function is only called at the start of the bundle
+        require(callCount == 0, "TransientInterop: callCount is not 0"); //this function is only called at the start of the bundle
         // console.log("addCallToBundle", callCount);
         // console.logBytes32(_bundleId);
-        
-        // setting the bundle data 
+
+        // setting the bundle data
         uint256 callSlot = uint256(keccak256(abi.encodePacked(CALL_SLOT_MODIFIER, _bundleId, callCount)));
         TransientPrimitivesLib.set(callSlot, uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)));
         TransientPrimitivesLib.set(callSlot + 1, uint256(uint160(L2_BOOTLOADER_ADDRESS)));
@@ -66,11 +66,11 @@ library TransientInterop {
         // console.logBytes32(_bundleId);
 
         uint256 callCount = bundleMetadata.callCount;
-        require(callCount > 0, "TransientInterop: callCount is 0");//
+        require(callCount > 0, "TransientInterop: callCount is 0"); //
         // console.log("addCallToBundle", callCount);
         // console.logBytes32(_bundleId);
-        
-        // setting the bundle data 
+
+        // setting the bundle data
         uint256 callSlot = uint256(keccak256(abi.encodePacked(CALL_SLOT_MODIFIER, _bundleId, callCount)));
         TransientPrimitivesLib.set(callSlot, uint256(uint160(_interopCall.to)));
         TransientPrimitivesLib.set(callSlot + 1, uint256(uint160(_interopCall.from)));

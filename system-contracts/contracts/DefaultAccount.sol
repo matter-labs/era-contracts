@@ -65,7 +65,7 @@ contract DefaultAccount is IAccount {
     function forwardFromIC(address _to, bytes memory _data) external payable {
         (bool success, bytes memory returnData) = _to.call{value: msg.value}(_data);
         // if (!success) {
-            // revert("Forwarding call failed");
+        // revert("Forwarding call failed");
         // }
     }
 
@@ -93,7 +93,6 @@ contract DefaultAccount is IAccount {
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
     ) internal returns (bytes4 magic) {
-
         // Note, that nonce holder can only be called with "isSystem" flag.
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
@@ -101,7 +100,7 @@ contract DefaultAccount is IAccount {
             0,
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
-        
+
         if (_transaction.to == uint256(uint160(address(INTEROP_HANDLER_SYSTEM_CONTRACT)))) {
             magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             return magic;
