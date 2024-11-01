@@ -827,25 +827,23 @@
     sinon-chai "^3.7.0"
     zksync-ethers "^5.0.0"
 
-"@matterlabs/hardhat-zksync-verify@^0.7.0":
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.7.0.tgz#f7df3e288fa509af861e80e803db877189c7c390"
-  integrity sha512-9JhKnOZhfAHuFCn76JbM1HlAJ2HeXAVl3e4hH7ZXqPiQR8FJX7JMUiUe1ShdhbFQPBwXVWkCO0bHiEcmWs7vtA==
+"@matterlabs/hardhat-zksync-verify@1.7.0":
+  version "1.7.0"
+  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-1.7.0.tgz#462a3bb015186e0de0eb68c95bf0bd360678b951"
+  integrity sha512-jQnrnE9uDfdP1KaG/GLs0J8+5efH97yRmNFzYuokT5qrSU0y6Ws6OFJmgDodB7hHnWOD6FSU9TebaFlAxxtFOA==
   dependencies:
     "@ethersproject/abi" "^5.7.0"
     "@ethersproject/address" "5.7.0"
-    "@matterlabs/hardhat-zksync-solc" "^1.2.0"
+    "@matterlabs/hardhat-zksync-solc" "^1.2.5"
     "@nomicfoundation/hardhat-verify" "^2.0.8"
-    "@openzeppelin/contracts" "^4.9.2"
     axios "^1.7.2"
     cbor "^9.0.2"
     chai "^4.3.4"
     chalk "^4.1.2"
     debug "^4.3.5"
-    hardhat "^2.14.0"
+    semver "^7.6.2"
     sinon "^18.0.0"
     sinon-chai "^3.7.0"
-    zksync-ethers "^5.8.0"
 
 "@matterlabs/hardhat-zksync-verify@^1.4.3":
   version "1.4.3"
@@ -8213,13 +8211,6 @@ zksync-ethers@^5.0.0:
   version "5.8.0"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.8.0.tgz#ff054345048f851c33cb6efcf2094f40d4da6063"
   integrity sha512-/4qI5UElh0lspu0ew2IXBCO+O9kXEzZOM7JqvlfRWWGIUKZ+EDXnjIPgkH0y5/MnMT3FDq9koAAUCyZVWqHUJg==
-  dependencies:
-    ethers "~5.7.0"
-
-zksync-ethers@^5.8.0:
-  version "5.10.0"
-  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.10.0.tgz#3caf25478539a3fd6e170c13555cec6a1dae32e2"
-  integrity sha512-OAjTGAHF9wbdkRGkj7XZuF/a1Sk/FVbwH4pmLjAKlR7mJ7sQtQhBhrPU2dCc67xLaNvEESPfwil19ES5wooYFg==
   dependencies:
     ethers "~5.7.0"
 
