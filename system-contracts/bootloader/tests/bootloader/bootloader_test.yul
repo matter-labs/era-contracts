@@ -470,13 +470,18 @@ function TEST_getGasPrice() {
 function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
     testing_testWillFailWith("Max priority fee greater than max fee")
 
-    //getGasPrice(4, 5)
+    // getGasPrice(4, 5)
 }
 
 function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
+    let prevBatchHash := mload(32)
+    let newTimestamp := mload(64)
+    let newBatchNumber := mload(96)
+    let baseFee := 10
+    setNewBatch(prevBatchHash, newTimestamp, newBatchNumber, baseFee)
+
     testing_testWillFailWith("Base fee greater than max fee")
-    let baseFee := basefee()
-    getGasPrice(baseFee, baseFee)
+    // getGasPrice(6, 5)
 }
 
 function TEST_getRawCodeHashSuccessTrue() {
@@ -709,15 +714,3 @@ function TEST_getFarCallABI() {
 
     testing_assertEq(result, ret, "Invalid far call ABI")
 }
-
-// function TEST_getWordByte() {
-//     let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
-//     let word := mload(txPtr)
-//     let byteIdx := 31
-//     let ptr := shr(mul(8, byteIdx), word)
-
-//     let wordByte := getWordByte(word, byteIdx)
-//     let expected := and(ptr, 0xFF)
-
-//     testing_assertEq(wordByte, expected, "Invalid word byte")
-// }
