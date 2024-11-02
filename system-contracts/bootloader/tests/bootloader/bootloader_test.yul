@@ -113,11 +113,15 @@ function TEST_systemLogKeys() {
 function TEST_setTxOrigin() {
     let newTxOrigin := 0 
     setTxOrigin(newTxOrigin)
+
+    testing_assertEq(newTxOrigin, mload(4), "Invalid Tx Origin")
 }
 
 function TEST_setGasPrice() {
     let newGasPrice := 10
     setGasPrice(newGasPrice)
+
+    testing_assertEq(newGasPrice, mload(4), "Invalid gas price")
 }
 
 function TEST_setPubdataInfo() {
@@ -155,7 +159,7 @@ function TEST_setL2BlockRevert() {
 }
 
 function TEST_setContextVal() {
-    let selector := {{RIGHT_PADDED_SET_GAS_PRICE}} 
+    let selector := RIGHT_PADDED_SET_GAS_PRICE_SELECTOR()
     let value := 10
     mstore(0, selector)
     mstore(4, value)
