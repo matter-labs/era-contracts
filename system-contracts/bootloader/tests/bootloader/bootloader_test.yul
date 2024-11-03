@@ -159,7 +159,7 @@ function TEST_setL2BlockRevert() {
 }
 
 function TEST_setContextVal() {
-    let selector := RIGHT_PADDED_SET_GAS_PRICE_SELECTOR()
+    let selector := 0xbf1fe42000000000000000000000000000000000000000000000000000000000
     let value := 10
     mstore(0, selector)
     mstore(4, value)
