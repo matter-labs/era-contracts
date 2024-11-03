@@ -4,16 +4,16 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployL1Script} from "../../../../deploy-scripts/DeployL1.s.sol";
+import {Bridgehub} from "../../../../contracts/bridgehub/Bridgehub.sol";
+import {IInteropCenter} from "../../../../contracts/bridgehub/IInteropCenter.sol";
+import {L1AssetRouter} from "../../../../contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1Nullifier} from "../../../../contracts/bridge/L1Nullifier.sol";
+import {L1NativeTokenVault} from "../../../../contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {DataEncoding} from "../../../../contracts/common/libraries/DataEncoding.sol";
+import {CTMDeploymentTracker} from "../../../../contracts/bridgehub/CTMDeploymentTracker.sol";
+import {IChainTypeManager} from "../../../../contracts/state-transition/IChainTypeManager.sol";
+import {DeployedAddresses, Config} from "../../../../deploy-scripts/DeployUtils.s.sol";
 
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;

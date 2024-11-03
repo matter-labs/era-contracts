@@ -6,23 +6,24 @@ pragma solidity 0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {Call} from "contracts/governance/Common.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+
+import {Bridgehub} from "../contracts/bridgehub/Bridgehub.sol";
+import {IInteropCenter} from "../contracts/bridgehub/IInteropCenter.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "../contracts/bridgehub/IBridgehub.sol";
+import {IGovernance} from "../contracts/governance/IGovernance.sol";
+import {Call} from "../contracts/governance/Common.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../contracts/common/Config.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2ContractHelper} from "../contracts/common/l2-helpers/L2ContractHelper.sol";
+import {IChainAdmin} from "../contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
 import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
 import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {AccessControlRestriction} from "../contracts/governance/AccessControlRestriction.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(

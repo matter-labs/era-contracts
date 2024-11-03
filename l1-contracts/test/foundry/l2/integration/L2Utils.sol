@@ -7,26 +7,27 @@ import "forge-std/console.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {InteropCenter, IInteropCenter} from "contracts/bridgehub/InteropCenter.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IContractDeployer, L2ContractHelper} from "../../../../contracts/common/l2-helpers/L2ContractHelper.sol";
 
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {L2AssetRouter} from "../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVault} from "../../../../contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {L2SharedBridgeLegacy} from "../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
+import {IMessageRoot} from "../../../../contracts/bridgehub/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {Bridgehub, IBridgehub} from "../../../../contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter, IInteropCenter} from "../../../../contracts/bridgehub/InteropCenter.sol";
+import {MessageRoot} from "../../../../contracts/bridgehub/MessageRoot.sol";
 
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {ETH_TOKEN_ADDRESS} from "../../../../contracts/common/Config.sol";
 
-import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
-import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
+import {DataEncoding} from "../../../../contracts/common/libraries/DataEncoding.sol";
+import {BridgedStandardERC20} from "../../../../contracts/bridge/BridgedStandardERC20.sol";
+
+import {SystemContractsCaller} from "../../../../contracts/common/l2-helpers/SystemContractsCaller.sol";
+import {DeployFailed} from "../../../../contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
 library L2Utils {
@@ -51,10 +52,12 @@ library L2Utils {
 
     /// @notice Returns the bytecode of a given system contract.
     function readSystemContractsBytecode(string memory _filename) internal view returns (bytes memory) {
+        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
         string memory file = vm.readFile(
             // solhint-disable-next-line func-named-parameters
             string.concat(
-                "../system-contracts/artifacts-zk/contracts-preprocessed/",
+                CONTRACTS_PATH,
+                "/system-contracts/artifacts-zk/contracts-preprocessed/",
                 _filename,
                 ".sol/",
                 _filename,
