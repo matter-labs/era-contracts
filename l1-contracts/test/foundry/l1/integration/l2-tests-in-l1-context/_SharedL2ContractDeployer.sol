@@ -76,7 +76,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
 
     IChainTypeManager internal chainTypeManager;
 
-    function setUp() public {
+    function setUp() public virtual {
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
         beacon.transferOwnership(ownerWallet);

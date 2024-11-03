@@ -5,28 +5,28 @@ import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {InteropCenter, IInteropCenter} from "contracts/bridgehub/InteropCenter.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
+import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter, IInteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
+import {L1AssetRouter} from "../../../../../contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1Nullifier} from "../../../../../contracts/bridge/L1Nullifier.sol";
+import {L1NativeTokenVault} from "../../../../../contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
+import {CTMDeploymentTracker} from "../../../../../contracts/bridgehub/CTMDeploymentTracker.sol";
+import {IChainTypeManager} from "../../../../../contracts/state-transition/IChainTypeManager.sol";
+import {DeployedAddresses, Config} from "../../../../../deploy-scripts/DeployUtils.s.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployUtils} from "../../../../../deploy-scripts/DeployUtils.s.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
-import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {MessageRoot} from "../../../../../contracts/bridgehub/MessageRoot.sol";
+import {L2AssetRouter} from "../../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVault} from "../../../../../contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {L2NativeTokenVaultDev} from "../../../../../contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
+import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
+import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
+import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
 
 struct SystemContractsArgs {
     uint256 l1ChainId;
