@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {Verifier} from "contracts/verifier/Verifier.sol";
+import {Verifier} from "../../../../contracts/verifier/Verifier.sol";
 import {VerifierTest} from "contracts/dev-contracts/VerifierTest.sol";
 
 contract VerifierCaller {
