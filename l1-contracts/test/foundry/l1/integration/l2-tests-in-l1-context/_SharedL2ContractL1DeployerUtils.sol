@@ -120,8 +120,10 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual {
         string memory root = vm.projectRoot();
+        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
         string memory inputPath = string.concat(
             root,
+            CONTRACTS_PATH,
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
         );
         initializeConfig(inputPath);
