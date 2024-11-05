@@ -119,11 +119,17 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
     }
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual {
+        deployL2ContractsInner(_l1ChainId, false);
+    }
+    
+    function deployL2ContractsInner(uint256 _l1ChainId, bool _skip) public {
         string memory root = vm.projectRoot();
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
         string memory inputPath = string.concat(
             root,
+            "/",
             CONTRACTS_PATH,
+            "/l1-contracts",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
         );
         initializeConfig(inputPath);
@@ -135,7 +141,9 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         addresses.blobVersionedHashRetriever = address(0x1);
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
-        instantiateCreate2Factory();
+        if (!_skip) {
+            instantiateCreate2Factory(); 
+        }
         deployGenesisUpgrade();
         deployVerifier();
         deployValidatorTimelock();

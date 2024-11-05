@@ -52,7 +52,7 @@ contract L1ContractDeployer is Test {
         );
 
         l1Script = new DeployL1Script();
-        l1Script.runForTest();
+        l1Script.runForTest(false);
 
         ecosystemAddresses = l1Script.getAddresses();
         ecosystemConfig = l1Script.getConfig();

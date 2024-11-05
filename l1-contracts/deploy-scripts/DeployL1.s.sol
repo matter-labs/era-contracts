@@ -68,11 +68,11 @@ contract DeployL1Script is Script, DeployUtils {
     function run() public {
         console.log("Deploying L1 contracts");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", false);
     }
 
-    function runForTest() public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+    function runForTest(bool skipL1Deployments) public {
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), skipL1Deployments);
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -83,7 +83,7 @@ contract DeployL1Script is Script, DeployUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath) internal {
+    function runInner(string memory inputPath, string memory outputPath, bool skipL1Deployments) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
@@ -91,7 +91,9 @@ contract DeployL1Script is Script, DeployUtils {
         saveDiamondSelectors();
         initializeConfig(inputPath);
 
-        instantiateCreate2Factory();
+        if (!skipL1Deployments) {
+            instantiateCreate2Factory();
+        }
         deployIfNeededMulticall3();
 
         deployVerifier();
@@ -521,7 +523,12 @@ contract DeployL1Script is Script, DeployUtils {
         bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
 
         string memory root = vm.projectRoot();
-        string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
+        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
+        string memory outputPath = string.concat(root,
+            "/",
+            CONTRACTS_PATH,
+            "/l1-contracts",
+            "/script-out/diamond-selectors.toml");
 
         bytes memory adminFacetSelectorsBytes = abi.encode(adminFacetSelectors);
         bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);

@@ -36,6 +36,10 @@ contract SharedL2ContractL2DeployerUtils is DeployUtils, SharedL2ContractL1Deplo
         return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, config.contracts.create2FactorySalt);
     }
 
+    function deployL2Contracts(uint256 _l1ChainId) public virtual override {
+        deployL2ContractsInner(_l1ChainId, true);
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
 }

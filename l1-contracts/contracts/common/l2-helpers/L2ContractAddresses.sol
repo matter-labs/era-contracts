@@ -59,6 +59,9 @@ address constant L2_MESSAGE_ROOT_ADDR = address(0x10005);
 /// @dev the address of the L2 interop center
 address constant L2_INTEROP_CENTER_ADDR = address(0x10006);
 
+/// @dev the address of the L2 interop handler
+address constant L2_INTEROP_HANDLER_ADDR = address(0x10007);
+
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 

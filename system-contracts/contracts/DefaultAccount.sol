@@ -7,7 +7,7 @@ import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol"
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, INTEROP_HANDLER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, L2_INTEROP_HANDLER} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
 
@@ -101,7 +101,7 @@ contract DefaultAccount is IAccount {
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
 
-        if (_transaction.to == uint256(uint160(address(INTEROP_HANDLER_SYSTEM_CONTRACT)))) {
+        if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
             magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             return magic;
         }
@@ -154,8 +154,8 @@ contract DefaultAccount is IAccount {
         uint128 value = Utils.safeCastToU128(_transaction.value);
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
-        if (to == (address((INTEROP_HANDLER_SYSTEM_CONTRACT)))) {
-            INTEROP_HANDLER_SYSTEM_CONTRACT.executeInteropBundle(_transaction);
+        if (to == (address((L2_INTEROP_HANDLER)))) {
+            L2_INTEROP_HANDLER.executeInteropBundle(_transaction);
             return;
         }
 
@@ -235,8 +235,8 @@ contract DefaultAccount is IAccount {
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
-        if (_transaction.to == uint256(uint160(address(INTEROP_HANDLER_SYSTEM_CONTRACT)))) {
-            INTEROP_HANDLER_SYSTEM_CONTRACT.executePaymasterBundle(_transaction);
+        if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
+            L2_INTEROP_HANDLER.executePaymasterBundle(_transaction);
         }
         bool success = _transaction.payToTheBootloader();
         if (!success) {

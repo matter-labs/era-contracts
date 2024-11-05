@@ -38,17 +38,11 @@ error LengthIsNotDivisibleBy32(uint256 length);
  * @notice The contract that handles the interop bundles.
  */
 contract InteropHandler is IInteropHandler {
-    // address public constant L2_INTEROP_HANDLER = address(INTEROP_HANDLER_SYSTEM_CONTRACT);
-    address public constant L2_BASE_TOKEN = address(BASE_TOKEN_SYSTEM_CONTRACT);
-
-    uint256 public feeCounter;
-    uint256 public interopCounter;
     bytes32 public bytecodeHash;
-    uint256 public salt;
 
     function setInteropAccountBytecode() public {
-        salt++;
-        InteropAccount deployedAccount = new InteropAccount{salt: bytes32(uint256(uint160(salt)))}();
+        // salt++;
+        InteropAccount deployedAccount = new InteropAccount{salt: bytes32(uint256(uint160(1234)))}();
         IAccountCodeStorage codeStorage = IAccountCodeStorage(
             address(uint160(0x0000000000000000000000000000000000008002))
         );
@@ -56,7 +50,7 @@ contract InteropHandler is IInteropHandler {
     }
 
     function executePaymasterBundle(Transaction calldata _transaction) external {
-        feeCounter++;
+        // feeCounter++;
         (bytes memory paymasterBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
         // (, bytes memory paymasterProof) = abi.decode(_transaction.signature);
         // // todo verify signature = merkleProof.
@@ -98,7 +92,7 @@ contract InteropHandler is IInteropHandler {
             // IAccount(applyL1ToL2Alias(interopCall.from)).hello();
             emit Address(interopCall.from);
 
-            address accountAddress = aliasAccount(interopCall.from);
+            address accountAddress = getAliasedAccount(interopCall.from, 0); // kl todo add chainId
             emit Address(accountAddress);
             InteropAccount account = InteropAccount(accountAddress);
             uint256 codeSize;
@@ -146,7 +140,7 @@ contract InteropHandler is IInteropHandler {
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
-    function aliasAccount(address fromAsSalt) public view returns (address) {
+    function getAliasedAccount(address fromAsSalt, uint256) public view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode()); // todo add constructor params.
         // bytes32 bytecodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(address(uint160(0x0000000000000000000000000000000000011013)));
         return
