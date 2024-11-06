@@ -12,7 +12,7 @@ import {InteropAccount} from "./InteropAccount.sol";
 // import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 // import {DefaultAccount} from "./DefaultAccount.sol";
 // import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BASE_TOKEN_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IInteropHandler, InteropCall, InteropBundle} from "./IInteropHandler.sol";
 
@@ -41,12 +41,8 @@ contract InteropHandler is IInteropHandler {
     bytes32 public bytecodeHash;
 
     function setInteropAccountBytecode() public {
-        // salt++;
-        InteropAccount deployedAccount = new InteropAccount{salt: bytes32(uint256(uint160(1234)))}();
-        IAccountCodeStorage codeStorage = IAccountCodeStorage(
-            address(uint160(0x0000000000000000000000000000000000008002))
-        );
-        bytecodeHash = codeStorage.getRawCodeHash(address(uint160(0x0000000000000000000000000000000000011013)));
+        IAccountCodeStorage codeStorage = IAccountCodeStorage(L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT);
+        bytecodeHash = codeStorage.getRawCodeHash(L2_INTEROP_ACCOUNT_ADDR);
     }
 
     function executePaymasterBundle(Transaction calldata _transaction) external {

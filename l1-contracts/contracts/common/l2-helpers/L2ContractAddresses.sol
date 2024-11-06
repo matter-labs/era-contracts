@@ -9,6 +9,9 @@ import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(0x8001);
 
+/// @dev The address of the account code storage system contract
+address constant L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = address(0x8002);
+
 /// @dev The address of the known code storage system contract
 address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(0x8004);
 
@@ -61,6 +64,9 @@ address constant L2_INTEROP_CENTER_ADDR = address(0x10006);
 
 /// @dev the address of the L2 interop handler
 address constant L2_INTEROP_HANDLER_ADDR = address(0x10007);
+
+/// @dev the address of the L2 interop center
+address constant L2_INTEROP_ACCOUNT_ADDR = address(0x10008);
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
