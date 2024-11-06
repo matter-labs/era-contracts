@@ -103,7 +103,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                         Bundle interface
     //////////////////////////////////////////////////////////////*/
 
-    function startBundle(uint256 _destinationChainId) external returns (bytes32 bundleId) {
+    function startBundle(uint256 _destinationChainId) external override returns (bytes32 bundleId) {
         bundleId = _startBundle(_destinationChainId, msg.sender);
     }
 
@@ -119,7 +119,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
     }
 
-    function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external {
+    function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external override {
         // console.log("addCallToBundle external", msg.sender);
         _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
     }
@@ -140,7 +140,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function finishAndSendBundle(
         bytes32 _bundleId,
         address _executionAddress
-    ) external payable returns (bytes32 interopBundleHash) {
+    ) external payable override returns (bytes32 interopBundleHash) {
         interopBundleHash = _finishAndSendBundle(_bundleId, _executionAddress);
     }
 
@@ -149,12 +149,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _executionAddress
     ) internal returns (bytes32 interopBundleHash) {
         require(block.chainid != L1_CHAIN_ID, "InteropCenter: Cannot send bundle from L1");
-        interopBundleHash = _finishAndSendBundle(_bundleId, _executionAddress, msg.value, msg.sender);
+        interopBundleHash = _finishAndSendBundleLong(_bundleId, _executionAddress, msg.value, msg.sender);
     }
 
-    event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
-
-    function _finishAndSendBundle(
+    function _finishAndSendBundleLong(
         bytes32 _bundleId,
         address _executionAddress,
         uint256 _receivedMsgValue,
@@ -236,7 +234,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                         Interop tx interface
     //////////////////////////////////////////////////////////////*/
 
-    function sendInteropTrigger(InteropTrigger memory _interopTrigger) public returns (bytes32 canonicalTxHash) {
+    function sendInteropTrigger(InteropTrigger memory _interopTrigger) public override returns (bytes32 canonicalTxHash) {
         if (block.chainid == L1_CHAIN_ID) {
             // on L1 we need to send the tx via an old interface
             revert("InteropCenter: Cannot send trigger from L1");
@@ -300,6 +298,30 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                         EOA helpers
     //////////////////////////////////////////////////////////////*/
 
+    function sendCall(
+        uint256 _destinationChainId,
+        address _destinationAddress,
+        bytes calldata _data,
+        uint256 _value
+    ) public payable returns (bytes32) { 
+        bytes32 bundleId = _startBundle(_destinationChainId, msg.sender);
+        _addCallToBundle(
+            bundleId, 
+            InteropCallRequest({
+                to: _destinationAddress,
+                value: _value,
+                data: _data
+            }), 
+            msg.sender);
+        bytes32 bundleHash = _finishAndSendBundleLong(
+                bundleId,
+                msg.sender,
+                msg.value,
+                msg.sender
+            );
+        return bundleHash;
+    }
+
     struct ExtraInputs {
         address sender;
         address refundRecipient;
@@ -311,7 +333,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropCallStarter[] memory _feePaymentCallStarters,
         InteropCallStarter[] memory _executionCallStarters,
         GasFields memory _gasFields
-    ) public payable returns (bytes32 canonicalTxHash) {
+    ) public payable override returns (bytes32 canonicalTxHash) {
         return
             _requestInterop(
                 _destinationChainId,
@@ -373,7 +395,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             }
         }
 
-        viaIR.feeBundleHash = _finishAndSendBundle(
+        viaIR.feeBundleHash = _finishAndSendBundleLong(
             viaIR.feeBundleId,
             _extraInputs.sender,
             feeValue,
@@ -398,7 +420,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             }
         }
 
-        bytes32 executionBundleHash = _finishAndSendBundle(
+        bytes32 executionBundleHash = _finishAndSendBundleLong(
             viaIR.executionBundleId,
             address(0),
             msg.value - feeValue,
@@ -474,7 +496,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
     function requestInteropSingleDirectCall(
         L2TransactionRequestDirect calldata _request
-    ) public payable returns (bytes32 canonicalTxHash) {
+    ) public payable override returns (bytes32 canonicalTxHash) {
         return _requestInteropSingleDirectCall(_request, msg.sender);
     }
 

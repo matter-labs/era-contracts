@@ -43,7 +43,7 @@ contract L2Erc20Test is Test, L2Erc20TestAbstract, SharedL2ContractL2DeployerUti
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public override(SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer) {
+    ) public override(SharedL2ContractL2DeployerUtils, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
 }

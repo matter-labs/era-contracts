@@ -72,7 +72,7 @@ contract InteropHandler is IInteropHandler {
     }
 
     function executeInteropBundle(Transaction calldata _transaction) external {
-        interopCounter++;
+        // interopCounter++;
         // todo verify signature.
         (, bytes memory executionBundle) = abi.decode(_transaction.data, (bytes, bytes));
         // // (bytes memory executionBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
@@ -188,6 +188,8 @@ contract InteropHandler is IInteropHandler {
         // Setting the length
         hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224);
     }
+
+    // kl todo add verifyInteropMsg
 
     // bytes memory returnData = this.mimicCall(
     //     gasleft(),

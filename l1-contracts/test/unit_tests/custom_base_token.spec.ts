@@ -10,7 +10,7 @@ import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
 import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
 import type { IL1NativeTokenVault } from "../../typechain/IL1NativeTokenVault";
 import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultFactory";
-import { IInteropCenter } from "../../typechain/IInteropCenter";
+import type { IInteropCenter } from "../../typechain/IInteropCenter";
 import { IInteropCenterFactory } from "../../typechain/IInteropCenterFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";

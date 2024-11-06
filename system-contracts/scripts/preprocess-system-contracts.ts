@@ -19,8 +19,8 @@ async function preprocess(testMode: boolean) {
     console.log("\x1b[31mWarning: test mode for the preprocessing being used!\x1b[0m");
     params.SYSTEM_CONTRACTS_OFFSET = "0x9000";
   }
-  const substring = "uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000;"
-  const replacingSubstring = `uint160 constant SYSTEM_CONTRACTS_OFFSET = ${params.SYSTEM_CONTRACTS_OFFSET};`
+  const substring = "uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000;";
+  const replacingSubstring = `uint160 constant SYSTEM_CONTRACTS_OFFSET = ${params.SYSTEM_CONTRACTS_OFFSET};`;
 
   const timestampFilePath = path.join(process.cwd(), TIMESTAMP_FILE);
   const folderToCheck = path.join(process.cwd(), CONTRACTS_DIR);
@@ -40,7 +40,7 @@ async function preprocess(testMode: boolean) {
   );
 
   for (const contractPath of contracts) {
-    let contract = fs.readFileSync(contractPath,'utf8');
+    const contract = fs.readFileSync(contractPath, "utf8");
     const preprocessed = await contract.replace(substring, replacingSubstring);
     const fileName = `${OUTPUT_DIR}/${contractPath.slice(CONTRACTS_DIR.length)}`;
     const directory = path.dirname(fileName);

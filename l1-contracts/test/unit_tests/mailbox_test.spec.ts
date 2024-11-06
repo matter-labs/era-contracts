@@ -3,15 +3,9 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
+import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet, InteropCenter } from "../../typechain";
 import {
-  Bridgehub,
-  Forwarder,
-  MailboxFacetTest,
-  MockExecutorFacet,
-  InteropCenter,
   InteropCenterFactory,
-} from "../../typechain";
-import {
   BridgehubFactory,
   ForwarderFactory,
   MailboxFacetFactory,

@@ -24,4 +24,5 @@ interface IInteropHandler {
     function setInteropAccountBytecode() external;
     function executePaymasterBundle(Transaction calldata _transaction) external;
     function executeInteropBundle(Transaction calldata _transaction) external;
+    function getAliasedAccount(address fromAsSalt, uint256) external view returns (address);
 }

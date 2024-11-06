@@ -54,7 +54,7 @@ contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2Deploy
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public override(SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer) {
+    ) public override(SharedL2ContractL2DeployerUtils, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
 }

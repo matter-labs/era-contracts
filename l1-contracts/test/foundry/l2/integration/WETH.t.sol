@@ -30,7 +30,7 @@ contract WethTest is Test, L2WethTestAbstract, SharedL2ContractL2DeployerUtils {
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public override(SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer) {
+    ) public override(SharedL2ContractL2DeployerUtils, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
 }
