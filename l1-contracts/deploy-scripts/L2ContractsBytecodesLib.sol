@@ -308,7 +308,7 @@ library L2ContractsBytecodesLib {
     function readTimestampAsserterBytecode() internal view returns (bytes memory) {
         return
             Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/dev-contracts/TimestampAsserter.sol/TimestampAsserter.json"
-        );
+                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/TimestampAsserter.sol/TimestampAsserter.json"
+            );
     }
 }
