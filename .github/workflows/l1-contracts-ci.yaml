@@ -98,7 +98,6 @@ jobs:
         with:
           submodules: recursive
 
-<<<<<<< HEAD
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -143,8 +142,6 @@ jobs:
         with:
           submodules: recursive
 
-=======
->>>>>>> 9fb1264
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:

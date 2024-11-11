@@ -80,19 +80,19 @@ jobs:
   #       with:
   #         toolchain: nightly-2023-04-17
 
-      # - name: Restore artifacts cache
-      #   uses: actions/cache/restore@v3
-      #   with:
-      #     fail-on-cache-miss: true
-      #     key: artifacts-system-${{ github.sha }}
-      #     path: |
-      #       system-contracts/zkout
-      #       system-contracts/cache-forge
-      #       system-contracts/bootloader/build
-      #       system-contracts/artifacts-zk
-      #       system-contracts/cache-zk
-      #       system-contracts/typechain
-      #       system-contracts/contracts-preprocessed
+  # - name: Restore artifacts cache
+  #   uses: actions/cache/restore@v3
+  #   with:
+  #     fail-on-cache-miss: true
+  #     key: artifacts-system-${{ github.sha }}
+  #     path: |
+  #       system-contracts/zkout
+  #       system-contracts/cache-forge
+  #       system-contracts/bootloader/build
+  #       system-contracts/artifacts-zk
+  #       system-contracts/cache-zk
+  #       system-contracts/typechain
+  #       system-contracts/contracts-preprocessed
 
   #     - name: Run bootloader tests
   #       run: |
@@ -141,7 +141,6 @@ jobs:
       - name: Print output logs of era_test_node
         if: always()
         run: cat era_test_node.log
-
 # FIXME: restore check hashes as it does not
 # work in the base branch as well
 # check-hashes:

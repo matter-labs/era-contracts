@@ -33,23 +33,15 @@ jobs:
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
-<<<<<<< HEAD
           yarn build:foundry
-=======
-          forge build
->>>>>>> 9fb1264
 
       - name: Build l2 contracts
         working-directory: l2-contracts
         run: |
-<<<<<<< HEAD
           yarn build:foundry
 
       - name: Build system contract artifacts
         run: yarn sc build
-=======
-          forge build --zksync --zk-enable-eravm-extensions
->>>>>>> 9fb1264
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -60,11 +52,8 @@ jobs:
             l1-contracts/out
             l2-contracts/cache-forge
             l2-contracts/zkout
-<<<<<<< HEAD
             system-contracts/cache-forge
             system-contracts/zkout
-=======
->>>>>>> 9fb1264
 
   lint:
     runs-on: ubuntu-latest
