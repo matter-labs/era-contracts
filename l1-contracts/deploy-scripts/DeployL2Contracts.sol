@@ -122,6 +122,15 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployTimestampAsserter() public {
+        initializeConfig();
+        loadContracts(false);
+
+        deployTimestampAsserter()();
+
+        saveOutput();
+    }
+
     function loadContracts(bool legacyBridge) internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readFoundryBytecode(
