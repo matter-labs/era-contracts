@@ -302,4 +302,13 @@ library L2ContractsBytecodesLib {
                 "/../l1-contracts/artifacts-zk/contracts/governance/L2ProxyAdminDeployer.sol/L2ProxyAdminDeployer.json"
             );
     }
+
+    /// @notice Reads the bytecode of the TimestampAsserter contract.
+    /// @return The bytecode of the TimestampAsserter contract.
+    function readTimestampAsserterBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/TimestampAsserter.sol/TimestampAsserter.json"
+            );
+    }
 }
