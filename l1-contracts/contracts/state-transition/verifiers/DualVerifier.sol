@@ -48,7 +48,7 @@ contract DualVerifier is IVerifier {
     ) public view virtual returns (bool) {
         // Ensure the recursive aggregation input has a valid length (at least one element
         // for the proof system differentiator).
-        if (_recursiveAggregationInput.length > 0) {
+        if (_recursiveAggregationInput.length == 0) {
             revert EmptyRecursiveAggregationInputLength();
         }
 
