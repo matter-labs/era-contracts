@@ -221,4 +221,13 @@ library L2ContractsBytecodesLib {
     function readL2WrappedBaseToken() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL1("L2WrappedBaseToken.sol", "L2WrappedBaseToken");
     }
+
+    /// @notice Reads the bytecode of the TimestampAsserter contract.
+    /// @return The bytecode of the TimestampAsserter contract.
+    function readTimestampAsserterBytecode() internal view returns (bytes memory) {
+        return
+            Utils.readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/TimestampAsserter.sol/TimestampAsserter.json"
+            );
+    }
 }
