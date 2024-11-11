@@ -5,14 +5,16 @@ pragma solidity 0.8.24;
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {ZkSyncHyperchainStorage, PubdataPricingMode} from "../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev ChainRegistrator serves as the main point for chain registration.
-contract ChainRegistrator is Ownable2StepUpgradeable {
+/// @dev ChainRegistrar serves as the main point for chain registration.
+contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     /// Address that will be used for deploying l2 contracts
     address l2Deployer;
     /// Bridgehub
@@ -76,9 +78,20 @@ contract ChainRegistrator is Ownable2StepUpgradeable {
         address governor;
     }
 
+    constructor(address _bridgehub, address _l2Deployer) {
+        bridgehub = IBridgehub(_bridgehub);
+        l2Deployer = _l2Deployer;
+    }
+
+    /// @notice used to initialize the contract
+    function initialize(address _owner) external {
+        _transferOwnership(_owner);
+    }
+
+
     function proposeChainRegistration(ChainConfig calldata config) public {
         bytes32 key = keccak256(abi.encode(msg.sender, config.chainId));
-        if (deployedChains[key] || bridgehub.getHyperchain(config.chainId) != address(0)) {
+        if (deployedChains[key] || bridgehub.stateTransitionManager(config.chainId) != address(0)) {
             revert ChainIsAlreadyDeployed();
         }
         proposedChains[key] = config;
@@ -108,16 +121,17 @@ contract ChainRegistrator is Ownable2StepUpgradeable {
         if (deployedChains[key]) {
             revert ChainIsAlreadyDeployed();
         }
-        address diamondProxy = bridgehub.getHyperchain(chainId);
-        if (diamondProxy == address(0)) {
+        address stm = bridgehub.stateTransitionManager(chainId);
+        if (stm == address(0)) {
             revert ChainIsNotYetDeployed();
         }
+        address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
         address chainAdmin = IZkSyncHyperchain(diamondProxy).getAdmin();
         address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }
-        emit NewChainDeployed(chainId, address(diamondProxy), address(chainAdmin));
+        emit NewChainDeployed(chainId, diamondProxy, chainAdmin);
         emit SharedBridgeRegistered(chainId, l2BridgeAddress);
         deployedChains[key] = true;
     }
