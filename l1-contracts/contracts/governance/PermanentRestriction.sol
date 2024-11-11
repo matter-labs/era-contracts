@@ -242,13 +242,12 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Tries to call `IGetters.getChainId()` function on the `_chain`.
-    /// @notice Function is internal for testing purposes only.
     /// It ensures that the returndata is of correct format and if not, it returns false.
     /// @param _chain The address of the potential chain
     /// @return chainId The chainId of the chain.
     /// @return success Whether the call was successful.
     /// If the second item is `false`, the caller should ignore the first value.
-    function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
+    function _getChainIdUnffallibleCall(address _chain) private view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;
 
         // Note, that we do use assembly here to ensure that the function does not panic in case of
@@ -272,6 +271,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Tries to get the new admin from the migration.
+    /// @notice Function is internal for testing purposes only.
     /// @param _call The call data.
     /// @return Returns a tuple of the new admin and whether the transaction is indeed the migration.
     /// If the second item is `false`, the caller should ignore the first value.
