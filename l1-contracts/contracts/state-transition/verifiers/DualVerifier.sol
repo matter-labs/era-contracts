@@ -45,7 +45,7 @@ contract DualVerifier is IVerifier {
         uint256[] calldata _publicInputs,
         uint256[] calldata _proof,
         uint256[] calldata _recursiveAggregationInput
-    ) public view virtual returns (bool) {
+    ) external view virtual returns (bool) {
         // Ensure the recursive aggregation input has a valid length (at least one element
         // for the proof system differentiator).
         if (_recursiveAggregationInput.length == 0) {
@@ -70,23 +70,6 @@ contract DualVerifier is IVerifier {
         }
     }
 
-    /// @notice Extract the recursive aggregation input by removing the first element (proof type differentiator).
-    /// @param _recursiveAggregationInput The original recursive aggregation input array.
-    /// @return result A new array with the first element removed. The first element was used as a hack for
-    /// differentiator between FFLONK and PLONK proofs.
-    function _extractRecursiveAggregationInput(
-        uint256[] calldata _recursiveAggregationInput
-    ) internal pure returns (uint256[] memory result) {
-        uint256 length = _recursiveAggregationInput.length;
-        // Allocate memory for the new array (length - 1) since the first element is omitted.
-        result = new uint256[](length - 1);
-
-        // Copy elements starting from index 1 (the second element) of the original array.
-        for (uint256 i = 1; i < length; ++i) {
-            result[i - 1] = _recursiveAggregationInput[i];
-        }
-    }
-
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view returns (bytes32) {
         return PLONK_VERIFIER.verificationKeyHash();
@@ -103,6 +86,23 @@ contract DualVerifier is IVerifier {
         // If the verifier type is unknown, revert with an error.
         else {
             revert UnknownVerifierType();
+        }
+    }
+
+    /// @notice Extract the recursive aggregation input by removing the first element (proof type differentiator).
+    /// @param _recursiveAggregationInput The original recursive aggregation input array.
+    /// @return result A new array with the first element removed. The first element was used as a hack for
+    /// differentiator between FFLONK and PLONK proofs.
+    function _extractRecursiveAggregationInput(
+        uint256[] calldata _recursiveAggregationInput
+    ) internal pure returns (uint256[] memory result) {
+        uint256 length = _recursiveAggregationInput.length;
+        // Allocate memory for the new array (length - 1) since the first element is omitted.
+        result = new uint256[](length - 1);
+
+        // Copy elements starting from index 1 (the second element) of the original array.
+        for (uint256 i = 1; i < length; ++i) {
+            result[i - 1] = _recursiveAggregationInput[i];
         }
     }
 }
