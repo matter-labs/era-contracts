@@ -98,6 +98,7 @@ jobs:
         with:
           submodules: recursive
 
+<<<<<<< HEAD
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -142,12 +143,21 @@ jobs:
         with:
           submodules: recursive
 
+=======
+>>>>>>> 9fb1264
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
           cache: yarn
 
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
       - name: Install dependencies
         run: yarn
 
