@@ -242,6 +242,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Tries to call `IGetters.getChainId()` function on the `_chain`.
+    /// @notice Function is internal for testing purposes only.
     /// It ensures that the returndata is of correct format and if not, it returns false.
     /// @param _chain The address of the potential chain
     /// @return chainId The chainId of the chain.
