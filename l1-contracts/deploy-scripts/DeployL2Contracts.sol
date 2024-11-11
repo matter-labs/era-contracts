@@ -126,7 +126,7 @@ contract DeployL2Script is Script {
         initializeConfig();
         loadContracts(false);
 
-        deployTimestampAsserter()();
+        deployTimestampAsserter();
 
         saveOutput();
     }
