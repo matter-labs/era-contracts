@@ -137,7 +137,7 @@ contract VerifierFflonk is IVerifierV2 {
     function verify(
         uint256[] calldata, // _publicInputs
         uint256[] calldata // _proof
-    ) public view virtual returns (bool) {
+    ) external view virtual returns (bool) {
         // Beginning of the big inline assembly block that makes all the verification work.
         // Note: We use the custom memory layout, so the return value should be returned from the assembly, not
         // Solidity code.
