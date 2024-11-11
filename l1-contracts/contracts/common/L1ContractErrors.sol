@@ -305,8 +305,6 @@ error ZeroAddress();
 error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
-// 0xe2e6f808
-error WrongRecursiveAggregationInputLength();
 // 0xc352bb73
 error UnknownVerifierType();
 // 0xdf320f0a
