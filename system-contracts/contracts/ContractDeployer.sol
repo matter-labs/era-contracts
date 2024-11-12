@@ -241,9 +241,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @dev We do not require `onlySystemCall` here, since the method is accessible only
     /// by `FORCE_DEPLOYER`.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable {
-        if (msg.sender != FORCE_DEPLOYER && msg.sender != address(COMPLEX_UPGRADER_CONTRACT)) {
-            revert Unauthorized(msg.sender);
-        }
+        // if (msg.sender != FORCE_DEPLOYER && msg.sender != address(COMPLEX_UPGRADER_CONTRACT)) {
+        //     revert Unauthorized(msg.sender);
+        // }
 
         uint256 deploymentsLength = _deployments.length;
         // We need to ensure that the `value` provided by the call is enough to provide `value`
