@@ -35,7 +35,7 @@ contract RegisterHyperchainScript is Script {
         address chainAdmin;
     }
 
-    ChainRegistrar chainRegistrar;
+    ChainRegistrar internal chainRegistrar;
     Config internal config;
     ChainRegistrar.ChainConfig internal chainConfig;
 
@@ -192,7 +192,7 @@ contract RegisterHyperchainScript is Script {
 
     function saveOutput() internal {
         vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
-        vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
+        string memory toml = vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
         vm.writeToml(toml, path);

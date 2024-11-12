@@ -106,22 +106,19 @@ contract ChainRegistrarTest is Test {
 
     function test_SuccessfulProposal() public {
         address author = makeAddr("author");
-        ChainRegistrar.BaseToken memory baseToken = ChainRegistrar.BaseToken({
+        vm.prank(author);
+        vm.recordLogs();
+        chainRegistrar.proposeChainRegistration({
+            chainId: 1,
+            pubdataPricingMode: PubdataPricingMode.Validium,
+            commitOperator: makeAddr("commitOperator"),
+            operator: makeAddr("operator"),
+            governor: makeAddr("governor"),
             tokenAddress: ETH_TOKEN_ADDRESS,
             tokenMultiplierSetter: makeAddr("setter"),
             gasPriceMultiplierNominator: 1,
             gasPriceMultiplierDenominator: 1
         });
-        vm.prank(author);
-        vm.recordLogs();
-        chainRegistrar.proposeChainRegistration(ChainRegistrar.ChainConfig({
-            chainId: 1,
-            pubdataPricingMode: PubdataPricingMode.Validium,
-            baseToken: baseToken,
-            commitOperator: makeAddr("commitOperator"),
-            operator: makeAddr("operator"),
-            governor: makeAddr("governor")
-        }));
         Vm.Log[] memory proposeLogs = vm.getRecordedLogs();
         console.logAddress(admin);
         console.logAddress(bridgeHub.admin());

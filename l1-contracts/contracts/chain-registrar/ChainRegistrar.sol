@@ -90,7 +90,31 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     }
 
 
-    function proposeChainRegistration(ChainConfig calldata config) public {
+    function proposeChainRegistration(
+        uint256 chainId,
+        PubdataPricingMode pubdataPricingMode,
+        address commitOperator,
+        address operator,
+        address governor,
+        address tokenAddress,
+        address tokenMultiplierSetter,
+        uint128 gasPriceMultiplierNominator,
+        uint128 gasPriceMultiplierDenominator
+    ) public {
+
+        ChainConfig memory config = ChainConfig({
+            chainId: chainId,
+            pubdataPricingMode: pubdataPricingMode,
+            commitOperator: commitOperator,
+            operator: operator,
+            governor: governor,
+            baseToken: BaseToken({
+            tokenAddress: tokenAddress,
+            tokenMultiplierSetter: tokenMultiplierSetter,
+            gasPriceMultiplierNominator: gasPriceMultiplierNominator,
+            gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
+        })
+        });
         bytes32 key = keccak256(abi.encode(msg.sender, config.chainId));
         if (deployedChains[key] || bridgehub.stateTransitionManager(config.chainId) != address(0)) {
             revert ChainIsAlreadyDeployed();
