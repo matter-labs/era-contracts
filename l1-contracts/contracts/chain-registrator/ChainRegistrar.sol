@@ -10,6 +10,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -126,13 +127,21 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert ChainIsNotYetDeployed();
         }
         address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
-        address chainAdmin = IZkSyncHyperchain(diamondProxy).getAdmin();
+        (bool success, bytes memory returnData) = diamondProxy.call(abi.encodeWithSelector(IGetters.getAdmin.selector));
+        address chainAdmin = bytesToAddress(returnData);
         address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }
+
         emit NewChainDeployed(chainId, diamondProxy, chainAdmin);
         emit SharedBridgeRegistered(chainId, l2BridgeAddress);
         deployedChains[key] = true;
+    }
+
+    function bytesToAddress(bytes memory bys) private pure returns (address addr) {
+        assembly {
+            addr := mload(add(bys, 32))
+        }
     }
 }

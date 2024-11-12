@@ -5,6 +5,7 @@ import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract DummyHyperchain is MailboxFacet {
+    address public admin;
     constructor(address bridgeHubAddress, uint256 _eraChainId) MailboxFacet(_eraChainId) {
         s.bridgehub = bridgeHubAddress;
     }
@@ -32,15 +33,23 @@ contract DummyHyperchain is MailboxFacet {
         s.priorityTxMaxGasLimit = type(uint256).max;
     }
 
+    function initialize(address _admin) external {
+        admin = _admin;
+    }
+
+    function getAdmin() external view returns (address) {
+        return admin;
+    }
+
     function _randomFeeParams() internal pure returns (FeeParams memory) {
         return
             FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            });
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
     }
 }
