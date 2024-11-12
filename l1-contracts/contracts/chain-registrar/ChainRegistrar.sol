@@ -19,7 +19,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     /// Address that will be used for deploying l2 contracts
     address l2Deployer;
     /// Bridgehub
-    IBridgehub bridgehub;
+    IBridgehub public bridgehub;
 
     /// Chains that has been succesfuly deployed
     mapping(bytes32 => bool) public deployedChains;
@@ -32,30 +32,16 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     error BridgeIsNotRegistered();
 
     /// @notice new chain is deployed
-    event NewChainDeployed(
-        uint256 indexed chainId,
-        address diamondProxy,
-        address chainAdmin
-    );
+    event NewChainDeployed(uint256 indexed chainId, address diamondProxy, address chainAdmin);
 
     /// @notice new chain is proposed to register
-    event NewChainRegistrationProposal(
-        uint256 indexed chainId,
-        address author,
-        bytes32 key
-    );
+    event NewChainRegistrationProposal(uint256 indexed chainId, address author, bytes32 key);
 
     /// @notice Shared bridge is registered on l2
-    event SharedBridgeRegistered(
-        uint256 indexed chainId,
-        address l2Address
-    );
+    event SharedBridgeRegistered(uint256 indexed chainId, address l2Address);
 
     /// @notice new chain is deployed
-    event L2DeployerChanged(
-        address newDeployer
-    );
-
+    event L2DeployerChanged(address newDeployer);
 
     struct BaseToken {
         address tokenAddress;
@@ -122,7 +108,8 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         proposedChains[key] = config;
         // For Deploying L2 contracts on for non ETH based networks, we as bridgehub owners required base token.
         if (config.baseToken.tokenAddress != ETH_TOKEN_ADDRESS) {
-            uint256 amount = 1 ether * config.baseToken.gasPriceMultiplierNominator / config.baseToken.gasPriceMultiplierDenominator;
+            uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
+                                config.baseToken.gasPriceMultiplierDenominator;
             if (IERC20(config.baseToken.tokenAddress).balanceOf(address(this)) < amount) {
                 IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
             }
@@ -130,18 +117,17 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         emit NewChainRegistrationProposal(config.chainId, msg.sender, key);
     }
 
-    function changeDeployer(address newDeployer) onlyOwner public {
+    function changeDeployer(address newDeployer) public onlyOwner {
         l2Deployer = newDeployer;
         emit L2DeployerChanged(l2Deployer);
     }
 
-    function getChainConfig(address author, uint256 chainId) public view returns (ChainConfig memory){
+    function getChainConfig(address author, uint256 chainId) public view returns (ChainConfig memory) {
         bytes32 key = keccak256(abi.encode(author, chainId));
         return proposedChains[key];
     }
 
-
-    function chainRegistered(address author, uint256 chainId) onlyOwner public {
+    function chainRegistered(address author, uint256 chainId) public onlyOwner {
         bytes32 key = keccak256(abi.encode(author, chainId));
         ChainConfig memory config = proposedChains[key];
         if (config.chainId == 0) {

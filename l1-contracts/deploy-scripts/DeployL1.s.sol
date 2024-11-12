@@ -309,16 +309,12 @@ contract DeployL1Script is Script {
     function deployChainRegistrar() internal {
         bytes memory bytecode = abi.encodePacked(
             type(ChainRegistrar).creationCode,
-            abi.encode(
-                addresses.bridgehub.bridgehubProxy,
-                config.l2Deployer
-            )
+            abi.encode(addresses.bridgehub.bridgehubProxy, config.l2Deployer)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Chain Registrar deployed at:", contractAddress);
         addresses.chainRegistrar = contractAddress;
     }
-
 
     function deployChainAdmin() internal {
         bytes memory bytecode = abi.encodePacked(

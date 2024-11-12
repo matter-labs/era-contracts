@@ -8,6 +8,8 @@ import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -28,6 +30,7 @@ contract RegisterHyperchainScript is Script {
         address proposalAuthor;
         address chainRegistrar;
         address bridgehub;
+        uint256 bridgehubCreateNewChainSalt;
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
@@ -65,19 +68,19 @@ contract RegisterHyperchainScript is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         config.stateTransitionProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
-        config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
         config.chainRegistrar = toml.readAddress("$.deployed_addresses.chain_registrar");
+        chainRegistrar = ChainRegistrar(config.chainRegistrar);
 
+        config.bridgehub = address(chainRegistrar.bridgehub());
+        config.validatorTimelock = StateTransitionManager(config.stateTransitionProxy).validatorTimelock();
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
 
         config.chainChainId = toml.readUint("$.chain.chain_chain_id");
-        config.proposalAuthor = toml.readUint("$.chain.proposal_author");
+        config.proposalAuthor = toml.readAddress("$.chain.proposal_author");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
-        chainRegistrar = ChainRegistrar(config.chainRegistrar);
     }
 
     function loadChain() internal {
@@ -98,7 +101,7 @@ contract RegisterHyperchainScript is Script {
             revert("Token address is not a contract address");
         }
 
-        console.log("Using base token address:", config.baseToken);
+        console.log("Using base token address:", chainConfig.baseToken.tokenAddress);
     }
 
     function registerTokenOnBridgehub() internal {
@@ -117,7 +120,6 @@ contract RegisterHyperchainScript is Script {
             console.log("Token registered on Bridgehub");
         }
     }
-
 
     function deployChainAdmin() internal {
         vm.broadcast();

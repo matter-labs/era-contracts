@@ -44,12 +44,12 @@ contract DummyHyperchain is MailboxFacet {
     function _randomFeeParams() internal pure returns (FeeParams memory) {
         return
             FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 1_000_000,
-            maxPubdataPerBatch: 110_000,
-            maxL2GasPerBatch: 80_000_000,
-            priorityTxMaxPubdata: 99_000,
-            minimalL2GasPrice: 250_000_000
-        });
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            });
     }
 }

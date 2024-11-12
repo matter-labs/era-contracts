@@ -20,7 +20,6 @@ import {ChainCreationParams} from "contracts/state-transition/IStateTransitionMa
 import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import "contracts/dev-contracts/test/DummyHyperchain.sol";
 
-
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
     DummyStateTransitionManagerWBH private stm;
@@ -31,8 +30,7 @@ contract ChainRegistrarTest is Test {
     bytes diamondCutData;
     bytes initCalldata;
 
-
-    constructor () public {
+    constructor() public {
         bridgeHub = new DummyBridgehub();
         stm = new DummyStateTransitionManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
@@ -58,28 +56,26 @@ contract ChainRegistrarTest is Test {
         bridgeHub.addStateTransitionManager(address(stm));
         bridgeHub.addToken(ETH_TOKEN_ADDRESS);
 
-
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
-
 
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(makeAddr("verifier")),
             verifierParams: VerifierParams({
-            recursionNodeLevelVkHash: bytes32(0),
-            recursionLeafLevelVkHash: bytes32(0),
-            recursionCircuitsSetVksHash: bytes32(0)
-        }),
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
             priorityTxMaxGasLimit: 10,
             feeParams: FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 1_000_000,
-            maxPubdataPerBatch: 110_000,
-            maxL2GasPerBatch: 80_000_000,
-            priorityTxMaxPubdata: 99_000,
-            minimalL2GasPrice: 250_000_000
-        }),
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            }),
             blobVersionedHashRetriever: makeAddr("blob")
         });
         initCalldata = abi.encode(initializeData);
@@ -134,6 +130,5 @@ contract ChainRegistrarTest is Test {
         vm.prank(admin);
         chainRegistrar.chainRegistered(author, 1);
         Vm.Log[] memory registeredLogs = vm.getRecordedLogs();
-
     }
 }
