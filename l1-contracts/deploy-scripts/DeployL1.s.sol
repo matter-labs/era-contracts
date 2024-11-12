@@ -34,6 +34,7 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+import {ChainRegistrar} from "../contracts/chain-registrar/ChainRegistrar.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
@@ -52,6 +53,7 @@ contract DeployL1Script is Script {
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
+        address chainRegistrar;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -88,6 +90,7 @@ contract DeployL1Script is Script {
         uint256 l1ChainId;
         uint256 eraChainId;
         address deployerAddress;
+        address l2Deployer;
         address ownerAddress;
         bool testnetVerifier;
         ContractsConfig contracts;
@@ -157,6 +160,7 @@ contract DeployL1Script is Script {
         deployErc20BridgeImplementation();
         deployErc20BridgeProxy();
         updateSharedBridge();
+        deployChainRegistrar();
 
         updateOwners();
 
@@ -176,6 +180,7 @@ contract DeployL1Script is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
+        config.l2Deployer = toml.readAddress("$.l2_deployer");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
@@ -300,6 +305,20 @@ contract DeployL1Script is Script {
         console.log("Governance deployed at:", contractAddress);
         addresses.governance = contractAddress;
     }
+
+    function deployChainRegistrar() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(ChainRegistrar).creationCode,
+            abi.encode(
+                addresses.bridgehub.bridgehubProxy,
+                config.l2Deployer
+            )
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("Chain Registrar deployed at:", contractAddress);
+        addresses.chainRegistrar = contractAddress;
+    }
+
 
     function deployChainAdmin() internal {
         bytes memory bytecode = abi.encodePacked(
@@ -715,6 +734,7 @@ contract DeployL1Script is Script {
         vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+        vm.serializeAddress("deployed_addresses", "chain_registrar", addresses.chainRegistrar);
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "bridges", bridges);
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
