@@ -8,7 +8,7 @@ import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interf
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import "contracts/bridgehub/Bridgehub.sol";
-import "contracts/chain-registrator/ChainRegistrar.sol";
+import "contracts/chain-registrar/ChainRegistrar.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import "contracts/dev-contracts/test/DummyBridgehub.sol";
@@ -18,7 +18,7 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import "../../../../../contracts/dev-contracts/test/DummyHyperchain.sol";
+import "contracts/dev-contracts/test/DummyHyperchain.sol";
 
 
 contract ChainRegistrarTest is Test {
@@ -128,8 +128,6 @@ contract ChainRegistrarTest is Test {
         console.logAddress(bridgeHub.owner());
         DummyHyperchain hyperchain = new DummyHyperchain(address(bridgeHub), 270);
         hyperchain.initialize(admin);
-//        console.logBytes4(GettersFacet.getAdmin.selector);
-//        console.logBytes4(DummyHyperchain.getAdmin.selector);
         vm.prank(admin);
         stm.setHyperchain(1, makeAddr("hyperchain"));
         bridgeHub.setStateTransitionManager(1, address(stm));

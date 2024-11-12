@@ -111,6 +111,11 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         emit L2DeployerChanged(l2Deployer);
     }
 
+    function getChainConfig(address author, uint256 chainId) public view returns (ChainConfig memory){
+        bytes32 key = keccak256(abi.encode(author, chainId));
+        return proposedChains[key];
+    }
+
 
     function chainRegistered(address author, uint256 chainId) onlyOwner public {
         bytes32 key = keccak256(abi.encode(author, chainId));
@@ -128,6 +133,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         }
         address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
         (bool success, bytes memory returnData) = diamondProxy.call(abi.encodeWithSelector(IGetters.getAdmin.selector));
+        require(success);
         address chainAdmin = bytesToAddress(returnData);
         address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
         if (l2BridgeAddress == address(0)) {
