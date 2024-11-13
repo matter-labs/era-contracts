@@ -175,6 +175,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         bytes memory initData2;
 
         {
+            // stack too deep
             initData1 = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),

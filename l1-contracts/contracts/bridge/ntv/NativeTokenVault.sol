@@ -430,8 +430,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _bridgeToken
     ) public view virtual override returns (address);
 
-    error TokenOriginChainIdMismatch(uint256 expected, uint256 actual);
-
     /// @notice Deploys and initializes the bridged token for the native counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.
     /// @param _originToken The address of origin token.

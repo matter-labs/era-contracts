@@ -48,10 +48,10 @@ function getPaddedSelector(contractName: string, method: string): string {
   return padZeroRight(result, PADDED_SELECTOR_LENGTH);
 }
 
-function getLeftPaddedSelector(contractName: string, method: string): string {
-  const result = getSelector(contractName, method);
-  return ethers.utils.hexlify(ethers.utils.zeroPad(result, 32));
-}
+// function getLeftPaddedSelector(contractName: string, method: string): string {
+//   const result = getSelector(contractName, method);
+//   return ethers.utils.hexlify(ethers.utils.zeroPad(result, 32));
+// }
 
 function getSystemContextCodeHash() {
   let bytecode;
@@ -91,11 +91,11 @@ const params = {
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
   RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2BaseToken", "mint"),
-  RIGHT_PADDED_MARK_AS_EXECUTED_SELECTOR: getPaddedSelector("L2Nullifier", "markAsExecuted"),
-  LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR: getLeftPaddedSelector(
-    "BootloaderUtilities",
-    "calculateXL2MerkleProof"
-  ),
+  // RIGHT_PADDED_MARK_AS_EXECUTED_SELECTOR: getPaddedSelector("L2Nullifier", "markAsExecuted"),
+  // LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR: getLeftPaddedSelector(
+  //   "BootloaderUtilities",
+  //   "calculateXL2MerkleProof"
+  // ),
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),

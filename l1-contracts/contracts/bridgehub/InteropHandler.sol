@@ -41,6 +41,18 @@ error LengthIsNotDivisibleBy32(uint256 length);
 contract InteropHandler is IInteropHandler {
     bytes32 public bytecodeHash;
 
+    /// @notice The balances of the users.
+    mapping(bytes32 txHash => bool alreadyExecuted) internal alreadyExecuted;
+
+    function markAsExecuted(bytes32 txHash) external {
+        // if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
+        //     revert Unauthorized(msg.sender);
+        // }
+        // // solhint-disable-next-line gas-custom-errors
+        // require(!alreadyExecuted[txHash], "L2N: Already executed");
+        // alreadyExecuted[txHash] = true;
+    }
+
     function setInteropAccountBytecode() public {
         IAccountCodeStorage codeStorage = IAccountCodeStorage(L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT);
         bytecodeHash = codeStorage.getRawCodeHash(L2_INTEROP_ACCOUNT_ADDR);
