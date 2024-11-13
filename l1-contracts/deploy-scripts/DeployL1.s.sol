@@ -312,6 +312,8 @@ contract DeployL1Script is Script {
             abi.encode(addresses.bridgehub.bridgehubProxy, config.l2Deployer)
         );
         address contractAddress = deployViaCreate2(bytecode);
+        vm.broadcast();
+        ChainRegistrar(contractAddress).initialize(config.ownerAddress);
         console.log("Chain Registrar deployed at:", contractAddress);
         addresses.chainRegistrar = contractAddress;
     }

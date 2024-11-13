@@ -2,13 +2,14 @@
 
 pragma solidity ^0.8.21;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
@@ -22,6 +23,8 @@ contract DeployL2Script is Script {
         address l1SharedBridgeProxy;
         address governance;
         address erc20BridgeProxy;
+        address chainRegistrar;
+        address proposalAuthor;
         // The owner of the contract sets the validator/attester weights.
         // Can be the developer multisig wallet on mainnet.
         address consensusRegistryOwner;
@@ -65,6 +68,7 @@ contract DeployL2Script is Script {
         deploySharedBridge();
         deploySharedBridgeProxy(legacyBridge);
         initializeChain();
+        finalizeRegistration();
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -90,6 +94,7 @@ contract DeployL2Script is Script {
         deploySharedBridge();
         deploySharedBridgeProxy(legacyBridge);
         initializeChain();
+        finalizeRegistration();
 
         saveOutput();
     }
@@ -184,6 +189,8 @@ contract DeployL2Script is Script {
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
         config.erc20BridgeProxy = toml.readAddress("$.erc20_bridge");
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
+        config.chainRegistrar = toml.readAddress("$.chain_registrar");
+        config.proposalAuthor = toml.readAddress("$.proposal_author");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
     }
@@ -365,5 +372,13 @@ contract DeployL2Script is Script {
             _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
             _value: 0
         });
+    }
+
+    function finalizeRegistration() internal {
+        ChainRegistrar chainRegistrar = ChainRegistrar(config.chainRegistrar);
+        console.logAddress(msg.sender);
+        console.logAddress(chainRegistrar.owner());
+        vm.broadcast();
+        chainRegistrar.chainRegistered(config.proposalAuthor, config.chainId);
     }
 }

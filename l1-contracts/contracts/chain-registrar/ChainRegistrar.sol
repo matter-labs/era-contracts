@@ -32,7 +32,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     error BridgeIsNotRegistered();
 
     /// @notice new chain is deployed
-    event NewChainDeployed(uint256 indexed chainId, address diamondProxy, address chainAdmin);
+    event NewChainDeployed(uint256 indexed chainId, address author, address diamondProxy, address chainAdmin);
 
     /// @notice new chain is proposed to register
     event NewChainRegistrationProposal(uint256 indexed chainId, address author, bytes32 key);
@@ -40,7 +40,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     /// @notice Shared bridge is registered on l2
     event SharedBridgeRegistered(uint256 indexed chainId, address l2Address);
 
-    /// @notice new chain is deployed
+    /// @notice L2 Deployer has changed
     event L2DeployerChanged(address newDeployer);
 
     struct BaseToken {
@@ -75,7 +75,6 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         _transferOwnership(_owner);
     }
 
-
     function proposeChainRegistration(
         uint256 chainId,
         PubdataPricingMode pubdataPricingMode,
@@ -87,7 +86,6 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         uint128 gasPriceMultiplierNominator,
         uint128 gasPriceMultiplierDenominator
     ) public {
-
         ChainConfig memory config = ChainConfig({
             chainId: chainId,
             pubdataPricingMode: pubdataPricingMode,
@@ -95,11 +93,11 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             operator: operator,
             governor: governor,
             baseToken: BaseToken({
-            tokenAddress: tokenAddress,
-            tokenMultiplierSetter: tokenMultiplierSetter,
-            gasPriceMultiplierNominator: gasPriceMultiplierNominator,
-            gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
-        })
+                tokenAddress: tokenAddress,
+                tokenMultiplierSetter: tokenMultiplierSetter,
+                gasPriceMultiplierNominator: gasPriceMultiplierNominator,
+                gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
+            })
         });
         bytes32 key = keccak256(abi.encode(msg.sender, config.chainId));
         if (deployedChains[key] || bridgehub.stateTransitionManager(config.chainId) != address(0)) {
@@ -109,7 +107,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         // For Deploying L2 contracts on for non ETH based networks, we as bridgehub owners required base token.
         if (config.baseToken.tokenAddress != ETH_TOKEN_ADDRESS) {
             uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
-                                config.baseToken.gasPriceMultiplierDenominator;
+                config.baseToken.gasPriceMultiplierDenominator;
             if (IERC20(config.baseToken.tokenAddress).balanceOf(address(this)) < amount) {
                 IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
             }
@@ -150,7 +148,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert BridgeIsNotRegistered();
         }
 
-        emit NewChainDeployed(chainId, diamondProxy, chainAdmin);
+        emit NewChainDeployed(chainId, diamondProxy, author, chainAdmin);
         emit SharedBridgeRegistered(chainId, l2BridgeAddress);
         deployedChains[key] = true;
     }
