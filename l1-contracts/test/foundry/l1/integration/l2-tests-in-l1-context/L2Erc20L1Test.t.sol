@@ -25,14 +25,16 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2Erc20TestAbstract} from "./L2Erc20TestAbstract.t.sol";
-import {SharedL2ContractL1DeployerUtils} from "./_SharedL2ContractL1DeployerUtils.sol";
+
+import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {L2Erc20TestAbstract} from "../l2-tests-abstract/L2Erc20TestAbstract.t.sol";
+
+import {SharedL2ContractL1DeployerUtils, SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
+
 
 contract L2Erc20L1Test is Test, SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer, L2Erc20TestAbstract {
     function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}

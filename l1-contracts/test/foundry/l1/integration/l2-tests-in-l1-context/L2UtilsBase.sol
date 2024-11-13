@@ -20,8 +20,8 @@ import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
 import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
 
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 import {Utils} from "../../../../../deploy-scripts/Utils.sol";
+import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 library L2UtilsBase {
     using stdToml for string;

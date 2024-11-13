@@ -22,8 +22,8 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {SharedL2ContractL1DeployerUtils} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
 import {L2Utils, SystemContractsArgs} from "./L2Utils.sol";
 import {SharedL2ContractL2DeployerUtils} from "./_SharedL2ContractL2DeployerUtils.sol";
-import {L2Erc20TestAbstract} from "../../l1/integration/l2-tests-in-l1-context/L2Erc20TestAbstract.t.sol";
-import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+import {L2Erc20TestAbstract} from "../../l1/integration/l2-tests-abstract/L2Erc20TestAbstract.t.sol";
+import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 contract L2Erc20Test is Test, L2Erc20TestAbstract, SharedL2ContractL2DeployerUtils {
     function test() internal virtual override(DeployUtils, SharedL2ContractL2DeployerUtils) {}

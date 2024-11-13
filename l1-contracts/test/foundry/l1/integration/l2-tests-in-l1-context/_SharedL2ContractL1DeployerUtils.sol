@@ -28,20 +28,9 @@ import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
 import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
 
-import {L2UtilsBase} from "./L2UtilsBase.sol";
+import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
-struct SystemContractsArgs {
-    bool broadcast;
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    address legacySharedBridge;
-    address l2TokenBeacon;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedOwner;
-    bool contractsDeployedAlready;
-    address l1CtmDeployer;
-}
+import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 contract SharedL2ContractL1DeployerUtils is DeployUtils {
     using stdToml for string;
@@ -51,8 +40,6 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual {
         L2UtilsBase.initSystemContracts(_args);
     }
-
-
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual {
         deployL2ContractsInner(_l1ChainId, false);

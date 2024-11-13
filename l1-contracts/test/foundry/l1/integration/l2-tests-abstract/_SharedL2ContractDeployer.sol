@@ -32,9 +32,22 @@ import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncodi
 
 import {IChainTypeManager} from "../../../../../contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../../../../../contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
+// import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "../../../../../deploy-scripts/DeployUtils.s.sol";
+
+struct SystemContractsArgs {
+    bool broadcast;
+    uint256 l1ChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    address legacySharedBridge;
+    address l2TokenBeacon;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedOwner;
+    bool contractsDeployedAlready;
+    address l1CtmDeployer;
+}
 
 abstract contract SharedL2ContractDeployer is DeployUtils {
     L2WrappedBaseToken internal weth;

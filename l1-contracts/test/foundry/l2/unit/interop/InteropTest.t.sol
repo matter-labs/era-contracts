@@ -18,7 +18,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} fro
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-import {SystemContractsArgs} from "../../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+import {SystemContractsArgs} from "../../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {L2Utils} from "../../integration/L2Utils.sol";
 import {L2TransactionRequestTwoBridgesOuter, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
