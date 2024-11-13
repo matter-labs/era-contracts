@@ -9,7 +9,7 @@
     "const-name-snakecase": "off",
     "contract-name-camelcase": "off",
     "gas-calldata-parameters": "error",
-    "gas-custom-errors": "error",
+    "gas-custom-errors": "warn",
     "gas-increment-by-one": "error",
     "gas-length-in-loops": "error",
     "gas-struct-packing": "error",
