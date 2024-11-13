@@ -789,10 +789,10 @@ for { } true { } {
     }
     case 0x58 { // OP_PC
         evmGasLeft := chargeGas(evmGasLeft, 2)
-        ip := add(ip, 1)
 
-        // PC = ip - 32 (bytecode size) - 1 (current instruction)
-        sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_LEN_OFFSET()), 33), stackHead)
+        sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+
+        ip := add(ip, 1)
     }
     case 0x59 { // OP_MSIZE
         evmGasLeft := chargeGas(evmGasLeft, 2)
