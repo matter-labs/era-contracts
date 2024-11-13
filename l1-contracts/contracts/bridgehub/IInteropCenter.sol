@@ -93,7 +93,7 @@ interface IInteropCenter {
 
     function requestInteropSingleCall(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable returns (bytes32 canonicalTxHash); 
+    ) external payable returns (bytes32 canonicalTxHash);
 
     function requestInteropSingleDirectCall(
         L2TransactionRequestDirect calldata _request

@@ -17,7 +17,6 @@ import {Unauthorized} from "./SystemContractErrors.sol";
 contract L2Nullifier is IL2Nullifier {
     // /// @notice The balances of the users.
     // mapping(bytes32 txHash => bool alreadyExecuted) internal alreadyExecuted;
-
     // function markAsExecuted(bytes32 txHash) external {
     //     // if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
     //     //     revert Unauthorized(msg.sender);

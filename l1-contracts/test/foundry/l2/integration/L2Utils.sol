@@ -88,15 +88,9 @@ library L2Utils {
             _args.aliasedOwner = RANDOM_ADDRESS;
         }
         forceDeployMessageRoot(_args);
-        forceDeployBridgehub(
-            _args
-        );
-        forceDeployAssetRouter(
-            _args
-        );
-        forceDeployNativeTokenVault(
-            _args
-        );
+        forceDeployBridgehub(_args);
+        forceDeployAssetRouter(_args);
+        forceDeployNativeTokenVault(_args);
         forceDeployInteropCenter(_args);
         forceDeployInteropAccount(_args);
         forceDeployInteropHandler(_args);
@@ -108,12 +102,15 @@ library L2Utils {
         forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR), _args.broadcast);
     }
 
-    function forceDeployBridgehub(
-        SystemContractsArgs memory _args
-    ) internal {
+    function forceDeployBridgehub(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
         new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100);
-        forceDeployWithConstructor("Bridgehub", L2_BRIDGEHUB_ADDR, abi.encode(_args.l1ChainId, _args.aliasedOwner, 100), _args.broadcast);
+        forceDeployWithConstructor(
+            "Bridgehub",
+            L2_BRIDGEHUB_ADDR,
+            abi.encode(_args.l1ChainId, _args.aliasedOwner, 100),
+            _args.broadcast
+        );
         Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
         prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
 
@@ -142,24 +139,14 @@ library L2Utils {
     function forceDeployInteropAccount(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
         new InteropAccount();
-        forceDeployWithConstructor(
-            "InteropAccount",
-            L2_INTEROP_ACCOUNT_ADDR,
-            abi.encode()
-            , _args.broadcast
-        );
+        forceDeployWithConstructor("InteropAccount", L2_INTEROP_ACCOUNT_ADDR, abi.encode(), _args.broadcast);
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
         new InteropHandler();
-        forceDeployWithConstructor(
-            "InteropHandler",
-            L2_INTEROP_HANDLER_ADDR,
-            abi.encode()
-            , _args.broadcast
-        );
+        forceDeployWithConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR, abi.encode(), _args.broadcast);
         InteropHandler interopHandler = InteropHandler(L2_INTEROP_HANDLER_ADDR);
         prankOrBroadcast(_args.broadcast, L2_FORCE_DEPLOYER_ADDR);
         interopHandler.setInteropAccountBytecode();
@@ -170,20 +157,32 @@ library L2Utils {
     // / @param _eraChainId The chain ID of the era chain.
     // / @param _l1AssetRouter The address of the L1 asset router.
     // / @param _legacySharedBridge The address of the legacy shared bridge.
-    function forceDeployAssetRouter(
-        SystemContractsArgs memory _args
-    ) internal {
+    function forceDeployAssetRouter(SystemContractsArgs memory _args) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
-        {   
+        {
             prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-            new L2AssetRouter(_args.l1ChainId, _args.eraChainId, _args.l1AssetRouter, _args.legacySharedBridge, ethAssetId, _args.aliasedOwner);
+            new L2AssetRouter(
+                _args.l1ChainId,
+                _args.eraChainId,
+                _args.l1AssetRouter,
+                _args.legacySharedBridge,
+                ethAssetId,
+                _args.aliasedOwner
+            );
         }
         forceDeployWithConstructor(
             "L2AssetRouter",
             L2_ASSET_ROUTER_ADDR,
-            abi.encode(_args.l1ChainId, _args.eraChainId, _args.l1AssetRouter, _args.legacySharedBridge, ethAssetId, _args.aliasedOwner)
-            , _args.broadcast
+            abi.encode(
+                _args.l1ChainId,
+                _args.eraChainId,
+                _args.l1AssetRouter,
+                _args.legacySharedBridge,
+                ethAssetId,
+                _args.aliasedOwner
+            ),
+            _args.broadcast
         );
     }
 
@@ -194,12 +193,10 @@ library L2Utils {
     // / @param _legacySharedBridge The address of the legacy shared bridge.
     // / @param _l2TokenBeacon The address of the L2 token beacon.
     // / @param _contractsDeployedAlready Whether the contracts are deployed already.
-    function forceDeployNativeTokenVault(
-        SystemContractsArgs memory _args
-    ) internal {
+    function forceDeployNativeTokenVault(SystemContractsArgs memory _args) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
-        {   
+        {
             prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
             new L2NativeTokenVault({
                 _l1ChainId: _args.l1ChainId,
@@ -224,8 +221,8 @@ library L2Utils {
                 _args.contractsDeployedAlready,
                 address(0),
                 ethAssetId
-            )
-            , _args.broadcast
+            ),
+            _args.broadcast
         );
     }
 
@@ -235,11 +232,7 @@ library L2Utils {
         bytes memory _constructorArgs,
         bool _broadcast
     ) public {
-        console.log(string.concat(
-            "Force deploying ", 
-            _contractName,
-            string(abi.encode(_address))
-        ));
+        console.log(string.concat("Force deploying ", _contractName, string(abi.encode(_address))));
         bytes memory bytecode = readEraBytecode(_contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
@@ -253,7 +246,6 @@ library L2Utils {
             input: _constructorArgs
         });
         console.logBytes32(bytecodehash);
-
 
         prankOrBroadcast(_broadcast, RANDOM_ADDRESS);
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(deployments);

@@ -35,7 +35,6 @@ import {L2Erc20TestAbstract} from "../l2-tests-abstract/L2Erc20TestAbstract.t.so
 
 import {SharedL2ContractL1DeployerUtils, SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
-
 contract L2Erc20L1Test is Test, SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer, L2Erc20TestAbstract {
     function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
 

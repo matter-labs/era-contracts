@@ -136,7 +136,7 @@ abstract contract SharedL2ContractDeployer is DeployUtils {
         );
         if (!_skip) {
             deployL2Contracts(L1_CHAIN_ID);
-            
+
             vm.prank(aliasedL1AssetRouter);
             l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_BRIDGEHUB_ADDR);
             vm.prank(ownerWallet);

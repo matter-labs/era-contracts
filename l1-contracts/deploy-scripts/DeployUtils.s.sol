@@ -386,11 +386,13 @@ contract DeployUtils is Script {
     function deployChainTypeManagerProxy() internal {
         string memory root = vm.projectRoot();
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
-        string memory inputPath = string.concat(root,
+        string memory inputPath = string.concat(
+            root,
             "/",
             CONTRACTS_PATH,
             "/l1-contracts",
-            "/script-out/diamond-selectors.toml");
+            "/script-out/diamond-selectors.toml"
+        );
         string memory toml = vm.readFile(inputPath);
 
         bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");

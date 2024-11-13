@@ -524,11 +524,13 @@ contract DeployL1Script is Script, DeployUtils {
 
         string memory root = vm.projectRoot();
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
-        string memory outputPath = string.concat(root,
+        string memory outputPath = string.concat(
+            root,
             "/",
             CONTRACTS_PATH,
             "/l1-contracts",
-            "/script-out/diamond-selectors.toml");
+            "/script-out/diamond-selectors.toml"
+        );
 
         bytes memory adminFacetSelectorsBytes = abi.encode(adminFacetSelectors);
         bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);

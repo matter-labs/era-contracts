@@ -97,7 +97,7 @@ library L2UtilsBase {
         // //     .sig("assetHandlerAddress(bytes32)")
         // //     .with_key(baseTokenAssetId)
         // //     .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
-        
+
         // bytes memory ntvBytecode = Utils.readL1ContractsBytecode("bridge/ntv/", "L2NativeTokenVault");
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 

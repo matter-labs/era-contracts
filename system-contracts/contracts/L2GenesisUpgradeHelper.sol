@@ -57,10 +57,7 @@ library L2GenesisUpgradeHelper {
             }
         }
 
-        bytes memory interopHandlerConstructorData = abi.encodeCall(
-            L2_INTEROP_HANDLER.setInteropAccountBytecode,
-            ()
-        );
+        bytes memory interopHandlerConstructorData = abi.encodeCall(L2_INTEROP_HANDLER.setInteropAccountBytecode, ());
 
         (bool success3, bytes memory returnData3) = SystemContractHelper.mimicCall(
             address(L2_INTEROP_HANDLER),

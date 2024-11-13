@@ -242,7 +242,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                         Interop tx interface
     //////////////////////////////////////////////////////////////*/
 
-    function sendInteropTrigger(InteropTrigger memory _interopTrigger) public override returns (bytes32 canonicalTxHash) {
+    function sendInteropTrigger(
+        InteropTrigger memory _interopTrigger
+    ) public override returns (bytes32 canonicalTxHash) {
         if (block.chainid == L1_CHAIN_ID) {
             // on L1 we need to send the tx via an old interface
             revert("InteropCenter: Cannot send trigger from L1");
@@ -311,22 +313,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _destinationAddress,
         bytes calldata _data,
         uint256 _value
-    ) public payable returns (bytes32) { 
+    ) public payable returns (bytes32) {
         bytes32 bundleId = _startBundle(_destinationChainId, msg.sender);
         _addCallToBundle(
-            bundleId, 
-            InteropCallRequest({
-                to: _destinationAddress,
-                value: _value,
-                data: _data
-            }), 
-            msg.sender);
-        bytes32 bundleHash = _finishAndSendBundleLong(
-                bundleId,
-                msg.sender,
-                msg.value,
-                msg.sender
-            );
+            bundleId,
+            InteropCallRequest({to: _destinationAddress, value: _value, data: _data}),
+            msg.sender
+        );
+        bytes32 bundleHash = _finishAndSendBundleLong(bundleId, msg.sender, msg.value, msg.sender);
         return bundleHash;
     }
 

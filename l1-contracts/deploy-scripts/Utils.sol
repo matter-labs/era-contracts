@@ -245,7 +245,7 @@ library Utils {
     // function getL1ContractsPath(string memory path, string memory filename) internal view returns (string memory) {
     //     string memory root = vm.projectRoot();
     //     string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
-        
+
     //     // solhint-disable-next-line func-named-parameters
     //     return string.concat(
     //         root,

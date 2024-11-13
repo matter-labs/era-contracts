@@ -44,7 +44,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
     function deployL2Contracts(uint256 _l1ChainId) public virtual {
         deployL2ContractsInner(_l1ChainId, false);
     }
-    
+
     function deployL2ContractsInner(uint256 _l1ChainId, bool _skip) public {
         string memory root = vm.projectRoot();
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
@@ -65,7 +65,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {
-            instantiateCreate2Factory(); 
+            instantiateCreate2Factory();
         }
         deployGenesisUpgrade();
         deployVerifier();
