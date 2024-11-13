@@ -132,8 +132,12 @@ object "EvmEmulator" {
             offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
         }
         
+        function MAX_STACK_SLOT_OFFSET() -> offset {
+            offset := add(STACK_OFFSET(), mul(1023, 32))
+        }
+        
         function BYTECODE_LEN_OFFSET() -> offset {
-            offset := add(STACK_OFFSET(), mul(1024, 32))
+            offset := add(MAX_STACK_SLOT_OFFSET(), 32)
         }
         
         function BYTECODE_OFFSET() -> offset {
@@ -514,7 +518,7 @@ object "EvmEmulator" {
         }
         
         function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-            if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
+            if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
                 panic()
             }
         
@@ -537,12 +541,6 @@ object "EvmEmulator" {
         
         function popStackCheck(sp, numInputs) {
             if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-                panic()
-            }
-        }
-        
-        function pushStackCheck(sp, numInputs) {
-            if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
                 panic()
             }
         }
@@ -3180,8 +3178,12 @@ object "EvmEmulator" {
                 offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
             }
             
+            function MAX_STACK_SLOT_OFFSET() -> offset {
+                offset := add(STACK_OFFSET(), mul(1023, 32))
+            }
+            
             function BYTECODE_LEN_OFFSET() -> offset {
-                offset := add(STACK_OFFSET(), mul(1024, 32))
+                offset := add(MAX_STACK_SLOT_OFFSET(), 32)
             }
             
             function BYTECODE_OFFSET() -> offset {
@@ -3562,7 +3564,7 @@ object "EvmEmulator" {
             }
             
             function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-                if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
+                if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
                     panic()
                 }
             
@@ -3585,12 +3587,6 @@ object "EvmEmulator" {
             
             function popStackCheck(sp, numInputs) {
                 if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-                    panic()
-                }
-            }
-            
-            function pushStackCheck(sp, numInputs) {
-                if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
                     panic()
                 }
             }
