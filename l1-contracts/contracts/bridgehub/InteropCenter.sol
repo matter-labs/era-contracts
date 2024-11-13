@@ -664,7 +664,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) internal nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
-            revert AddressTooLow(_request.secondBridgeAddress);
+            revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
         }
 
         {
@@ -766,22 +766,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             // solhint-disable-next-line func-named-parameters
             // emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
         }
-    }
-
-    /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
-    /// @param _chainId the chainId of the chain
-    /// @param _canonicalTxHash the canonical transaction hash
-    /// @param _expirationTimestamp the expiration timestamp for the transaction
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external override onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID == block.chainid) {
-            revert BridgehubOnL1();
-        }
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
     /// @notice forwards function call to Mailbox based on ChainId

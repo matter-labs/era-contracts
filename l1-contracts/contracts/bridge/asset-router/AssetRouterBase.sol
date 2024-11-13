@@ -273,7 +273,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
         } else {
             assetHandlerAddress[_assetId] = _nativeTokenVault;
-            IAssetHandler(_nativeTokenVault).bridgeMint(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
+            IAssetHandler(_nativeTokenVault).bridgeMint(_chainId, _assetId, _transferData);
         }
     }
 

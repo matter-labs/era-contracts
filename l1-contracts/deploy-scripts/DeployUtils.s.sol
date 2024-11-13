@@ -54,6 +54,7 @@ import {ICTMDeploymentTracker} from "../contracts/bridgehub/ICTMDeploymentTracke
 import {IMessageRoot} from "../contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "../contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -69,8 +70,6 @@ struct FixedForceDeploymentsData {
     bytes32 interopCenterBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
-    address l2BridgeProxyOwnerAddress;
-    address l2BridgedStandardERC20ProxyOwnerAddress;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -96,6 +95,7 @@ struct L1NativeTokenVaultAddresses {
 }
 
 struct DataAvailabilityDeployedAddresses {
+    address rollupDAManager;
     address l1RollupDAValidator;
     address l1ValidiumDAValidator;
 }
@@ -269,6 +269,12 @@ contract DeployUtils is Script {
             );
     }
 
+    function deployBytecodesSupplier() internal {
+        address contractAddress = deployViaCreate2(type(BytecodesSupplier).creationCode, "");
+        console.log("BytecodesSupplier deployed at:", contractAddress);
+        addresses.stateTransition.bytecodesSupplier = contractAddress;
+    }
+
     function deployVerifier() internal {
         bytes memory code;
         if (config.testnetVerifier) {
@@ -341,18 +347,21 @@ contract DeployUtils is Script {
         addresses.transparentProxyAdmin = address(proxyAdmin);
     }
 
-    function deployChainTypeManagerContract() internal {
-        deployStateTransitionDiamondFacets();
+    function deployChainTypeManagerContract(address _rollupDAManager) internal {
+        deployStateTransitionDiamondFacets(_rollupDAManager);
         deployChainTypeManagerImplementation();
         deployChainTypeManagerProxy();
     }
 
-    function deployStateTransitionDiamondFacets() internal {
-        address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode, abi.encode());
+    function deployStateTransitionDiamondFacets(address _rollupDAManager) internal {
+        address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId));
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
-        address adminFacet = deployViaCreate2(type(AdminFacet).creationCode, abi.encode(config.l1ChainId));
+        address adminFacet = deployViaCreate2(
+            type(AdminFacet).creationCode,
+            abi.encode(config.l1ChainId, _rollupDAManager)
+        );
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 

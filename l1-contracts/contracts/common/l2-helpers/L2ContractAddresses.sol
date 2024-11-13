@@ -45,7 +45,7 @@ address constant L2_COMPLEX_UPGRADER_ADDR = address(0x800f);
 /// @dev The address used to execute the genesis upgrade
 address constant L2_GENESIS_UPGRADE_ADDR = address(0x10001);
 
-/// @dev The address of the L2 bridge hub system contract, used to start L2<>L2 transactions
+/// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(0x10002);
 
 /// @dev the address of the l2 asset router.
@@ -70,9 +70,6 @@ address constant L2_INTEROP_ACCOUNT_ADDR = address(0x10008);
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
-
-/// @dev the address of the deployer system contract
-address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
 /// @dev the address of the l2 messenger system contract
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));

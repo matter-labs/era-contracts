@@ -60,10 +60,9 @@ library MessageHashing {
         if (metadataAsUint256 == 0) {
             // It is the new version
             bytes1 metadataVersion = bytes1(proofMetadata);
-            require(
-                uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION,
-                "Mailbox: unsupported proof metadata version"
-            );
+            if (uint256(uint8(metadataVersion)) != SUPPORTED_PROOF_METADATA_VERSION) {
+                revert UnsupportedProofMetadataVersion(uint256(uint8(metadataVersion)));
+            }
 
             proofStartIndex = 1;
             logLeafProofLen = uint256(uint8(proofMetadata[1]));

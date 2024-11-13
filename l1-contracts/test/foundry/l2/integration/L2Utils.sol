@@ -9,7 +9,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "../../../../contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -78,7 +78,7 @@ library L2Utils {
      */
     function initSystemContracts(SystemContractsArgs memory _args) internal {
         bytes memory contractDeployerBytecode = readSystemContractsBytecode("ContractDeployer");
-        vm.etch(DEPLOYER_SYSTEM_CONTRACT, contractDeployerBytecode);
+        vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, contractDeployerBytecode);
         forceDeploySystemContracts(_args);
     }
 
@@ -248,7 +248,7 @@ library L2Utils {
         console.logBytes32(bytecodehash);
 
         prankOrBroadcast(_broadcast, RANDOM_ADDRESS);
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(deployments);
+        IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
     }
 
     function deployViaCreat2L2(

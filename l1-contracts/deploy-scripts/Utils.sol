@@ -48,6 +48,7 @@ address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03);
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
 address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
+address constant L2_WETH_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
 address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
@@ -65,6 +66,7 @@ struct StateTransitionDeployedAddresses {
     address defaultUpgrade;
     address validatorTimelock;
     address diamondProxy;
+    address bytecodesSupplier;
 }
 
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error
@@ -191,7 +193,6 @@ library Utils {
     function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
-        console.log(path);
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
         return bytecode;
@@ -211,7 +212,7 @@ library Utils {
                 ".json"
             )
         );
-        bytes memory bytecode = vm.parseJson(file, "$.bytecode");
+        bytes memory bytecode = vm.parseJsonBytes(file, "$.bytecode");
         return bytecode;
     }
 
@@ -261,6 +262,30 @@ library Utils {
     // }
 
     /**
+     * @dev Returns the bytecode of a given system contract.
+     */
+    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
+        // It is the only exceptional case
+        if (keccak256(abi.encodePacked(filename)) == keccak256(abi.encodePacked("EventWriter"))) {
+            return
+                vm.readFileBinary(
+                    // solhint-disable-next-line func-named-parameters
+                    string.concat("../system-contracts/contracts-preprocessed/artifacts/", filename, ".yul.zbin")
+                );
+        }
+
+        return
+            vm.readFileBinary(
+                // solhint-disable-next-line func-named-parameters
+                string.concat(
+                    "../system-contracts/contracts-preprocessed/precompiles/artifacts/",
+                    filename,
+                    ".yul.zbin"
+                )
+            );
+    }
+
+    /**
      * @dev Deploy a Create2Factory contract.
      */
     function deployCreate2Factory() internal returns (address) {
@@ -271,8 +296,8 @@ library Utils {
             child := create(0, add(bytecode, 0x20), mload(bytecode))
         }
         vm.stopBroadcast();
-        require(child != address(0), "Failed to deploy Create2Factory");
-        require(child.code.length > 0, "Failed to deploy Create2Factory");
+        require(child != address(0), "Failed to deploy create2factory");
+        require(child.code.length > 0, "Failed to deploy create2factory");
         return child;
     }
 
@@ -867,6 +892,15 @@ library Utils {
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
+        return bytecode;
+    }
+
+    function readZKFoundryBytecode(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }
 

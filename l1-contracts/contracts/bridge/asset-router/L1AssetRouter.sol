@@ -2,9 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-// import {console} from "forge-std/console.sol";
-
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -16,7 +13,7 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-import {IL1Nullifier, FinalizeL1DepositParams} from "../interfaces/IL1Nullifier.sol";
+import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
@@ -25,7 +22,9 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
+import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
@@ -124,12 +123,16 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _transferOwnership(_owner);
     }
 
-    /// @notice Sets the L1ERC20Bridge contract address.
+    /// @notice Sets the NativeTokenVault contract address.
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "AR: native token v already set");
-        require(address(_nativeTokenVault) != address(0), "AR: native token vault 0");
+        if (address(nativeTokenVault) != address(0)) {
+            revert NativeTokenVaultAlreadySet();
+        }
+        if (address(_nativeTokenVault) == address(0)) {
+            revert ZeroAddress();
+        }
         nativeTokenVault = _nativeTokenVault;
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         assetHandlerAddress[ethAssetId] = address(nativeTokenVault);
@@ -155,9 +158,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetRegistrationData,
         address _assetDeploymentTracker
     ) external onlyOwner {
-        bytes32 assetId = keccak256(
-            abi.encode(uint256(block.chainid), _assetDeploymentTracker, _assetRegistrationData)
-        );
+        bytes32 assetId = keccak256(abi.encode(block.chainid, _assetDeploymentTracker, _assetRegistrationData));
         assetDeploymentTracker[assetId] = _assetDeploymentTracker;
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
@@ -171,7 +172,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Used to set the asset handler address for a given asset ID on a remote ZK chain
-    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
     /// @param _chainId The ZK chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The encoding of asset ID.
@@ -509,19 +509,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
-        /// by the legacy bridge.
-        address legacyL2Bridge = L1_NULLIFIER.l2BridgeAddress(_chainId);
-        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
-            chainId: _chainId,
-            l2BatchNumber: _l2BatchNumber,
-            l2MessageIndex: _l2MessageIndex,
-            l2Sender: legacyL2Bridge == address(0) ? L2_ASSET_ROUTER_ADDR : legacyL2Bridge,
-            l2TxNumberInBatch: _l2TxNumberInBatch,
-            message: _message,
-            merkleProof: _merkleProof
+        L1_NULLIFIER.finalizeWithdrawal({
+            _chainId: _chainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
         });
-        L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.

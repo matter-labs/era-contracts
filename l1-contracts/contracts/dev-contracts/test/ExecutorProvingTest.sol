@@ -8,6 +8,8 @@ import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExec
 import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
+    constructor() ExecutorFacet(block.chainid) {}
+
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment

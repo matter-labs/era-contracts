@@ -18,7 +18,6 @@ uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE
 /// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`
 bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
-// TODO: change constant to the real root hash of empty Merkle tree (SMA-184)
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
 /// @dev Denotest the type of transaction that is used for L2->L2 interop
@@ -76,7 +75,7 @@ uint256 constant L1_TX_DELTA_FACTORY_DEPS_L2_GAS = 2473;
 uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = 64;
 
 /// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
-uint256 constant MAX_NEW_FACTORY_DEPS = 32;
+uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
@@ -115,6 +114,10 @@ bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGE
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
 /// @dev the maximum number of supported chains, this is an arbitrary limit.
+/// @dev Note, that in case of a malicious Bridgehub admin, the total number of chains
+/// can be up to 2 times higher. This may be possible, in case the old ChainTypeManager
+/// had `100` chains and these were migrated to the Bridgehub only after `MAX_NUMBER_OF_ZK_CHAINS`
+/// were added to the bridgehub via creation of new chains.
 uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
 
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
@@ -158,6 +161,8 @@ struct ZKChainCommitment {
     bytes32[] batchHashes;
     /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
+    /// @notice Whether a chain is a permanent rollup.
+    bool isPermanentRollup;
 }
 
 /// @dev The address that is used to signal that the provided msg.value should be sent to the msg.sender on the destination chain.

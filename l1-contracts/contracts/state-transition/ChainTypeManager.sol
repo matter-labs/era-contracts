@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
@@ -19,6 +17,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
+import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -127,7 +126,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
-        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
         validatorTimelock = _initializeData.validatorTimelock;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
@@ -215,7 +214,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
     /// @param _validatorTimelock the new validatorTimelock address
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
@@ -235,8 +234,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
-        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
+        _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
+        _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
@@ -249,11 +248,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
-    /// @dev set the protocol version timestamp
+    /// @notice Set the protocol version deadline
     /// @param _protocolVersion the protocol version
     /// @param _timestamp the timestamp is the deadline
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        _setProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -332,7 +331,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _chainId the chainId of the chain
     /// @param _validator the new validator
     /// @param _active whether the validator is active
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
         IZKChain(getZKChain(_chainId)).setValidator(_validator, _active);
     }
 
@@ -361,7 +360,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             return getZKChain(_chainId);
         }
 
-        // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
         {
@@ -421,7 +419,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         {
             // check input
             bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
-            require(forceDeploymentHash == initialForceDeploymentHash, "CTM: initial force deployment mismatch");
+            if (forceDeploymentHash != initialForceDeploymentHash) {
+                revert InitialForceDeploymentMismatch(forceDeploymentHash, initialForceDeploymentHash);
+            }
         }
         // genesis upgrade, deploys some contracts, sets chainId
         IAdmin(zkChainAddress).genesisUpgrade(
@@ -437,17 +437,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return IZKChain(getZKChain(_chainId)).getProtocolVersion();
     }
 
-    /// @param _newSettlementLayerChainId the chainId of the chain
-    /// @param _isWhitelisted whether the chain is whitelisted
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
-        require(_newSettlementLayerChainId != 0, "Bad chain id");
-
-        // Currently, we require that the sync layer is deployed by the same CTM.
-        require(getZKChain(_newSettlementLayerChainId) != address(0), "CTM: sync layer not registered");
-
-        IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
-    }
-
     /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
     /// @param _chainId The chain id of the chain to be migrated.
     /// @param _data The data needed to perform the migration.
@@ -458,12 +447,16 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
         // happens. The correctness of it will be checked on the CTM on the new settlement layer.
         (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(_newSettlementLayerAdmin != address(0), "CTM: admin zero");
+        if (_newSettlementLayerAdmin == address(0)) {
+            revert AdminZero();
+        }
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
-        address zkChain = getZKChain(_chainId);
-        require(IZKChain(zkChain).getProtocolVersion() == protocolVersion, "CTM: outdated pv");
+        uint256 chainProtocolVersion = IZKChain(getZKChain(_chainId)).getProtocolVersion();
+        if (chainProtocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(chainProtocolVersion, protocolVersion);
+        }
 
         return
             abi.encode(
@@ -488,7 +481,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
-        require(_protocolVersion == protocolVersion, "CTM, outdated pv");
+        if (_protocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(_protocolVersion, protocolVersion);
+        }
         chainAddress = _deployNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
@@ -512,12 +507,31 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // state updates that occur.
     }
 
+    /// @notice Set the protocol version deadline
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
+    function _setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) internal {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
+        emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Legacy functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice return the chain contract address for a chainId
     function getHyperchain(uint256 _chainId) public view returns (address) {
+        // During upgrade, there will be a period when the zkChains mapping on
+        // bridgehub will not be filled yet, while the ValidatorTimelock
+        // will still query the address to obtain the chain id.
+        //
+        // To cover this case, we firstly use the existing storage and only then
+        // we use the bridgehub if the former was not present.
+        // This logic should be deleted in one of the future upgrades.
+        address legacyAddress = getZKChainLegacy(_chainId);
+        if (legacyAddress != address(0)) {
+            return legacyAddress;
+        }
         return getZKChain(_chainId);
     }
 }

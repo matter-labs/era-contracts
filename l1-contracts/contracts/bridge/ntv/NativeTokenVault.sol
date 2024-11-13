@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -21,7 +19,8 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress, DeployingBridgedTokenForNativeToken} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, DeployingBridgedTokenForNativeToken, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyToken} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -46,8 +45,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
 
-    /// @dev A mapping assetId => tokenAddress
-    mapping(bytes32 assetId => uint256 chainId) public originChainId;
+    /// @dev A mapping assetId => originChainId
+    mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
@@ -91,7 +90,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (_nativeToken == WETH_TOKEN) {
             revert TokenNotSupported(WETH_TOKEN);
         }
-        require(_nativeToken.code.length > 0, "NTV: empty token");
+        if (_nativeToken.code.length == 0) {
+            revert EmptyToken();
+        }
+        if (assetId[_nativeToken] != bytes32(0)) {
+            revert AssetIdAlreadyRegistered();
+        }
         _unsafeRegisterNativeToken(_nativeToken);
     }
 
@@ -235,8 +239,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
-            _l2Receiver: _receiver,
-            _l1Token: originToken,
+            _remoteReceiver: _receiver,
+            _originToken: originToken,
             _amount: _amount,
             _erc20Metadata: erc20Metadata
         });
@@ -291,8 +295,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
-            _l2Receiver: _receiver,
-            _l1Token: nativeToken,
+            _remoteReceiver: _receiver,
+            _originToken: nativeToken,
             _amount: amount,
             _erc20Metadata: erc20Metadata
         });
@@ -335,10 +339,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal {
         bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
-        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
+        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
     function _handleChainBalanceIncrease(

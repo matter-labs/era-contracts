@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-
 // solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
@@ -49,7 +48,9 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
         l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-        require(l2TokenAddress != address(0), "Token not initialized");
+        if (l2TokenAddress == address(0)) {
+            revert("Token not initialized");
+        }
     }
 
     function test_shouldFinalizeERC20Deposit() public {

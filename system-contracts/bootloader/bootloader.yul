@@ -193,7 +193,7 @@ object "Bootloader" {
 
             /// @dev The maximum number of new factory deps that are allowed in a transaction
             function MAX_NEW_FACTORY_DEPS() -> ret {
-                ret := 32
+                ret := 64
             }
 
             /// @dev Besides the factory deps themselves, we also need another 4 slots for:
@@ -3901,12 +3901,12 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function chainedPriorityTxnHashLogKey() -> ret {
-                ret := 3
+                ret := 2
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function numberOfLayer1TxsLogKey() -> ret {
-                ret := 4
+                ret := 3
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum

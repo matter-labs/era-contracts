@@ -95,11 +95,12 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
         nativeTokenVault = msg.sender;
 
+        bytes memory nameBytes;
+        bytes memory symbolBytes;
+        bytes memory decimalsBytes;
         // We parse the data exactly as they were created on the L1 bridge
         // slither-disable-next-line unused-return
-        (, bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = DataEncoding.decodeTokenData(
-            _data
-        );
+        (, nameBytes, symbolBytes, decimalsBytes) = DataEncoding.decodeTokenData(_data);
 
         ERC20Getters memory getters;
         string memory decodedName;

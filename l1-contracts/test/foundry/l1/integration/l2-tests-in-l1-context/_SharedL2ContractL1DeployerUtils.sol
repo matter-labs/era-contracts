@@ -70,7 +70,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         deployGenesisUpgrade();
         deployVerifier();
         deployValidatorTimelock();
-        deployChainTypeManagerContract();
+        deployChainTypeManagerContract(address(0));
     }
 
     // add this to be excluded from coverage report

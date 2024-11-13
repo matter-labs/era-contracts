@@ -111,6 +111,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getPriorityTreeStartIndex() external view returns (uint256) {
+        return s.priorityTree.startIndex;
+    }
+
+    /// @inheritdoc IGetters
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
         if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
             return s.priorityTree.getFirstUnprocessedPriorityTx();

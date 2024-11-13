@@ -142,14 +142,13 @@ abstract contract SharedL2ContractDeployer is DeployUtils {
             vm.prank(ownerWallet);
             l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
             vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-            l2Bridgehub.setAssetHandlerAddress(
+            l2Bridgehub.setCTMAssetAddress(
                 bytes32(uint256(uint160(l1CTM))),
                 address(addresses.stateTransition.chainTypeManagerProxy)
             );
             chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
             getExampleChainCommitment();
         }
-        console.log("setup complete");
     }
 
     function getExampleChainCommitment() internal returns (bytes memory) {
@@ -163,6 +162,12 @@ abstract contract SharedL2ContractDeployer is DeployUtils {
             abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
             abi.encode(address(0))
         );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
+            abi.encode(address(uint160(1)))
+        );
+
         vm.prank(L2_BRIDGEHUB_ADDR);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
@@ -220,7 +225,7 @@ abstract contract SharedL2ContractDeployer is DeployUtils {
         L2WrappedBaseToken wethImpl = new L2WrappedBaseToken();
         TransparentUpgradeableProxy wethProxy = new TransparentUpgradeableProxy(address(wethImpl), ownerWallet, "");
         weth = L2WrappedBaseToken(payable(wethProxy));
-        weth.initializeV2("Wrapped Ether", "WETH", L2_ASSET_ROUTER_ADDR, l1WethAddress, baseTokenAssetId);
+        weth.initializeV3("Wrapped Ether", "WETH", L2_ASSET_ROUTER_ADDR, l1WethAddress, baseTokenAssetId);
         return weth;
     }
 

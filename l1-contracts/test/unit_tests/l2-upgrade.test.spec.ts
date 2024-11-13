@@ -365,56 +365,17 @@ describe("L2 upgrade test", function () {
     expect(revertReason).contains("PubdataGreaterThanLimit");
   });
 
-  it("Should validate factory deps", async () => {
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-    const wrongFactoryDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const wrongTx = buildL2CanonicalTransaction({
-      factoryDeps: [wrongFactoryDepHash],
-      nonce: 4 + initialMinorProtocolVersion,
-    });
-
-    const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
-        l2ProtocolUpgradeTx: wrongTx,
-        factoryDeps: [myFactoryDep],
-        newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
-      })
-    );
-
-    expect(revertReason).contains("L2BytecodeHashMismatch");
-  });
-
-  it("Should validate factory deps length match", async () => {
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-    const wrongTx = buildL2CanonicalTransaction({
-      factoryDeps: [],
-      nonce: 4 + initialMinorProtocolVersion,
-    });
-
-    const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
-        l2ProtocolUpgradeTx: wrongTx,
-        factoryDeps: [myFactoryDep],
-        newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
-      })
-    );
-
-    expect(revertReason).contains("UnexpectedNumberOfFactoryDeps");
-  });
-
   it("Should validate factory deps length isn't too large", async () => {
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
     const randomDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
 
     const wrongTx = buildL2CanonicalTransaction({
-      factoryDeps: Array(33).fill(randomDepHash),
+      factoryDeps: Array(65).fill(randomDepHash),
       nonce: 4 + initialMinorProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
-        factoryDeps: Array(33).fill(myFactoryDep),
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
       })
     );
@@ -449,7 +410,6 @@ describe("L2 upgrade test", function () {
       verifierParams: newerVerifierParams,
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
-      factoryDeps: [myFactoryDep],
       newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 5, 0),
     };
 
@@ -997,7 +957,6 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     l1ContractsUpgradeCalldata: "0x",
     postUpgradeCalldata: "0x",
     upgradeTimestamp: ethers.constants.Zero,
-    factoryDeps: [],
     newProtocolVersion,
     ...proposedUpgrade,
   };

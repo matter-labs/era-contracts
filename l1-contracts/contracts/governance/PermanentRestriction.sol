@@ -20,11 +20,6 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 
-/// @dev We use try-catch to test whether some of the conditions should be checked.
-/// To avoid attacks based on the 63/64 gas limitations, we ensure that each such call
-/// has at least this amount.
-uint256 constant MIN_GAS_FOR_FALLABLE_CALL = 5_000_000;
-
 /// @title PermanentRestriction contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -49,12 +44,13 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     mapping(bytes allowedCalldata => bool isAllowed) public allowedCalls;
 
     /// @notice The mapping of the validated selectors.
-    mapping(bytes4 selector => bool isValidated) public validatedSelectors;
+    mapping(bytes4 selector => bool isValidated) public selectorsToValidate;
 
     /// @notice The mapping of whitelisted L2 admins.
     mapping(address adminAddress => bool isWhitelisted) public allowedL2Admins;
 
     constructor(IBridgehub _bridgehub, address _l2AdminFactory) {
+        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L2_ADMIN_FACTORY = _l2AdminFactory;
     }
@@ -64,7 +60,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev Expected to be delegatecalled by the `TransparentUpgradableProxy`
     /// upon initialization.
     function initialize(address _initialOwner) external initializer {
-        // solhint-disable-next-line gas-custom-errors, reason-string
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }
@@ -74,7 +69,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Allows a certain `ChainAdmin` implementation to be used as an admin.
     /// @param _implementationHash The hash of the implementation code.
     /// @param _isAllowed The flag that indicates if the implementation is allowed.
-    function allowAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
+    function setAllowedAdminImplementation(bytes32 _implementationHash, bool _isAllowed) external onlyOwner {
         allowedAdminImplementations[_implementationHash] = _isAllowed;
 
         emit AdminImplementationAllowed(_implementationHash, _isAllowed);
@@ -92,8 +87,8 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Allows a certain selector to be validated.
     /// @param _selector The selector of the function.
     /// @param _isValidated The flag that indicates if the selector is validated.
-    function setSelectorIsValidated(bytes4 _selector, bool _isValidated) external onlyOwner {
-        validatedSelectors[_selector] = _isValidated;
+    function setSelectorShouldBeValidated(bytes4 _selector, bool _isValidated) external onlyOwner {
+        selectorsToValidate[_selector] = _isValidated;
 
         emit SelectorValidationChanged(_selector, _isValidated);
     }
@@ -134,7 +129,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @param _call The call data.
     /// @dev Note that we do not need to validate the migration to the L1 layer as the admin
     /// is not changed in this case.
-    function _validateMigrationToL2(Call calldata _call) internal view {
+    function _validateMigrationToL2(Call calldata _call) private view {
         (address admin, bool isMigration) = _getNewAdminFromMigration(_call);
         if (isMigration) {
             if (!allowedL2Admins[admin]) {
@@ -145,7 +140,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
     /// @notice Validates the call as the chain admin
     /// @param _call The call data.
-    function _validateAsChainAdmin(Call calldata _call) internal view {
+    function _validateAsChainAdmin(Call calldata _call) private view {
         if (!_isAdminOfAChain(_call.target)) {
             // We only validate calls related to being an admin of a chain
             return;
@@ -164,7 +159,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return;
         }
 
-        if (!validatedSelectors[selector]) {
+        if (!selectorsToValidate[selector]) {
             // The selector is not validated, any data is allowed.
             return;
         }
@@ -177,7 +172,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Validates the correctness of the new admin.
     /// @param _call The call data.
     /// @dev Ensures that the admin has a whitelisted implementation and does not remove this restriction.
-    function _validateNewAdmin(Call calldata _call) internal view {
+    function _validateNewAdmin(Call calldata _call) private view {
         address newChainAdmin = abi.decode(_call.data[4:], (address));
 
         bytes32 implementationCodeHash = newChainAdmin.codehash;
@@ -196,7 +191,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @notice Validates the removal of the restriction.
     /// @param _call The call data.
     /// @dev Ensures that this restriction is not removed.
-    function _validateRemoveRestriction(Call calldata _call) internal view {
+    function _validateRemoveRestriction(Call calldata _call) private view {
         if (_call.target != msg.sender) {
             return;
         }
@@ -255,7 +250,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @return success Whether the `chain` is indeed an address of a ZK Chain.
     /// @dev Returns a tuple of the chainId and whether the call was successful.
     /// If the second item is `false`, the caller should ignore the first value.
-    function _getChainIdUnffallibleCall(address _chain) internal view returns (uint256 chainId, bool success) {
+    function _getChainIdUnffallibleCall(address _chain) private view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;
         assembly {
             // We use scratch space here, so it is safe

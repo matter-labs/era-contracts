@@ -8,12 +8,12 @@ pragma solidity ^0.8.20;
 interface IConsensusRegistry {
     /// @dev Represents a consensus node.
     /// @param attesterLastUpdateCommit The latest `attestersCommit` where the node's attester attributes were updated.
+    /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
+    /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
     /// @param attesterLatest Attester attributes to read if `node.attesterLastUpdateCommit` < `attestersCommit`.
     /// @param attesterSnapshot Attester attributes to read if `node.attesterLastUpdateCommit` == `attestersCommit`.
-    /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
     /// @param validatorLatest Validator attributes to read if `node.validatorLastUpdateCommit` < `validatorsCommit`.
     /// @param validatorSnapshot Validator attributes to read if `node.validatorLastUpdateCommit` == `validatorsCommit`.
-    /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
     struct Node {
         uint32 attesterLastUpdateCommit;
         uint32 validatorLastUpdateCommit;
@@ -97,24 +97,28 @@ interface IConsensusRegistry {
     error UnauthorizedOnlyOwnerOrNodeOwner();
     error NodeOwnerExists();
     error NodeOwnerDoesNotExist();
-    error NodeOwnerNotFound();
     error ValidatorPubKeyExists();
     error AttesterPubKeyExists();
-    error InvalidInputNodeOwnerAddress();
     error InvalidInputBLS12_381PublicKey();
     error InvalidInputBLS12_381Signature();
     error InvalidInputSecp256k1PublicKey();
+    error ZeroAttesterWeight();
+    error ZeroValidatorWeight();
 
     event NodeAdded(
         address indexed nodeOwner,
+        bool isValidatorActive,
         uint32 validatorWeight,
         BLS12_381PublicKey validatorPubKey,
         BLS12_381Signature validatorPoP,
+        bool isAttesterActive,
         uint32 attesterWeight,
         Secp256k1PublicKey attesterPubKey
     );
-    event NodeDeactivated(address indexed nodeOwner);
-    event NodeActivated(address indexed nodeOwner);
+    event AttesterDeactivated(address indexed nodeOwner);
+    event ValidatorDeactivated(address indexed nodeOwner);
+    event AttesterActivated(address indexed nodeOwner);
+    event ValidatorActivated(address indexed nodeOwner);
     event NodeRemoved(address indexed nodeOwner);
     event NodeDeleted(address indexed nodeOwner);
     event NodeValidatorWeightChanged(address indexed nodeOwner, uint32 newWeight);
@@ -126,16 +130,22 @@ interface IConsensusRegistry {
 
     function add(
         address _nodeOwner,
+        bool _isValidatorActive,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP,
+        bool _isAttesterActive,
         uint32 _attesterWeight,
         Secp256k1PublicKey calldata _attesterPubKey
     ) external;
 
-    function deactivate(address _nodeOwner) external;
+    function deactivateAttester(address _nodeOwner) external;
 
-    function activate(address _nodeOwner) external;
+    function deactivateValidator(address _nodeOwner) external;
+
+    function activateAttester(address _nodeOwner) external;
+
+    function activateValidator(address _nodeOwner) external;
 
     function remove(address _nodeOwner) external;
 
@@ -158,4 +168,6 @@ interface IConsensusRegistry {
     function getAttesterCommittee() external view returns (CommitteeAttester[] memory);
 
     function getValidatorCommittee() external view returns (CommitteeValidator[] memory);
+
+    function numNodes() external view returns (uint256);
 }
