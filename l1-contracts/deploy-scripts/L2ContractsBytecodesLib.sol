@@ -230,4 +230,10 @@ library L2ContractsBytecodesLib {
                 "/../l2-contracts/artifacts-zk/contracts/dev-contracts/TimestampAsserter.sol/TimestampAsserter.json"
             );
     }
+
+    /// @notice Reads the bytecode of the ChainAdmin contract.
+    /// @return The bytecode of the ChainAdmin contract.
+    function readChainAdminBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
+    }
 }

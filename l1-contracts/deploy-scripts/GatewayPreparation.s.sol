@@ -37,6 +37,11 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {Call} from "contracts/governance/Common.sol";
+
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -68,6 +73,7 @@ contract GatewayPreparation is Script {
 
     struct Output {
         bytes32 governanceL2TxHash;
+        address l2ChainAdminAddress;
         address gatewayTransactionFiltererImplementation;
         address gatewayTransactionFiltererProxy;
     }
@@ -121,14 +127,28 @@ contract GatewayPreparation is Script {
             output.gatewayTransactionFiltererImplementation
         );
         vm.serializeAddress("root", "gateway_transaction_filterer_proxy", output.gatewayTransactionFiltererProxy);
+        vm.serializeAddress("root", "l2_chain_admin_address", output.l2ChainAdminAddress);
         string memory toml = vm.serializeBytes32("root", "governance_l2_tx_hash", output.governanceL2TxHash);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-preparation-l1.toml");
         vm.writeToml(toml, path);
     }
 
+    function saveOutput(address l2ChainAdminAddress) internal {
+        Output memory output = Output({
+            governanceL2TxHash: bytes32(0),
+            l2ChainAdminAddress: l2ChainAdminAddress,
+            gatewayTransactionFiltererImplementation: address(0),
+            gatewayTransactionFiltererProxy: address(0)
+        });
+
+        saveOutput(output);
+
+    }
+
     function saveOutput(bytes32 governanceL2TxHash) internal {
         Output memory output = Output({
             governanceL2TxHash: governanceL2TxHash,
+            l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: address(0),
             gatewayTransactionFiltererProxy: address(0)
         });
@@ -142,6 +162,7 @@ contract GatewayPreparation is Script {
     ) internal {
         Output memory output = Output({
             governanceL2TxHash: bytes32(0),
+            l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: gatewayTransactionFiltererImplementation,
             gatewayTransactionFiltererProxy: gatewayTransactionFiltererProxy
         });
@@ -250,8 +271,31 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
+    function deployL2ChainAdmin() public {
+        initializeConfig();
+
+        // FIXME: it is deployed without any restrictions. 
+        address l2ChainAdminAddress = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readChainAdminBytecode(),
+            constructorargs: abi.encode(new address[](0)),
+            create2salt: bytes32(0),
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy
+        });
+
+        saveOutput(l2ChainAdminAddress);
+    }
+
     /// @dev Calling this function requires private key to the admin of the chain
-    function migrateChainToGateway(address chainAdmin, address accessControlRestriction, uint256 chainId) public {
+    function migrateChainToGateway(
+        address chainAdmin, 
+        address l2ChainAdmin,
+        address accessControlRestriction, 
+        uint256 chainId
+    ) public {
         initializeConfig();
 
         IBridgehub bridgehubContract = IBridgehub(config.bridgehub);
@@ -280,9 +324,6 @@ contract GatewayPreparation is Script {
         }
 
         console.log("Chain Admin address:", chainAdmin);
-
-        // TODO(EVM-746): Use L2-based chain admin contract
-        address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
 
         bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
 
@@ -398,7 +439,8 @@ contract GatewayPreparation is Script {
         uint256 chainId,
         address l1DAValidator,
         address l2DAValidator,
-        address chainDiamondProxyOnGateway
+        address chainDiamondProxyOnGateway,
+        address chainAdminOnGateway
     ) public {
         initializeConfig();
 
@@ -408,10 +450,10 @@ contract GatewayPreparation is Script {
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
-            data,
+            _callL2AdminCalldata(data, chainDiamondProxyOnGateway),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            chainDiamondProxyOnGateway,
+            chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
@@ -425,7 +467,8 @@ contract GatewayPreparation is Script {
         address accessControlRestriction,
         uint256 chainId,
         address validatorAddress,
-        address gatewayValidatorTimelock
+        address gatewayValidatorTimelock,
+        address chainAdminOnGateway
     ) public {
         initializeConfig();
 
@@ -435,16 +478,29 @@ contract GatewayPreparation is Script {
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
-            data,
+            _callL2AdminCalldata(data, gatewayValidatorTimelock),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            gatewayValidatorTimelock,
+            chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
         );
 
         saveOutput(l2TxHash);
+    }
+
+    function _callL2AdminCalldata(
+        bytes memory _data,
+        address _target
+    ) private returns (bytes memory adminCalldata) {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _target,
+            value: 0,
+            data: _data
+        });
+        adminCalldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
