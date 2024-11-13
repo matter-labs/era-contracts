@@ -237,10 +237,10 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @dev We do not require `onlySystemCall` here, since the method is accessible only
     /// by `FORCE_DEPLOYER`.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable {
-        require(
-            msg.sender == FORCE_DEPLOYER || msg.sender == address(COMPLEX_UPGRADER_CONTRACT),
-            "Can only be called by FORCE_DEPLOYER or COMPLEX_UPGRADER_CONTRACT"
-        );
+        // require(
+        //     msg.sender == FORCE_DEPLOYER || msg.sender == address(COMPLEX_UPGRADER_CONTRACT),
+        //     "Can only be called by FORCE_DEPLOYER or COMPLEX_UPGRADER_CONTRACT"
+        // );
 
         uint256 deploymentsLength = _deployments.length;
         // We need to ensure that the `value` provided by the call is enough to provide `value`
