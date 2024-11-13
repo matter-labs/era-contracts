@@ -127,5 +127,4 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
-
 }
