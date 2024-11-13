@@ -215,6 +215,51 @@ library Utils {
         return bytecode;
     }
 
+    // /**
+    // * @dev Returns the bytecode of a given system contract.
+    // */
+    // function readL1ContractsBytecode(string memory path, string memory filename) internal view returns (bytes memory) {
+    //     string memory root = vm.projectRoot();
+    //     string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
+    //     string memory file = vm.readFile(
+    //         // solhint-disable-next-line func-named-parameters
+    //         string.concat(
+    //             root,
+    //             "/",
+    //             CONTRACTS_PATH,
+    //             "/l1-contracts/artifacts-zk/contracts/",
+    //             path,
+    //             filename,
+    //             ".sol/",
+    //             filename,
+    //             ".json"
+    //         )
+    //     );
+    //     bytes memory bytecode = vm.parseJson(file, "$.bytecode");
+    //     return bytecode;
+    // }
+
+    //     /**
+    // * @dev Returns the bytecode of a given system contract.
+    // */
+    // function getL1ContractsPath(string memory path, string memory filename) internal view returns (string memory) {
+    //     string memory root = vm.projectRoot();
+    //     string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
+        
+    //     // solhint-disable-next-line func-named-parameters
+    //     return string.concat(
+    //         root,
+    //         "/",
+    //         CONTRACTS_PATH,
+    //         "/l1-contracts/artifacts-zk/contracts/",
+    //         path,
+    //         filename,
+    //         ".sol/",
+    //         filename,
+    //         ".json"
+    //     );
+    // }
+
     /**
      * @dev Deploy a Create2Factory contract.
      */

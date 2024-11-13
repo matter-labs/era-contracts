@@ -29,6 +29,7 @@ contract InteropTest is Test {
         bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
         L2Utils.initSystemContracts(
             SystemContractsArgs({
+                broadcast: false,
                 l1ChainId: 1,
                 eraChainId: 2,
                 l1AssetRouter: address(1),

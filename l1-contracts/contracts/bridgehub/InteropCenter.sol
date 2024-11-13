@@ -100,6 +100,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         assetRouter = _assetRouter;
     }
     /*//////////////////////////////////////////////////////////////
+                        Message interface
+    //////////////////////////////////////////////////////////////*/
+
+    function sendMessage(bytes calldata _msg) external returns (bytes32 canonicalTxHash) {
+        return L2_MESSENGER.sendToL1(_msg);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         Bundle interface
     //////////////////////////////////////////////////////////////*/
 

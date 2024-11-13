@@ -14,7 +14,8 @@ import {InteropAccount} from "./InteropAccount.sol";
 // import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {BASE_TOKEN_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IInteropHandler, InteropCall, InteropBundle} from "./IInteropHandler.sol";
+import {IInteropHandler} from "./IInteropHandler.sol";
+import {InteropCall, InteropBundle} from "../common/Messaging.sol";
 
 enum BytecodeError {
     Version,

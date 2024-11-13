@@ -28,7 +28,10 @@ import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
 import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
 
+import {L2UtilsBase} from "./L2UtilsBase.sol";
+
 struct SystemContractsArgs {
+    bool broadcast;
     uint256 l1ChainId;
     uint256 eraChainId;
     address l1AssetRouter;
@@ -46,77 +49,10 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
 
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual {
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
-        address wethToken = address(0x1);
-        // we deploy the code to get the contract code with immutables which we then vm.etch
-        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR)));
-        address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
-        address interopCenter = address(
-            new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner)
-        );
-        address assetRouter = address(
-            new L2AssetRouter(
-                _args.l1ChainId,
-                _args.eraChainId,
-                _args.l1AssetRouter,
-                _args.legacySharedBridge,
-                baseTokenAssetId,
-                _args.aliasedOwner
-            )
-        );
-        address ntv = address(
-            new L2NativeTokenVaultDev(
-                _args.l1ChainId,
-                _args.aliasedOwner,
-                _args.l2TokenProxyBytecodeHash,
-                _args.legacySharedBridge,
-                _args.l2TokenBeacon,
-                _args.contractsDeployedAlready,
-                wethToken,
-                baseTokenAssetId
-            )
-        );
-
-        vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
-        MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
-
-        vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
-        vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
-        uint256 prevChainId = block.chainid;
-        vm.chainId(_args.l1ChainId);
-        Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
-        vm.chainId(prevChainId);
-        vm.prank(_args.aliasedOwner);
-        Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
-            L2_ASSET_ROUTER_ADDR,
-            ICTMDeploymentTracker(_args.l1CtmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            L2_INTEROP_CENTER_ADDR
-        );
-        vm.prank(_args.aliasedOwner);
-        vm.chainId(_args.l1ChainId);
-        Bridgehub(L2_INTEROP_CENTER_ADDR).initialize(_args.aliasedOwner);
-        vm.chainId(prevChainId);
-        vm.prank(_args.aliasedOwner);
-        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(L2_ASSET_ROUTER_ADDR);
-
-        DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
-        vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
-
-        vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
-        stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
-
-        stdstore
-            .target(L2_ASSET_ROUTER_ADDR)
-            .sig("assetHandlerAddress(bytes32)")
-            .with_key(baseTokenAssetId)
-            .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
-
-        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
-
-        vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
-        L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
+        L2UtilsBase.initSystemContracts(_args);
     }
+
+
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual {
         deployL2ContractsInner(_l1ChainId, false);

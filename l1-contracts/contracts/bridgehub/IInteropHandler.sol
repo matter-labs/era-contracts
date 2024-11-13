@@ -4,22 +4,6 @@ pragma solidity ^0.8.20;
 
 import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
 
-struct InteropCall {
-    address to;
-    address from;
-    uint256 value;
-    bytes data;
-}
-
-struct InteropBundle {
-    uint256 destinationChainId;
-    InteropCall[] calls;
-    // If not set - anyone can execute it.
-    address[] executionAddresses;
-    // Who can 'cancel' this bundle.
-    address cancellationAddress;
-}
-
 interface IInteropHandler {
     function setInteropAccountBytecode() external;
     function executePaymasterBundle(Transaction calldata _transaction) external;

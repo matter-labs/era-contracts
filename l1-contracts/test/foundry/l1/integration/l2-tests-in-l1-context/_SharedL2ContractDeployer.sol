@@ -24,8 +24,8 @@ import {IAdmin} from "../../../../../contracts/state-transition/chain-interfaces
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IBridgehub} from "../../../../../contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../../../../contracts/bridgehub/IInteropCenter.sol";
+import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter, IInteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
@@ -36,7 +36,7 @@ import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "../../../../../deploy-scripts/DeployUtils.s.sol";
 
-abstract contract SharedL2ContractDeployer is Test, DeployUtils {
+abstract contract SharedL2ContractDeployer is DeployUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -76,6 +76,13 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
     IChainTypeManager internal chainTypeManager;
 
     function setUp() public virtual {
+        setUpInner(false);
+    }
+
+    function setUpInner(bool _skip) public virtual {
+        if (_skip) {
+            vm.startBroadcast();
+        }
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
         beacon.transferOwnership(ownerWallet);
@@ -97,9 +104,12 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         );
 
         L2WrappedBaseToken weth = deployL2Weth();
-
+        if (_skip) {
+            vm.stopBroadcast();
+        }
         initSystemContracts(
             SystemContractsArgs({
+                broadcast: _skip,
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
@@ -111,19 +121,22 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
                 l1CtmDeployer: l1CTMDeployer
             })
         );
-        deployL2Contracts(L1_CHAIN_ID);
-
-        vm.prank(aliasedL1AssetRouter);
-        l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_BRIDGEHUB_ADDR);
-        vm.prank(ownerWallet);
-        l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-        l2Bridgehub.setAssetHandlerAddress(
-            bytes32(uint256(uint160(l1CTM))),
-            address(addresses.stateTransition.chainTypeManagerProxy)
-        );
-        chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        getExampleChainCommitment();
+        if (!_skip) {
+            deployL2Contracts(L1_CHAIN_ID);
+            
+            vm.prank(aliasedL1AssetRouter);
+            l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_BRIDGEHUB_ADDR);
+            vm.prank(ownerWallet);
+            l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
+            l2Bridgehub.setAssetHandlerAddress(
+                bytes32(uint256(uint160(l1CTM))),
+                address(addresses.stateTransition.chainTypeManagerProxy)
+            );
+            chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            getExampleChainCommitment();
+        }
+        console.log("setup complete");
     }
 
     function getExampleChainCommitment() internal returns (bytes memory) {
