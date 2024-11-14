@@ -139,23 +139,15 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert ChainIsNotYetDeployed();
         }
         address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
-        //        (bool success, bytes memory returnData) = diamondProxy.call(abi.encodeWithSelector(IGetters.getAdmin.selector));
-        //        require(success);
-        //        address chainAdmin = bytesToAddress(returnData);
-        address chainAdmin = IGetters(diamondProxy).getAdmin();
+        // Matter Labs team set the pending admin to the chain admin and now governor of the chain must accept ownership
+        address chainAdmin = IGetters(diamondProxy).getPendingAdmin();
         address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }
 
-        emit NewChainDeployed(chainId, diamondProxy, author, chainAdmin);
+        emit NewChainDeployed(chainId, author, diamondProxy, chainAdmin);
         emit SharedBridgeRegistered(chainId, l2BridgeAddress);
         deployedChains[key] = true;
-    }
-
-    function bytesToAddress(bytes memory bys) private pure returns (address addr) {
-        assembly {
-            addr := mload(add(bys, 32))
-        }
     }
 }
