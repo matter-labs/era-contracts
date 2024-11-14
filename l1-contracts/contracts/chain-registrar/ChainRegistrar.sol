@@ -9,19 +9,18 @@ import {IStateTransitionManager} from "../state-transition/IStateTransitionManag
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev ChainRegistrar serves as the main point for chain registration.
-contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
+contract ChainRegistrar is Ownable2StepUpgradeable {
     /// Address that will be used for deploying l2 contracts
     address l2Deployer;
     /// Bridgehub
     IBridgehub public bridgehub;
 
-    /// Chains that has been succesfuly deployed
+    /// Chains that has been successfully deployed
     mapping(bytes32 => bool) public deployedChains;
     /// Proposal for chain registration
     mapping(bytes32 => ChainConfig) public proposedChains;
@@ -65,13 +64,9 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         address governor;
     }
 
-    constructor(address _bridgehub, address _l2Deployer) {
+    constructor(address _bridgehub, address _l2Deployer, address _owner) {
         bridgehub = IBridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
-    }
-
-    /// @notice used to initialize the contract
-    function initialize(address _owner) external {
         _transferOwnership(_owner);
     }
 
@@ -93,11 +88,11 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             operator: operator,
             governor: governor,
             baseToken: BaseToken({
-                tokenAddress: tokenAddress,
-                tokenMultiplierSetter: tokenMultiplierSetter,
-                gasPriceMultiplierNominator: gasPriceMultiplierNominator,
-                gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
-            })
+            tokenAddress: tokenAddress,
+            tokenMultiplierSetter: tokenMultiplierSetter,
+            gasPriceMultiplierNominator: gasPriceMultiplierNominator,
+            gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
+        })
         });
         bytes32 key = keccak256(abi.encode(msg.sender, config.chainId));
         if (deployedChains[key] || bridgehub.stateTransitionManager(config.chainId) != address(0)) {
@@ -107,7 +102,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         // For Deploying L2 contracts on for non ETH based networks, we as bridgehub owners required base token.
         if (config.baseToken.tokenAddress != ETH_TOKEN_ADDRESS) {
             uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
-                config.baseToken.gasPriceMultiplierDenominator;
+                                config.baseToken.gasPriceMultiplierDenominator;
             if (IERC20(config.baseToken.tokenAddress).balanceOf(address(this)) < amount) {
                 IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
             }
