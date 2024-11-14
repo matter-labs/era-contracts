@@ -490,7 +490,7 @@ contract RegisterZKChainScript is Script {
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-        if(output.l2LegacySharedBridge != address(0)) {
+        if (output.l2LegacySharedBridge != address(0)) {
             vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
         }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
