@@ -10,11 +10,12 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev ChainRegistrar serves as the main point for chain registration.
-contract ChainRegistrar is Ownable2StepUpgradeable {
+contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     /// Address that will be used for deploying l2 contracts
     address l2Deployer;
     /// Bridgehub
@@ -64,7 +65,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
         address governor;
     }
 
-    constructor(address _bridgehub, address _l2Deployer, address _owner) {
+    constructor(address _bridgehub, address _l2Deployer, address _owner) reentrancyGuardInitializer {
         bridgehub = IBridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
         _transferOwnership(_owner);
@@ -120,7 +121,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
         return proposedChains[key];
     }
 
-    function chainRegistered(address author, uint256 chainId) public onlyOwner {
+    function chainRegistered(address author, uint256 chainId) public onlyOwner nonReentrant {
         bytes32 key = keccak256(abi.encode(author, chainId));
         ChainConfig memory config = proposedChains[key];
         if (config.chainId == 0) {
