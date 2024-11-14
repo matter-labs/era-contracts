@@ -31,39 +31,70 @@ contract AcceptAdmin is Script {
     // This function should be called by the owner to accept the admin role
     function governanceAcceptOwner(address governor, address target) public {
         Ownable2Step adminContract = Ownable2Step(target);
-        Utils.executeUpgrade({
-            _governor: governor,
-            _salt: bytes32(0),
-            _target: target,
-            _data: abi.encodeCall(adminContract.acceptOwnership, ()),
-            _value: 0,
-            _delay: 0
-        });
+        bytes memory data = abi.encodeCall(adminContract.acceptOwnership, ());
+        //Only execute if the operation does not exist yet
+        if (!Utils.governanceOperationExists(governor, target, 0, data, bytes32(0), bytes32(0))) {
+            Utils.executeUpgrade({
+                _governor: governor,
+                _salt: bytes32(0),
+                _target: target,
+                _data: data,
+                _value: 0,
+                _delay: 0
+            });
+        }
     }
 
     // This function should be called by the owner to accept the admin role
     function governanceAcceptAdmin(address governor, address target) public {
         IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
-        Utils.executeUpgrade({
-            _governor: governor,
-            _salt: bytes32(0),
-            _target: target,
-            _data: abi.encodeCall(adminContract.acceptAdmin, ()),
-            _value: 0,
-            _delay: 0
-        });
+        bytes memory data = abi.encodeCall(adminContract.acceptAdmin, ());
+        //Only execute if the operation does not exist yet
+        if (!Utils.governanceOperationExists(governor, target, 0, data, bytes32(0), bytes32(0))) {
+            Utils.executeUpgrade({
+                _governor: governor,
+                _salt: bytes32(0),
+                _target: target,
+                _data: data,
+                _value: 0,
+                _delay: 0
+            });
+        }
     }
 
     // This function should be called by the owner to accept the admin role
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
         IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
+        address currentAdmin;
 
-        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
+        // Attempt to call admin() using a low-level call
+        (bool success, bytes memory result) = target.call(abi.encodeWithSignature("admin()"));
 
-        vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();
+        if (success) {
+            // Decode the result to get the current admin address
+            currentAdmin = abi.decode(result, (address));
+        } else {
+            // If admin() fails, try calling getAdmin() instead
+            (success, result) = target.call(abi.encodeWithSignature("getAdmin()"));
+            require(success, "Both admin() and getAdmin() calls failed");
+
+            // Decode the result to get the current admin address
+            currentAdmin = abi.decode(result, (address));
+        }
+
+        // Proceed with multicall if the admin is different
+        if (currentAdmin != address(chainAdmin)) {
+            IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
+            calls[0] = IChainAdmin.Call({
+                target: target,
+                value: 0,
+                data: abi.encodeCall(adminContract.acceptAdmin, ())
+            });
+
+            vm.startBroadcast();
+            chainAdmin.multicall(calls, true);
+            vm.stopBroadcast();
+        }
     }
 
     // This function should be called by the owner to update token multiplier setter role
