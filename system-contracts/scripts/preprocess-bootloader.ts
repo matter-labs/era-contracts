@@ -266,8 +266,8 @@ async function main() {
   writeFileSync(`${OUTPUT_DIR_2}/transfer_test.yul`, transferTest);
 
   // For impersonating block start
-  writeFileSync(`${OUTPUT_DIR_1}/proved_batch_impersonating.yul`, provedBatchImpersonatingBootloader);
-  writeFileSync(`${OUTPUT_DIR_1}/fee_estimate_impersonating.yul`, feeEstimationImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/proved_batch_impersonating.yul`, provedBatchImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/fee_estimate_impersonating.yul`, feeEstimationImpersonatingBootloader);
   // For impersonating block end
 
   console.log("Bootloader preprocessing done!");
