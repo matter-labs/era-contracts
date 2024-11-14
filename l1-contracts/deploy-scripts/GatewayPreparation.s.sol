@@ -42,7 +42,6 @@ import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 
-
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 // solhint-disable-next-line gas-struct-packing
@@ -142,7 +141,6 @@ contract GatewayPreparation is Script {
         });
 
         saveOutput(output);
-
     }
 
     function saveOutput(bytes32 governanceL2TxHash) internal {
@@ -274,7 +272,7 @@ contract GatewayPreparation is Script {
     function deployL2ChainAdmin() public {
         initializeConfig();
 
-        // FIXME: it is deployed without any restrictions. 
+        // FIXME: it is deployed without any restrictions.
         address l2ChainAdminAddress = Utils.deployThroughL1({
             bytecode: L2ContractsBytecodesLib.readChainAdminBytecode(),
             constructorargs: abi.encode(new address[](0)),
@@ -291,9 +289,9 @@ contract GatewayPreparation is Script {
 
     /// @dev Calling this function requires private key to the admin of the chain
     function migrateChainToGateway(
-        address chainAdmin, 
+        address chainAdmin,
         address l2ChainAdmin,
-        address accessControlRestriction, 
+        address accessControlRestriction,
         uint256 chainId
     ) public {
         initializeConfig();
@@ -490,16 +488,9 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
-    function _callL2AdminCalldata(
-        bytes memory _data,
-        address _target
-    ) private returns (bytes memory adminCalldata) {
+    function _callL2AdminCalldata(bytes memory _data, address _target) private returns (bytes memory adminCalldata) {
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: _target,
-            value: 0,
-            data: _data
-        });
+        calls[0] = Call({target: _target, value: 0, data: _data});
         adminCalldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
     }
 
