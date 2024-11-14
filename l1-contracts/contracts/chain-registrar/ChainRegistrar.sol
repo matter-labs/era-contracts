@@ -3,8 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {ZkSyncHyperchainStorage, PubdataPricingMode} from "../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {PubdataPricingMode} from "../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
@@ -17,8 +16,8 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @dev ChainRegistrar serves as the main point for chain registration.
 contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     /// Address that will be used for deploying l2 contracts
-    address l2Deployer;
-    /// Bridgehub
+    address public l2Deployer;
+    /// ZKsync Bridgehub
     IBridgehub public bridgehub;
 
     /// Chains that has been successfully deployed
@@ -54,16 +53,16 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     struct ChainConfig {
         /// @param Chain id of the new chain should be unique for this bridgehub
         uint256 chainId;
-        /// @param pubdataPricingMode How the users will charged for pubdata.
-        PubdataPricingMode pubdataPricingMode;
-        /// @param baseToken of the chain
-        BaseToken baseToken;
         /// @param Operator for making commit txs.
         address commitOperator;
         /// @param Operator for making Prove and Execute transactions
         address operator;
         /// @param Governor of the chain. Ownership of the chain will be transferred to this operator
         address governor;
+        /// @param baseToken of the chain
+        BaseToken baseToken;
+        /// @param pubdataPricingMode How the users will charged for pubdata.
+        PubdataPricingMode pubdataPricingMode;
     }
 
     constructor(address _bridgehub, address _l2Deployer, address _owner) reentrancyGuardInitializer {
@@ -90,11 +89,11 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             operator: operator,
             governor: governor,
             baseToken: BaseToken({
-            tokenAddress: tokenAddress,
-            tokenMultiplierSetter: tokenMultiplierSetter,
-            gasPriceMultiplierNominator: gasPriceMultiplierNominator,
-            gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
-        })
+                tokenAddress: tokenAddress,
+                tokenMultiplierSetter: tokenMultiplierSetter,
+                gasPriceMultiplierNominator: gasPriceMultiplierNominator,
+                gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
+            })
         });
         bytes32 key = keccak256(abi.encode(msg.sender, config.chainId));
         if (deployedChains[key] || bridgehub.stateTransitionManager(config.chainId) != address(0)) {
@@ -104,7 +103,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         // For Deploying L2 contracts on for non ETH based networks, we as bridgehub owners required base token.
         if (config.baseToken.tokenAddress != ETH_TOKEN_ADDRESS) {
             uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
-                                config.baseToken.gasPriceMultiplierDenominator;
+                config.baseToken.gasPriceMultiplierDenominator;
             if (IERC20(config.baseToken.tokenAddress).balanceOf(address(this)) < amount) {
                 bool success = IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
                 if (!success) {
@@ -140,9 +139,9 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert ChainIsNotYetDeployed();
         }
         address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
-//        (bool success, bytes memory returnData) = diamondProxy.call(abi.encodeWithSelector(IGetters.getAdmin.selector));
-//        require(success);
-//        address chainAdmin = bytesToAddress(returnData);
+        //        (bool success, bytes memory returnData) = diamondProxy.call(abi.encodeWithSelector(IGetters.getAdmin.selector));
+        //        require(success);
+        //        address chainAdmin = bytesToAddress(returnData);
         address chainAdmin = IGetters(diamondProxy).getAdmin();
         address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
         if (l2BridgeAddress == address(0)) {
