@@ -17,8 +17,14 @@ interface IGetters is IZKChainBase {
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @return The address of the verifier smart contract
-    function getVerifier() external view returns (address);
+    /// @return The address of the Wrapper verifier smart contract
+    function getDualVerifier() external view returns (address);
+    /// @return The address of the PLONK verifier smart contract
+    function getPlonkVerifier() external view returns (address);
+    /// @return The address of the FFLONK verifier smart contract
+    function getFflonkVerifier() external view returns (address);
+    /// @return The length of the FFLONK proof type
+    function getFflonkProofLength() external view returns (uint256);
 
     /// @return The address of the current admin
     function getAdmin() external view returns (address);

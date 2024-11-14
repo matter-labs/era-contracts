@@ -14,9 +14,9 @@ import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {MalformedCalldata, ZeroAddress, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {
-    function test_revertWhen_verifierIsZeroAddress() public {
+    function test_revertWhen_dualVerifierIsZeroAddress() public {
         InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-        initializeData.verifier = IVerifier(address(0));
+        initializeData.dualVerifier = IVerifier(address(0));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -27,6 +27,35 @@ contract InitializeTest is DiamondInitTest {
         vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
+
+    function test_revertWhen_plonkVerifierIsZeroAddress() public {
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
+        initializeData.plonkVerifier = address(0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(ZeroAddress.selector);
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
+    function test_revertWhen_fflonkVerifierIsZeroAddress() public {
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
+        initializeData.fflonkVerifier = address(0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(ZeroAddress.selector);
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
 
     function test_revertWhen_governorIsZeroAddress() public {
         InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
@@ -88,7 +117,11 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getBaseTokenAssetId(), initializeData.baseTokenAssetId);
         assertEq(utilsFacet.util_getProtocolVersion(), initializeData.protocolVersion);
 
-        assertEq(address(utilsFacet.util_getVerifier()), address(initializeData.verifier));
+        assertEq(address(utilsFacet.util_getDualVerifier()), address(initializeData.dualVerifier));
+        assertEq(utilsFacet.util_getPlonkVerifier(), initializeData.plonkVerifier);
+        assertEq(utilsFacet.util_getFflonkVerifier(), initializeData.fflonkVerifier);
+        assertEq(utilsFacet.util_getFflonkProofLength(), initializeData.fflonkProofLength);
+
         assertEq(utilsFacet.util_getAdmin(), initializeData.admin);
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 

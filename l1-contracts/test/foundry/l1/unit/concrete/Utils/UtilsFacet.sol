@@ -32,12 +32,36 @@ contract UtilsFacet is ZKChainBase {
         return s.baseTokenAssetId;
     }
 
-    function util_setVerifier(IVerifier _verifier) external {
-        s.verifier = _verifier;
+    function util_setDualVerifier(IVerifier _dualVerifier) external {
+        s.dualVerifier = _dualVerifier;
     }
 
-    function util_getVerifier() external view returns (IVerifier) {
-        return s.verifier;
+    function util_getDualVerifier() external view returns (IVerifier) {
+        return s.dualVerifier;
+    }
+
+    function util_setPlonkVerifier(address _plonkVerifier) external {
+        s.plonkVerifier = _plonkVerifier;
+    }
+
+    function util_getPlonkVerifier() external view returns (address) {
+        return s.plonkVerifier;
+    }
+
+    function util_setFflonkVerifier(address _fflonkVerifier) external {
+        s.fflonkVerifier = _fflonkVerifier;
+    }
+
+    function util_getFflonkVerifier() external view returns (address) {
+        return s.fflonkVerifier;
+    }
+
+    function util_setFflonkProofLength(uint256 _fflonkProofLength) external {
+        s.fflonkProofLength = _fflonkProofLength;
+    }
+
+    function util_getFflonkProofLength() external view returns (uint256) {
+        return s.fflonkProofLength;
     }
 
     function util_setStoredBatchHashes(uint32 _batchId, bytes32 _storedBatchHash) external {

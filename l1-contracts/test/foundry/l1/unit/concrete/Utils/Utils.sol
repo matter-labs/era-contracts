@@ -387,7 +387,10 @@ library Utils {
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 storedBatchZero: bytes32(0),
-                verifier: makeVerifier(testnetVerifier),
+                dualVerifier: makeVerifier(testnetVerifier),
+                plonkVerifier: address(0x23432423445),
+                fflonkVerifier: address(0x24345211125),
+                fflonkProofLength: 0,
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
@@ -402,7 +405,10 @@ library Utils {
     ) public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
-                verifier: makeVerifier(testnetVerifier),
+                dualVerifier: makeVerifier(testnetVerifier),
+                plonkVerifier: address(0x23432423445),
+                fflonkVerifier: address(0x24345211125),
+                fflonkProofLength: 0,
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
