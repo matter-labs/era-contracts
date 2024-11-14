@@ -145,7 +145,7 @@ contract RegisterHyperchainScript is Script {
         Utils.chainAdminMulticall({_chainAdmin: bridgehub.admin(), _target: config.bridgehub, _data: data, _value: 0});
         console.log("Hyperchain registered");
 
-        // Get new diamond proxy address from emitted events
+        // Get new diamond proxy address from bridgehub
         address diamondProxyAddress = bridgehub.getHyperchain(chainConfig.chainId);
         if (diamondProxyAddress == address(0)) {
             revert("Diamond proxy address not found");
@@ -158,7 +158,7 @@ contract RegisterHyperchainScript is Script {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
         vm.startBroadcast();
-        validatorTimelock.addValidator(chainConfig.chainId, chainConfig.commitOperator);
+        validatorTimelock.addValidator(chainConfig.chainId, chainConfig.blobOperator);
         validatorTimelock.addValidator(chainConfig.chainId, chainConfig.operator);
         vm.stopBroadcast();
 

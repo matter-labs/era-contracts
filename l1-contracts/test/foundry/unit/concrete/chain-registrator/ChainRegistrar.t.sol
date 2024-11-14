@@ -106,7 +106,7 @@ contract ChainRegistrarTest is Test {
         chainRegistrar.proposeChainRegistration({
             chainId: 1,
             pubdataPricingMode: PubdataPricingMode.Validium,
-            commitOperator: makeAddr("commitOperator"),
+            blobOperator: makeAddr("blobOperator"),
             operator: makeAddr("operator"),
             governor: makeAddr("governor"),
             tokenAddress: ETH_TOKEN_ADDRESS,
@@ -127,7 +127,7 @@ contract ChainRegistrarTest is Test {
         sharedBridge.initializeChainGovernance(1, makeAddr("l2bridge"));
         vm.recordLogs();
         vm.prank(admin);
-        chainRegistrar.chainRegistered(author, 1);
+        chainRegistrar.setChainAsRegistered(author, 1);
         Vm.Log[] memory registeredLogs = vm.getRecordedLogs();
     }
 }

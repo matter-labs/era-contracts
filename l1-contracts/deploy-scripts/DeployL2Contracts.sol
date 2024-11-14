@@ -377,6 +377,6 @@ contract DeployL2Script is Script {
     function finalizeRegistration() internal {
         ChainRegistrar chainRegistrar = ChainRegistrar(config.chainRegistrar);
         vm.broadcast();
-        chainRegistrar.chainRegistered(config.proposalAuthor, config.chainId);
+        chainRegistrar.setChainAsRegistered(config.proposalAuthor, config.chainId);
     }
 }

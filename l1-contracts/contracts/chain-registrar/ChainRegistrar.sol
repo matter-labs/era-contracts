@@ -54,7 +54,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         /// @param Chain id of the new chain should be unique for this bridgehub
         uint256 chainId;
         /// @param Operator for making commit txs.
-        address commitOperator;
+        address blobOperator;
         /// @param Operator for making Prove and Execute transactions
         address operator;
         /// @param Governor of the chain. Ownership of the chain will be transferred to this operator
@@ -74,7 +74,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     function proposeChainRegistration(
         uint256 chainId,
         PubdataPricingMode pubdataPricingMode,
-        address commitOperator,
+        address blobOperator,
         address operator,
         address governor,
         address tokenAddress,
@@ -85,7 +85,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         ChainConfig memory config = ChainConfig({
             chainId: chainId,
             pubdataPricingMode: pubdataPricingMode,
-            commitOperator: commitOperator,
+            blobOperator: blobOperator,
             operator: operator,
             governor: governor,
             baseToken: BaseToken({
@@ -124,7 +124,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         return proposedChains[key];
     }
 
-    function chainRegistered(address author, uint256 chainId) public onlyOwner nonReentrant {
+    function setChainAsRegistered(address author, uint256 chainId) public onlyOwner nonReentrant {
         bytes32 key = keccak256(abi.encode(author, chainId));
         ChainConfig memory config = proposedChains[key];
         if (config.chainId == 0) {
