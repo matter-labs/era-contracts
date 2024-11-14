@@ -225,9 +225,6 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the TimestampAsserter contract.
     /// @return The bytecode of the TimestampAsserter contract.
     function readTimestampAsserterBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/TimestampAsserter.sol/TimestampAsserter.json"
-            );
+        return Utils.readZKFoundryBytecodeL2("TimestampAsserter.sol", "TimestampAsserter");
     }
 }
