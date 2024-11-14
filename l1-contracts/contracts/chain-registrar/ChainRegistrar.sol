@@ -27,6 +27,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     mapping(bytes32 => ChainConfig) public proposedChains;
 
     error ProposalNotFound();
+    error BaseTokenTransferFailed();
     error ChainIsAlreadyDeployed();
     error ChainIsNotYetDeployed();
     error BridgeIsNotRegistered();
@@ -105,7 +106,10 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
                                 config.baseToken.gasPriceMultiplierDenominator;
             if (IERC20(config.baseToken.tokenAddress).balanceOf(address(this)) < amount) {
-                IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
+                bool success = IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
+                if (!success) {
+                    revert BaseTokenTransferFailed();
+                }
             }
         }
         emit NewChainRegistrationProposal(config.chainId, msg.sender, key);
@@ -136,9 +140,10 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert ChainIsNotYetDeployed();
         }
         address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
-        (bool success, bytes memory returnData) = diamondProxy.call(abi.encodeWithSelector(IGetters.getAdmin.selector));
-        require(success);
-        address chainAdmin = bytesToAddress(returnData);
+//        (bool success, bytes memory returnData) = diamondProxy.call(abi.encodeWithSelector(IGetters.getAdmin.selector));
+//        require(success);
+//        address chainAdmin = bytesToAddress(returnData);
+        address chainAdmin = IGetters(diamondProxy).getAdmin();
         address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
