@@ -22,6 +22,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.commit }}
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -35,11 +44,21 @@ jobs:
           yarn
           echo "release_tag=${{ inputs.prefix }}-${{ inputs.commit }}" >> $GITHUB_OUTPUT
 
-      - name: Build contracts
+      - name: Build l1 contracts
+        working-directory: l1-contracts
         run: |
-          yarn l1 build
-          yarn l2 build
-          yarn sc build
+          yarn build:foundry
+
+      - name: Build l2 contracts
+        working-directory: l2-contracts
+        run: |
+          yarn build:foundry
+
+      - name: Build system-contracts
+        working-directory: system-contracts
+        run: |
+          yarn install
+          yarn build:foundry
 
       - name: Prepare artifacts
         run: |

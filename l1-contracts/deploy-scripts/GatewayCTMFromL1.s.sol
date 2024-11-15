@@ -63,9 +63,7 @@ contract GatewayCTMFromL1 is Script {
         address nativeTokenVault;
         address chainTypeManagerProxy;
         address sharedBridgeProxy;
-        address governance;
         address governanceAddr;
-        address deployerAddr;
         address baseToken;
         uint256 chainChainId;
         uint256 eraChainId;
@@ -108,7 +106,6 @@ contract GatewayCTMFromL1 is Script {
         if (config.baseToken != ADDRESS_ONE) {
             distributeBaseToken();
         }
-        deployGatewayContracts();
 
         (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
@@ -199,7 +196,8 @@ contract GatewayCTMFromL1 is Script {
             chainTypeManagerProxy: toml.readAddress("$.chain_type_manager_proxy_addr"),
             sharedBridgeProxy: toml.readAddress("$.shared_bridge_proxy_addr"),
             chainChainId: toml.readUint("$.chain_chain_id"),
-            governance: toml.readAddress("$.governance"),
+            governanceAddr: toml.readAddress("$.governance"),
+            baseToken: toml.readAddress("$.base_token"),
             l1ChainId: toml.readUint("$.l1_chain_id"),
             eraChainId: toml.readUint("$.era_chain_id"),
             testnetVerifier: toml.readBool("$.testnet_verifier"),
@@ -223,9 +221,9 @@ contract GatewayCTMFromL1 is Script {
             forceDeploymentsData: toml.readBytes("$.force_deployments_data")
         });
 
-        address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+        address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governanceAddr);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
-            governanceAddress: aliasedGovernor,
+            aliasedGovernanceAddress: aliasedGovernor,
             salt: bytes32(0),
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,

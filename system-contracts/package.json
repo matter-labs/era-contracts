@@ -15,9 +15,7 @@
     "fast-glob": "^3.3.2",
     "hardhat": "=2.22.2",
     "preprocess": "^3.2.0",
-    "zksync-ethers": "^5.9.0",
-    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@4.9.5",
-    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@4.9.5"
+    "zksync-ethers": "^5.9.0"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.2.0",
@@ -53,6 +51,7 @@
   },
   "scripts": {
     "build": "yarn build:system-contracts && yarn build:bootloader",
+    "build:foundry": "yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
     "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",

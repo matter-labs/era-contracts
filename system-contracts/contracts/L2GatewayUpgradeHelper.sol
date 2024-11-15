@@ -170,13 +170,13 @@ library L2GenesisUpgradeHelper {
         });
 
         address deployedTokenBeacon;
+        bool contractsDeployedAlready;
         if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
             deployedTokenBeacon = address(
                 IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon()
             );
+            contractsDeployedAlready = true;
         }
-
-        bool shouldDeployBeacon = deployedTokenBeacon == address(0);
 
         // Configure the Native Token Vault deployment.
         forceDeployments[3] = ForceDeployment({
@@ -191,7 +191,7 @@ library L2GenesisUpgradeHelper {
                 fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
                 additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
-                shouldDeployBeacon,
+                contractsDeployedAlready,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId
             )
@@ -258,12 +258,10 @@ library L2GenesisUpgradeHelper {
             _baseTokenAssetId
         );
 
-        bytes memory constructorParams = abi.encode(WRAPPED_BASE_TOKEN_IMPL_ADDRESS, _aliasedL1Governance, initData);
-
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(
             WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
             _aliasedL1Governance,
-            constructorParams
+            initData
         );
 
         return address(proxy);

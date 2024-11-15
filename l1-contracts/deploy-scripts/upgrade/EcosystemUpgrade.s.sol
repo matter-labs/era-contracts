@@ -127,6 +127,7 @@ contract EcosystemUpgrade is Script {
         address upgradeTimer;
         address bytecodesSupplier;
         address l2WrappedBaseTokenStore;
+        address blobVersionedHashRetriever;
     }
 
     struct ExpectedL2Addresses {
@@ -218,7 +219,6 @@ contract EcosystemUpgrade is Script {
         address stateTransitionManagerAddress;
         address transparentProxyAdmin;
         address eraDiamondProxy;
-        address blobVersionedHashRetriever;
     }
 
     struct TokensConfig {
@@ -713,13 +713,18 @@ contract EcosystemUpgrade is Script {
         config.contracts.eraDiamondProxy = toml.readAddress("$.contracts.era_diamond_proxy");
         config.contracts.legacyErc20BridgeAddress = toml.readAddress("$.contracts.legacy_erc20_bridge_address");
         config.contracts.oldValidatorTimelock = toml.readAddress("$.contracts.old_validator_timelock");
-        // TODO: value stored there is incorrect at the moment, figure out the correct value
-        config.contracts.blobVersionedHashRetriever = toml.readAddress("$.contracts.blob_versioned_hash_retriever");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
 
         // TODO: maybe receive the address from the config + cross check
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
+    }
+
+    function deployBlobVersionedHashRetriever() internal {
+        bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
+        addresses.blobVersionedHashRetriever = contractAddress;
     }
 
     function initializeGeneratedData() internal {
@@ -1291,7 +1296,7 @@ contract EcosystemUpgrade is Script {
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
-            blobVersionedHashRetriever: config.contracts.blobVersionedHashRetriever
+            blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
