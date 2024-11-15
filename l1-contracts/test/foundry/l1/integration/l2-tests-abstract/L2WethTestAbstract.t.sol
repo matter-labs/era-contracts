@@ -28,7 +28,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {Unauthorized, UnimplementedMessage, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 

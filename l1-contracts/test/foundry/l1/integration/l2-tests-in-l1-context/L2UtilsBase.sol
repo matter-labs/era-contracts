@@ -89,14 +89,14 @@ library L2UtilsBase {
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
 
-        // vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
-        // // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
+        vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
+        // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
 
-        // // stdstore
-        // //     .target(L2_ASSET_ROUTER_ADDR)
-        // //     .sig("assetHandlerAddress(bytes32)")
-        // //     .with_key(baseTokenAssetId)
-        // //     .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
+        // stdstore
+        //     .target(L2_ASSET_ROUTER_ADDR)
+        //     .sig("assetHandlerAddress(bytes32)")
+        //     .with_key(baseTokenAssetId)
+        //     .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
 
         // bytes memory ntvBytecode = Utils.readL1ContractsBytecode("bridge/ntv/", "L2NativeTokenVault");
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);

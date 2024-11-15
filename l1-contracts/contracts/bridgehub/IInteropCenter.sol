@@ -56,12 +56,6 @@ interface IInteropCenter {
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
-
     function l2TransactionBaseCost(
         uint256 _chainId,
         uint256 _gasPrice,

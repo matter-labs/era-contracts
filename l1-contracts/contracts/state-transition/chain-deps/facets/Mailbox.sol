@@ -176,7 +176,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         // to a chain's message root only if the chain has indeed executed its batch on top of it.
         //
         // We trust all chains whitelisted by the Bridgehub governance.
-        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId)) {
+        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofVerificationResult.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
         address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(
@@ -307,7 +307,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IInteropCenter(s.interopCenter).forwardTransactionOnGateway,
+            IBridgehub(s.bridgehub).forwardTransactionOnGateway,
             (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return

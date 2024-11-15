@@ -71,6 +71,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+//
+error ChainNotLegacy();
 // 0xf7a01e4d
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
@@ -143,12 +145,12 @@ error InvalidTxType(uint256 txType);
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // // 0xaa7feadc
 // error InvalidValue();
-// //
-// error L2AssetRouter_LegacyDataNotImplemented();
-// //
-// error L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
-// //
-// error L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
+//
+error L2AssetRouter_LegacyDataNotImplemented();
+//
+error L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
+//
+error L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
 // // 0x888b2f09
 // error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
 // // 0xa4f62e33
@@ -201,10 +203,10 @@ error NonIncreasingTimestamp();
 error NonSequentialBatch();
 // 0x0ac76f01
 error NonSequentialVersion();
-// // 0x4ef79e5a
-// error NonZeroAddress(address);
-// //
-// error NotCurrentSettlementLayer();
+// 0x4ef79e5a
+error NonZeroAddress(address);
+//
+error NotCurrentSettlementLayer();
 // 0xdd629f86
 error NotEnoughGas();
 // 0xdd7e3621

@@ -46,7 +46,8 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
-        GatewayUpgradeEncodedInput memory decodedInput = abi.decode(
+        // todo rename to decodedInput
+        GatewayUpgradeEncodedInput memory encodedInput = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
             (GatewayUpgradeEncodedInput)
         );
@@ -55,10 +56,10 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
 
         s.baseTokenAssetId = baseTokenAssetId;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        s.validators[decodedInput.oldValidatorTimelock] = false;
-        s.validators[decodedInput.newValidatorTimelock] = true;
+        s.validators[encodedInput.oldValidatorTimelock] = false;
+        s.validators[encodedInput.newValidatorTimelock] = true;
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
-        s.interopCenter = decodedInput.interopCenter;
+        s.interopCenter = encodedInput.interopCenter;
 
         bytes memory gatewayUpgradeCalldata = abi.encode(
             encodedInput.ctmDeployer,

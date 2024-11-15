@@ -517,7 +517,7 @@ contract EcosystemUpgrade is Script {
             fixedForceDeploymentsData: generatedData.forceDeploymentsData,
             oldValidatorTimelock: config.contracts.oldValidatorTimelock,
             newValidatorTimelock: addresses.validatorTimelock,
-            wrappedBaseTokenStore: addresses.l2WrappedBaseTokenStore
+            wrappedBaseTokenStore: addresses.l2WrappedBaseTokenStore,
             interopCenter: addresses.bridgehub.interopCenterProxy
         });
 

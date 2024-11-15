@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import "forge-std/Test.sol";
 import "contracts/upgrades/BytecodesSupplier.sol";
-import "contracts/common/libraries/L2ContractHelper.sol";
+import "contracts/common/l2-helpers/L2ContractHelper.sol";
 import "contracts/common/L1ContractErrors.sol";
 
 contract BytecodesSupplierTest is Test {

@@ -43,7 +43,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
-        l2InteropCenter.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
+        l2Bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
     }
 
     function test_withdrawFromGateway() public {

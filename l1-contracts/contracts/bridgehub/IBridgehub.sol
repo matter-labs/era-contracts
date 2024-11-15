@@ -245,6 +245,12 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     /// @dev It is a legacy method. Do not use!
     function getHyperchain(uint256 _chainId) external view returns (address);
 
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
     function routeBridgehubConfirmL2Transaction(
         address _secondBridgeAddress,
         uint256 _chainId,

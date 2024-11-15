@@ -24,7 +24,7 @@ import {Diamond} from "../libraries/Diamond.sol";
 
 import {ChainTypeManager} from "../ChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -279,7 +279,7 @@ contract GatewayCTMDeployer {
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
+            new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
         );
         ProxyAdmin proxyAdmin = new ProxyAdmin{salt: _salt}();
         proxyAdmin.transferOwnership(_config.aliasedGovernanceAddress);
