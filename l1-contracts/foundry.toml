@@ -43,4 +43,4 @@ optimizer = true
 optimizer_runs = 200
 [profile.default.zksync] 
 enable_eravm_extensions = true
-zksolc = "1.5.3"
+zksolc = "1.5.0"
