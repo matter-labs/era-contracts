@@ -53,7 +53,7 @@ interface IAdmin is IZKChainBase {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
-    /// @dev Only the current admin can execute the upgrade
+    /// @dev Only the ChainTypeManager contract can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
