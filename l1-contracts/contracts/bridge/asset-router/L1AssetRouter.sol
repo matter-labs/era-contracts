@@ -25,7 +25,6 @@ import {UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExis
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 

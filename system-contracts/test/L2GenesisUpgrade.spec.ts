@@ -8,6 +8,7 @@ import {
   TEST_FORCE_DEPLOYER_ADDRESS,
   REAL_L2_ASSET_ROUTER_ADDRESS,
   REAL_L2_MESSAGE_ROOT_ADDRESS,
+  REAL_L2_INTEROP_CENTER_ADDRESS,
   TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS,
   ADDRESS_ONE,
 } from "./shared/constants";
@@ -62,7 +63,7 @@ describe("L2GenesisUpgrade tests", function () {
     await setResult(
       "IBridgehub",
       "setAddresses",
-      [REAL_L2_ASSET_ROUTER_ADDRESS, ctmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS],
+      [REAL_L2_ASSET_ROUTER_ADDRESS, ctmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS, REAL_L2_INTEROP_CENTER_ADDRESS],
       {
         failure: false,
         returnData: "0x",
@@ -72,6 +73,24 @@ describe("L2GenesisUpgrade tests", function () {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["address"], [bridgehubOwnerAddress]),
     });
+    await setResult(
+      "IInteropCenter",
+      "setAddresses",
+      [REAL_L2_ASSET_ROUTER_ADDRESS],
+      {
+        failure: false,
+        returnData: "0x",
+      }
+    );
+    await setResult(
+      "IInteropHandler",
+      "setInteropAccountBytecode",
+      [],
+      {
+        failure: false,
+        returnData: "0x",
+      }
+    );
 
     await setResult("SystemContext", "setChainId", [chainId], {
       failure: false,
@@ -86,6 +105,9 @@ describe("L2GenesisUpgrade tests", function () {
     const msgRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
     const messageRootBytecodeHash = zksync.utils.hashBytecode(msgRootBytecode);
 
+    const interopCenterBytecode = (await loadArtifact("DummyInteropCenter")).bytecode;
+    const interopCenterBytecodeHash = zksync.utils.hashBytecode(interopCenterBytecode);
+
     const ntvBytecode = (await loadArtifact("DummyL2NativeTokenVault")).bytecode;
     const ntvBytecodeHash = zksync.utils.hashBytecode(ntvBytecode);
 
@@ -97,7 +119,7 @@ describe("L2GenesisUpgrade tests", function () {
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl)",
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, bytes32 interopCenterBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl)",
       ],
       [
         {
@@ -111,6 +133,7 @@ describe("L2GenesisUpgrade tests", function () {
           l2AssetRouterBytecodeHash: l2AssetRouterBytecodeHash,
           l2NtvBytecodeHash: ntvBytecodeHash,
           messageRootBytecodeHash: messageRootBytecodeHash,
+          interopCenterBytecodeHash: interopCenterBytecodeHash,
           // For genesis upgrade these values will always be zero
           l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
           l2BridgedStandardERC20Impl: ethers.constants.AddressZero,

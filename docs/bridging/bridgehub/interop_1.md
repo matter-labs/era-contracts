@@ -4,7 +4,7 @@
 
 ## What is interop?
 
-Interop is a way to communicate: observe messages, send assets, execute calls,  bundle of calls and transactions between two ZKStack chains.
+Interop is a way to communicate: observe messages, send assets, execute calls, bundle of calls and transactions between two ZKStack chains.
 
 **Observe messages**
 Allows you to see that some interop message (think about it as special Event) was created on the source chain.
@@ -42,36 +42,32 @@ While this looks very similar to ‘regular’ call, there are some caveats, esp
 ### Simple scenario FAQ
 
 - Who pays for gas?
-    - when you use this method, your account must have `gasLimit * gasPrice`  worth of destination chain tokens available on the source chain. (so if you send this request from Era and destination chain is Sophon with SOPH, you must have SOPH tokens on Era)
-    - There are of course far more payment options (but that’s in later sections).
+  - when you use this method, your account must have `gasLimit * gasPrice` worth of destination chain tokens available on the source chain. (so if you send this request from Era and destination chain is Sophon with SOPH, you must have SOPH tokens on Era)
+  - There are of course far more payment options (but that’s in later sections).
 - How does the destination contract know it is from me?
-    - destination contract will be called with `msg.sender` equal to `keccak(source_account, source_chain)[:20]`  (in the perfect world, we would have used `source_account@source_chain` - similar to how email works - but as we have to fit into 20 bytes ethereum address, we do a keccak).
+  - destination contract will be called with `msg.sender` equal to `keccak(source_account, source_chain)[:20]` (in the perfect world, we would have used `source_account@source_chain` - similar to how email works - but as we have to fit into 20 bytes ethereum address, we do a keccak).
 - Who executes it on the destination chain?
-    - This call will be ‘auto executed’ on the destination chain. You as a user don’t have to do anything.
+  - This call will be ‘auto executed’ on the destination chain. You as a user don’t have to do anything.
 - What if it fails out of gas? Or what if I set too low gasPrice?
-    - In either of these scenarios, you can ‘retry’ it, by using `retryInteropTransaction` (not implemented yet).
-        
-        ```solidity
-        cast send source-chain.com INTEROP_CENTER_ADDRESS retryInteropTransaction(
-          0x2654.. // previous interop transaction hash from above
-          200_000, // new gasLimit
-          300_000_000 // new gasPrice
-         )
-        ```
-        
-    - IMPORTANT: depending on your use case, it might be very important to retry rather than to create a new `sendInteropWithSingleCall` - for example if your call includes some larger asset transfer, creating the new `sendInteropWithSingleCall` would attempt to freeze/burn these assets again.
+  - In either of these scenarios, you can ‘retry’ it, by using `retryInteropTransaction` (not implemented yet).
+    ```solidity
+    cast send source-chain.com INTEROP_CENTER_ADDRESS retryInteropTransaction(
+      0x2654.. // previous interop transaction hash from above
+      200_000, // new gasLimit
+      300_000_000 // new gasPrice
+     )
+    ```
+  - IMPORTANT: depending on your use case, it might be very important to retry rather than to create a new `sendInteropWithSingleCall` - for example if your call includes some larger asset transfer, creating the new `sendInteropWithSingleCall` would attempt to freeze/burn these assets again.
 - If some of my assets were burned when I did the transaction, but it failed on destination chain, how do I get them back?
-    - If your transaction failed on destination chain, you can either try to retry it with more gas, higher gas limits (see above) or cancel it (not implemented yet):
-        
-        ```solidity
-        cast send source-chain INTEROP_CENTER_ADDRESS cancelInteropTransaction(
-        	0x2654.. // previous interop transaction
-        	100_000 // gasLimit (yes, cancellation needs gas too - but just to mark as cancelled)
-        	300_000_000 // gasPrice
-        )
-        ```
-        
-    - after that, you’ll need to call the `claimFailedDeposit` methods on your source chain contracts to get the assets that were burned when you did the transaction back - details of those are contract specific.
+  - If your transaction failed on destination chain, you can either try to retry it with more gas, higher gas limits (see above) or cancel it (not implemented yet):
+    ```solidity
+    cast send source-chain INTEROP_CENTER_ADDRESS cancelInteropTransaction(
+    	0x2654.. // previous interop transaction
+    	100_000 // gasLimit (yes, cancellation needs gas too - but just to mark as cancelled)
+    	300_000_000 // gasPrice
+    )
+    ```
+  - after that, you’ll need to call the `claimFailedDeposit` methods on your source chain contracts to get the assets that were burned when you did the transaction back - details of those are contract specific.
 
 ### Complex scenario
 
@@ -97,7 +93,7 @@ The good news, is that third party bridges can use interop to improve the transf
 
 Interop speed depends on its lowest level - InteropMessage propagation speed - which boils down to the question, at which moment are you (as destination chain) sure that the message created by source chain is valid.
 
-As security is our top priority, the default Interop will wait for the ZK proof - which might take around 10 minutes. 
+As security is our top priority, the default Interop will wait for the ZK proof - which might take around 10 minutes.
 
 At the same time, we plan to release another INTEROP_CENTER contract (under a different address, but with same interface) - that would work within 1 second, but with additional risks (similar to optimistic chains).
 

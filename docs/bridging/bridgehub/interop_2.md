@@ -34,13 +34,13 @@ contract InteropCenter {
 	  uint256 sourceChainId; // filled by InteropCenter
 	  uint256 messageNum; // a 'nonce' to guarantee different hashes.
 	}
-	
+
 	// Verifies if such interop message was ever producted.
 	function verifyInteropMessage(bytes32 interopHash, Proof merkleProof) return bool;
 }
 ```
 
-When you call the `sendInteropMessage`, the `InteropCenter`  will add some additional fields (like your sender address, source chain id and messageNum - which acts as a nonce to guarantee that the hash of this struct is globally unique) - and return you the `interopHash`.
+When you call the `sendInteropMessage`, the `InteropCenter` will add some additional fields (like your sender address, source chain id and messageNum - which acts as a nonce to guarantee that the hash of this struct is globally unique) - and return you the `interopHash`.
 
 This is now a globally unique identifier, that you can use on any chain in the network, to call the `verifyInteropMessage`.
 
@@ -84,15 +84,13 @@ contract SignupContract {
     require(message.data == "We are open");
 	  signupIsOpen = true;
   }
-  
+
   function signup() {
      require(signupIsOpen);
-     signedUpUser[msg.sender] = true;  
+     signedUpUser[msg.sender] = true;
   }
 }
 ```
-
- 
 
 In the example above, the signupManager on chain A, is calling the `signup_open` method. Then any user on other chains, can get the `signup_open_msg_hash` , get the necessary proof, and call the `openSignup` function on any destination chain.
 
@@ -112,7 +110,7 @@ function sendInteropMessage(bytes data) {
 
 As you can see, it fills the necessary data, and then calls the `sendToL1` method.
 
-The `sendToL1` is a system contract, that collects all these messages, creates a merkle tree out of them at the end of the batch, and sends them to the settlement layer (L1 or Gateway) when it commits the batch. 
+The `sendToL1` is a system contract, that collects all these messages, creates a merkle tree out of them at the end of the batch, and sends them to the settlement layer (L1 or Gateway) when it commits the batch.
 To see an exact description of the Merkle root structure read the [nested l3 l1 messaging doc](../../gateway/nested_l3_l1_messaging.md).
 
 ![image.png](./img/chain_root.png)
@@ -127,10 +125,10 @@ The settlment layer receives the messages and once the proof for the batch is su
 
 Each chain is regularly syncing data from its settlement layers, and fetches that globalRoot at this time.
 
-If a user now wants to call the `verifyInteropMessage` on some chain, they first have to ask the chain for the merkle path from the batch that they are interested into, up to the `globalRoot`. Afterwards, they can simply provide this path when calling a method on the destination chain (in our case the `openSignup`  method).
+If a user now wants to call the `verifyInteropMessage` on some chain, they first have to ask the chain for the merkle path from the batch that they are interested into, up to the `globalRoot`. Afterwards, they can simply provide this path when calling a method on the destination chain (in our case the `openSignup` method).
 
 ![image.png](./img/merkle_proof.png)
-Note the chain root across batches is missing from this image. 
+Note the chain root across batches is missing from this image.
 
 **What if Chain doesn’t provide the proof?**
 

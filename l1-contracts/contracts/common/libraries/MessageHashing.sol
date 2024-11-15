@@ -9,7 +9,6 @@ import {UncheckedMath} from "./UncheckedMath.sol";
 
 import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../state-transition/L1StateTransitionErrors.sol";
 
-
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
 

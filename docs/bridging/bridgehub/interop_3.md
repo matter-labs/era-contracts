@@ -22,7 +22,7 @@ struct InteropCall {
 	address destinationAddress,
 	uint256 destinationChainId,
 	calldata data,
-	uint256 value	
+	uint256 value
 }
 contract InteropCenter {
 	// On source chain.
@@ -41,9 +41,9 @@ contract InteropCenter {
   // Executes a given bundle.
   // interopMessage is the message that contains your bundle as payload.
   // If it fails, it can be called again.
-	function executeInteropBundle(interopMessage, proof);
-	// If the bundle didn't execute succesfully yet, it can be marked as cancelled.
-	// See details below.
+  function executeInteropBundle(interopMessage, proof);
+  // If the bundle didn't execute succesfully yet, it can be marked as cancelled.
+  // See details below.
   function cancelInteropBundle(interopMessage, proof);
 }
 ```
@@ -60,7 +60,7 @@ The msg.sender on the destination chain will be `AliasedAccount` - which is an a
 
 (Normally we’d like to use `sourceAccount@sourceChain` - but as ethereum limits the size of addresses to 20 bytes, we compute the keccak of the string above, and use this as the address).
 
-One way to think about it, is you (as account 0x5bFF1… on chain A) can send a call to some contract on a destination chain, and for that contract, it would look like it was a local call coming from the address `keccak(0x5bFF1 || A)` . This means that you are ‘controlling’ such account address on **every ZKChain** by sending interop messages from the `0x5bFF1..`  account on chain A.
+One way to think about it, is you (as account 0x5bFF1… on chain A) can send a call to some contract on a destination chain, and for that contract, it would look like it was a local call coming from the address `keccak(0x5bFF1 || A)` . This means that you are ‘controlling’ such account address on **every ZKChain** by sending interop messages from the `0x5bFF1..` account on chain A.
 
 ![image.png](./img/aliased_account.png)
 
@@ -94,12 +94,12 @@ contract HQ {
     // Adding aliased accounts.
 	  shops[address(keccak(addressOnChain || chainId))] = true;
   }
-  
+
   function reportSales(uint256 itemPrice) {
     // only allow calls from our shops (their aliased accounts).
 	  require(shops[msg.sender]);
 	  sales[msg.sender] += itemPrice;
-  } 
+  }
 }
 ```
 
@@ -140,13 +140,13 @@ contract InteropCenter {
 		// Calls have to be done in this order.
 		InteropCall calls[];
 		uint256 destinationChain;
-		
+
 		// If not set - anyone can execute it.
-		address executionAddresses[]; 
+		address executionAddresses[];
 		// Who can 'cancel' this bundle.
 		address cancellationAddress;
 	}
-	
+
 	// Starts a new bundle.
 	// All the calls that will be added to this bundle (potentially by different contracts)
 	// will have a 'shared fate'.
@@ -182,8 +182,8 @@ bundleId = InteropCenter(INTEROP_CENTER).startBundle(chainD);
 // when this call is executed on chainD, it will mint 1k USDC there.
 // BUT - this interopCall is tied to this bundle id.
 USDCBridge.transferWithBundle(
-  bundleId, 
-  chainD, 
+  bundleId,
+  chainD,
   aliasedAccount(this(account), block.chain_id),
   1000);
 
@@ -192,9 +192,9 @@ InteropCenter.addToBundle(bundleId,
             USDCOnDestinationChain,
             createCalldata("approve", 1000, poolOnDestinationChain),
             0);
-// This will create interopCall to do the swap.            
-InteropCenter.addToBundle(bundleId, 
-            poolOnDestinationChain, 
+// This will create interopCall to do the swap.
+InteropCenter.addToBundle(bundleId,
+            poolOnDestinationChain,
             createCalldata("swap", "USDC_PEPE", 1000, ...),
             0)
 // And this will be the interopcall to transfer all the assets back.
@@ -202,7 +202,7 @@ InteropCenter.addToBundle(bundleId,
             pepeBridgeOnDestinationChain,
             createCalldata("transferAll", block.chain_id, this(account)),
             0)
- 
+
 
 bundleHash = interopCenter.finishAndSendBundle(bundleId);
 ```
@@ -219,16 +219,15 @@ If bundle execution fails - either due to some contract error, or out of gas - n
 
 This is equivalent to our ‘hitchhiker’ (or with a bundle - more like a group of hitchhikers) - if the car they travelled on doesn’t make it to the destination, they simply look for a new one rather than going back home ;-)
 
-But there will be scenarios when the bundle should be cancelled - and it can be done by the `cancellationAddress` that is specified in the  bundle itself.
+But there will be scenarios when the bundle should be cancelled - and it can be done by the `cancellationAddress` that is specified in the bundle itself.
 
 For our cross chain swap example:
 
 - call `cancelInteropBundle(interopMessage, proof)` on the destination chain
-    - we will have a helper method for this - look in the next article.
+  - we will have a helper method for this - look in the next article.
 - when this happens, the destination chain will create an `InteropMessage` with cancellation info.
 - with the proof of this method, the user will be able to call USDC bridge to get their assets back:
 
 ```solidity
 USDCBridge.recoverFailedTransfer(bundleId, cancellationMessage, proof);
 ```
-

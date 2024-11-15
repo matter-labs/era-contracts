@@ -60,13 +60,13 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(0x10004);
 address constant L2_MESSAGE_ROOT_ADDR = address(0x10005);
 
 /// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(0x10006);
+address constant L2_INTEROP_CENTER_ADDR = address(0x10008);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(0x10007);
+address constant L2_INTEROP_HANDLER_ADDR = address(0x10009);
 
-/// @dev the address of the L2 interop center
-address constant L2_INTEROP_ACCOUNT_ADDR = address(0x10008);
+/// @dev the address of the L2 interop account
+address constant L2_INTEROP_ACCOUNT_ADDR = address(0x1000a);
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
