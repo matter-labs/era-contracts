@@ -104,7 +104,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         if (config.baseToken.tokenAddress != ETH_TOKEN_ADDRESS) {
             uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
                 config.baseToken.gasPriceMultiplierDenominator;
-            if (IERC20(config.baseToken.tokenAddress).balanceOf(address(this)) < amount) {
+            if (IERC20(config.baseToken.tokenAddress).balanceOf(l2Deployer) < amount) {
                 bool success = IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
                 if (!success) {
                     revert BaseTokenTransferFailed();

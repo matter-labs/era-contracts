@@ -121,7 +121,7 @@ contract RegisterHyperchainScript is Script {
 
     function deployChainAdmin() internal {
         vm.broadcast();
-        ChainAdmin chainAdmin = new ChainAdmin(chainConfig.governor, address(0));
+        ChainAdmin chainAdmin = new ChainAdmin(chainConfig.governor, chainConfig.baseToken.tokenMultiplierSetter);
         console.log("ChainAdmin deployed at:", address(chainAdmin));
         config.chainAdmin = address(chainAdmin);
     }
