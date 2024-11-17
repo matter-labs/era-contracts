@@ -161,7 +161,7 @@ jobs:
         run: yarn
 
       - name: Build system contract artifacts
-        run: yarn sc build
+        run: yarn sc build:foundry
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3

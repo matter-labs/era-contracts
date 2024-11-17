@@ -41,7 +41,7 @@ jobs:
           yarn build:foundry
 
       - name: Build system contract artifacts
-        run: yarn sc build
+        run: yarn sc build:foundry
 
       - name: Create cache
         uses: actions/cache/save@v3
