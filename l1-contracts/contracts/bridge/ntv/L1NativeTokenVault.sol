@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
@@ -24,7 +22,8 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed, OriginChainIdNotFound} from "../../common/L1ContractErrors.sol";
+import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -36,9 +35,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
-    /// @dev Era's chainID
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -48,12 +44,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _l1WethAddress Address of WETH on deployed chain
     /// @param _l1AssetRouter Address of Asset Router on L1.
-    /// @param _eraChainId ID of Era.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     constructor(
         address _l1WethAddress,
         address _l1AssetRouter,
-        uint256 _eraChainId,
         IL1Nullifier _l1Nullifier
     )
         NativeTokenVault(
@@ -63,7 +57,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             block.chainid
         )
     {
-        ERA_CHAIN_ID = _eraChainId;
         L1_NULLIFIER = _l1Nullifier;
     }
 
@@ -107,10 +100,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 nullifierChainBalance = IERC20(_token).balanceOf(address(L1_NULLIFIER));
-            require(nullifierChainBalance > 0, "NTV: 0 amount to transfer");
+            if (nullifierChainBalance == 0) {
+                revert ZeroAmountToTransfer();
+            }
             L1_NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore >= nullifierChainBalance, "NTV: wrong amount transferred");
+            if (balanceAfter - balanceBefore < nullifierChainBalance) {
+                revert WrongAmountTransferred(balanceAfter - balanceBefore, nullifierChainBalance);
+            }
         }
     }
 
@@ -134,7 +131,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyAssetRouter {
-        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, "NTV: wrong counterpart");
+        if (_assetHandlerAddressOnCounterpart != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert WrongCounterpart();
+        }
     }
 
     function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
@@ -208,7 +207,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
+            if (!callSuccess) {
+                revert ClaimFailedDepositFailed();
+            }
         } else {
             uint256 originChainId = _getOriginChainId(_assetId);
             if (originChainId == block.chainid) {
@@ -230,9 +231,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
-        address _l1Token
+        address _nonNativeToken
     ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
+        bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         return
             Create2.computeAddress(
                 salt,
@@ -273,7 +274,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
     }
 
-    function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
+    function _deployBeaconProxy(bytes32 _salt, uint256) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(
             0,

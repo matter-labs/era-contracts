@@ -118,6 +118,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function admin() external view returns (address);
 
+    function assetRouter() external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
@@ -223,7 +225,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function ctmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 
-    function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external;
+    function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
 

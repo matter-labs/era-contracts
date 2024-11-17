@@ -86,6 +86,15 @@ interface IL1Nullifier {
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
 
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external;
+
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.

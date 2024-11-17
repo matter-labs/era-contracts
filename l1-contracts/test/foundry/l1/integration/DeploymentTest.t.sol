@@ -24,6 +24,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAdd
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 
@@ -34,7 +35,9 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
-        require(users.length == 0, "Addresses already generated");
+        if (users.length != 0) {
+            revert AddressesAlreadyGenerated();
+        }
 
         for (uint256 i = 0; i < TEST_USERS_COUNT; i++) {
             address newAddress = makeAddr(string(abi.encode("account", i)));
@@ -136,12 +139,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
             address bridgehubStmForChain = bridgehub.chainTypeManager(chainId);
             bytes32 bridgehubBaseAssetIdForChain = bridgehub.baseTokenAssetId(chainId);
-            address bridgehubChainAddressdForChain = bridgehub.getZKChain(chainId);
+            address bridgehubChainAddressedForChain = bridgehub.getZKChain(chainId);
             address bhAddr = IZKChain(chain).getBridgehub();
 
             assertEq(bridgehubStmForChain, stmAddr);
             assertEq(bridgehubBaseAssetIdForChain, baseTokenAssetId);
-            assertEq(bridgehubChainAddressdForChain, chain);
+            assertEq(bridgehubChainAddressedForChain, chain);
             assertEq(bhAddr, address(bridgehub));
         }
 

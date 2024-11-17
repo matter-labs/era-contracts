@@ -136,7 +136,7 @@ contract DeployL2Script is Script {
             bytecode = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
         }
 
-        deployed.l2DaValidatorAddress = Utils.deployThroughL1({
+        deployed.l2DaValidatorAddress = Utils.deployThroughL1Deterministic({
             bytecode: bytecode,
             constructorargs: bytes(""),
             create2salt: "",
