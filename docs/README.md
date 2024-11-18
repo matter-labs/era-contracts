@@ -12,7 +12,7 @@ The order of the files here only roughly represents the order of reading. A lot 
     - [Standard pubdata format](./settlement_contracts/data_availability/standard_pubdata_format.md)
     - [State diff compression v1 spec](./settlement_contracts/data_availability/state_diff_compression_v1_spec.md)
   - L1->L2 transaction handling
-    - [Processing of L1->L2 transactions](./settlement_contracts/priority_queue/processing_of_l1->l2_txs.md)
+    - [Processing of L1->L2 transactions](./settlement_contracts/priority_queue/processing_of_l1-l2_txs.md)
     - [Priority queue](./settlement_contracts/priority_queue/priority-queue.md)
   - Consensus
     - [Consensus Registry](./consensus/consensus-registry.md)

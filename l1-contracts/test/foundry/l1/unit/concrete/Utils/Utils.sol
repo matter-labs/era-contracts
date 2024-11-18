@@ -20,6 +20,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
+import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -586,6 +587,32 @@ library Utils {
         for (uint256 i = 0; i < len; ++i) {
             _ops[i] = info;
         }
+    }
+
+    function deployL1RollupDAValidatorBytecode() internal returns (address) {
+        bytes memory bytecode = DeployUtils.readRollupDAValidatorBytecode();
+
+        return deployViaCreate(bytecode);
+    }
+
+    /**
+     * @dev Deploys contract using CREATE.
+     */
+    function deployViaCreate(bytes memory _bytecode) internal returns (address addr) {
+        if (_bytecode.length == 0) {
+            revert("Bytecode is not set");
+        }
+
+        assembly {
+            // Allocate memory for the bytecode
+            let size := mload(_bytecode) // Load the size of the bytecode
+            let ptr := add(_bytecode, 0x20) // Skip the length prefix (32 bytes)
+
+            // Create the contract
+            addr := create(0, ptr, size)
+        }
+
+        require(addr != address(0), "Deployment failed");
     }
 
     // add this to be excluded from coverage report

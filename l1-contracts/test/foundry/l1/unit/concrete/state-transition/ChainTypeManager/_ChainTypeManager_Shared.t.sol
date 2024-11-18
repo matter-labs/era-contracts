@@ -30,7 +30,6 @@ import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -39,7 +38,7 @@ contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
-    RollupL1DAValidator internal rollupL1DAValidator;
+    address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
     address internal constant admin = address(0x2020202);
@@ -143,7 +142,7 @@ contract ChainTypeManagerTest is Test {
         );
         chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
 
-        rollupL1DAValidator = new RollupL1DAValidator();
+        rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
         vm.stopPrank();
         vm.startPrank(governor);

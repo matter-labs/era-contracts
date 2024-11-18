@@ -21,6 +21,8 @@
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.2.0",
     "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
+    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@4.9.5",
+    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@4.9.5",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@typechain/ethers-v5": "^2.0.0",
     "@types/chai": "^4.2.21",
