@@ -10,4 +10,5 @@ remappings = [
 ]
 
 [profile.default.zksync]
-zksolc = "1.5.4"
+zksolc = "1.5.6"
+suppressed_errors = ["sendtransfer"]
