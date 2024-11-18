@@ -9,7 +9,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -103,13 +103,6 @@ library Utils {
         assembly {
             value := mload(add(bys, 0x20))
         }
-    }
-
-    /**
-     * @dev Returns the bytecode hash of the batch bootloader.
-     */
-    function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return vm.readFile("../system-contracts/bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin");
     }
 
     /**
