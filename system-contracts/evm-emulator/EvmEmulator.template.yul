@@ -21,27 +21,6 @@ object "EvmEmulator" {
             copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
-        function padBytecode(offset, len) -> blobOffset, blobLen {
-            blobOffset := sub(offset, 32)
-            let trueLastByte := add(offset, len)
-
-            mstore(blobOffset, len)
-            // clearing out additional bytes
-            mstore(trueLastByte, 0)
-            mstore(add(trueLastByte, 32), 0)
-
-            blobLen := add(len, 32)
-
-            if iszero(eq(mod(blobLen, 32), 0)) {
-                blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
-            }
-
-            // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
-            if iszero(eq(mod(blobLen, 64), 32)) {
-                blobLen := add(blobLen, 32)
-            }
-        }
-
         function validateBytecodeAndChargeGas(offset, deployedCodeLen, gasToReturn) -> returnGas {
             if deployedCodeLen {
                 // EIP-3860
@@ -97,8 +76,6 @@ object "EvmEmulator" {
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
 
         gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
-
-        offset, len := padBytecode(offset, len)
 
         mstore(add(offset, len), gasToReturn)
 

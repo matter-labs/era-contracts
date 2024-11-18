@@ -21,27 +21,6 @@ object "EvmEmulator" {
             copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
-        function padBytecode(offset, len) -> blobOffset, blobLen {
-            blobOffset := sub(offset, 32)
-            let trueLastByte := add(offset, len)
-
-            mstore(blobOffset, len)
-            // clearing out additional bytes
-            mstore(trueLastByte, 0)
-            mstore(add(trueLastByte, 32), 0)
-
-            blobLen := add(len, 32)
-
-            if iszero(eq(mod(blobLen, 32), 0)) {
-                blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
-            }
-
-            // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
-            if iszero(eq(mod(blobLen, 64), 32)) {
-                blobLen := add(blobLen, 32)
-            }
-        }
-
         function validateBytecodeAndChargeGas(offset, deployedCodeLen, gasToReturn) -> returnGas {
             if deployedCodeLen {
                 // EIP-3860
@@ -442,28 +421,6 @@ object "EvmEmulator" {
             
                 copiedLen := len
             } 
-        }
-        
-        // Returns the length of the EVM bytecode.
-        function fetchDeployedEvmCodeLen(addr) -> codeLen {
-            let codeHash := getRawCodeHash(addr)
-            mstore(0, codeHash)
-        
-            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-        
-            switch iszero(success)
-            case 1 {
-                // The code oracle call can only fail in the case where the contract
-                // we are querying is the current one executing and it has not yet been
-                // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                // inside the constructor. In that case, code length is zero.
-                codeLen := 0
-            }
-            default {
-                // The first word is the true length of the bytecode
-                returndatacopy(0, 0, 32)
-                codeLen := mload(0)
-            }
         }
         
         function getMax(a, b) -> max {
@@ -1810,9 +1767,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    switch isEvmContract(addr) 
-                        case 0  { stackHead := extcodesize(addr) }
-                        default { stackHead := fetchDeployedEvmCodeLen(addr) }
+                    stackHead := extcodesize(addr)
             
                     ip := add(ip, 1)
                 }
@@ -3176,8 +3131,6 @@ object "EvmEmulator" {
 
         gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
 
-        offset, len := padBytecode(offset, len)
-
         mstore(add(offset, len), gasToReturn)
 
         verbatim_2i_0o("return_deployed", offset, add(len, 32))
@@ -3582,28 +3535,6 @@ object "EvmEmulator" {
                 
                     copiedLen := len
                 } 
-            }
-            
-            // Returns the length of the EVM bytecode.
-            function fetchDeployedEvmCodeLen(addr) -> codeLen {
-                let codeHash := getRawCodeHash(addr)
-                mstore(0, codeHash)
-            
-                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-            
-                switch iszero(success)
-                case 1 {
-                    // The code oracle call can only fail in the case where the contract
-                    // we are querying is the current one executing and it has not yet been
-                    // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                    // inside the constructor. In that case, code length is zero.
-                    codeLen := 0
-                }
-                default {
-                    // The first word is the true length of the bytecode
-                    returndatacopy(0, 0, 32)
-                    codeLen := mload(0)
-                }
             }
             
             function getMax(a, b) -> max {
@@ -4950,9 +4881,7 @@ object "EvmEmulator" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        switch isEvmContract(addr) 
-                            case 0  { stackHead := extcodesize(addr) }
-                            default { stackHead := fetchDeployedEvmCodeLen(addr) }
+                        stackHead := extcodesize(addr)
                 
                         ip := add(ip, 1)
                     }

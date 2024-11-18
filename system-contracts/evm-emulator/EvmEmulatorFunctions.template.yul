@@ -382,28 +382,6 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
     } 
 }
 
-// Returns the length of the EVM bytecode.
-function fetchDeployedEvmCodeLen(addr) -> codeLen {
-    let codeHash := getRawCodeHash(addr)
-    mstore(0, codeHash)
-
-    let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-
-    switch iszero(success)
-    case 1 {
-        // The code oracle call can only fail in the case where the contract
-        // we are querying is the current one executing and it has not yet been
-        // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-        // inside the constructor. In that case, code length is zero.
-        codeLen := 0
-    }
-    default {
-        // The first word is the true length of the bytecode
-        returndatacopy(0, 0, 32)
-        codeLen := mload(0)
-    }
-}
-
 function getMax(a, b) -> max {
     max := b
     if gt(a, b) {

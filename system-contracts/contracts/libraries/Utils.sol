@@ -141,23 +141,10 @@ library Utils {
     /// @param _bytecode The EVM bytecode to hash.
     /// @return hashedEVMBytecode The 32-byte hash of the EVM bytecode.
     /// Note: The function reverts the execution if the bytecode has non expected format:
-    /// - Bytecode bytes length is not a multiple of 32
     /// - Bytecode bytes length is greater than 2^16 - 1 bytes
-    /// - Bytecode words length is not odd
     function hashEVMBytecode(bytes calldata _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
-        // Note that the length of the bytecode must be provided in 32-byte words.
-        if (_bytecode.length % 32 != 0) {
-            revert MalformedBytecode(BytecodeError.Length);
-        }
-
         if (_bytecode.length > MAX_EVM_BYTECODE_LENGTH) {
             revert MalformedBytecode(BytecodeError.EvmBytecodeLength);
-        }
-
-        uint256 lengthInWords = _bytecode.length / 32;
-        // bytecode length in words must be odd
-        if (lengthInWords % 2 == 0) {
-            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
 
         hashedEVMBytecode =
