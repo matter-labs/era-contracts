@@ -179,12 +179,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             // Deploy from EraVM context
 
             // #### Uncomment for Solidity semantic tests (EraVM contracts are deployed with 0 nonce, but tests expect 1)
-            /*
+            
                 senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(msg.sender);
                 if (senderNonce == 0) {
                     NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
                 }
-            */
+            
 
             senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         }
