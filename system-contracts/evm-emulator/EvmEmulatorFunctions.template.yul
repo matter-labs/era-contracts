@@ -127,9 +127,6 @@ function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
 
 function OVERHEAD() -> overhead { overhead := 2000 }
 
-// From precompiles/CodeOracle
-function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
-
 function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
 
 ////////////////////////////////////////////////////////////////
@@ -790,17 +787,6 @@ function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, args
 // Call native ZkVm contract from EVM context
 function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
     let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
-    let decommitZkVmGasCost := decommitmentCost(addr)
-
-    // we are going to charge decommit cost even if address is already warm
-    // decommit cost is subtracted from the callee frame
-    switch gt(decommitZkVmGasCost, zkEvmGasToPass)
-    case 0 {
-        zkEvmGasToPass := sub(zkEvmGasToPass, decommitZkVmGasCost)
-    }
-    default {
-        zkEvmGasToPass := 0
-    }
 
     if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
         zkEvmGasToPass := UINT32_MAX()
@@ -826,15 +812,6 @@ function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffs
     if gt(zkEvmGasToPass, zkEvmGasUsed) {
         frameGasLeft := div(sub(zkEvmGasToPass, zkEvmGasUsed), GAS_DIVISOR())
     }
-}
-
-function decommitmentCost(addr) -> cost {
-    // charge for contract decommitment
-    let byteSize := extcodesize(addr)
-    cost := mul(
-        div(add(byteSize, 31), 32), // rounding up
-        DECOMMIT_COST_PER_WORD()
-    ) 
 }
 
 function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
