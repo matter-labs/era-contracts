@@ -37,17 +37,19 @@ contract ProposeChainRegistration is Script {
 
         config.chainConfig.chainId = toml.readUint("$.chain.chain_id");
         config.chainConfig.operator = toml.readAddress("$.chain.operator");
-        config.chainConfig.blobOperator = toml.readAddress("$.chain.blobOperator");
+        config.chainConfig.blobOperator = toml.readAddress("$.chain.blob_operator");
         config.chainConfig.governor = toml.readAddress("$.chain.governor");
-        config.chainConfig.pubdataPricingMode = PubdataPricingMode(toml.readUint("$.chain.pubdataPricingMode"));
+        config.chainConfig.pubdataPricingMode = PubdataPricingMode(toml.readUint("$.chain.pubdata_pricing_mode"));
 
-        config.chainConfig.baseToken.tokenMultiplierSetter = toml.readAddress("$.base_token.token_multiplier_setter");
-        config.chainConfig.baseToken.tokenAddress = toml.readAddress("$.base_token.token_address");
+        config.chainConfig.baseToken.tokenMultiplierSetter = toml.readAddress(
+            "$.chain.base_token.token_multiplier_setter"
+        );
+        config.chainConfig.baseToken.tokenAddress = toml.readAddress("$.chain.base_token.address");
         config.chainConfig.baseToken.gasPriceMultiplierNominator = uint128(
-            toml.readUint("$.base_token.gas_price_multiplier_nominator")
+            toml.readUint("$.chain.base_token.nominator")
         );
         config.chainConfig.baseToken.gasPriceMultiplierDenominator = uint128(
-            toml.readUint("$.base_token.gas_price_multiplier_denominator")
+            toml.readUint("$.chain.base_token.denominator")
         );
     }
 
