@@ -287,9 +287,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return Call({target: ecosystem.bridgehub, value: 0, data: data});
     }
 
-    function prepareInitializeChainGovernanceCall(
-        address l2SharedBridgeProxy
-    ) internal view returns (Call memory) {
+    function prepareInitializeChainGovernanceCall(address l2SharedBridgeProxy) internal view returns (Call memory) {
         L1SharedBridge bridge = L1SharedBridge(ecosystem.l1SharedBridgeProxy);
 
         bytes memory data = abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, l2SharedBridgeProxy));
@@ -300,10 +298,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     // @dev Prepares a call to schedule a transparent operation on the governance contract
     // `calls` is an array of calls that will be executed in the first stage (add a token to BH, create a new chain)
     // `initChainGovCall` is a call that will be executed in the second stage (register the L2 bridge on the L1 shared bridge)
-    function scheduleTransparentCalldata(
-        Call[] memory calls,
-        Call memory initChainGovCall
-    ) internal {
+    function scheduleTransparentCalldata(Call[] memory calls, Call memory initChainGovCall) internal {
         IGovernance governance = IGovernance(ecosystem.governance);
 
         IGovernance.Operation memory operation = IGovernance.Operation({

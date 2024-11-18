@@ -50,7 +50,11 @@ contract ChainAdminTest is Test {
 
     function test_multicallRevertFailedCall() public {
         IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
+        calls[0] = IChainAdmin.Call({
+            target: address(chainAdmin),
+            value: 0,
+            data: abi.encodeCall(gettersFacet.getAdmin, ())
+        });
 
         vm.expectRevert();
         vm.prank(owner);
@@ -59,8 +63,16 @@ contract ChainAdminTest is Test {
 
     function test_multicall() public {
         IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](2);
-        calls[0] = IChainAdmin.Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
-        calls[1] = IChainAdmin.Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
+        calls[0] = IChainAdmin.Call({
+            target: address(gettersFacet),
+            value: 0,
+            data: abi.encodeCall(gettersFacet.getAdmin, ())
+        });
+        calls[1] = IChainAdmin.Call({
+            target: address(gettersFacet),
+            value: 0,
+            data: abi.encodeCall(gettersFacet.getVerifier, ())
+        });
 
         vm.prank(owner);
         chainAdmin.multicall(calls, true);
