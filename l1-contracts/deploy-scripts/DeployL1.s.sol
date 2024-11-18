@@ -718,6 +718,7 @@ contract DeployL1Script is Script {
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+        vm.serializeString("deployed_addresses", "chain_admin", addresses.chainAdmin);
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "bridges", bridges);
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);

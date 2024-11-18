@@ -5,6 +5,7 @@ import {Script} from "forge-std/Script.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Utils} from "./Utils.sol";
@@ -58,8 +59,8 @@ contract AcceptAdmin is Script {
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
         IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
 
-        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
 
         vm.startBroadcast();
         chainAdmin.multicall(calls, true);
