@@ -9,8 +9,7 @@ remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
 ]
-suppressedErrors = ["sendtransfer"]
 
 [profile.default.zksync]
 zksolc = "1.5.6"
-suppressedErrors = ["sendtransfer"]
+suppressed_errors = ["sendtransfer"]
