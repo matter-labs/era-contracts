@@ -52,8 +52,8 @@
   "scripts": {
     "build": "yarn build:system-contracts && yarn build:bootloader && forge build --zksync",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
-    "build:system-contracts": "yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
-    "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",
+    "build:system-contracts": "yarn preprocess:system-contracts && forge build --zksync && yarn compile-yul compile-precompiles",
+    "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && forge build --zksync && yarn compile-yul compile-precompiles && yarn compile-zasm",
     "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
     "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "clean": "yarn clean:bootloader && yarn clean:system-contracts",
