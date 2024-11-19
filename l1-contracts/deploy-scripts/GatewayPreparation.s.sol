@@ -363,6 +363,7 @@ contract GatewayPreparation is Script {
     function startMigrateChainFromGateway(
         address chainAdmin,
         address accessControlRestriction,
+        address l2ChainAdmin,
         uint256 chainId
     ) public {
         initializeConfig();
@@ -385,7 +386,18 @@ contract GatewayPreparation is Script {
 
         bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
-        bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+
+        bytes memory l2Calldata;
+
+        {
+            bytes memory data = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+
+            Call[] memory calls = new Call[](1);
+            calls[0] = Call({target: L2_ASSET_ROUTER_ADDR, value: 0, data: data});
+
+            l2Calldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
+        }
+        // FIXME: this should migrate to use L2 transactions directly
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
@@ -393,7 +405,7 @@ contract GatewayPreparation is Script {
             l2Calldata,
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            L2_ASSET_ROUTER_ADDR,
+            l2ChainAdmin,
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
