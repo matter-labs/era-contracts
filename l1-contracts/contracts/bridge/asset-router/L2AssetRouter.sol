@@ -62,7 +62,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
                 // revert InvalidCaller(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            // revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
