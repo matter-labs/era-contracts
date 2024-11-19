@@ -9,12 +9,6 @@ interface IBaseToken {
 
     function totalSupply() external view returns (uint256);
 
-    function name() external pure returns (string memory);
-
-    function symbol() external pure returns (string memory);
-
-    function decimals() external pure returns (uint8);
-
     function mint(address _account, uint256 _amount) external;
 
     function withdraw(address _l1Receiver) external payable;
