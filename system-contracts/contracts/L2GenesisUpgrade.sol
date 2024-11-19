@@ -30,11 +30,11 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         }
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
 
-        // L2GatewayUpgradeHelper.performForceDeployedContractsInit(
-        //     _ctmDeployer,
-        //     _fixedForceDeploymentsData,
-        //     _additionalForceDeploymentsData
-        // );
+        L2GatewayUpgradeHelper.performForceDeployedContractsInit(
+            _ctmDeployer,
+            _fixedForceDeploymentsData,
+            _additionalForceDeploymentsData
+        );
 
         emit UpgradeComplete(_chainId);
     }

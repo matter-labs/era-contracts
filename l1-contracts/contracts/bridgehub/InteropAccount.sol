@@ -10,9 +10,8 @@ contract InteropAccount {
     }
 
     function forwardFromIC(address _to, bytes memory _data) external payable {
-        emit Hello(18);
         // IC mints value here manually.
-        emit Hello(address(this).balance);
+        emit Hello(uint256(uint160(_to)));
         (bool success, bytes memory returnData) = _to.call{value: msg.value}(_data); //
         if (!success) {
             emit ReturnMessage(returnData);
