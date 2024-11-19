@@ -340,11 +340,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.addToken(randomAddress);
     }
 
-    function test_addToken_cannotBeCalledByRandomAddress(
-        address randomAddress,
-        address randomCaller,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
+    function test_addToken_cannotBeCalledByRandomAddress(address randomAddress, address randomCaller) public {
         vm.assume(randomCaller != bridgeOwner);
         vm.assume(randomCaller != bridgeHub.admin());
 

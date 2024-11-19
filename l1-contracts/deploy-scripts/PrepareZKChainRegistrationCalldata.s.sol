@@ -14,6 +14,8 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
 
 /**
@@ -109,24 +111,24 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
         checkBaseTokenAddress();
 
-        IGovernance.Call[] memory calls;
+        Call[] memory calls;
         uint256 cnt = 0;
         if (!IBridgehub(ecosystem.bridgehub).tokenIsRegistered(config.baseToken)) {
-            calls = new IGovernance.Call[](2);
+            calls = new Call[](2);
             console.log("Adding a call to register base token on the bridgehub");
-            IGovernance.Call memory baseTokenRegistrationCall = prepareRegisterBaseTokenCall();
+            Call memory baseTokenRegistrationCall = prepareRegisterBaseTokenCall();
             calls[cnt] = baseTokenRegistrationCall;
             ++cnt;
         } else {
-            calls = new IGovernance.Call[](1);
+            calls = new Call[](1);
         }
 
-        IGovernance.Call memory registerChainCall = prepareRegisterHyperchainCall();
+        Call memory registerChainCall = prepareRegisterHyperchainCall();
         calls[cnt] = registerChainCall;
         ++cnt;
 
         address l2SharedBridgeProxy = computeL2BridgeAddress();
-        IGovernance.Call memory initChainCall = prepareInitializeChainGovernanceCall(l2SharedBridgeProxy);
+        Call memory initChainCall = prepareInitializeChainGovernanceCall(l2SharedBridgeProxy);
 
         scheduleTransparentCalldata(calls, initChainCall);
     }
@@ -182,12 +184,12 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         console.log("Using base token address:", config.baseToken);
     }
 
-    function prepareRegisterBaseTokenCall() internal view returns (IGovernance.Call memory) {
+    function prepareRegisterBaseTokenCall() internal view returns (Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
         bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
 
-        return IGovernance.Call({target: ecosystem.bridgehub, value: 0, data: data});
+        return Call({target: ecosystem.bridgehub, value: 0, data: data});
     }
 
     // @dev Computes the address of the L2 bridge and the L2 bridge proxy
@@ -271,7 +273,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return proxyContractAddress;
     }
 
-    function prepareRegisterHyperchainCall() internal view returns (IGovernance.Call memory) {
+    function prepareRegisterHyperchainCall() internal view returns (Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
         AllowedBytecodeTypes allowedBytecodeTypesMode = config.allowEvmEmulator
@@ -292,26 +294,21 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
             )
         );
 
-        return IGovernance.Call({target: ecosystem.bridgehub, value: 0, data: data});
+        return Call({target: ecosystem.bridgehub, value: 0, data: data});
     }
 
-    function prepareInitializeChainGovernanceCall(
-        address l2SharedBridgeProxy
-    ) internal view returns (IGovernance.Call memory) {
+    function prepareInitializeChainGovernanceCall(address l2SharedBridgeProxy) internal view returns (Call memory) {
         L1SharedBridge bridge = L1SharedBridge(ecosystem.l1SharedBridgeProxy);
 
         bytes memory data = abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, l2SharedBridgeProxy));
 
-        return IGovernance.Call({target: ecosystem.l1SharedBridgeProxy, value: 0, data: data});
+        return Call({target: ecosystem.l1SharedBridgeProxy, value: 0, data: data});
     }
 
     // @dev Prepares a call to schedule a transparent operation on the governance contract
     // `calls` is an array of calls that will be executed in the first stage (add a token to BH, create a new chain)
     // `initChainGovCall` is a call that will be executed in the second stage (register the L2 bridge on the L1 shared bridge)
-    function scheduleTransparentCalldata(
-        IGovernance.Call[] memory calls,
-        IGovernance.Call memory initChainGovCall
-    ) internal {
+    function scheduleTransparentCalldata(Call[] memory calls, Call memory initChainGovCall) internal {
         IGovernance governance = IGovernance(ecosystem.governance);
 
         IGovernance.Operation memory operation = IGovernance.Operation({
@@ -323,7 +320,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         bytes memory scheduleCalldata = abi.encodeCall(governance.scheduleTransparent, (operation, 0));
         bytes memory executeCalldata = abi.encodeCall(governance.execute, (operation));
 
-        IGovernance.Call[] memory initChainGovArray = new IGovernance.Call[](1);
+        Call[] memory initChainGovArray = new Call[](1);
         initChainGovArray[0] = initChainGovCall;
 
         IGovernance.Operation memory operation2 = IGovernance.Operation({
