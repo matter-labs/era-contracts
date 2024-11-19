@@ -56,14 +56,13 @@ const getSolidityContractDetails = (dir: string, contractName: string): Contract
 
 const getSolidityContractsDetails = (dir: string): ContractDetails[] => {
   const absolutePath = makePathAbsolute(dir);
-  const eligibleFiles = fs.readdirSync(absolutePath)
+  const eligibleFiles = fs
+    .readdirSync(absolutePath)
     .filter((f) => f.endsWith(".sol"))
     .map((f) => f.replace(".sol", ""));
   const bytecodesDir = SOLIDITY_ARTIFACTS_DIR;
   const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol");
-  const contractNames = dirsEndingWithSol
-    .map((d) => d.replace(".sol", ""))
-    .filter((c) => eligibleFiles.includes(c));
+  const contractNames = dirsEndingWithSol.map((d) => d.replace(".sol", "")).filter((c) => eligibleFiles.includes(c));
   const solidityContractsDetails = contractNames.map((c) => getSolidityContractDetails(dir, c));
   return solidityContractsDetails;
 };
