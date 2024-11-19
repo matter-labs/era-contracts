@@ -296,6 +296,12 @@ object "EvmEmulator" {
             }
         }
         
+        function insufficientBalance(value) -> res {
+            if value {
+                res := gt(value, selfbalance())
+            }
+        }
+        
         // It is the responsibility of the caller to ensure that ip is correct
         function readIP(ip, bytecodeEndOffset) -> opcode {
             if lt(ip, bytecodeEndOffset) {
@@ -824,12 +830,18 @@ object "EvmEmulator" {
                 }
             }
             default {
-                pushEvmFrame(gasToPass, isStatic)
-                // pass all remaining native gas
-                success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
-                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                if iszero(success) {
-                    resetEvmFrame()
+                switch insufficientBalance(value)
+                case 0 {
+                    pushEvmFrame(gasToPass, isStatic)
+                    // pass all remaining native gas
+                    success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                    if iszero(success) {
+                        resetEvmFrame()
+                    }
+                }
+                default {
+                    frameGasLeft := gasToPass
                 }
             }
         }
@@ -1060,12 +1072,7 @@ object "EvmEmulator" {
         
             _eraseReturndataPointer()
         
-            let err := 0
-            if value {
-                if gt(value, selfbalance()) {
-                    err := 1
-                }
-            }
+            let err := insufficientBalance(value)
         
             if iszero(err) {
                 offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
@@ -3351,6 +3358,12 @@ object "EvmEmulator" {
                 }
             }
             
+            function insufficientBalance(value) -> res {
+                if value {
+                    res := gt(value, selfbalance())
+                }
+            }
+            
             // It is the responsibility of the caller to ensure that ip is correct
             function readIP(ip, bytecodeEndOffset) -> opcode {
                 if lt(ip, bytecodeEndOffset) {
@@ -3879,12 +3892,18 @@ object "EvmEmulator" {
                     }
                 }
                 default {
-                    pushEvmFrame(gasToPass, isStatic)
-                    // pass all remaining native gas
-                    success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
-                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                    if iszero(success) {
-                        resetEvmFrame()
+                    switch insufficientBalance(value)
+                    case 0 {
+                        pushEvmFrame(gasToPass, isStatic)
+                        // pass all remaining native gas
+                        success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
+                        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                        if iszero(success) {
+                            resetEvmFrame()
+                        }
+                    }
+                    default {
+                        frameGasLeft := gasToPass
                     }
                 }
             }
@@ -4115,12 +4134,7 @@ object "EvmEmulator" {
             
                 _eraseReturndataPointer()
             
-                let err := 0
-                if value {
-                    if gt(value, selfbalance()) {
-                        err := 1
-                    }
-                }
+                let err := insufficientBalance(value)
             
                 if iszero(err) {
                     offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
