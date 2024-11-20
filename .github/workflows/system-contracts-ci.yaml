@@ -172,5 +172,6 @@ jobs:
             system-contracts/typechain
             system-contracts/contracts-preprocessed
             system-contracts/bootloader/build
+            system-contracts/zkout
       - name: Check hashes
         run: yarn sc calculate-hashes:check
