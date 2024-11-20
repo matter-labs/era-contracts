@@ -3,8 +3,8 @@ import type { CompilerPaths } from "./utils";
 import { spawn, compilerLocation, prepareCompilerPaths } from "./utils";
 import * as fs from "fs";
 
-const COMPILER_VERSION = "1.5.6";
-const IS_COMPILER_PRE_RELEASE = true;
+const COMPILER_VERSION = "1.5.7";
+const IS_COMPILER_PRE_RELEASE = false;
 
 export async function compileZasm(paths: CompilerPaths, file: string) {
   const zksolcLocation = await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
