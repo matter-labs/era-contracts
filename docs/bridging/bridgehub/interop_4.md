@@ -33,27 +33,27 @@ contract InteropCenter {
   /// Such transaction can be 'picked up' by the destination chain automatically.
   /// This function covers all the cases - we expect most users to use the helper
   /// functions defined later.
-	function sendInteropTransaction(
-		destinationChain,
-		bundleHash,        // the main bundle that you want to execute on destination chain
-		gasLimit,          // gasLimit & price for execution
-		gasPrice,
-		feesBundleHash,  // this is the bundle that contains the calls to pay for gas
-		destinationPaymaster,  // optionally - you can use a paymaster on destination chain
-		destinationPaymasterInput); // with specific params
+ function sendInteropTransaction(
+  destinationChain,
+  bundleHash,        // the main bundle that you want to execute on destination chain
+  gasLimit,          // gasLimit & price for execution
+  gasPrice,
+  feesBundleHash,  // this is the bundle that contains the calls to pay for gas
+  destinationPaymaster,  // optionally - you can use a paymaster on destination chain
+  destinationPaymasterInput); // with specific params
 
 
-	struct InteropTransaction {
-		address sourceChainSender
-		uint256 destinationChain
-	  uint256 gasLimit;
-	  uint256 gasPrice;
-	  uint256 value;
-	  bytes32 bundleHash;
-	  bytes32 feesBundleHash;
- 	  address destinationPaymaster;
-	  bytes destinationPaymasterInput;
-	}
+ struct InteropTransaction {
+  address sourceChainSender
+  uint256 destinationChain
+   uint256 gasLimit;
+   uint256 gasPrice;
+   uint256 value;
+   bytes32 bundleHash;
+   bytes32 feesBundleHash;
+    address destinationPaymaster;
+   bytes destinationPaymasterInput;
+ }
 }
 ```
 
@@ -109,17 +109,17 @@ For example - if you send transaction from ERA (base token - ETH) to Sophon (bas
 For this, we’ll offer a helper function:
 
 ```solidity
-	contract InteropCenter {
-		// Creates InteropTransaction to the destination chain with payment with base token.
-		// Before calling, you have to 'approve' InteropCenter to the ERC20/Bridge that holds the destination chain's base tokens.
-		// or if the destination chain's tokens are the same as yours, just attach value to this call.
-		function sendInteropTxMinimal(
-			destinationChain,
-			bundleHash,        // the main bundle that you want to execute on destination chain
-			gasLimit,          // gasLimit & price for execution
-			gasPrice,
-		);
-	}
+ contract InteropCenter {
+  // Creates InteropTransaction to the destination chain with payment with base token.
+  // Before calling, you have to 'approve' InteropCenter to the ERC20/Bridge that holds the destination chain's base tokens.
+  // or if the destination chain's tokens are the same as yours, just attach value to this call.
+  function sendInteropTxMinimal(
+   destinationChain,
+   bundleHash,        // the main bundle that you want to execute on destination chain
+   gasLimit,          // gasLimit & price for execution
+   gasPrice,
+  );
+ }
 ```
 
 ### Using paymaster on the destination chain

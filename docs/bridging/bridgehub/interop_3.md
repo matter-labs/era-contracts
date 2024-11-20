@@ -18,14 +18,14 @@ On the sending side, the interface offers you the option to send this ‘call’
 
 ```solidity
 struct InteropCall {
-	address sourceSender,
-	address destinationAddress,
-	uint256 destinationChainId,
-	calldata data,
-	uint256 value
+ address sourceSender,
+ address destinationAddress,
+ uint256 destinationChainId,
+ calldata data,
+ uint256 value
 }
 contract InteropCenter {
-	// On source chain.
+ // On source chain.
   // Sends a 'single' basic internal call to destination chain & address.
   // Internally, it starts a bundle, adds this call and sends it over.
   function sendCall(destinationChain, destinationAddress, calldata, msgValue) returns bytes32 bundleId;
@@ -71,18 +71,18 @@ Imagine you have contracts on chains B, C and D, and you’d like them to send �
 ```solidity
 // Deployed on chains B, C, D.
 contract Shop {
-	/// Called by the customers when they buy something.
-	function buy(uint256 itemPrice) {
-	  // handle payment etc.
-	  ...
-	  // report to HQ
-	  InteropCenter(INTEROP_ADDRESS).sendCall(
-		  324,       // chain id of chain A,
-		  0xc425..,  // HQ contract on chain A,
-		  createCalldata("reportSales(uint256)", itemPrice), // calldata
-		  0,         // no value
-		);
-	}
+ /// Called by the customers when they buy something.
+ function buy(uint256 itemPrice) {
+   // handle payment etc.
+   ...
+   // report to HQ
+   InteropCenter(INTEROP_ADDRESS).sendCall(
+    324,       // chain id of chain A,
+    0xc425..,  // HQ contract on chain A,
+    createCalldata("reportSales(uint256)", itemPrice), // calldata
+    0,         // no value
+  );
+ }
 }
 
 // Deployed on chain A
@@ -92,13 +92,13 @@ contract HQ {
   mapping (address => uint256) sales;
   function addShop(address addressOnChain, uint256 chainId) onlyOwner {
     // Adding aliased accounts.
-	  shops[address(keccak(addressOnChain || chainId))] = true;
+   shops[address(keccak(addressOnChain || chainId))] = true;
   }
 
   function reportSales(uint256 itemPrice) {
     // only allow calls from our shops (their aliased accounts).
-	  require(shops[msg.sender]);
-	  sales[msg.sender] += itemPrice;
+   require(shops[msg.sender]);
+   sales[msg.sender] += itemPrice;
   }
 }
 ```
@@ -136,27 +136,27 @@ In this sense, you can think about a bundle as a ‘multicall’ - but with two 
 
 ```solidity
 contract InteropCenter {
-	struct InteropBundle {
-		// Calls have to be done in this order.
-		InteropCall calls[];
-		uint256 destinationChain;
+ struct InteropBundle {
+  // Calls have to be done in this order.
+  InteropCall calls[];
+  uint256 destinationChain;
 
-		// If not set - anyone can execute it.
-		address executionAddresses[];
-		// Who can 'cancel' this bundle.
-		address cancellationAddress;
-	}
+  // If not set - anyone can execute it.
+  address executionAddresses[];
+  // Who can 'cancel' this bundle.
+  address cancellationAddress;
+ }
 
-	// Starts a new bundle.
-	// All the calls that will be added to this bundle (potentially by different contracts)
-	// will have a 'shared fate'.
-	// The whole bundle must be going to a single destination chain.
-	function startBundle(destinationChain) returns bundleId;
-	// Adds a new call to the opened bundle.
-	// Returns the messageId of this single message in the bundle.
-	function addToBundle(bundleId, destinationAddress, calldata, msgValue) return msgHash;
-	// Finishes a given bundle, and sends it.
-	function finishAndSendBundle(bundleId) return msgHash;
+ // Starts a new bundle.
+ // All the calls that will be added to this bundle (potentially by different contracts)
+ // will have a 'shared fate'.
+ // The whole bundle must be going to a single destination chain.
+ function startBundle(destinationChain) returns bundleId;
+ // Adds a new call to the opened bundle.
+ // Returns the messageId of this single message in the bundle.
+ function addToBundle(bundleId, destinationAddress, calldata, msgValue) return msgHash;
+ // Finishes a given bundle, and sends it.
+ function finishAndSendBundle(bundleId) return msgHash;
 }
 ```
 

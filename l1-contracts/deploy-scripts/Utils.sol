@@ -921,7 +921,15 @@ library Utils {
         // kl todo add contracts path here
         string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
 
-        string memory path = string.concat("/", CONTRACTS_PATH, "/system-contracts/zkout/", fileName, "/", contractName, ".json");
+        string memory path = string.concat(
+            "/",
+            CONTRACTS_PATH,
+            "/system-contracts/zkout/",
+            fileName,
+            "/",
+            contractName,
+            ".json"
+        );
         bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }

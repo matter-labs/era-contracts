@@ -27,14 +27,14 @@ For the simplest scenario - of executing a contract on a destination chain:
 
 ```solidity
 cast send source-chain-rpc.com INTEROP_CENTER_ADDRESS sendInteropWithSingleCall(
-	0x1fa72e78 // destination_chain_id,
-	0xb4AB2FF34fa... // destination_contract,
-	0x29723511000000... // destination_calldata,
-	0, // value
-	100_000, // gasLimit
-	250_000_000, // gasPrice
+ 0x1fa72e78 // destination_chain_id,
+ 0xb4AB2FF34fa... // destination_contract,
+ 0x29723511000000... // destination_calldata,
+ 0, // value
+ 100_000, // gasLimit
+ 250_000_000, // gasPrice
     ..
-	)
+ )
 ```
 
 While this looks very similar to ‘regular’ call, there are some caveats, especially around failures and error handling. Please read the FAQ below.
@@ -50,6 +50,7 @@ While this looks very similar to ‘regular’ call, there are some caveats, esp
   - This call will be ‘auto executed’ on the destination chain. You as a user don’t have to do anything.
 - What if it fails out of gas? Or what if I set too low gasPrice?
   - In either of these scenarios, you can ‘retry’ it, by using `retryInteropTransaction` (not implemented yet).
+
     ```solidity
     cast send source-chain.com INTEROP_CENTER_ADDRESS retryInteropTransaction(
       0x2654.. // previous interop transaction hash from above
@@ -57,16 +58,19 @@ While this looks very similar to ‘regular’ call, there are some caveats, esp
       300_000_000 // new gasPrice
      )
     ```
+
   - IMPORTANT: depending on your use case, it might be very important to retry rather than to create a new `sendInteropWithSingleCall` - for example if your call includes some larger asset transfer, creating the new `sendInteropWithSingleCall` would attempt to freeze/burn these assets again.
 - If some of my assets were burned when I did the transaction, but it failed on destination chain, how do I get them back?
   - If your transaction failed on destination chain, you can either try to retry it with more gas, higher gas limits (see above) or cancel it (not implemented yet):
+
     ```solidity
     cast send source-chain INTEROP_CENTER_ADDRESS cancelInteropTransaction(
-    	0x2654.. // previous interop transaction
-    	100_000 // gasLimit (yes, cancellation needs gas too - but just to mark as cancelled)
-    	300_000_000 // gasPrice
+     0x2654.. // previous interop transaction
+     100_000 // gasLimit (yes, cancellation needs gas too - but just to mark as cancelled)
+     300_000_000 // gasPrice
     )
     ```
+
   - after that, you’ll need to call the `claimFailedDeposit` methods on your source chain contracts to get the assets that were burned when you did the transaction back - details of those are contract specific.
 
 ### Complex scenario

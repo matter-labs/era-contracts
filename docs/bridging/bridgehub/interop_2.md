@@ -25,18 +25,18 @@ The `InteropCenter` is a contract, that is pre-deployed on all the chains on a f
 contract InteropCenter {
   // Sends interop message. Can be called by anyone.
   // Returns the unique interopHash.
-	function sendInteropMessage(bytes data) returns interopHash;
+ function sendInteropMessage(bytes data) returns interopHash;
 
   // Interop message - uniquely identified by the hash of the payload.
-	struct InteropMessage {
-	  bytes data;
-	  address sender; // filled by InteropCenter
-	  uint256 sourceChainId; // filled by InteropCenter
-	  uint256 messageNum; // a 'nonce' to guarantee different hashes.
-	}
+ struct InteropMessage {
+   bytes data;
+   address sender; // filled by InteropCenter
+   uint256 sourceChainId; // filled by InteropCenter
+   uint256 messageNum; // a 'nonce' to guarantee different hashes.
+ }
 
-	// Verifies if such interop message was ever producted.
-	function verifyInteropMessage(bytes32 interopHash, Proof merkleProof) return bool;
+ // Verifies if such interop message was ever producted.
+ function verifyInteropMessage(bytes32 interopHash, Proof merkleProof) return bool;
 }
 ```
 
@@ -82,7 +82,7 @@ contract SignupContract {
     require(message.sourceChainId == CHAIN_A_ID);
     require(message.sender == SIGNUP_MANAGER_ON_CHAIN_A);
     require(message.data == "We are open");
-	  signupIsOpen = true;
+   signupIsOpen = true;
   }
 
   function signup() {

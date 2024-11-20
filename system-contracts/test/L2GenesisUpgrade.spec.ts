@@ -73,24 +73,14 @@ describe("L2GenesisUpgrade tests", function () {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["address"], [bridgehubOwnerAddress]),
     });
-    await setResult(
-      "IInteropCenter",
-      "setAddresses",
-      [REAL_L2_ASSET_ROUTER_ADDRESS],
-      {
-        failure: false,
-        returnData: "0x",
-      }
-    );
-    await setResult(
-      "IInteropHandler",
-      "setInteropAccountBytecode",
-      [],
-      {
-        failure: false,
-        returnData: "0x",
-      }
-    );
+    await setResult("IInteropCenter", "setAddresses", [REAL_L2_ASSET_ROUTER_ADDRESS], {
+      failure: false,
+      returnData: "0x",
+    });
+    await setResult("IInteropHandler", "setInteropAccountBytecode", [], {
+      failure: false,
+      returnData: "0x",
+    });
 
     await setResult("SystemContext", "setChainId", [chainId], {
       failure: false,
