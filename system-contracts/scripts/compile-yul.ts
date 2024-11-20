@@ -5,8 +5,8 @@ import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
 
-const COMPILER_VERSION = "1.5.6";
-const IS_COMPILER_PRE_RELEASE = true;
+const COMPILER_VERSION = "1.5.7";
+const IS_COMPILER_PRE_RELEASE = false;
 const CONTRACTS_DIR = "contracts-preprocessed";
 const BOOTLOADER_DIR = "bootloader";
 const TIMESTAMP_FILE_YUL = "last_compilation_yul.timestamp";
