@@ -27,12 +27,17 @@ jobs:
         with:
           python-version: 3.8
 
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
       - name: Install Slither
         run: |
           pip install slither-analyzer
-
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
 
       - name: Remove non-compiled files
         run: |
@@ -43,6 +48,6 @@ jobs:
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol
 
       - name: Run Slither
+        working-directory: l1-contracts
         run: |
-          cd l1-contracts
           slither --config ./slither.config.json .

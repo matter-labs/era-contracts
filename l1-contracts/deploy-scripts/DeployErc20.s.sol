@@ -83,7 +83,7 @@ contract DeployErc20Script is Script {
     function deployTokens() internal {
         uint256 tokensLength = config.tokens.length;
         for (uint256 i = 0; i < tokensLength; ++i) {
-            TokenDescription memory token = config.tokens[i];
+            TokenDescription storage token = config.tokens[i];
             console.log("Deploying token:", token.name);
             address tokenAddress = deployErc20({
                 name: token.name,

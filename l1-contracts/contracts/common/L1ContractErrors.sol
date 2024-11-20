@@ -137,6 +137,8 @@ error InvalidValue();
 error L2BridgeNotDeployed(uint256 chainId);
 // 0xff8811ff
 error L2BridgeNotSet(uint256 chainId);
+// 0x685577fa
+error L2BridgeAlreadySet(uint256 chainId);
 // 0xcb5e4247
 error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
 // 0xfb5c22e6
@@ -193,6 +195,8 @@ error NonZeroAddress(address);
 error NotEnoughGas();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0x058d9a1b
+error NotPendingAdmin();
 // 0xf3ed9dfa
 error OnlyEraSupported();
 // 0x1a21feed
