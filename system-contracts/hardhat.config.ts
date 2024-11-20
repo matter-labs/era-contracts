@@ -6,8 +6,8 @@ import "@nomiclabs/hardhat-ethers";
 import "hardhat-typechain";
 
 // This version of system contracts requires a pre release of the compiler
-const COMPILER_VERSION = "v1.5.6";
-const PRE_RELEASE_VERSION = "1.5.6";
+const COMPILER_VERSION = "v1.5.7";
+const PRE_RELEASE_VERSION = "1.5.7";
 function getZksolcUrl(): string {
   // @ts-ignore
   const platform = { darwin: "macosx", linux: "linux", win32: "windows" }[process.platform];
