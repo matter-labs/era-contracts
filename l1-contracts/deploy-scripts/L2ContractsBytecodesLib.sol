@@ -227,4 +227,10 @@ library L2ContractsBytecodesLib {
     function readTimestampAsserterBytecode() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL2("TimestampAsserter.sol", "TimestampAsserter");
     }
+
+    /// @notice Reads the bytecode of the ChainAdmin contract.
+    /// @return The bytecode of the ChainAdmin contract.
+    function readChainAdminBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
+    }
 }
