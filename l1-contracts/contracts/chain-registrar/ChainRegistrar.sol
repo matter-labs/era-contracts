@@ -65,12 +65,25 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         PubdataPricingMode pubdataPricingMode;
     }
 
+    struct DeployedChainConfig {
+        address pendingChainAdmin;
+        address chainAdmin;
+        address diamondProxy;
+        address l2BridgeAddress;
+    }
+
+    // @dev Initialize the contract
     function initialize(address _bridgehub, address _l2Deployer, address _owner) public reentrancyGuardInitializer {
         bridgehub = IBridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
         _transferOwnership(_owner);
     }
 
+    // @dev  Propose a new chain to be registered in zksync ecosystem.
+    // ZkSync administration will use this data for registering the chain on bridgehub.
+    // The call will fail if the chain already registered.
+    // Note: For non eth based chains it requires to either approve equivalent of 1 eth of base token or transfer
+    // this token to l2 deployer directly
     function proposeChainRegistration(
         uint256 chainId,
         PubdataPricingMode pubdataPricingMode,
@@ -114,6 +127,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         emit NewChainRegistrationProposal(config.chainId, msg.sender, key);
     }
 
+    // @dev Change l2 deployer
     function changeDeployer(address newDeployer) public onlyOwner {
         l2Deployer = newDeployer;
         emit L2DeployerChanged(l2Deployer);
@@ -124,6 +138,30 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         return proposedChains[key];
     }
 
+    function getDeployedChainConfig(uint256 chainId) public view returns (DeployedChainConfig memory) {
+        address stm = bridgehub.stateTransitionManager(chainId);
+        if (stm == address(0)) {
+            revert ChainIsNotYetDeployed();
+        }
+        address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
+
+        address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
+        address chainAdmin = IGetters(diamondProxy).getAdmin();
+        address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
+        if (l2BridgeAddress == address(0)) {
+            revert BridgeIsNotRegistered();
+        }
+
+        DeployedChainConfig memory config = DeployedChainConfig({
+            pendingChainAdmin: pendingChainAdmin,
+            chainAdmin: chainAdmin,
+            diamondProxy: diamondProxy,
+            l2BridgeAddress: l2BridgeAddress
+        });
+        return config;
+    }
+
+    // @dev Mark chain as registered. Emit necessary events for spinning up the chain server
     function setChainAsRegistered(address author, uint256 chainId) public onlyOwner nonReentrant {
         bytes32 key = keccak256(abi.encode(author, chainId));
         ChainConfig memory config = proposedChains[key];
@@ -131,23 +169,11 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert ProposalNotFound();
         }
 
-        if (deployedChains[key]) {
-            revert ChainIsAlreadyDeployed();
-        }
-        address stm = bridgehub.stateTransitionManager(chainId);
-        if (stm == address(0)) {
-            revert ChainIsNotYetDeployed();
-        }
-        address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
-        // Matter Labs team set the pending admin to the chain admin and now governor of the chain must accept ownership
-        address chainAdmin = IGetters(diamondProxy).getPendingAdmin();
-        address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
-        if (l2BridgeAddress == address(0)) {
-            revert BridgeIsNotRegistered();
-        }
+        DeployedChainConfig memory deployedConfig = getDeployedChainConfig(chainId);
 
-        emit NewChainDeployed(chainId, author, diamondProxy, chainAdmin);
-        emit SharedBridgeRegistered(chainId, l2BridgeAddress);
+        // Matter Labs team set the pending admin to the chain admin and now governor of the chain must accept ownership
+        emit NewChainDeployed(chainId, author, deployedConfig.diamondProxy, deployedConfig.pendingChainAdmin);
+        emit SharedBridgeRegistered(chainId, deployedConfig.l2BridgeAddress);
         deployedChains[key] = true;
     }
 }
