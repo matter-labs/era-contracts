@@ -65,7 +65,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         PubdataPricingMode pubdataPricingMode;
     }
 
-    struct DeployedChainConfig {
+    struct RegisteredChainConfig {
         address pendingChainAdmin;
         address chainAdmin;
         address diamondProxy;
@@ -138,7 +138,8 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         return proposedChains[key];
     }
 
-    function getDeployedChainConfig(uint256 chainId) public view returns (DeployedChainConfig memory) {
+    // @dev Get data about the chain that has been fully deployed
+    function getRegisteredChainConfig(uint256 chainId) public view returns (RegisteredChainConfig memory) {
         address stm = bridgehub.stateTransitionManager(chainId);
         if (stm == address(0)) {
             revert ChainIsNotYetDeployed();
@@ -152,7 +153,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert BridgeIsNotRegistered();
         }
 
-        DeployedChainConfig memory config = DeployedChainConfig({
+        RegisteredChainConfig memory config = RegisteredChainConfig({
             pendingChainAdmin: pendingChainAdmin,
             chainAdmin: chainAdmin,
             diamondProxy: diamondProxy,
@@ -169,7 +170,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             revert ProposalNotFound();
         }
 
-        DeployedChainConfig memory deployedConfig = getDeployedChainConfig(chainId);
+        RegisteredChainConfig memory deployedConfig = getRegisteredChainConfig(chainId);
 
         // Matter Labs team set the pending admin to the chain admin and now governor of the chain must accept ownership
         emit NewChainDeployed(chainId, author, deployedConfig.diamondProxy, deployedConfig.pendingChainAdmin);
