@@ -102,11 +102,11 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             operator: operator,
             governor: governor,
             baseToken: BaseToken({
-                tokenAddress: tokenAddress,
-                tokenMultiplierSetter: tokenMultiplierSetter,
-                gasPriceMultiplierNominator: gasPriceMultiplierNominator,
-                gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
-            })
+            tokenAddress: tokenAddress,
+            tokenMultiplierSetter: tokenMultiplierSetter,
+            gasPriceMultiplierNominator: gasPriceMultiplierNominator,
+            gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
+        })
         });
         bytes32 key = keccak256(abi.encode(msg.sender, config.chainId));
         if (deployedChains[key] || bridgehub.stateTransitionManager(config.chainId) != address(0)) {
@@ -116,7 +116,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         // For Deploying L2 contracts on for non ETH based networks, we as bridgehub owners required base token.
         if (config.baseToken.tokenAddress != ETH_TOKEN_ADDRESS) {
             uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
-                config.baseToken.gasPriceMultiplierDenominator;
+                                config.baseToken.gasPriceMultiplierDenominator;
             if (IERC20(config.baseToken.tokenAddress).balanceOf(l2Deployer) < amount) {
                 bool success = IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
                 if (!success) {
@@ -139,15 +139,22 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     }
 
     // @dev Get data about the chain that has been fully deployed
-    function getRegisteredChainConfig(uint256 chainId) public view returns (RegisteredChainConfig memory) {
+    function getRegisteredChainConfig(uint256 chainId) public returns (RegisteredChainConfig memory) {
         address stm = bridgehub.stateTransitionManager(chainId);
         if (stm == address(0)) {
             revert ChainIsNotYetDeployed();
         }
         address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
 
-        address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
-        address chainAdmin = IGetters(diamondProxy).getAdmin();
+        (bool success, bytes memory data) = diamondProxy.call(abi.encodeWithSignature("getPendingAdmin()"));
+        require(success);
+        (bool success1, bytes memory data1) = diamondProxy.call(abi.encodeWithSignature("getAdmin()"));
+        require(success1);
+
+        address pendingChainAdmin = bytesToAddress(data);
+        address chainAdmin = bytesToAddress(data1);
+//        address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
+//        address chainAdmin = IGetters(diamondProxy).getAdmin();
         address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
@@ -177,4 +184,9 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         emit SharedBridgeRegistered(chainId, deployedConfig.l2BridgeAddress);
         deployedChains[key] = true;
     }
+
+    function bytesToAddress(bytes memory b) private pure returns (address) {
+        return address(uint160(bytes20(b)));
+    }
+
 }
