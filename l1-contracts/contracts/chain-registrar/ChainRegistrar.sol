@@ -15,7 +15,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev ChainRegistrar serves as the main point for chain registration.
 contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
-    /// Address that will be used for deploying l2 contracts
+    /// @notice Address that will be used for deploying l2 contracts
     address public l2Deployer;
     /// ZKsync Bridgehub
     IBridgehub public bridgehub;
@@ -80,7 +80,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     }
 
     // @dev  Propose a new chain to be registered in zksync ecosystem.
-    // ZkSync administration will use this data for registering the chain on bridgehub.
+    // ZKsync administration will use this data for registering the chain on bridgehub.
     // The call will fail if the chain already registered.
     // Note: For non eth based chains it requires to either approve equivalent of 1 eth of base token or transfer
     // this token to l2 deployer directly
