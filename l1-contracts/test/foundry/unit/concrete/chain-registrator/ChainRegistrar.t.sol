@@ -116,13 +116,10 @@ contract ChainRegistrarTest is Test {
             gasPriceMultiplierDenominator: 1
         });
         Vm.Log[] memory proposeLogs = vm.getRecordedLogs();
-        console.logAddress(admin);
-        console.logAddress(bridgeHub.admin());
-        console.logAddress(bridgeHub.owner());
         DummyHyperchain hyperchain = new DummyHyperchain(address(bridgeHub), 270);
         hyperchain.initialize(admin);
         vm.prank(admin);
-        stm.setHyperchain(1, makeAddr("hyperchain"));
+        stm.setHyperchain(1, address(hyperchain));
         bridgeHub.setStateTransitionManager(1, address(stm));
         vm.prank(admin);
         sharedBridge.initializeChainGovernance(1, makeAddr("l2bridge"));
@@ -130,5 +127,10 @@ contract ChainRegistrarTest is Test {
         vm.prank(admin);
         chainRegistrar.setChainAsRegistered(author, 1);
         Vm.Log[] memory registeredLogs = vm.getRecordedLogs();
+        ChainRegistrar.RegisteredChainConfig memory registeredConfig = chainRegistrar.getRegisteredChainConfig(1);
+        require(registeredConfig.diamondProxy != address(0));
+        require(registeredConfig.chainAdmin != address(0));
+        require(registeredConfig.l2BridgeAddress != address(0));
+        require(registeredConfig.pendingChainAdmin != address(0));
     }
 }
