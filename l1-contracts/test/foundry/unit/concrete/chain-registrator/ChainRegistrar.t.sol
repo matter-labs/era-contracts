@@ -105,15 +105,15 @@ contract ChainRegistrarTest is Test {
         vm.prank(author);
         vm.recordLogs();
         chainRegistrar.proposeChainRegistration({
-            chainId: 1,
-            pubdataPricingMode: PubdataPricingMode.Validium,
-            blobOperator: makeAddr("blobOperator"),
-            operator: makeAddr("operator"),
-            governor: makeAddr("governor"),
-            tokenAddress: ETH_TOKEN_ADDRESS,
-            tokenMultiplierSetter: makeAddr("setter"),
-            gasPriceMultiplierNominator: 1,
-            gasPriceMultiplierDenominator: 1
+            _chainId: 1,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _tokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("setter"),
+            _gasPriceMultiplierNominator: 1,
+            _gasPriceMultiplierDenominator: 1
         });
         Vm.Log[] memory proposeLogs = vm.getRecordedLogs();
         DummyHyperchain hyperchain = new DummyHyperchain(address(bridgeHub), 270);

@@ -10,20 +10,22 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev ChainRegistrar serves as the main point for chain registration.
 contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     /// @notice Address that will be used for deploying l2 contracts
     address public l2Deployer;
     /// ZKsync Bridgehub
     IBridgehub public bridgehub;
 
     /// Chains that has been successfully deployed
-    mapping(bytes32 => bool) public deployedChains;
+    mapping(address => mapping(uint256 => bool)) public deployedChains;
     /// Proposal for chain registration
-    mapping(bytes32 => ChainConfig) public proposedChains;
+    mapping(address => mapping(uint256 => ChainConfig)) public proposedChains;
 
     error ProposalNotFound();
     error BaseTokenTransferFailed();
@@ -35,7 +37,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     event NewChainDeployed(uint256 indexed chainId, address author, address diamondProxy, address chainAdmin);
 
     /// @notice new chain is proposed to register
-    event NewChainRegistrationProposal(uint256 indexed chainId, address author, bytes32 key);
+    event NewChainRegistrationProposal(uint256 indexed chainId, address author);
 
     /// @notice Shared bridge is registered on l2
     event SharedBridgeRegistered(uint256 indexed chainId, address l2Address);
@@ -85,70 +87,67 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     // Note: For non eth based chains it requires to either approve equivalent of 1 eth of base token or transfer
     // this token to l2 deployer directly
     function proposeChainRegistration(
-        uint256 chainId,
-        PubdataPricingMode pubdataPricingMode,
-        address blobOperator,
-        address operator,
-        address governor,
-        address tokenAddress,
-        address tokenMultiplierSetter,
-        uint128 gasPriceMultiplierNominator,
-        uint128 gasPriceMultiplierDenominator
+        uint256 _chainId,
+        PubdataPricingMode _pubdataPricingMode,
+        address _blobOperator,
+        address _operator,
+        address _governor,
+        address _tokenAddress,
+        address _tokenMultiplierSetter,
+        uint128 _gasPriceMultiplierNominator,
+        uint128 _gasPriceMultiplierDenominator
     ) public {
         ChainConfig memory config = ChainConfig({
-            chainId: chainId,
-            pubdataPricingMode: pubdataPricingMode,
-            blobOperator: blobOperator,
-            operator: operator,
-            governor: governor,
+            chainId: _chainId,
+            pubdataPricingMode: _pubdataPricingMode,
+            blobOperator: _blobOperator,
+            operator: _operator,
+            governor: _governor,
             baseToken: BaseToken({
-                tokenAddress: tokenAddress,
-                tokenMultiplierSetter: tokenMultiplierSetter,
-                gasPriceMultiplierNominator: gasPriceMultiplierNominator,
-                gasPriceMultiplierDenominator: gasPriceMultiplierDenominator
+                tokenAddress: _tokenAddress,
+                tokenMultiplierSetter: _tokenMultiplierSetter,
+                gasPriceMultiplierNominator: _gasPriceMultiplierNominator,
+                gasPriceMultiplierDenominator: _gasPriceMultiplierDenominator
             })
         });
-        bytes32 key = keccak256(abi.encode(msg.sender, config.chainId));
-        if (deployedChains[key] || bridgehub.stateTransitionManager(config.chainId) != address(0)) {
+        if (
+            deployedChains[msg.sender][config.chainId] || bridgehub.stateTransitionManager(config.chainId) != address(0)
+        ) {
             revert ChainIsAlreadyDeployed();
         }
-        proposedChains[key] = config;
+        proposedChains[msg.sender][_chainId] = config;
         // For Deploying L2 contracts on for non ETH based networks, we as bridgehub owners required base token.
         if (config.baseToken.tokenAddress != ETH_TOKEN_ADDRESS) {
             uint256 amount = (1 ether * config.baseToken.gasPriceMultiplierNominator) /
                 config.baseToken.gasPriceMultiplierDenominator;
             if (IERC20(config.baseToken.tokenAddress).balanceOf(l2Deployer) < amount) {
-                bool success = IERC20(config.baseToken.tokenAddress).transferFrom(msg.sender, l2Deployer, amount);
-                if (!success) {
-                    revert BaseTokenTransferFailed();
-                }
+                IERC20(config.baseToken.tokenAddress).safeTransferFrom(msg.sender, l2Deployer, amount);
             }
         }
-        emit NewChainRegistrationProposal(config.chainId, msg.sender, key);
+        emit NewChainRegistrationProposal(config.chainId, msg.sender);
     }
 
     // @dev Change l2 deployer
-    function changeDeployer(address newDeployer) public onlyOwner {
-        l2Deployer = newDeployer;
+    function changeDeployer(address _newDeployer) public onlyOwner {
+        l2Deployer = _newDeployer;
         emit L2DeployerChanged(l2Deployer);
     }
 
-    function getChainConfig(address author, uint256 chainId) public view returns (ChainConfig memory) {
-        bytes32 key = keccak256(abi.encode(author, chainId));
-        return proposedChains[key];
+    function getChainConfig(address _author, uint256 _chainId) public view returns (ChainConfig memory) {
+        return proposedChains[_author][_chainId];
     }
 
     // @dev Get data about the chain that has been fully deployed
-    function getRegisteredChainConfig(uint256 chainId) public returns (RegisteredChainConfig memory) {
-        address stm = bridgehub.stateTransitionManager(chainId);
+    function getRegisteredChainConfig(uint256 _chainId) public view returns (RegisteredChainConfig memory) {
+        address stm = bridgehub.stateTransitionManager(_chainId);
         if (stm == address(0)) {
             revert ChainIsNotYetDeployed();
         }
-        address diamondProxy = IStateTransitionManager(stm).getHyperchain(chainId);
+        address diamondProxy = IStateTransitionManager(stm).getHyperchain(_chainId);
 
         address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
         address chainAdmin = IGetters(diamondProxy).getAdmin();
-        address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(chainId);
+        address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(_chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }
@@ -163,18 +162,17 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     }
 
     // @dev Mark chain as registered. Emit necessary events for spinning up the chain server
-    function setChainAsRegistered(address author, uint256 chainId) public onlyOwner nonReentrant {
-        bytes32 key = keccak256(abi.encode(author, chainId));
-        ChainConfig memory config = proposedChains[key];
+    function setChainAsRegistered(address _author, uint256 _chainId) public onlyOwner nonReentrant {
+        ChainConfig memory config = proposedChains[_author][_chainId];
         if (config.chainId == 0) {
             revert ProposalNotFound();
         }
 
-        RegisteredChainConfig memory deployedConfig = getRegisteredChainConfig(chainId);
+        RegisteredChainConfig memory deployedConfig = getRegisteredChainConfig(_chainId);
 
         // Matter Labs team set the pending admin to the chain admin and now governor of the chain must accept ownership
-        emit NewChainDeployed(chainId, author, deployedConfig.diamondProxy, deployedConfig.pendingChainAdmin);
-        emit SharedBridgeRegistered(chainId, deployedConfig.l2BridgeAddress);
-        deployedChains[key] = true;
+        emit NewChainDeployed(_chainId, _author, deployedConfig.diamondProxy, deployedConfig.pendingChainAdmin);
+        emit SharedBridgeRegistered(_chainId, deployedConfig.l2BridgeAddress);
+        deployedChains[_author][_chainId] = true;
     }
 }
