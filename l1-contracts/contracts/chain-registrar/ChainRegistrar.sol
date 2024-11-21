@@ -65,7 +65,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         PubdataPricingMode pubdataPricingMode;
     }
 
-    constructor(address _bridgehub, address _l2Deployer, address _owner) reentrancyGuardInitializer {
+    function initialize(address _bridgehub, address _l2Deployer, address _owner) public reentrancyGuardInitializer {
         bridgehub = IBridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
         _transferOwnership(_owner);

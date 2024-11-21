@@ -307,13 +307,24 @@ contract DeployL1Script is Script {
     }
 
     function deployChainRegistrar() internal {
+        bytes memory bytecodeImplementation = abi.encodePacked(type(ChainRegistrar).creationCode);
+        address chainRegistrarImplementation = deployViaCreate2(bytecodeImplementation);
+        console.log("Chain Registrar implementation deployed at:", chainRegistrarImplementation);
+
         bytes memory bytecode = abi.encodePacked(
-            type(ChainRegistrar).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy, config.l2Deployer, config.ownerAddress)
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(
+                chainRegistrarImplementation,
+                addresses.transparentProxyAdmin,
+                abi.encodeCall(
+                    ChainRegistrar.initialize,
+                    (addresses.bridgehub.bridgehubProxy, config.l2Deployer, config.ownerAddress)
+                )
+            )
         );
-        address contractAddress = deployViaCreate2(bytecode);
-        console.log("Chain Registrar deployed at:", contractAddress);
-        addresses.chainRegistrar = contractAddress;
+        address chainRegistrar = deployViaCreate2(bytecode);
+        console.log("Chain Registrar deployed at:", chainRegistrar);
+        addresses.chainRegistrar = chainRegistrar;
     }
 
     function deployChainAdmin() internal {

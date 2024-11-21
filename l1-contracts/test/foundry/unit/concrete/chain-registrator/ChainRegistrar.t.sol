@@ -96,7 +96,8 @@ contract ChainRegistrarTest is Test {
         vm.stopPrank();
         vm.prank(stm.admin());
         stm.setChainCreationParams(chainCreationParams);
-        chainRegistrar = new ChainRegistrar(address(bridgeHub), deployer, admin);
+        chainRegistrar = new ChainRegistrar();
+        chainRegistrar.initialize(address(bridgeHub), deployer, admin);
     }
 
     function test_SuccessfulProposal() public {
