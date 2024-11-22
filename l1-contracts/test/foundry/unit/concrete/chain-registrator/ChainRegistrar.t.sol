@@ -110,7 +110,7 @@ contract ChainRegistrarTest is Test {
             _blobOperator: makeAddr("blobOperator"),
             _operator: makeAddr("operator"),
             _governor: makeAddr("governor"),
-            _tokenAddress: ETH_TOKEN_ADDRESS,
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
             _tokenMultiplierSetter: makeAddr("setter"),
             _gasPriceMultiplierNominator: 1,
             _gasPriceMultiplierDenominator: 1
