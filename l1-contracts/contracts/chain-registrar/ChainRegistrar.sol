@@ -9,38 +9,28 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev ChainRegistrar serves as the main point for chain registration.
-contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
+contract ChainRegistrar is Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
     /// @notice Address that will be used for deploying l2 contracts
     address public l2Deployer;
     /// ZKsync Bridgehub
     IBridgehub public bridgehub;
 
-    /// Chains that has been successfully deployed
-    mapping(address => mapping(uint256 => bool)) public deployedChains;
     /// Proposal for chain registration
     mapping(address => mapping(uint256 => ChainConfig)) public proposedChains;
 
-    error ProposalNotFound();
     error BaseTokenTransferFailed();
     error ChainIsAlreadyDeployed();
     error ChainIsNotYetDeployed();
     error BridgeIsNotRegistered();
 
-    /// @notice new chain is deployed
-    event NewChainDeployed(uint256 indexed chainId, address author, address diamondProxy, address chainAdmin);
-
     /// @notice new chain is proposed to register
     event NewChainRegistrationProposal(uint256 indexed chainId, address author);
-
-    /// @notice Shared bridge is registered on l2
-    event SharedBridgeRegistered(uint256 indexed chainId, address l2Address);
 
     /// @notice L2 Deployer has changed
     event L2DeployerChanged(address newDeployer);
@@ -75,17 +65,19 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     }
 
     // @dev Initialize the contract
-    function initialize(address _bridgehub, address _l2Deployer, address _owner) public reentrancyGuardInitializer {
+    function initialize(address _bridgehub, address _l2Deployer, address _owner) public {
         bridgehub = IBridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
         _transferOwnership(_owner);
     }
 
-    // @dev  Propose a new chain to be registered in zksync ecosystem.
-    // ZKsync administration will use this data for registering the chain on bridgehub.
-    // The call will fail if the chain already registered.
-    // Note: For non eth based chains it requires to either approve equivalent of 1 eth of base token or transfer
-    // this token to l2 deployer directly
+    /// @dev  Propose a new chain to be registered in zksync ecosystem.
+    /// ZKsync administration will use this data for registering the chain on bridgehub.
+    /// The call will fail if the chain already registered.
+    /// Note: For non eth based chains it requires to either approve equivalent of 1 eth of base token or transfer
+    /// this token to l2 deployer directly
+    /// @param _chainId
+
     function proposeChainRegistration(
         uint256 _chainId,
         PubdataPricingMode _pubdataPricingMode,
@@ -96,7 +88,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
         address _tokenMultiplierSetter,
         uint128 _gasPriceMultiplierNominator,
         uint128 _gasPriceMultiplierDenominator
-    ) public {
+    ) external {
         ChainConfig memory config = ChainConfig({
             chainId: _chainId,
             pubdataPricingMode: _pubdataPricingMode,
@@ -110,9 +102,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
                 gasPriceMultiplierDenominator: _gasPriceMultiplierDenominator
             })
         });
-        if (
-            deployedChains[msg.sender][config.chainId] || bridgehub.stateTransitionManager(config.chainId) != address(0)
-        ) {
+        if (bridgehub.stateTransitionManager(config.chainId) != address(0)) {
             revert ChainIsAlreadyDeployed();
         }
         proposedChains[msg.sender][_chainId] = config;
@@ -131,10 +121,6 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
     function changeDeployer(address _newDeployer) public onlyOwner {
         l2Deployer = _newDeployer;
         emit L2DeployerChanged(l2Deployer);
-    }
-
-    function getChainConfig(address _author, uint256 _chainId) public view returns (ChainConfig memory) {
-        return proposedChains[_author][_chainId];
     }
 
     // @dev Get data about the chain that has been fully deployed
@@ -159,20 +145,5 @@ contract ChainRegistrar is Ownable2StepUpgradeable, ReentrancyGuard {
             l2BridgeAddress: l2BridgeAddress
         });
         return config;
-    }
-
-    // @dev Mark chain as registered. Emit necessary events for spinning up the chain server
-    function setChainAsRegistered(address _author, uint256 _chainId) public onlyOwner nonReentrant {
-        ChainConfig memory config = proposedChains[_author][_chainId];
-        if (config.chainId == 0) {
-            revert ProposalNotFound();
-        }
-
-        RegisteredChainConfig memory deployedConfig = getRegisteredChainConfig(_chainId);
-
-        // Matter Labs team set the pending admin to the chain admin and now governor of the chain must accept ownership
-        emit NewChainDeployed(_chainId, _author, deployedConfig.diamondProxy, deployedConfig.pendingChainAdmin);
-        emit SharedBridgeRegistered(_chainId, deployedConfig.l2BridgeAddress);
-        deployedChains[_author][_chainId] = true;
     }
 }

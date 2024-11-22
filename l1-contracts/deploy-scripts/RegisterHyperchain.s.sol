@@ -82,7 +82,7 @@ contract RegisterHyperchainScript is Script {
     }
 
     function loadChain() internal {
-        chainConfig = chainRegistrar.getChainConfig(config.proposalAuthor, config.chainChainId);
+        chainConfig = chainRegistrar.proposedChains[config.proposalAuthor][config.chainChainId];
     }
 
     function checkTokenAddress() internal view {

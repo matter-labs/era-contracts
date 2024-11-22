@@ -125,8 +125,6 @@ contract ChainRegistrarTest is Test {
         sharedBridge.initializeChainGovernance(1, makeAddr("l2bridge"));
         vm.recordLogs();
         vm.prank(admin);
-        chainRegistrar.setChainAsRegistered(author, 1);
-        Vm.Log[] memory registeredLogs = vm.getRecordedLogs();
         ChainRegistrar.RegisteredChainConfig memory registeredConfig = chainRegistrar.getRegisteredChainConfig(1);
         require(registeredConfig.diamondProxy != address(0));
         require(registeredConfig.chainAdmin != address(0));

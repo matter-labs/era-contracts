@@ -68,7 +68,6 @@ contract DeployL2Script is Script {
         deploySharedBridge();
         deploySharedBridgeProxy(legacyBridge);
         initializeChain();
-        finalizeRegistration();
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -372,11 +371,5 @@ contract DeployL2Script is Script {
             _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
             _value: 0
         });
-    }
-
-    function finalizeRegistration() internal {
-        ChainRegistrar chainRegistrar = ChainRegistrar(config.chainRegistrar);
-        vm.broadcast();
-        chainRegistrar.setChainAsRegistered(config.proposalAuthor, config.chainId);
     }
 }
