@@ -12,7 +12,7 @@ import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
-import {VerifierFFLONK} from "contracts/state-transition/verifiers/VerifierFFLONK.sol";
+import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFFLONK.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
