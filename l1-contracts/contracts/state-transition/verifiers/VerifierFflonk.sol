@@ -23,20 +23,23 @@ contract VerifierFflonk is IVerifierV2 {
     // ================Verification Key================
     uint256 internal constant VK_NUM_INPUTS = 1;
     // [C0]1 = qL(X^8)+ X*qR(X^8)+ X^2*qO(X^8)+ X^3*qM(X^8)+ X^4*qC(X^8)+ X^5*Sσ1(X^8)+ X^6*Sσ2(X^8)+ X^7*Sσ3(X^8)
-    uint256 internal constant VK_C0_G1_X = 0x15c99dbc62b8191204ff93984b0de4fb7c79ac7a1ef2c94f4ce940319a2408b2;
-    uint256 internal constant VK_C0_G1_Y = 0x0521b86a104e07c8971bf2e17d7665d59df7566c08e6e0c9750f584bb24084ce;
+    uint256 internal constant VK_C0_G1_X = 0x15d6a2585e95760f0405daa7dc24062bae7c4b597fd1fc40f693c6b58c39322b;
+    uint256 internal constant VK_C0_G1_Y = 0x218800413bb52a9f78532505358c354cf0644365f24b546dcffdda41118fc42a;
+
     // k1 = 5, k2 = 7
-    uint256 internal constant VK_NON_RESIDUES_0 = 0x0000000000000000000000000000000000000000000000000000000000000005;
-    uint256 internal constant VK_NON_RESIDUES_1 = 0x0000000000000000000000000000000000000000000000000000000000000007;
+    uint256 internal constant VK_NON_RESIDUES_0 = 0x05;
+    uint256 internal constant VK_NON_RESIDUES_1 = 0x07;
+
     // G2 Elements = [1]_2, [s]_2
     uint256 internal constant VK_G2_ELEMENT_0_X1 = 0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2;
     uint256 internal constant VK_G2_ELEMENT_0_X2 = 0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed;
     uint256 internal constant VK_G2_ELEMENT_0_Y1 = 0x090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b;
     uint256 internal constant VK_G2_ELEMENT_0_Y2 = 0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa;
-    uint256 internal constant VK_G2_ELEMENT_1_X1 = 0x260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c1;
-    uint256 internal constant VK_G2_ELEMENT_1_X2 = 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0;
-    uint256 internal constant VK_G2_ELEMENT_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
-    uint256 internal constant VK_G2_ELEMENT_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
+    uint256 internal constant VK_G2_ELEMENT_1_X1 = 0x12740934ba9615b77b6a49b06fcce83ce90d67b1d0e2a530069e3a7306569a91;
+    uint256 internal constant VK_G2_ELEMENT_1_X2 = 0x116da8c89a0d090f3d8644ada33a5f1c8013ba7204aeca62d66d931b99afe6e7;
+    uint256 internal constant VK_G2_ELEMENT_1_Y1 = 0x25222d9816e5f86b4a7dedd00d04acc5c979c18bd22b834ea8c6d07c0ba441db;
+    uint256 internal constant VK_G2_ELEMENT_1_Y2 = 0x076441042e77b6309644b56251f059cf14befc72ac8a6157d30924e58dc4c172;
+
 
     // Memory slots from 0x000 to 0x200 are reserved for intermediate computations and call to precompiles.
 

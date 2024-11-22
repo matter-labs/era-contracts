@@ -22,8 +22,8 @@ contract VerifierFflonk is IVerifierV2 {
 
     // ================Verification Key================
     uint256 internal constant VK_NUM_INPUTS = 1;
-    {{c0}}
-    {{residue_g2_elements}}
+    {{{c0}}}
+    {{{residue_g2_elements}}}
 
     // Memory slots from 0x000 to 0x200 are reserved for intermediate computations and call to precompiles.
 
@@ -124,7 +124,7 @@ contract VerifierFflonk is IVerifierV2 {
     function verify(
         uint256[] calldata, // _publicInputs
         uint256[] calldata // _proof
-    ) public view virtual returns (bool) {
+    ) external view virtual returns (bool) {
         // Beginning of the big inline assembly block that makes all the verification work.
         // Note: We use the custom memory layout, so the return value should be returned from the assembly, not
         // Solidity code.
