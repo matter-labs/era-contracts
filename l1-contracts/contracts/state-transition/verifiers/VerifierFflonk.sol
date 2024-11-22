@@ -40,7 +40,6 @@ contract VerifierFflonk is IVerifierV2 {
     uint256 internal constant VK_G2_ELEMENT_1_Y1 = 0x25222d9816e5f86b4a7dedd00d04acc5c979c18bd22b834ea8c6d07c0ba441db;
     uint256 internal constant VK_G2_ELEMENT_1_Y2 = 0x076441042e77b6309644b56251f059cf14befc72ac8a6157d30924e58dc4c172;
 
-
     // Memory slots from 0x000 to 0x200 are reserved for intermediate computations and call to precompiles.
 
     // ================Transcript================
@@ -118,6 +117,7 @@ contract VerifierFflonk is IVerifierV2 {
     function verificationKeyHash() external pure returns (bytes32 vkHash) {
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(
                     VK_NUM_INPUTS,
                     VK_C0_G1_X,
