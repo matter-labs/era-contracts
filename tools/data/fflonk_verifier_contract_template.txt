@@ -22,21 +22,8 @@ contract VerifierFflonk is IVerifierV2 {
 
     // ================Verification Key================
     uint256 internal constant VK_NUM_INPUTS = 1;
-    // [C0]1 = qL(X^8)+ X*qR(X^8)+ X^2*qO(X^8)+ X^3*qM(X^8)+ X^4*qC(X^8)+ X^5*Sσ1(X^8)+ X^6*Sσ2(X^8)+ X^7*Sσ3(X^8)
-    uint256 internal constant VK_C0_G1_X = 0x15c99dbc62b8191204ff93984b0de4fb7c79ac7a1ef2c94f4ce940319a2408b2;
-    uint256 internal constant VK_C0_G1_Y = 0x0521b86a104e07c8971bf2e17d7665d59df7566c08e6e0c9750f584bb24084ce;
-    // k1 = 5, k2 = 7
-    uint256 internal constant VK_NON_RESIDUES_0 = 0x0000000000000000000000000000000000000000000000000000000000000005;
-    uint256 internal constant VK_NON_RESIDUES_1 = 0x0000000000000000000000000000000000000000000000000000000000000007;
-    // G2 Elements = [1]_2, [s]_2
-    uint256 internal constant VK_G2_ELEMENT_0_X1 = 0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2;
-    uint256 internal constant VK_G2_ELEMENT_0_X2 = 0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed;
-    uint256 internal constant VK_G2_ELEMENT_0_Y1 = 0x090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b;
-    uint256 internal constant VK_G2_ELEMENT_0_Y2 = 0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa;
-    uint256 internal constant VK_G2_ELEMENT_1_X1 = 0x260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c1;
-    uint256 internal constant VK_G2_ELEMENT_1_X2 = 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0;
-    uint256 internal constant VK_G2_ELEMENT_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
-    uint256 internal constant VK_G2_ELEMENT_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
+    {{c0}}
+    {{residue_g2_elements}}
 
     // Memory slots from 0x000 to 0x200 are reserved for intermediate computations and call to precompiles.
 
@@ -1326,7 +1313,7 @@ contract VerifierFflonk is IVerifierV2 {
                 // the identity check is reduced into following
                 // L(X) - W'(X)*Z_{T\S0}(y)(X-y) == 0
                 // verifier has commitments to the C_i(X) polynomials
-                // verifer also recomputed r_i(y)
+                // verifier also recomputed r_i(y)
                 // group constant and commitment parts
                 // first prepare L(X)/Z_{T\S0}(y)
                 // C(X) = C0(X) + ((alpha*Z_{T\S1}(y)/Z_{T\S0}(y))*C1(X)) + ((alpha^2*Z_{T\S2}(y)/Z_{T\S0}(y))*C2(X))
