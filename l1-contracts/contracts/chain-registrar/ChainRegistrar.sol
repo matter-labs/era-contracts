@@ -14,6 +14,8 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev ChainRegistrar serves as the main point for chain registration.
+/// Contract should be deployed using Proxy. This contract is an addition to the zksync ecosystem
+/// and it's not allowed to do any calls to the Bridgehub.
 contract ChainRegistrar is Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
     /// @notice Address that will be used for deploying l2 contracts
@@ -36,27 +38,33 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     event L2DeployerChanged(address newDeployer);
 
     struct BaseToken {
-        address tokenAddress;
-        address tokenMultiplierSetter;
+        /// @param gasPriceMultiplierNominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
         uint128 gasPriceMultiplierNominator;
+        /// @param gasPriceMultiplierDenominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
         uint128 gasPriceMultiplierDenominator;
+        /// @param tokenAddress the base token address used to pay for gas fees
+        address tokenAddress;
+        /// @param okenMultiplierSetter The new address to be set as the token multiplier setter.
+        address tokenMultiplierSetter;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct ChainConfig {
         /// @param Chain id of the new chain should be unique for this bridgehub
         uint256 chainId;
+        /// @param baseToken of the chain
+        BaseToken baseToken;
         /// @param Operator for making commit txs.
         address blobOperator;
         /// @param Operator for making Prove and Execute transactions
         address operator;
-        /// @param Governor of the chain. Ownership of the chain will be transferred to this operator
+        /// @param Governor of the chain. Ownership of the ChainAdmin will be transferred to this address
         address governor;
-        /// @param baseToken of the chain
-        BaseToken baseToken;
         /// @param pubdataPricingMode How the users will charged for pubdata.
         PubdataPricingMode pubdataPricingMode;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct RegisteredChainConfig {
         address pendingChainAdmin;
         address chainAdmin;
@@ -76,15 +84,22 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// The call will fail if the chain already registered.
     /// Note: For non eth based chains it requires to either approve equivalent of 1 eth of base token or transfer
     /// this token to l2 deployer directly
-    /// @param _chainId
-
+    /// @param _chainId of the new chain should be unique for this bridgehub
+    /// @param _pubdataPricingMode How the users will charged for pubdata.
+    /// @param _blobOperator for making commit txs.
+    /// @param _operator for making Prove and Execute transactions
+    /// @param _governor Ownership of the ChainAdmin will be transferred to this address
+    /// @param _baseTokenAddress the base token address used to pay for gas fees
+    /// @param _tokenMultiplierSetter The new address to be set as the token multiplier setter.
+    /// @param _gasPriceMultiplierNominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
+    /// @param _gasPriceMultiplierDenominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
     function proposeChainRegistration(
         uint256 _chainId,
         PubdataPricingMode _pubdataPricingMode,
         address _blobOperator,
         address _operator,
         address _governor,
-        address _tokenAddress,
+        address _baseTokenAddress,
         address _tokenMultiplierSetter,
         uint128 _gasPriceMultiplierNominator,
         uint128 _gasPriceMultiplierDenominator
@@ -96,7 +111,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
             operator: _operator,
             governor: _governor,
             baseToken: BaseToken({
-                tokenAddress: _tokenAddress,
+                tokenAddress: _baseTokenAddress,
                 tokenMultiplierSetter: _tokenMultiplierSetter,
                 gasPriceMultiplierNominator: _gasPriceMultiplierNominator,
                 gasPriceMultiplierDenominator: _gasPriceMultiplierDenominator
