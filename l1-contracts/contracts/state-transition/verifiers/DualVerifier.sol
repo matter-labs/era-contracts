@@ -45,7 +45,7 @@ contract DualVerifier is IVerifier {
         uint256[] calldata _publicInputs,
         uint256[] calldata _proof,
         uint256[] calldata _recursiveAggregationInput
-    ) external view virtual returns (bool) {
+    ) public view virtual returns (bool) {
         // Ensure the recursive aggregation input has a valid length (at least one element
         // for the proof system differentiator).
         if (_recursiveAggregationInput.length == 0) {
