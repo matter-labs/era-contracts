@@ -305,6 +305,10 @@ error ZeroAddress();
 error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
+// 0xc352bb73
+error UnknownVerifierType();
+// 0xdf320f0a
+error EmptyRecursiveAggregationInputLength();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

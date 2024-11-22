@@ -157,12 +157,15 @@ jobs:
         with:
           toolchain: 1.72.0
 
-      - name: Generate Verifier.sol
+      - name: Generate verifiers
         working-directory: tools
         run: cargo run
 
-      - name: Compare
-        run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/Verifier.sol
+      - name: Compare VerifierPlonk.sol
+        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierPlonk.sol
+
+      - name: Compare VerifierFflonk.sol
+        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierFflonk.sol
 
   coverage:
     defaults:
