@@ -41,11 +41,8 @@ pub fn insert_residue_elements_and_commitments(
     let residue_g2_elements = generate_residue_g2_elements(vk);
     let commitments = generate_commitments(vk);
 
-    let verifier_contract_template =
-        template.replace("{{residue_g2_elements}}", &residue_g2_elements);
-
     Ok(reg.render_template(
-        &verifier_contract_template,
+        &template,
         &json!({"residue_g2_elements": residue_g2_elements, "c0": commitments,
                         "vk_hash": vk_hash}),
     )?)
