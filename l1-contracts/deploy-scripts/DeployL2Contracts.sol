@@ -25,7 +25,7 @@ contract DeployL2Script is Script {
         address bridgehubAddress;
         address governance;
         address erc20BridgeProxy;
-        bool validiumMode;
+        string validiumType;
         address consensusRegistryOwner;
     }
 
@@ -105,7 +105,7 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
         string memory toml = vm.readFile(path);
-        config.validiumMode = toml.readBool("$.validium_mode");
+        config.validiumType = toml.readString("$.validium_type");
         config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.governance = toml.readAddress("$.governance");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
@@ -130,8 +130,16 @@ contract DeployL2Script is Script {
 
     function deployL2DaValidator() internal {
         bytes memory bytecode;
-        if (config.validiumMode) {
-            bytecode = L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode();
+        if (bytes(config.validiumType).length != 0) {
+            bytes32 validiumTypeHash = keccak256(abi.encodePacked(config.validiumType));
+
+            if (validiumTypeHash == keccak256(abi.encodePacked("NoDA"))) {
+                bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+            } else if (validiumTypeHash == keccak256(abi.encodePacked("Avail"))) {
+                bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
+            } else {
+                revert("Invalid validium type");
+            }
         } else {
             bytecode = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
         }

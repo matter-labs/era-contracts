@@ -1021,6 +1021,14 @@ library Utils {
         bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
     }
 
+    function readAvailL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json");
+    }
+
+    function readMockAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/MockAvailBridge.sol/MockAvailBridge.json");
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }

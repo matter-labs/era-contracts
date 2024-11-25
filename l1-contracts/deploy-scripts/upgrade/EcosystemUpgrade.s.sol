@@ -805,7 +805,7 @@ contract EcosystemUpgrade is Script {
         // We do not know whether the chain will be a rollup or a validium, just in case, we'll deploy
         // both of the validators.
         upgradeSpecificDependencies[5] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
-        upgradeSpecificDependencies[6] = L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode();
+        upgradeSpecificDependencies[6] = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
 
         upgradeSpecificDependencies[7] = L2ContractsBytecodesLib
             .readTransparentUpgradeableProxyBytecodeFromSystemContracts();
