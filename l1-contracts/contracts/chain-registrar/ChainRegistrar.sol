@@ -14,8 +14,8 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 /// @title ChainRegistrar Contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This contract is used for proposing and registering new chains in the zkSync ecosystem.
-/// @notice It helps chain administrators retrieve all necessary L1 information about their chain.
+/// @notice This contract is used as a public registry where anyone can propose new chain registration in ZKsync ecosystem.
+/// @notice It also helps chain administrators retrieve all necessary L1 information about their chain.
 /// @notice Additionally, it assists zkSync administrators in verifying the correctness of registration transactions.
 /// @dev ChainRegistrar is designed for use with a proxy for upgradability.
 /// @dev It interacts with the Bridgehub for getting chain registration results.
@@ -27,7 +27,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// @dev During the chain proposal, some base tokens must be transferred to this address.
     address public l2Deployer;
 
-    /// @notice Address of the ZKsync Bridgehub.
+    /// @notice Address of ZKsync Bridgehub.
     IBridgehub public bridgehub;
 
     /// @notice Mapping of proposed chains by author and chain ID.
@@ -99,13 +99,13 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// @param _bridgehub Address of the ZKsync Bridgehub.
     /// @param _l2Deployer Address of the L2 deployer.
     /// @param _owner Address of the contract owner.
-    function initialize(address _bridgehub, address _l2Deployer, address _owner) public {
+    function initialize(address _bridgehub, address _l2Deployer, address _owner) external Initializer {
         bridgehub = IBridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
         _transferOwnership(_owner);
     }
 
-    /// @notice Proposes a new chain to be registered in the zkSync ecosystem.
+    /// @notice Proposes a new chain to be registered in the ZKsync ecosystem.
     /// @dev The proposal will fail if the chain has already been registered.
     /// @dev For non-ETH-based chains, either an equivalent of 1 ETH of the base token must be approved or transferred to the L2 deployer.
     /// @param _chainId Unique ID of the proposed chain.
