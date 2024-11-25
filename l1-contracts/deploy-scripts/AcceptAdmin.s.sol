@@ -74,4 +74,12 @@ contract AcceptAdmin is Script {
         admin.setTokenMultiplierSetter(target);
         vm.stopBroadcast();
     }
+
+    // Accepts ownership for ChainAdmin. Must be called by pending owner.
+    function chainAdminAcceptOwnership(address chainAdmin) public {
+        ChainAdmin admin = ChainAdmin(payable(chainAdmin));
+
+        vm.broadcast();
+        admin.acceptOwnership();
+    }
 }

@@ -34,6 +34,7 @@ contract DeployL2Script is Script {
         address multicall3;
         address forceDeployUpgraderAddress;
         address timestampAsserter;
+        address proxyAdmin;
     }
 
     struct ContractsBytecodes {
@@ -47,6 +48,7 @@ contract DeployL2Script is Script {
         bytes multicall3Bytecode;
         bytes forceDeployUpgrader;
         bytes timestampAsserterBytecode;
+        bytes proxyAdminBytecode;
     }
 
     function run() public {
@@ -62,9 +64,9 @@ contract DeployL2Script is Script {
         loadContracts(legacyBridge);
 
         deployFactoryDeps();
+        deployProxyAdmin();
         deploySharedBridge();
         deploySharedBridgeProxy(legacyBridge);
-        initializeChain();
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -87,9 +89,9 @@ contract DeployL2Script is Script {
         loadContracts(legacyBridge);
 
         deployFactoryDeps();
+        deployProxyAdmin();
         deploySharedBridge();
         deploySharedBridgeProxy(legacyBridge);
-        initializeChain();
 
         saveOutput();
     }
@@ -173,6 +175,10 @@ contract DeployL2Script is Script {
         contracts.timestampAsserterBytecode = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/TimestampAsserter.sol/TimestampAsserter.json"
         );
+
+        contracts.proxyAdminBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/ProxyAdmin.sol/ProxyAdmin.json"
+        );
     }
 
     function initializeConfig() internal {
@@ -209,6 +215,40 @@ contract DeployL2Script is Script {
         Utils.publishBytecodes(factoryDeps, config.chainId, config.bridgehubAddress, config.l1SharedBridgeProxy);
     }
 
+    function deployProxyAdmin() internal {
+        config.proxyAdmin = Utils.deployThroughL1({
+            bytecode: contracts.proxyAdminBytecode,
+            constructorargs: "",
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+
+        address l1Governor = L1SharedBridge(config.l1SharedBridgeProxy).owner();
+        address aliasedGovernor = l1Governor;
+        if (!Utils.isEOA(l1Governor)) {
+            aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(l1Governor);
+        }
+
+        bytes memory transferCalldata = abi.encodeWithSignature(
+            "transferOwnership(address)",
+            aliasedGovernor
+        );
+
+        Utils.runL1L2Transaction({
+            l2Calldata: transferCalldata,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            dstAddress: config.proxyAdmin,
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
     function deploySharedBridge() internal {
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = contracts.beaconProxy;
@@ -228,13 +268,12 @@ contract DeployL2Script is Script {
     }
 
     function deployForceDeployer() internal {
-        bytes[] memory factoryDeps = new bytes[](0);
         config.forceDeployUpgraderAddress = Utils.deployThroughL1({
             bytecode: contracts.forceDeployUpgrader,
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: factoryDeps,
+            factoryDeps: new bytes[](0),
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
@@ -242,7 +281,7 @@ contract DeployL2Script is Script {
     }
 
     function deploySharedBridgeProxy(bool legacyBridge) internal {
-        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+        address l2GovernorAddress = config.proxyAdmin;
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
 
         string memory functionSignature;
@@ -353,17 +392,6 @@ contract DeployL2Script is Script {
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
-        });
-    }
-
-    function initializeChain() internal {
-        L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
-
-        Utils.chainAdminMulticall({
-            _chainAdmin: bridge.admin(),
-            _target: config.l1SharedBridgeProxy,
-            _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
-            _value: 0
         });
     }
 }

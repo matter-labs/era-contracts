@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -211,8 +212,13 @@ library Utils {
             constructorargs
         );
 
+        address aliasedSender = msg.sender;
+        if (!isEOA(msg.sender)) {
+            aliasedSender = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+        }
+
         address contractAddress = L2ContractHelper.computeCreate2Address(
-            msg.sender,
+            aliasedSender,
             create2salt,
             bytecodeHash,
             keccak256(constructorargs)
@@ -474,5 +480,16 @@ library Utils {
             );
             vm.stopBroadcast();
         }
+    }
+
+    /**
+     * @dev Checks whether the address is an EOA.
+     */
+    function isEOA(address _addr) internal view returns (bool) {
+        uint32 size;
+        assembly {
+            size := extcodesize(_addr)
+        }
+        return (size == 0);
     }
 }
