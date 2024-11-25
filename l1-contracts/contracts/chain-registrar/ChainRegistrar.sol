@@ -97,6 +97,12 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
         address l2BridgeAddress;
     }
 
+    /// @dev Contract is expected to be used as proxy implementation.
+    constructor() {
+        // Disable initialization to prevent Parity hack.
+        _disableInitializers();
+    }
+
     /// @notice Initializes the contract with the given parameters.
     /// @dev Can only be called once, during contract deployment.
     /// @param _bridgehub Address of the ZKsync Bridgehub.
