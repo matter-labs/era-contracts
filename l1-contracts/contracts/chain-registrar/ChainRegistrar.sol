@@ -16,7 +16,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract is used as a public registry where anyone can propose new chain registration in ZKsync ecosystem.
 /// @notice It also helps chain administrators retrieve all necessary L1 information about their chain.
-/// @notice Additionally, it assists zkSync administrators in verifying the correctness of registration transactions.
+/// @notice Additionally, it assists ZKsync ecosystem admin in verifying the correctness of registration transactions.
 /// @dev ChainRegistrar is designed for use with a proxy for upgradability.
 /// @dev It interacts with the Bridgehub for getting chain registration results.
 /// @dev This contract does not make write calls to the Bridgehub itself for security reasons.
@@ -33,6 +33,9 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// @notice Mapping of proposed chains by author and chain ID.
     /// @notice Stores chain proposals made by users, where each address can propose a chain with a unique chain ID.
     mapping(address => mapping(uint256 => ChainConfig)) public proposedChains;
+
+    /// @dev Thrown when trying to propose a chain that is already proposed.
+    error ChainIsAlreadyProposed();
 
     /// @dev Thrown when trying to register a chain that is already deployed.
     error ChainIsAlreadyDeployed();
@@ -53,44 +56,44 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     event L2DeployerChanged(address newDeployer);
 
     /// @dev Struct for holding the base token configuration of a chain.
+    /// @param gasPriceMultiplierNominator Gas price multiplier numerator, used to compare the base token price to ether for L1->L2 transactions.
+    /// @param gasPriceMultiplierDenominator Gas price multiplier denominator, used to compare the base token price to ether for L1->L2 transactions.
+    /// @param tokenAddress Address of the base token used for gas fees.
+    /// @param tokenMultiplierSetter Address responsible for setting the token multiplier.
     struct BaseToken {
-        /// @notice Gas price multiplier numerator, used to compare the base token price to ether for L1->L2 transactions.
         uint128 gasPriceMultiplierNominator;
-        /// @notice Gas price multiplier denominator, used to compare the base token price to ether for L1->L2 transactions.
         uint128 gasPriceMultiplierDenominator;
-        /// @notice Address of the base token used for gas fees.
         address tokenAddress;
-        /// @notice Address responsible for setting the token multiplier.
         address tokenMultiplierSetter;
     }
 
     /// @dev Struct for holding the configuration of a proposed chain.
+    /// @param chainId Unique chain ID.
+    /// @param baseToken Base token configuration for the chain.
+    /// @param blobOperator Operator responsible for making commit transactions.
+    /// @param operator Operator responsible for making prove and execute transactions.
+    /// @param governor Governor of the chain; will receive ownership of the ChainAdmin contract.
+    /// @param pubdataPricingMode Mode for charging users for pubdata.
     // solhint-disable-next-line gas-struct-packing
     struct ChainConfig {
-        /// @notice Unique chain ID.
         uint256 chainId;
-        /// @notice Base token configuration for the chain.
         BaseToken baseToken;
-        /// @notice Operator responsible for making commit transactions.
         address blobOperator;
-        /// @notice Operator responsible for making prove and execute transactions.
         address operator;
-        /// @notice Governor of the chain; will receive ownership of the ChainAdmin contract.
         address governor;
-        /// @notice Mode for charging users for pubdata.
         PubdataPricingMode pubdataPricingMode;
     }
 
     /// @dev Struct for holding the configuration of a fully deployed chain.
+    /// @param pendingChainAdmin Address of the pending admin for the chain.
+    /// @param chainAdmin Address of the current admin for the chain.
+    /// @param diamondProxy Address of the main contract (diamond proxy) for the deployed chain.
+    /// @param l2BridgeAddress Address of the L2 bridge inside the deployed chain.
     // solhint-disable-next-line gas-struct-packing
     struct RegisteredChainConfig {
-        /// @notice Address of the pending admin for the chain.
         address pendingChainAdmin;
-        /// @notice Address of the current admin for the chain.
         address chainAdmin;
-        /// @notice Address of the main contract (diamond proxy) for the deployed chain.
         address diamondProxy;
-        /// @notice Address of the L2 bridge inside the deployed chain.
         address l2BridgeAddress;
     }
 
@@ -99,7 +102,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// @param _bridgehub Address of the ZKsync Bridgehub.
     /// @param _l2Deployer Address of the L2 deployer.
     /// @param _owner Address of the contract owner.
-    function initialize(address _bridgehub, address _l2Deployer, address _owner) external Initializer {
+    function initialize(address _bridgehub, address _l2Deployer, address _owner) external initializer {
         bridgehub = IBridgehub(_bridgehub);
         l2Deployer = _l2Deployer;
         _transferOwnership(_owner);
@@ -146,6 +149,13 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
             revert ChainIsAlreadyDeployed();
         }
 
+        ChainConfig memory existingConfig = proposedChains[msg.sender][_chainId];
+
+        // Check if the chain has already been proposed. This prevents situations where the chain author tries to modify parameters after the initial proposal, ensuring that ZKsync administrators are aware of any changes.
+        if (existingConfig.chainId != 0) {
+            revert ChainIsAlreadyProposed();
+        }
+
         proposedChains[msg.sender][_chainId] = config;
 
         // Handle base token transfer for non-ETH-based networks.
@@ -162,7 +172,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
 
     /// @notice Changes the address of the L2 deployer.
     /// @param _newDeployer New address of the L2 deployer.
-    function changeDeployer(address _newDeployer) public onlyOwner {
+    function changeDeployer(address _newDeployer) external onlyOwner {
         l2Deployer = _newDeployer;
         emit L2DeployerChanged(l2Deployer);
     }
@@ -170,7 +180,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// @notice Retrieves the configuration of a registered chain by its ID.
     /// @param _chainId ID of the chain.
     /// @return The configuration of the registered chain.
-    function getRegisteredChainConfig(uint256 _chainId) public view returns (RegisteredChainConfig memory) {
+    function getRegisteredChainConfig(uint256 _chainId) external view returns (RegisteredChainConfig memory) {
         address stm = bridgehub.stateTransitionManager(_chainId);
         if (stm == address(0)) {
             revert ChainIsNotYetDeployed();

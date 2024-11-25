@@ -101,6 +101,36 @@ contract ChainRegistrarTest is Test {
         chainRegistrar.initialize(address(bridgeHub), deployer, admin);
     }
 
+    function test_ChainIsAlreadyProposed() public {
+        address author = makeAddr("author");
+        vm.startPrank(author);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: 1,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("setter"),
+            _gasPriceMultiplierNominator: 1,
+            _gasPriceMultiplierDenominator: 1
+        });
+
+        vm.expectRevert(ChainRegistrar.ChainIsAlreadyProposed.selector);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: 1,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("newGovernor"),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS,
+            _tokenMultiplierSetter: makeAddr("setter"),
+            _gasPriceMultiplierNominator: 1,
+            _gasPriceMultiplierDenominator: 1
+        });
+        vm.stopPrank();
+    }
+
     function test_SuccessfulProposal() public {
         address author = makeAddr("author");
         vm.prank(author);
