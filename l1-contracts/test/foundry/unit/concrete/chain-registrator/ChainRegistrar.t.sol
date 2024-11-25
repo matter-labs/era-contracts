@@ -19,6 +19,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import "contracts/dev-contracts/test/DummyHyperchain.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
@@ -115,20 +116,116 @@ contract ChainRegistrarTest is Test {
             _gasPriceMultiplierNominator: 1,
             _gasPriceMultiplierDenominator: 1
         });
-        Vm.Log[] memory proposeLogs = vm.getRecordedLogs();
+        registerChainAndVerify(author, 1);
+    }
+
+    function test_CustomBaseToken() public {
+        address author = makeAddr("author");
+        vm.prank(author);
+        vm.recordLogs();
+        TestnetERC20Token token = new TestnetERC20Token("test", "test", 18);
+        token.mint(author, 100 ether);
+        vm.prank(author);
+        token.approve(address(chainRegistrar), 10 ether);
+        vm.prank(author);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: 1,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: address(token),
+            _tokenMultiplierSetter: makeAddr("setter"),
+            _gasPriceMultiplierNominator: 10,
+            _gasPriceMultiplierDenominator: 1
+        });
+        registerChainAndVerify(author, 1);
+    }
+
+    function test_PreTransferErc20Token() public {
+        address author = makeAddr("author");
+        vm.startPrank(author);
+        vm.recordLogs();
+        TestnetERC20Token token = new TestnetERC20Token("test", "test", 18);
+        token.mint(author, 100 ether);
+        token.transfer(chainRegistrar.l2Deployer(), 10 ether);
+        chainRegistrar.proposeChainRegistration({
+            _chainId: 1,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: address(token),
+            _tokenMultiplierSetter: makeAddr("setter"),
+            _gasPriceMultiplierNominator: 10,
+            _gasPriceMultiplierDenominator: 1
+        });
+        vm.stopPrank();
+        registerChainAndVerify(author, 1);
+    }
+
+    function test_BaseTokenPreTransferIsNotEnough() public {
+        address author = makeAddr("author");
+        vm.startPrank(author);
+        vm.recordLogs();
+        TestnetERC20Token token = new TestnetERC20Token("test", "test", 18);
+        token.mint(author, 100 ether);
+        token.transfer(chainRegistrar.l2Deployer(), 1 ether);
+        vm.expectRevert(bytes("ERC20: insufficient allowance"));
+        chainRegistrar.proposeChainRegistration({
+            _chainId: 1,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: address(token),
+            _tokenMultiplierSetter: makeAddr("setter"),
+            _gasPriceMultiplierNominator: 10,
+            _gasPriceMultiplierDenominator: 1
+        });
+    }
+
+    function test_BaseTokenApproveIsNotEnough() public {
+        address author = makeAddr("author");
+        vm.startPrank(author);
+        vm.recordLogs();
+        TestnetERC20Token token = new TestnetERC20Token("test", "test", 18);
+        token.mint(author, 100 ether);
+        token.approve(chainRegistrar.l2Deployer(), 1 ether);
+        vm.expectRevert(bytes("ERC20: insufficient allowance"));
+        chainRegistrar.proposeChainRegistration({
+            _chainId: 1,
+            _pubdataPricingMode: PubdataPricingMode.Validium,
+            _blobOperator: makeAddr("blobOperator"),
+            _operator: makeAddr("operator"),
+            _governor: makeAddr("governor"),
+            _baseTokenAddress: address(token),
+            _tokenMultiplierSetter: makeAddr("setter"),
+            _gasPriceMultiplierNominator: 10,
+            _gasPriceMultiplierDenominator: 1
+        });
+    }
+
+    function registerChainAndVerify(address author, uint256 chainId) internal {
         DummyHyperchain hyperchain = new DummyHyperchain(address(bridgeHub), 270);
         hyperchain.initialize(admin);
         vm.prank(admin);
         stm.setHyperchain(1, address(hyperchain));
-        bridgeHub.setStateTransitionManager(1, address(stm));
+        bridgeHub.setStateTransitionManager(chainId, address(stm));
         vm.prank(admin);
-        sharedBridge.initializeChainGovernance(1, makeAddr("l2bridge"));
-        vm.recordLogs();
-        vm.prank(admin);
-        ChainRegistrar.RegisteredChainConfig memory registeredConfig = chainRegistrar.getRegisteredChainConfig(1);
+        sharedBridge.initializeChainGovernance(chainId, makeAddr("l2bridge"));
+        ChainRegistrar.RegisteredChainConfig memory registeredConfig = chainRegistrar.getRegisteredChainConfig(chainId);
+        (
+            uint256 proposedChainId,
+            ChainRegistrar.BaseToken memory baseToken,
+            address blobOperator,
+            address operator,
+            address governor,
+            PubdataPricingMode pubdataPricingMode
+        ) = chainRegistrar.proposedChains(author, chainId);
         require(registeredConfig.diamondProxy != address(0));
         require(registeredConfig.chainAdmin != address(0));
         require(registeredConfig.l2BridgeAddress != address(0));
-        require(registeredConfig.pendingChainAdmin != address(0));
+        require(proposedChainId == chainId);
     }
 }
