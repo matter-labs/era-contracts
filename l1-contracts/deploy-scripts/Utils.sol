@@ -8,6 +8,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Call} from "contracts/governance/Common.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -123,13 +124,6 @@ library Utils {
         assembly {
             value := mload(add(bys, 0x20))
         }
-    }
-
-    /**
-     * @dev Returns the bytecode hash of the batch bootloader.
-     */
-    function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
     }
 
     /**
@@ -346,8 +340,8 @@ library Utils {
     ) internal {
         IGovernance governance = IGovernance(_governor);
 
-        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
-        calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: _value, data: _data});
 
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,

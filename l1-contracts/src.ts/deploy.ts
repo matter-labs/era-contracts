@@ -212,6 +212,8 @@ export class Deployer {
 
   public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
+
+    // We deploy the ChainAdmin contract itself
     const contractAddress = await this.deployViaCreate2(
       "ChainAdmin",
       [this.ownerAddress, ethers.constants.AddressZero],

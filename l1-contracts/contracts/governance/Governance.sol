@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
+import {Call} from "./Common.sol";
 import {ZeroAddress, Unauthorized, OperationMustBeReady, OperationMustBePending, OperationExists, InvalidDelay, PreviousOperationNotExecuted} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs

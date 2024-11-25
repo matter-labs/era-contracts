@@ -55,17 +55,23 @@ const getSolidityContractDetails = (dir: string, contractName: string): Contract
 };
 
 const getSolidityContractsDetails = (dir: string): ContractDetails[] => {
+  const absolutePath = makePathAbsolute(dir);
+  const eligibleFiles = fs
+    .readdirSync(absolutePath)
+    .filter((f) => f.endsWith(".sol"))
+    .map((f) => f.replace(".sol", ""));
   const bytecodesDir = SOLIDITY_ARTIFACTS_DIR;
   const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol");
-  const contractNames = dirsEndingWithSol.map((d) => d.replace(".sol", ""));
+  const contractNames = dirsEndingWithSol.map((d) => d.replace(".sol", "")).filter((c) => eligibleFiles.includes(c));
   const solidityContractsDetails = contractNames.map((c) => getSolidityContractDetails(dir, c));
   return solidityContractsDetails;
 };
 
-const YUL_ARTIFACTS_DIR = "artifacts";
+const YUL_ARTIFACTS_DIR = "zkout";
 
 const getYulContractDetails = (dir: string, contractName: string): ContractDetails => {
-  const bytecodePath = join(dir, YUL_ARTIFACTS_DIR, contractName + ".yul.zbin");
+  const artifactPath = dir !== "bootloader/build" ? dir : "contracts-preprocessed/bootloader";
+  const bytecodePath = join(YUL_ARTIFACTS_DIR, contractName + ".yul", artifactPath, contractName + ".yul.json");
   const sourceCodePath = join(dir, contractName + ".yul");
   return {
     contractName,
@@ -102,7 +108,7 @@ const readBytecode = (details: ContractDetails): string => {
       const jsonFile = fs.readFileSync(absolutePath, "utf8");
       return ethers.utils.hexlify("0x" + JSON.parse(jsonFile).bytecode.object);
     } else {
-      return ethers.utils.hexlify(fs.readFileSync(absolutePath));
+      return ethers.utils.hexlify(fs.readFileSync(absolutePath).toString(), { allowMissingPrefix: true });
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
