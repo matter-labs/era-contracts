@@ -20,6 +20,7 @@ import {ChainCreationParams} from "contracts/state-transition/IStateTransitionMa
 import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import "contracts/dev-contracts/test/DummyHyperchain.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
@@ -97,8 +98,13 @@ contract ChainRegistrarTest is Test {
         vm.stopPrank();
         vm.prank(stm.admin());
         stm.setChainCreationParams(chainCreationParams);
-        chainRegistrar = new ChainRegistrar();
-        chainRegistrar.initialize(address(bridgeHub), deployer, admin);
+        address chainRegistrarImplementation = address(new ChainRegistrar());
+        TransparentUpgradeableProxy chainRegistrarProxy = new TransparentUpgradeableProxy(
+            chainRegistrarImplementation,
+            admin,
+            abi.encodeCall(ChainRegistrar.initialize, (address(bridgeHub), deployer, admin))
+        );
+        chainRegistrar = ChainRegistrar(address(chainRegistrarProxy));
     }
 
     function test_ChainIsAlreadyProposed() public {
