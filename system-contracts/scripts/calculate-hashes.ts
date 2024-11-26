@@ -106,7 +106,7 @@ const readBytecode = (details: ContractDetails): string => {
   try {
     if (details.bytecodePath.endsWith(".json")) {
       const jsonFile = fs.readFileSync(absolutePath, "utf8");
-      return ethers.utils.hexlify("0x" + JSON.parse(jsonFile).bytecode.object);
+      return ethers.utils.hexlify(JSON.parse(jsonFile).bytecode.object);
     } else {
       return ethers.utils.hexlify(fs.readFileSync(absolutePath).toString(), { allowMissingPrefix: true });
     }
