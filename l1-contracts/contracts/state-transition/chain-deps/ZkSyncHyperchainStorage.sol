@@ -77,7 +77,7 @@ struct ZkSyncHyperchainStorage {
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
     /// (batch 0 is genesis)
     uint256 totalBatchesExecuted;
-    /// @notice Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch
+    /// @notice Total number of verified batches i.e. batches[totalBatchesVerified] points at the latest verified batch
     uint256 totalBatchesVerified;
     /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
     /// batch
