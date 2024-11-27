@@ -167,10 +167,6 @@ object "EvmEmulator" {
             max := 0x400000 // 4MB
         }
         
-        function MAX_MEMORY_SLOT() -> max {
-            max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
-        }
-        
         function MAX_UINT() -> max_uint {
             max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
         }
@@ -282,10 +278,10 @@ object "EvmEmulator" {
             }
         }
         
-        function checkMemIsAccessible(index, offset) {
-            checkOverflow(index, offset)
+        function checkMemIsAccessible(relativeOffset, size) {
+            checkOverflow(relativeOffset, size)
         
-            if gt(add(index, offset), MAX_MEMORY_SLOT()) {
+            if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
                 panic()
             }
         }
@@ -3217,10 +3213,6 @@ object "EvmEmulator" {
                 max := 0x400000 // 4MB
             }
             
-            function MAX_MEMORY_SLOT() -> max {
-                max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
-            }
-            
             function MAX_UINT() -> max_uint {
                 max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
             }
@@ -3332,10 +3324,10 @@ object "EvmEmulator" {
                 }
             }
             
-            function checkMemIsAccessible(index, offset) {
-                checkOverflow(index, offset)
+            function checkMemIsAccessible(relativeOffset, size) {
+                checkOverflow(relativeOffset, size)
             
-                if gt(add(index, offset), MAX_MEMORY_SLOT()) {
+                if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
                     panic()
                 }
             }
