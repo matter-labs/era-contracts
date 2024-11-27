@@ -422,7 +422,7 @@ function performSystemCallRevertable(to, dataLength) -> success {
 function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
     evmGasLeft := chargeGas(evmGas, 3)
 
-    if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
+    if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
         panic()
     }
     
