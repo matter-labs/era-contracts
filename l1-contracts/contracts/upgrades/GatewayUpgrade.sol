@@ -13,7 +13,7 @@ import {GatewayUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {L1GatewayHelper} from "./L1GatewayHelper.sol";
+import {L1GatewayBase} from "./L1GatewayBase.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct GatewayUpgradeEncodedInput {
@@ -29,7 +29,7 @@ struct GatewayUpgradeEncodedInput {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade {
+contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
@@ -61,11 +61,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         bytes memory gatewayUpgradeCalldata = abi.encode(
             encodedInput.ctmDeployer,
             encodedInput.fixedForceDeploymentsData,
-            L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
-                s,
-                encodedInput.wrappedBaseTokenStore,
-                s.__DEPRECATED_baseToken
-            )
+            getZKChainSpecificForceDeploymentsData(s, encodedInput.wrappedBaseTokenStore, s.__DEPRECATED_baseToken)
         );
         encodedInput.forceDeployments[encodedInput.l2GatewayUpgradePosition].input = gatewayUpgradeCalldata;
 

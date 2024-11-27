@@ -26,7 +26,6 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -51,7 +50,7 @@ contract ExecutorTest is Test {
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
-    RollupL1DAValidator internal rollupL1DAValidator;
+    address internal rollupL1DAValidator;
     MessageRoot internal messageRoot;
 
     uint256 eraChainId;
@@ -161,7 +160,7 @@ contract ExecutorTest is Test {
 
         eraChainId = 9;
 
-        rollupL1DAValidator = new RollupL1DAValidator();
+        rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();

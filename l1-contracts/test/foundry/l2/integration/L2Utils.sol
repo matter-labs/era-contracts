@@ -36,30 +36,35 @@ library L2Utils {
     string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json";
     string internal constant BRIDGEHUB_PATH = "./zkout/Bridgehub.sol/Bridgehub.json";
 
-    /// @notice Returns the bytecode of a given era contract from a `zkout` folder.
-    function readEraBytecode(string memory _filename) internal returns (bytes memory bytecode) {
-        string memory artifact = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
-            string.concat("./zkout/", _filename, ".sol/", _filename, ".json")
-        );
+    function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, artifactPath);
+        string memory json = vm.readFile(path);
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
+        return bytecode;
+    }
 
-        bytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
+    function readZKFoundryBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
+    function readZKFoundryBytecodeSystemContracts(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
     }
 
     /// @notice Returns the bytecode of a given system contract.
     function readSystemContractsBytecode(string memory _filename) internal view returns (bytes memory) {
-        string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
-            string.concat(
-                "../system-contracts/artifacts-zk/contracts-preprocessed/",
-                _filename,
-                ".sol/",
-                _filename,
-                ".json"
-            )
-        );
-        bytes memory bytecode = vm.parseJson(file, "$.bytecode");
-        return bytecode;
+        return readZKFoundryBytecodeSystemContracts(string.concat(_filename, ".sol"), _filename);
     }
 
     /**
@@ -197,7 +202,7 @@ library L2Utils {
         address _address,
         bytes memory _constructorArgs
     ) public {
-        bytes memory bytecode = readEraBytecode(_contractName);
+        bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 

@@ -34,7 +34,7 @@ library GatewayCTMDeployerHelper {
     ) internal returns (DeployedContracts memory contracts, bytes memory create2Calldata, address ctmDeployerAddress) {
         (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(
             _create2Salt,
-            Utils.readZKFoundryBytecode("GatewayCTMDeployer.sol", "GatewayCTMDeployer"),
+            Utils.readZKFoundryBytecodeL1("GatewayCTMDeployer.sol", "GatewayCTMDeployer"),
             abi.encode(config)
         );
 
@@ -283,7 +283,7 @@ library GatewayCTMDeployerHelper {
         bytes memory params,
         InnerDeployConfig memory config
     ) private returns (address) {
-        bytes memory bytecode = Utils.readZKFoundryBytecode(fileName, contractName);
+        bytes memory bytecode = Utils.readZKFoundryBytecodeL1(fileName, contractName);
 
         return
             L2ContractHelper.computeCreate2Address(
@@ -301,29 +301,29 @@ library GatewayCTMDeployerHelper {
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
-        dependencies[index++] = Utils.readZKFoundryBytecode("GatewayCTMDeployer.sol", "GatewayCTMDeployer");
-        dependencies[index++] = Utils.readZKFoundryBytecode("Multicall3.sol", "Multicall3");
-        dependencies[index++] = Utils.readZKFoundryBytecode("Mailbox.sol", "MailboxFacet");
-        dependencies[index++] = Utils.readZKFoundryBytecode("Executor.sol", "ExecutorFacet");
-        dependencies[index++] = Utils.readZKFoundryBytecode("Getters.sol", "GettersFacet");
-        dependencies[index++] = Utils.readZKFoundryBytecode("RollupDAManager.sol", "RollupDAManager");
-        dependencies[index++] = Utils.readZKFoundryBytecode("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
-        dependencies[index++] = Utils.readZKFoundryBytecode("RelayedSLDAValidator.sol", "RelayedSLDAValidator");
-        dependencies[index++] = Utils.readZKFoundryBytecode("Admin.sol", "AdminFacet");
-        dependencies[index++] = Utils.readZKFoundryBytecode("DiamondInit.sol", "DiamondInit");
-        dependencies[index++] = Utils.readZKFoundryBytecode("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("GatewayCTMDeployer.sol", "GatewayCTMDeployer");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Multicall3.sol", "Multicall3");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("RelayedSLDAValidator.sol", "RelayedSLDAValidator");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
         // Include both verifiers since we cannot determine which one will be used
-        dependencies[index++] = Utils.readZKFoundryBytecode("TestnetVerifier.sol", "TestnetVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecode("Verifier.sol", "Verifier");
-        dependencies[index++] = Utils.readZKFoundryBytecode("ValidatorTimelock.sol", "ValidatorTimelock");
-        dependencies[index++] = Utils.readZKFoundryBytecode("ChainTypeManager.sol", "ChainTypeManager");
-        dependencies[index++] = Utils.readZKFoundryBytecode("ProxyAdmin.sol", "ProxyAdmin");
-        dependencies[index++] = Utils.readZKFoundryBytecode(
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Verifier.sol", "Verifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1(
             "TransparentUpgradeableProxy.sol",
             "TransparentUpgradeableProxy"
         );
         // Not used in scripts, but definitely needed for CTM to work
-        dependencies[index++] = Utils.readZKFoundryBytecode("DiamondProxy.sol", "DiamondProxy");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondProxy.sol", "DiamondProxy");
 
         return dependencies;
     }

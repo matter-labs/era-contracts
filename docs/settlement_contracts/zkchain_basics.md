@@ -93,7 +93,7 @@ with the funds. To withdraw funds user should call `withdraw` function on the `L
 burn the funds on L2, allowing the user to reclaim them through the `finalizeWithdrawal` function on the
 `SharedBridge` (more in hyperchain section).
 
-More about L1->L2 operations can be found [here](./priority_queue/processing_of_l1->l2_txs.md).
+More about L1->L2 operations can be found [here](./priority_queue/processing_of_l1-l2_txs.md).
 
 L2 -> L1 communication, in contrast to L1 -> L2 communication, is based only on transferring the information, and not on
 the transaction execution on L1. The full description of the mechanism for sending information from L2 to L1 can be found [here](./data_availability/standard_pubdata_format.md).

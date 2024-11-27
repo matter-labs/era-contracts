@@ -32,7 +32,7 @@ In the [BaseZkSyncUpgrade](../../l1-contracts/contracts/upgrades/BaseZkSyncUpgr
 
 ## Protocol upgrade transaction
 
-During upgrade, we typically need not only update the L1 contracts, but also the L2 ones. This is achieved by creating an upgrade transactions. More details on how those are processed inside the system can be read [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
+During upgrade, we typically need not only update the L1 contracts, but also the L2 ones. This is achieved by creating an upgrade transactions. More details on how those are processed inside the system can be read [here](../settlement_contracts/priority_queue/processing_of_l1-l2_txs.md).
 
 ## Whitelisting and executing upgrade
 

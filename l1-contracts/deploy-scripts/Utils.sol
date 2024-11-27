@@ -182,7 +182,11 @@ library Utils {
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
+        return
+            readZKFoundryBytecodeSystemContracts(
+                "proved_batch.yul/contracts-preprocessed/bootloader",
+                "proved_batch.yul"
+            );
     }
 
     /**
@@ -200,18 +204,7 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
-            string.concat(
-                "../system-contracts/artifacts-zk/contracts-preprocessed/",
-                filename,
-                ".sol/",
-                filename,
-                ".json"
-            )
-        );
-        bytes memory bytecode = vm.parseJsonBytes(file, "$.bytecode");
-        return bytecode;
+        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
     }
 
     /**
@@ -820,11 +813,37 @@ library Utils {
         return bytecode;
     }
 
-    function readZKFoundryBytecode(
+    function readFoundryBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
+        return readFoundryBytecode(path);
+    }
+
+    function readZKFoundryBytecodeL1(
         string memory fileName,
         string memory contractName
     ) internal view returns (bytes memory) {
         string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
+    function readZKFoundryBytecodeL2(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l2-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
+    function readZKFoundryBytecodeSystemContracts(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
         bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }
