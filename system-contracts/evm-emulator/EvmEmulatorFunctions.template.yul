@@ -328,6 +328,13 @@ function isEvmContract(addr) -> isEVM {
     isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 
+function isConstructedEvmContract(addr) -> isConstructedEVM {
+    let rawCodeHash := getRawCodeHash(addr)
+    let version := shr(248, rawCodeHash)
+    let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
+    isConstructedEVM := and(eq(version, 2), isConstructedFlag)
+}
+
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
 function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
     let codeHash := getRawCodeHash(addr)
@@ -741,7 +748,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
 }
 
 function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-    switch isEvmContract(addr)
+    switch isConstructedEvmContract(addr)
     case 0 {
         // zkEVM native call
         let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
