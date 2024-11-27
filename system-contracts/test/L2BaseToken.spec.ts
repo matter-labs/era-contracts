@@ -149,21 +149,21 @@ describe("L2BaseToken tests", () => {
   describe("name", () => {
     it("correct name", async () => {
       const name = await L2BaseToken.name();
-      expect(name).to.equal("Ether");
+      expect(name).to.equal("Bitcoin");
     });
   });
 
   describe("symbol", () => {
     it("correct symbol", async () => {
       const symbol = await L2BaseToken.symbol();
-      expect(symbol).to.equal("ETH");
+      expect(symbol).to.equal("BTC");
     });
   });
 
   describe("decimals", () => {
     it("correct decimals", async () => {
       const decimals = await L2BaseToken.decimals();
-      expect(decimals).to.equal(18);
+      expect(decimals).to.equal(8);
     });
   });
 
