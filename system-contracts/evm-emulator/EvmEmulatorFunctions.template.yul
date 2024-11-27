@@ -105,10 +105,6 @@ function MAX_POSSIBLE_MEM_LEN() -> max {
     max := 0x400000 // 4MB
 }
 
-function MAX_MEMORY_SLOT() -> max {
-    max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
-}
-
 function MAX_UINT() -> max_uint {
     max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 }
@@ -220,10 +216,10 @@ function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
     }
 }
 
-function checkMemIsAccessible(index, offset) {
-    checkOverflow(index, offset)
+function checkMemIsAccessible(relativeOffset, size) {
+    checkOverflow(relativeOffset, size)
 
-    if gt(add(index, offset), MAX_MEMORY_SLOT()) {
+    if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
         panic()
     }
 }
