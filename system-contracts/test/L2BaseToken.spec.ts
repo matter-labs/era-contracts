@@ -170,9 +170,12 @@ describe("L2BaseToken tests", () => {
   describe("withdraw", () => {
     it("event, balance, totalsupply", async () => {
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
+      const btcAddress = ethers.utils.hexlify(
+        ethers.utils.toUtf8Bytes("bc1qy82gaw2htfd5sslplpgmz4ktf9y3k7pac2226k0wljlmw3atfw5qwm4av4")
+      );
       const message: string = ethers.utils.solidityPack(
-        ["bytes4", "address", "uint256"],
-        [mailboxIface.getSighash("finalizeEthWithdrawal"), wallets[1].address, amountToWithdraw]
+        ["bytes4", "bytes", "uint256"],
+        [mailboxIface.getSighash("finalizeEthWithdrawal"), btcAddress, amountToWithdraw]
       );
 
       await setResult("L1Messenger", "sendToL1", [message], {
@@ -187,9 +190,9 @@ describe("L2BaseToken tests", () => {
       const balanceBeforeWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
       const totalSupplyBefore = await L2BaseToken.totalSupply();
 
-      await expect(L2BaseToken.connect(richWallet).withdraw(wallets[1].address, { value: amountToWithdraw }))
+      await expect(L2BaseToken.connect(richWallet).withdraw(btcAddress, { value: amountToWithdraw }))
         .to.emit(L2BaseToken, "Withdrawal")
-        .withArgs(richWallet.address, wallets[1].address, amountToWithdraw);
+        .withArgs(richWallet.address, btcAddress, amountToWithdraw);
 
       const balanceAfterWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
       const totalSupplyAfter = await L2BaseToken.totalSupply();
