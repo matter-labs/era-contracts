@@ -2061,6 +2061,8 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0x5E { // OP_MCOPY
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+            
                     let destOffset, offset, size
                     popStackCheck(sp, 3)
                     destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
@@ -5109,6 +5111,8 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0x5E { // OP_MCOPY
+                        evmGasLeft := chargeGas(evmGasLeft, 3)
+                
                         let destOffset, offset, size
                         popStackCheck(sp, 3)
                         destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
