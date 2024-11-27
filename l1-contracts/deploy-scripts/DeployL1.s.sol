@@ -149,27 +149,30 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function getRollupL2ValidatorAddress() internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(
-        bytes32(0),
-        L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
-        hex""
-        );
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
+                hex""
+            );
     }
 
     function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(
-        bytes32(0),
-        L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
-        hex""
-        );
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
+                hex""
+            );
     }
 
     function getAvailL2ValidatorAddress() internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(
-        bytes32(0),
-        L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode()),
-        hex""
-        );
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode()),
+                hex""
+            );
     }
 
     function deployDAValidators() internal {
@@ -192,7 +195,11 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.startBroadcast(msg.sender);
         RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), getRollupL2ValidatorAddress(), true);
-        RollupDAManager(rollupDAManager).updateDAPair(address(noDAValidator), getNoDAValidiumL2ValidatorAddress(), true);
+        RollupDAManager(rollupDAManager).updateDAPair(
+            address(noDAValidator),
+            getNoDAValidiumL2ValidatorAddress(),
+            true
+        );
         RollupDAManager(rollupDAManager).updateDAPair(address(availDAValidator), getAvailL2ValidatorAddress(), true);
         vm.stopBroadcast();
     }

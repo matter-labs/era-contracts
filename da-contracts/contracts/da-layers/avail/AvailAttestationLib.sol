@@ -25,7 +25,8 @@ abstract contract AvailAttestationLib {
     function _attest(IAvailBridge.MerkleProofInput memory input) internal virtual {
         if (!bridge.verifyBlobLeaf(input)) revert InvalidAttestationProof();
         attestations[input.leaf] = AttestationData(
-            vectorx.rangeStartBlocks(input.rangeHash) + uint32(input.dataRootIndex) + 1, uint128(input.leafIndex)
+            vectorx.rangeStartBlocks(input.rangeHash) + uint32(input.dataRootIndex) + 1,
+            uint128(input.leafIndex)
         );
     }
 }

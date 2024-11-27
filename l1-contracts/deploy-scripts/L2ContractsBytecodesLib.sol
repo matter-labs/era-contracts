@@ -59,9 +59,9 @@ library L2ContractsBytecodesLib {
     function readTransparentUpgradeableProxyBytecodeFromSystemContracts() internal view returns (bytes memory) {
         return
             Utils.readZKFoundryBytecodeSystemContracts(
-            "TransparentUpgradeableProxy.sol",
-            "TransparentUpgradeableProxy"
-        );
+                "TransparentUpgradeableProxy.sol",
+                "TransparentUpgradeableProxy"
+            );
     }
 
     /// @notice Reads the bytecode of the ForceDeployUpgrader contract.
