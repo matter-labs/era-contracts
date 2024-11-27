@@ -531,6 +531,7 @@ function warmSlot(key, currentValue) -> isWarm, originalValue {
 
     performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
 
+    originalValue := currentValue
     if returndatasize() {
         isWarm := true
         returndatacopy(0, 0, 32)

@@ -593,6 +593,7 @@ object "EvmEmulator" {
         
             performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
         
+            originalValue := currentValue
             if returndatasize() {
                 isWarm := true
                 returndatacopy(0, 0, 32)
@@ -3619,6 +3620,7 @@ object "EvmEmulator" {
             
                 performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
             
+                originalValue := currentValue
                 if returndatasize() {
                     isWarm := true
                     returndatacopy(0, 0, 32)
