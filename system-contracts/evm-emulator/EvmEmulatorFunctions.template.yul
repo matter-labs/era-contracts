@@ -579,7 +579,7 @@ function resetEvmFrame() {
 //               CALLS FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
-function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
+function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
     let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, 7)
@@ -611,6 +611,10 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
     gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
 
     if gt(value, 0) {
+        if isStatic {
+            panic()
+        }
+
         gasUsed := add(gasUsed, 9000) // positive_value_cost
 
         if isAddrEmpty(addr) {
@@ -634,7 +638,7 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
         argsSize,
         add(retOffset, MEM_OFFSET()),
         retSize,
-        false
+        isStatic
     )
 
     newGasLeft := add(evmGasLeft, frameGasLeft)

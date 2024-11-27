@@ -641,7 +641,7 @@ object "EvmEmulator" {
         //               CALLS FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
         
-        function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
+        function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
             let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
         
             popStackCheck(oldSp, 7)
@@ -673,6 +673,10 @@ object "EvmEmulator" {
             gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
         
             if gt(value, 0) {
+                if isStatic {
+                    panic()
+                }
+        
                 gasUsed := add(gasUsed, 9000) // positive_value_cost
         
                 if isAddrEmpty(addr) {
@@ -696,7 +700,7 @@ object "EvmEmulator" {
                 argsSize,
                 add(retOffset, MEM_OFFSET()),
                 retSize,
-                false
+                isStatic
             )
         
             newGasLeft := add(evmGasLeft, frameGasLeft)
@@ -2627,13 +2631,7 @@ object "EvmEmulator" {
                 }
                 case 0xF1 { // OP_CALL
                     // A function was implemented in order to avoid stack depth errors.
-                    switch isStatic
-                    case 0 {
-                        evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead)
-                    }
-                    default {
-                        evmGasLeft, sp, stackHead := performStaticCall(sp, evmGasLeft, stackHead)
-                    }
+                    evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead, isStatic)
                     ip := add(ip, 1)
                 }
                 case 0xF3 { // OP_RETURN
@@ -3668,7 +3666,7 @@ object "EvmEmulator" {
             //               CALLS FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
             
-            function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
+            function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
                 let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
             
                 popStackCheck(oldSp, 7)
@@ -3700,6 +3698,10 @@ object "EvmEmulator" {
                 gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
             
                 if gt(value, 0) {
+                    if isStatic {
+                        panic()
+                    }
+            
                     gasUsed := add(gasUsed, 9000) // positive_value_cost
             
                     if isAddrEmpty(addr) {
@@ -3723,7 +3725,7 @@ object "EvmEmulator" {
                     argsSize,
                     add(retOffset, MEM_OFFSET()),
                     retSize,
-                    false
+                    isStatic
                 )
             
                 newGasLeft := add(evmGasLeft, frameGasLeft)
@@ -5654,13 +5656,7 @@ object "EvmEmulator" {
                     }
                     case 0xF1 { // OP_CALL
                         // A function was implemented in order to avoid stack depth errors.
-                        switch isStatic
-                        case 0 {
-                            evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead)
-                        }
-                        default {
-                            evmGasLeft, sp, stackHead := performStaticCall(sp, evmGasLeft, stackHead)
-                        }
+                        evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead, isStatic)
                         ip := add(ip, 1)
                     }
                     case 0xF3 { // OP_RETURN

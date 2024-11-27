@@ -1425,13 +1425,7 @@ for { } true { } {
     }
     case 0xF1 { // OP_CALL
         // A function was implemented in order to avoid stack depth errors.
-        switch isStatic
-        case 0 {
-            evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead)
-        }
-        default {
-            evmGasLeft, sp, stackHead := performStaticCall(sp, evmGasLeft, stackHead)
-        }
+        evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead, isStatic)
         ip := add(ip, 1)
     }
     case 0xF3 { // OP_RETURN
