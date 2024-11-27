@@ -35,7 +35,7 @@ In other words, in the current release base assets can only be transferred throu
 
 ## L1→L2 communication via `Bridgehub.requestL2TransactionDirect`
 
-L1→L2 communication allows users on L1 to create a request for a transaction to happen on L2. This is the primary censorship resistance mechanism. If you are interested, you can read more on L1→L2 communications [here](../../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md), but for now just understanding that L1→L2 communication allows to request transactions to happen on L2 is enough.
+L1→L2 communication allows users on L1 to create a request for a transaction to happen on L2. This is the primary censorship resistance mechanism. If you are interested, you can read more on L1→L2 communications [here](../../settlement_contracts/priority_queue/processing_of_l1-l2_txs.md), but for now just understanding that L1→L2 communication allows to request transactions to happen on L2 is enough.
 
 The L1→L2 communication is also the only way to mint a base asset at the moment. Fees to the operator as well as `msg.value` will be minted on `L2BaseToken` after the corresponding L1→L2 tx has been processed.
 
@@ -204,7 +204,7 @@ function bridgehubDeposit(
 ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 ```
 
-Now the job of the contract will be to “validate” whether they are okay with the transaction to come. For instance, the `CTMDeploymentTracker` checks that the `_prevMsgSender` is the owner of `CTMDeploymentTracker` and has the necesasry rights to perform the transaction out of the name of it.
+Now the job of the contract will be to “validate” whether they are okay with the transaction to come. For instance, the `CTMDeploymentTracker` checks that the `_prevMsgSender` is the owner of `CTMDeploymentTracker` and has the necessary rights to perform the transaction out of the name of it.
 
 Ultimately, the correctly processed `bridgehubDeposit` function basically grants `BridgeHub` the right to create an L1→L2 transaction out of the name of the `secondBridgeAddress`. Since it is so powerful, the first returned value must be a magical constant that is equal to `keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1`. The fact that it was a somewhat non standard signature and a struct with the magical value is the major defense against “accidental” approvals to start a transaction out of the name of an account.
 

@@ -5,7 +5,6 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
 import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
-import {ZeroAddress} from "./errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -22,14 +21,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev A mapping of node owners => nodes.
     mapping(address => Node) public nodes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given attester public key exists.
-    /// @dev Initially, the mappings mark the public keys used by the attesters in the current committee. However,
-    /// @dev after calling the changeAttesterKey functions, the mappings might also contain public keys of attesters
-    /// @dev that will only be part of the committee once the contract owner updates the attestersCommit state variable.
     mapping(bytes32 => bool) public attesterPubKeyHashes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
-    /// @dev Initially, the mappings mark the public keys used by the validators in the current committee. However,
-    /// @dev after calling the changeValidatorKey functions, the mappings might also contain public keys of validators
-    /// @dev that will only be part of the committee once the contract owner updates the validatorsCommit state variable.
     mapping(bytes32 => bool) public validatorPubKeyHashes;
     /// @dev Counter that increments with each new commit to the attester committee.
     uint32 public attestersCommit;
@@ -43,14 +36,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _;
     }
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
     function initialize(address _initialOwner) external initializer {
         if (_initialOwner == address(0)) {
-            revert ZeroAddress();
+            revert InvalidInputNodeOwnerAddress();
         }
         _transferOwnership(_initialOwner);
     }
@@ -59,20 +47,16 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Fails if node owner already exists.
     /// @dev Fails if a validator/attester with the same public key already exists.
     /// @param _nodeOwner The address of the new node's owner.
-    /// @param _isValidatorActive A flag stating if the validator starts activated.
     /// @param _validatorWeight The voting weight of the validator.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
     /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
-    /// @param _isAttesterActive A flag stating if the attester starts activated.
     /// @param _attesterWeight The voting weight of the attester.
     /// @param _attesterPubKey The ECDSA public key of the attester.
     function add(
         address _nodeOwner,
-        bool _isValidatorActive,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP,
-        bool _isAttesterActive,
         uint32 _attesterWeight,
         Secp256k1PublicKey calldata _attesterPubKey
     ) external onlyOwner {
@@ -81,12 +65,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
         _verifyInputSecp256k1PublicKey(_attesterPubKey);
-        if (_attesterWeight == 0) {
-            revert ZeroAttesterWeight();
-        }
-        if (_validatorWeight == 0) {
-            revert ZeroValidatorWeight();
-        }
 
         // Verify storage.
         _verifyNodeOwnerDoesNotExist(_nodeOwner);
@@ -99,8 +77,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         nodeOwners.push(_nodeOwner);
         nodes[_nodeOwner] = Node({
             attesterLatest: AttesterAttr({
+                active: true,
                 removed: false,
-                active: _isAttesterActive,
                 weight: _attesterWeight,
                 pubKey: _attesterPubKey
             }),
@@ -112,8 +90,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             }),
             attesterLastUpdateCommit: attestersCommit,
             validatorLatest: ValidatorAttr({
+                active: true,
                 removed: false,
-                active: _isValidatorActive,
                 weight: _validatorWeight,
                 pubKey: _validatorPubKey,
                 proofOfPossession: _validatorPoP
@@ -133,82 +111,50 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         emit NodeAdded({
             nodeOwner: _nodeOwner,
-            isValidatorActive: _isValidatorActive,
             validatorWeight: _validatorWeight,
             validatorPubKey: _validatorPubKey,
             validatorPoP: _validatorPoP,
-            isAttesterActive: _isAttesterActive,
             attesterWeight: _attesterWeight,
             attesterPubKey: _attesterPubKey
         });
     }
 
-    /// @notice Deactivates an attester, preventing it from participating in attester committees.
+    /// @notice Deactivates a node, preventing it from participating in committees.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be inactivated.
-    function deactivateAttester(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
 
-        _snapshotAttesterIfOutdated(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.active = false;
-
-        emit AttesterDeactivated(_nodeOwner);
-    }
-
-    /// @notice Deactivates a validator, preventing it from participating in validator committees.
-    /// @dev Only callable by the contract owner or the node owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner to be inactivated.
-    function deactivateValidator(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
-        if (deleted) {
-            return;
-        }
-
-        _snapshotValidatorIfOutdated(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.active = false;
 
-        emit ValidatorDeactivated(_nodeOwner);
+        emit NodeDeactivated(_nodeOwner);
     }
 
-    /// @notice Activates a previously inactive attester, allowing it to participate in attester committees.
-    /// @dev Only callable by the contract owner.
+    /// @notice Activates a previously inactive node, allowing it to participate in committees.
+    /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be activated.
-    function activateAttester(address _nodeOwner) external onlyOwner {
+    function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
 
-        _snapshotAttesterIfOutdated(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.active = true;
-
-        emit AttesterActivated(_nodeOwner);
-    }
-
-    /// @notice Activates a previously inactive validator, allowing it to participate in validator committees.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner to be activated.
-    function activateValidator(address _nodeOwner) external onlyOwner {
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
-        if (deleted) {
-            return;
-        }
-
-        _snapshotValidatorIfOutdated(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.active = true;
 
-        emit ValidatorActivated(_nodeOwner);
+        emit NodeActivated(_nodeOwner);
     }
 
     /// @notice Removes a node from the registry.
@@ -222,9 +168,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
-        _snapshotAttesterIfOutdated(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.removed = true;
-        _snapshotValidatorIfOutdated(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.removed = true;
 
         emit NodeRemoved(_nodeOwner);
@@ -234,18 +180,15 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose validator weight will be changed.
-    /// @param _weight The new validator weight to assign to the node, must be greater than 0.
+    /// @param _weight The new validator weight to assign to the node.
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
-        if (_weight == 0) {
-            revert ZeroValidatorWeight();
-        }
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
 
-        _snapshotValidatorIfOutdated(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.weight = _weight;
 
         emit NodeValidatorWeightChanged(_nodeOwner, _weight);
@@ -255,25 +198,22 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester weight will be changed.
-    /// @param _weight The new attester weight to assign to the node, must be greater than 0.
+    /// @param _weight The new attester weight to assign to the node.
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
-        if (_weight == 0) {
-            revert ZeroAttesterWeight();
-        }
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
 
-        _snapshotAttesterIfOutdated(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.weight = _weight;
 
         emit NodeAttesterWeightChanged(_nodeOwner, _weight);
     }
 
     /// @notice Changes the validator's public key and proof-of-possession in the registry.
-    /// @dev Only callable by the contract owner.
+    /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose validator key and PoP will be changed.
     /// @param _pubKey The new BLS12-381 public key to assign to the node's validator.
@@ -282,7 +222,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         address _nodeOwner,
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
-    ) external onlyOwner {
+    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyInputBLS12_381PublicKey(_pubKey);
         _verifyInputBLS12_381Signature(_pop);
         _verifyNodeOwnerExists(_nodeOwner);
@@ -296,7 +236,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         bytes32 newHash = _hashValidatorPubKey(_pubKey);
         _verifyValidatorPubKeyDoesNotExist(newHash);
         validatorPubKeyHashes[newHash] = true;
-        _snapshotValidatorIfOutdated(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.pubKey = _pubKey;
         node.validatorLatest.proofOfPossession = _pop;
 
@@ -304,11 +244,14 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     /// @notice Changes the attester's public key of a node in the registry.
-    /// @dev Only callable by the contract owner.
+    /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
-    function changeAttesterKey(address _nodeOwner, Secp256k1PublicKey calldata _pubKey) external onlyOwner {
+    function changeAttesterKey(
+        address _nodeOwner,
+        Secp256k1PublicKey calldata _pubKey
+    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyInputSecp256k1PublicKey(_pubKey);
         _verifyNodeOwnerExists(_nodeOwner);
         (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
@@ -322,7 +265,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _verifyAttesterPubKeyDoesNotExist(newHash);
         attesterPubKeyHashes[newHash] = true;
 
-        _snapshotAttesterIfOutdated(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.pubKey = _pubKey;
 
         emit NodeAttesterKeyChanged(_nodeOwner, _pubKey);
@@ -350,9 +293,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorsCommitted(validatorsCommit);
     }
 
-    /// @notice Returns an array of `CommitteeAttester` structs representing the current attester committee.
+    /// @notice Returns an array of `AttesterAttr` structs representing the current attester committee.
     /// @dev Collects active and non-removed attesters based on the latest commit to the committee.
-    function getAttesterCommittee() external view returns (CommitteeAttester[] memory) {
+    function getAttesterCommittee() public view returns (CommitteeAttester[] memory) {
         uint256 len = nodeOwners.length;
         CommitteeAttester[] memory committee = new CommitteeAttester[](len);
         uint256 count = 0;
@@ -375,9 +318,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         return committee;
     }
 
-    /// @notice Returns an array of `CommitteeValidator` structs representing the current attester committee.
+    /// @notice Returns an array of `ValidatorAttr` structs representing the current attester committee.
     /// @dev Collects active and non-removed validators based on the latest commit to the committee.
-    function getValidatorCommittee() external view returns (CommitteeValidator[] memory) {
+    function getValidatorCommittee() public view returns (CommitteeValidator[] memory) {
         uint256 len = nodeOwners.length;
         CommitteeValidator[] memory committee = new CommitteeValidator[](len);
         uint256 count = 0;
@@ -404,7 +347,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         return committee;
     }
 
-    function numNodes() external view returns (uint256) {
+    function numNodes() public view returns (uint256) {
         return nodeOwners.length;
     }
 
@@ -443,21 +386,21 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit NodeDeleted(_nodeOwner);
     }
 
-    function _snapshotAttesterIfOutdated(Node storage _node) private {
+    function _ensureAttesterSnapshot(Node storage _node) private {
         if (_node.attesterLastUpdateCommit < attestersCommit) {
             _node.attesterSnapshot = _node.attesterLatest;
             _node.attesterLastUpdateCommit = attestersCommit;
         }
     }
 
-    function _snapshotValidatorIfOutdated(Node storage _node) private {
+    function _ensureValidatorSnapshot(Node storage _node) private {
         if (_node.validatorLastUpdateCommit < validatorsCommit) {
             _node.validatorSnapshot = _node.validatorLatest;
             _node.validatorLastUpdateCommit = validatorsCommit;
         }
     }
 
-    function _doesNodeOwnerExist(address _nodeOwner) private view returns (bool) {
+    function _isNodeOwnerExists(address _nodeOwner) private view returns (bool) {
         BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorLatest.pubKey;
         if (pubKey.a == bytes32(0) && pubKey.b == bytes32(0) && pubKey.c == bytes32(0)) {
             return false;
@@ -466,13 +409,13 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _verifyNodeOwnerExists(address _nodeOwner) private view {
-        if (!_doesNodeOwnerExist(_nodeOwner)) {
+        if (!_isNodeOwnerExists(_nodeOwner)) {
             revert NodeOwnerDoesNotExist();
         }
     }
 
     function _verifyNodeOwnerDoesNotExist(address _nodeOwner) private view {
-        if (_doesNodeOwnerExist(_nodeOwner)) {
+        if (_isNodeOwnerExists(_nodeOwner)) {
             revert NodeOwnerExists();
         }
     }
@@ -495,7 +438,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function _verifyInputAddress(address _nodeOwner) private pure {
         if (_nodeOwner == address(0)) {
-            revert ZeroAddress();
+            revert InvalidInputNodeOwnerAddress();
         }
     }
 

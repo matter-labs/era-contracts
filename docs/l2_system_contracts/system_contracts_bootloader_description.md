@@ -272,7 +272,7 @@ The exact type of the transaction is marked by the `txType` field of the transac
 - `txType`: 254. It is a transaction type that is used for upgrading the L2 system. This is the only type of transaction is allowed to start a transaction out of the name of the contracts in kernel space.
 - `txType`: 255. It is a transaction that comes from L1. There are almost no restrictions explicitly imposed upon this type of transaction, since the bootloader at the end of its execution sends the rolling hash of the executed priority transactions. The L1 contract ensures that the hash did indeed match the [hashes of the priority transactions on L1](../../l1-contracts/contracts/state-transition/chain-deps/facets/Executor.sol#L376).
 
-You can also read more on L1->L2 transactions and upgrade transactions [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
+You can also read more on L1->L2 transactions and upgrade transactions [here](../settlement_contracts/priority_queue/processing_of_l1-l2_txs.md).
 
 However, as already stated, the bootloader’s memory is not deterministic and the operator is free to put anything it wants there. For all of the transaction types above the restrictions are imposed in the following ([method](../../system-contracts/bootloader/bootloader.yul#L3107)), which is called before starting processing the transaction.
 
@@ -309,7 +309,7 @@ The batch information slots [are used at the beginning of the batch](../../syste
   - 32 bytecode hash
   - 32 zeroes (but then it will be modified by the bootloader to contain 28 zeroes and then the 4-byte selector of the `publishCompressedBytecode` function of the `BytecodeCompressor`)
   - The calldata to the bytecode compressor (without the selector).
-- `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
+- `[266755..266756]` – slots where the hash and the number of current priority ops is stored. More on it in the priority operations [section](../settlement_contracts/priority_queue/processing_of_l1-l2_txs.md).
 
 #### L1Messenger Pubdata
 
@@ -418,7 +418,7 @@ There are two kinds of L1->L2 transactions:
 - Priority operations, initiated by users (they have type `255`).
 - Upgrade transactions, that can be initiated during system upgrade (they have type `254`).
 
-You can read more about differences between those in the corresponding [document](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
+You can read more about differences between those in the corresponding [document](../settlement_contracts/priority_queue/processing_of_l1-l2_txs.md).
 
 ### End of the batch
 
@@ -426,7 +426,7 @@ At the end of the batch we set `tx.origin` and `tx.gasprice` context variables t
 
 Also, we [set](../../system-contracts/bootloader/bootloader.yul#L4110) the fictive L2 block’s data. Then, we call the system context to ensure that it publishes the timestamp of the L2 block as well as L1 batch. We also reset the `txNumberInBlock` counter to avoid its state diffs from being published on L1. You can read more about block processing on ZKsync [here](./batches_and_blocks_on_zksync.md).
 
-After that, we publish the hash as well as the number of priority operations in this batch. More on it [here](../settlement_contracts/priority_queue/processing_of_l1->l2_txs.md).
+After that, we publish the hash as well as the number of priority operations in this batch. More on it [here](../settlement_contracts/priority_queue/processing_of_l1-l2_txs.md).
 
 Then, we call the L1Messenger system contract for it to compose the pubdata to be published on L1. You can read more about the pubdata processing [here](../settlement_contracts/data_availability/standard_pubdata_format.md).
 
