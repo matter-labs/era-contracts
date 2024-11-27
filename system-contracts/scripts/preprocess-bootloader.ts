@@ -53,7 +53,7 @@ function getSystemContextCodeHash() {
   let bytecode;
   try {
     const artifact = JSON.parse(fs.readFileSync("zkout/SystemContext.sol/SystemContext.json", { encoding: "utf-8" }));
-    bytecode = artifact.bytecode.object;
+    bytecode = "0x" + artifact.bytecode.object;
   } catch (e) {
     bytecode = hre.artifacts.readArtifactSync("SystemContext").bytecode;
   }
