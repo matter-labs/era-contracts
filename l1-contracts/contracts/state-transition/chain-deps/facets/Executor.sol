@@ -349,6 +349,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             PriorityOperation memory priorityOp = s.priorityQueue.popFront();
             concatHash = keccak256(abi.encode(concatHash, priorityOp.canonicalTxHash));
         }
+
+        s.priorityTree.skipUntil(s.priorityQueue.getFirstUnprocessedPriorityTx());
     }
 
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {

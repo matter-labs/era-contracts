@@ -80,6 +80,23 @@ library PriorityTree {
         }
     }
 
+    /// @notice Allows to skip a certain number of operations.
+    /// @param _lastUnprocessed The new expected id of the unprocessed transaction.
+    /// @dev It is used when the corresponding transactions have been processed by priority queue.
+    function skipUntil(Tree storage _tree, uint256 _lastUnprocessed) internal {
+        if (_tree.startIndex > _lastUnprocessed) {
+            // Nothing to do, return
+            return;
+        }
+        uint256 newUnprocessedIndex = _lastUnprocessed - _tree.startIndex;
+        if (newUnprocessedIndex <= _tree.unprocessedIndex) {
+            // These transactions were already processed, skip.
+            return;
+        }
+
+        _tree.unprocessedIndex = newUnprocessedIndex;
+    }
+
     /// @notice Initialize a chain from a commitment.
     function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         uint256 height = _commitment.sides.length; // Height, including the root node.
