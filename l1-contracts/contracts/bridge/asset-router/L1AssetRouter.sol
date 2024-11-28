@@ -507,9 +507,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
 
         bytes32 _assetId;
-        bytes memory bridgeMintCalldata;
-
         {
+            bytes memory bridgeMintCalldata;
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
             IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
@@ -522,9 +521,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 _transferData: abi.encode(_amount, _l2Receiver),
                 _passValue: false
             });
-        }
 
-        {
             bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, bridgeMintCalldata);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
@@ -546,12 +543,21 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
-        // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
-            ERA_CHAIN_ID,
-            DataEncoding.encodeLegacyTxDataHash(_originalCaller, _l1Token, _amount),
-            txHash
-        );
+        {
+            bytes memory transferData = abi.encode(_amount, _l2Receiver);
+            // Save the deposited amount to claim funds on L1 if the deposit failed on L2
+            L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
+                ERA_CHAIN_ID,
+                DataEncoding.encodeTxDataHash({
+                    _encodingVersion: LEGACY_ENCODING_VERSION,
+                    _originalCaller: _originalCaller,
+                    _assetId: _assetId,
+                    _nativeTokenVault: address(nativeTokenVault),
+                    _transferData: transferData
+                }),
+                txHash
+            );
+        }
 
         emit LegacyDepositInitiated({
             chainId: ERA_CHAIN_ID,
