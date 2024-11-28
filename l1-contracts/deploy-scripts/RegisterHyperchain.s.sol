@@ -82,7 +82,23 @@ contract RegisterHyperchainScript is Script {
     }
 
     function loadChain() internal {
-        chainConfig = chainRegistrar.proposedChains[config.proposalAuthor][config.chainChainId];
+        (
+            uint256 chainId,
+            ChainRegistrar.BaseToken memory baseToken,
+            address blobOperator,
+            address operator,
+            address governor,
+            PubdataPricingMode pubdataPricingMode
+        ) = chainRegistrar.proposedChains(config.proposalAuthor, config.chainChainId);
+
+        chainConfig = ChainRegistrar.ChainConfig({
+            chainId: chainId,
+            baseToken: baseToken,
+            operator: operator,
+            blobOperator: blobOperator,
+            governor: governor,
+            pubdataPricingMode: pubdataPricingMode
+        });
     }
 
     function checkTokenAddress() internal view {
