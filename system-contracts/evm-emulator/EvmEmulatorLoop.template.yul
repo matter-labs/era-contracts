@@ -339,7 +339,13 @@ for { } true { } {
     case 0x35 { // OP_CALLDATALOAD
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
-        stackHead := calldataload(accessStackHead(sp, stackHead))
+        let calldataOffset := accessStackHead(sp, stackHead)
+
+        stackHead := 0
+        // EraVM will revert if offset + length overflows uint32
+        if lt(calldataOffset, UINT32_MAX()) {
+            stackHead := calldataload(calldataOffset)
+        }
 
         ip := add(ip, 1)
     }
@@ -352,25 +358,38 @@ for { } true { } {
     case 0x37 { // OP_CALLDATACOPY
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
-        let destOffset, offset, size
+        let dstOffset, sourceOffset, len
 
         popStackCheck(sp, 3)
-        destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(destOffset, size)
-
-        if gt(offset, MAX_UINT64()) {
-            offset := MAX_UINT64()
-        } 
+        checkMemIsAccessible(dstOffset, len)
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
+        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        calldatacopy(add(destOffset, MEM_OFFSET()), offset, size)
+        dstOffset := add(dstOffset, MEM_OFFSET())
+
+        // EraVM will revert if offset + length overflows uint32
+        if gt(sourceOffset, UINT32_MAX()) {
+            sourceOffset := UINT32_MAX()
+        }
+
+        // Check bytecode out-of-bounds access
+        let truncatedLen := len
+        if gt(add(sourceOffset, len), UINT32_MAX()) {
+            truncatedLen := sub(UINT32_MAX(), sourceOffset) // truncate
+            $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
+        }
+
+        if truncatedLen {
+            calldatacopy(dstOffset, sourceOffset, truncatedLen)
+        }
+
         ip := add(ip, 1)
         
     }
