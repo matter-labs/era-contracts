@@ -494,10 +494,10 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     function _nextPriorityTxId() internal view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getTotalPriorityTxs();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getTotalPriorityTxs();
+        } else {
+            return s.priorityTree.getTotalPriorityTxs();
         }
     }
 
@@ -570,7 +570,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
-        if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+        if (_isPriorityQueueActive()) {
             s.priorityQueue.pushBack(
                 PriorityOperation({
                     canonicalTxHash: _canonicalTxHash,

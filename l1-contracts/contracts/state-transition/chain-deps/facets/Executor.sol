@@ -441,13 +441,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         require(batchesData.length == priorityOpsData.length, "bp");
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
-                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
-            } else {
+            if (_isPriorityQueueActive()) {
                 require(priorityOpsData[i].leftPath.length == 0, "le");
                 require(priorityOpsData[i].rightPath.length == 0, "re");
                 require(priorityOpsData[i].itemHashes.length == 0, "ih");
                 _executeOneBatch(batchesData[i], i);
+            } else {
+                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
             }
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }

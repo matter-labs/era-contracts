@@ -29,6 +29,9 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -126,6 +129,8 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
     }
 
     function getExampleChainCommitment() internal returns (bytes memory) {
+        address chainAdmin = makeAddr("chainAdmin");
+
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
@@ -140,10 +145,33 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
             baseTokenAssetId,
-            address(0x1),
+            chainAdmin,
             abi.encode(config.contracts.diamondCutData, generatedData.forceDeploymentsData),
             new bytes[](0)
         );
+
+        vm.prank(chainAdmin);
+        AdminFacet(chainAddress).setTokenMultiplier(1, 1);
+
+        // Now, let's also append a priority transaction for a more representative example
+        bytes[] memory deps = new bytes[](0);
+
+        vm.prank(address(l2Bridgehub));
+        MailboxFacet(chainAddress).bridgehubRequestL2Transaction(
+            BridgehubL2TransactionRequest({
+                sender: address(0),
+                contractL2: address(0),
+                // Just a giant number so it is always enough
+                mintValue: 1 ether,
+                l2Value: 10,
+                l2Calldata: hex"",
+                l2GasLimit: 72_000_000,
+                l2GasPerPubdataByteLimit: 800,
+                factoryDeps: deps,
+                refundRecipient: address(0)
+            })
+        );
+
         exampleChainCommitment = abi.encode(IZKChain(chainAddress).prepareChainCommitment());
     }
 
