@@ -26,6 +26,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -106,8 +107,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             keccak256(abi.encode(randomChainId, 204)),
             bytes32(uint256(uint160(address(chainTypeManager))))
         );
-        bridgehub.setLegacyBaseTokenAssetId(randomChainId);
-        bridgehub.setLegacyChainAddress(randomChainId);
+        bridgehub.registerLegacyChain(randomChainId);
+
+        assertEq(bridgehub.settlementLayer(randomChainId), block.chainid);
+
+        address messageRoot = address(bridgehub.messageRoot());
+        assertTrue(MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
