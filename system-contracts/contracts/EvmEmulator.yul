@@ -831,6 +831,7 @@ object "EvmEmulator" {
             let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
             if lt(gasToPass, precompileCost) {
                 zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
+                precompileCost := precompileCost // just in case
             }
         
             switch isStatic
@@ -3879,6 +3880,7 @@ object "EvmEmulator" {
                 let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
                 if lt(gasToPass, precompileCost) {
                     zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
+                    precompileCost := precompileCost // just in case
                 }
             
                 switch isStatic
