@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "../Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER} from "../Constants.sol";
 import {SystemCallFlagRequired, Unauthorized, CallerMustBeSystemContract, CallerMustBeBootloader, CallerMustBeForceDeployer, CallerMustBeEvmContract} from "../SystemContractErrors.sol";
 
 /**
