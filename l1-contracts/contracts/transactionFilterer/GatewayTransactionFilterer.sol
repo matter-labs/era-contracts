@@ -8,7 +8,6 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IL2Bridge} from "../bridge/interfaces/IL2Bridge.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
@@ -89,10 +88,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
                 return _checkSTMAssetId(decodedAssetId);
             }
 
-            if (
-                IAssetRouterBase.finalizeDeposit.selector != l2TxSelector &&
-                IL2Bridge.finalizeDeposit.selector != l2TxSelector
-            ) {
+            if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 
