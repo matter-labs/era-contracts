@@ -418,6 +418,8 @@ error InvalidAddress(address expected, address actual);
 error NotAllowed(address addr);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
+// 0x48c5fa28
+error InvalidProofLengthForFinalNode();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

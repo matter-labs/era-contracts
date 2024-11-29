@@ -118,9 +118,6 @@ library Merkle {
     }
 
     function _validatePathLengthForSingleProof(uint256 _index, uint256 _pathLength) private pure {
-        if (_pathLength == 0) {
-            revert MerklePathEmpty();
-        }
         if (_pathLength >= 256) {
             revert MerklePathOutOfBounds();
         }
