@@ -217,7 +217,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
-            revert InvalidSelector(_selector);
+            // The function does not exist
+            return false;
         }
         return ds.selectorToFacet[_selector].isFreezable;
     }
