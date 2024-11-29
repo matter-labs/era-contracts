@@ -381,6 +381,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }
+        _forceDeactivateQueue();
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
@@ -423,7 +424,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
     /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex) {
+        if (_isPriorityQueueActive()) {
             revert PriorityQueueNotReady();
         }
 

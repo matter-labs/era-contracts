@@ -356,6 +356,10 @@ error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
 
 // 0xce63ce17
 error NoCTMForAssetId(bytes32 assetId);
+// 0x1929b7de
+error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
+// 0x48c5fa28
+error InvalidProofLengthForFinalNode();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

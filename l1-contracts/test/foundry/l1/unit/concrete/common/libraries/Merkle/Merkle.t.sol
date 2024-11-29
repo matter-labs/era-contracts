@@ -57,12 +57,12 @@ contract MerkleTestTest is Test {
         testElements(elements.length - 1);
     }
 
-    function testEmptyProof_shouldRevert() public {
+    function testEmptyProof_shouldSucceed() public {
         bytes32 leaf = elements[0];
         bytes32[] memory proof;
 
-        vm.expectRevert(MerklePathEmpty.selector);
-        merkleTest.calculateRoot(proof, 0, leaf);
+        bytes32 root = merkleTest.calculateRoot(proof, 0, leaf);
+        assertEq(root, leaf);
     }
 
     function testLeafIndexTooBig_shouldRevert() public {

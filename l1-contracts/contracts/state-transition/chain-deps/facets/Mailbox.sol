@@ -25,7 +25,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDG
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
-import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
+import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow, InvalidProofLengthForFinalNode} from "../../../common/L1ContractErrors.sol";
 import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -130,7 +130,11 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
     function _parseProofMetadata(
         bytes32[] calldata _proof
-    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+    )
+        internal
+        pure
+        returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen, bool finalProofNode)
+    {
         bytes32 proofMetadata = _proof[0];
 
         // We support two formats of the proofs:
@@ -139,14 +143,15 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         // - first byte: metadata version (0x01).
         // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
         // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
+        // - fourth byte: whether the current proof is the last in the links of recursive proofs for settlement layers.
         // - the rest of the bytes are zeroes.
         //
         // In the future the old version will be disabled, and only the new version will be supported.
-        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 29 bytes are zeroes.
-        // It is safe, since the elements of the proof are hashes and are unlikely to have 29 zero bytes in them.
+        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 28 bytes are zeroes.
+        // It is safe, since the elements of the proof are hashes and are unlikely to have 28 zero bytes in them.
 
-        // We shift left by 3 bytes = 24 bits to remove the top 24 bits of the metadata.
-        uint256 metadataAsUint256 = (uint256(proofMetadata) << 24);
+        // We shift left by 4 bytes = 32 bits to remove the top 32 bits of the metadata.
+        uint256 metadataAsUint256 = (uint256(proofMetadata) << 32);
 
         if (metadataAsUint256 == 0) {
             // It is the new version
@@ -158,6 +163,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             proofStartIndex = 1;
             logLeafProofLen = uint256(uint8(proofMetadata[1]));
             batchLeafProofLen = uint256(uint8(proofMetadata[2]));
+            finalProofNode = uint256(uint8(proofMetadata[3])) != 0;
         } else {
             // It is the old version
 
@@ -165,6 +171,11 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             proofStartIndex = 0;
             logLeafProofLen = _proof.length;
             batchLeafProofLen = 0;
+            finalProofNode = true;
+        }
+
+        if (finalProofNode && batchLeafProofLen != 0) {
+            revert InvalidProofLengthForFinalNode();
         }
     }
 
@@ -211,7 +222,12 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         uint256 ptr = 0;
         bytes32 chainIdLeaf;
         {
-            (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof);
+            (
+                uint256 proofStartIndex,
+                uint256 logLeafProofLen,
+                uint256 batchLeafProofLen,
+                bool finalProofNode
+            ) = _parseProofMetadata(_proof);
             ptr = proofStartIndex;
 
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
@@ -221,9 +237,9 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             );
             ptr += logLeafProofLen;
 
-            // If the `batchLeafProofLen` is 0, then we assume that this is L1 contract of the top-level
+            // If the `finalProofNode` is true, then we assume that this is L1 contract of the top-level
             // in the aggregation, i.e. the batch root is stored here on L1.
-            if (batchLeafProofLen == 0) {
+            if (finalProofNode) {
                 // Double checking that the batch has been executed.
                 if (_batchNumber > s.totalBatchesExecuted) {
                     revert BatchNotExecuted(_batchNumber);
@@ -502,10 +518,10 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     function _nextPriorityTxId() internal view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getTotalPriorityTxs();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getTotalPriorityTxs();
+        } else {
+            return s.priorityTree.getTotalPriorityTxs();
         }
     }
 
@@ -578,7 +594,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
-        if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+        if (_isPriorityQueueActive()) {
             s.priorityQueue.pushBack(
                 PriorityOperation({
                     canonicalTxHash: _canonicalTxHash,

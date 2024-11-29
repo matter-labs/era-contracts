@@ -117,10 +117,10 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getFirstUnprocessedPriorityTx();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getFirstUnprocessedPriorityTx();
+        } else {
+            return s.priorityTree.getFirstUnprocessedPriorityTx();
         }
     }
 
@@ -131,11 +131,16 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getPriorityQueueSize() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getSize();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getSize();
+        } else {
+            return s.priorityTree.getSize();
         }
+    }
+
+    /// @inheritdoc IGetters
+    function isPriorityQueueActive() external view returns (bool) {
+        return _isPriorityQueueActive();
     }
 
     /// @inheritdoc IGetters

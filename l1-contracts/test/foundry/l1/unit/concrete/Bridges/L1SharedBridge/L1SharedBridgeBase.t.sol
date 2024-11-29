@@ -6,11 +6,11 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -108,7 +108,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.mockCall(
             address(nativeTokenVault),
             abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
-            abi.encode(address(0))
+            abi.encode(address(token))
         );
         vm.prank(bridgehubAddress);
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
@@ -479,5 +479,32 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
         assertEq(endBalanceNtv - startBalanceNtv, amount);
         assertEq(endEthBalanceNtv - startEthBalanceNtv, amount);
+    }
+
+    function test_bridgehubDeposit_Eth_storesCorrectTxHash() public {
+        _setBaseTokenAssetId(tokenAssetId);
+        vm.prank(bridgehubAddress);
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encode(tokenAssetId)
+        );
+        // solhint-disable-next-line func-named-parameters
+        L2TransactionRequestTwoBridgesInner memory request = sharedBridge.bridgehubDeposit{value: amount}(
+            chainId,
+            alice,
+            0,
+            abi.encode(ETH_TOKEN_ADDRESS, 0, bob)
+        );
+
+        bytes32 expectedTxHash = DataEncoding.encodeTxDataHash({
+            _nativeTokenVault: address(nativeTokenVault),
+            _encodingVersion: LEGACY_ENCODING_VERSION,
+            _originalCaller: alice,
+            _assetId: nativeTokenVault.BASE_TOKEN_ASSET_ID(),
+            _transferData: abi.encode(amount, bob)
+        });
+
+        assertEq(request.txDataHash, expectedTxHash);
     }
 }

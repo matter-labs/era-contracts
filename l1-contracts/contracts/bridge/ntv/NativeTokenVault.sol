@@ -255,36 +255,28 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     ) internal virtual returns (bytes memory _bridgeMintData) {
         (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
 
-        uint256 amount;
         address nativeToken = tokenAddress[_assetId];
         if (_assetId == BASE_TOKEN_ASSET_ID) {
-            amount = msg.value;
+            if (_depositAmount != msg.value) {
+                revert ValueMismatch(_depositAmount, msg.value);
+            }
 
-            // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
-            // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
-            if (_depositAmount == 0) {
-                _depositAmount = amount;
-            }
-            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
-            if (_depositAmount != amount) {
-                revert ValueMismatch(_depositAmount, amount);
-            }
+            _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
         } else {
             // The Bridgehub also checks this, but we want to be sure
             if (msg.value != 0) {
                 revert NonEmptyMsgValue();
             }
-            amount = _depositAmount;
-            _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
+            _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
             if (!_depositChecked) {
                 uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
                 // The token has non-standard transfer logic
-                if (amount != expectedDepositAmount) {
+                if (_depositAmount != expectedDepositAmount) {
                     revert TokensWithFeesNotSupported();
                 }
             }
         }
-        if (amount == 0) {
+        if (_depositAmount == 0) {
             // empty deposit amount
             revert EmptyDeposit();
         }
@@ -297,7 +289,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             _originalCaller: _originalCaller,
             _remoteReceiver: _receiver,
             _originToken: nativeToken,
-            _amount: amount,
+            _amount: _depositAmount,
             _erc20Metadata: erc20Metadata
         });
 
@@ -306,7 +298,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             assetId: _assetId,
             sender: _originalCaller,
             receiver: _receiver,
-            amount: amount
+            amount: _depositAmount
         });
     }
 

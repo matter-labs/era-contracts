@@ -218,22 +218,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         messageRoot = _messageRoot;
     }
 
-    /// @notice Used for the upgrade to set the baseTokenAssetId previously stored as baseToken.
-    /// @param _chainId the chainId of the chain.
-    function setLegacyBaseTokenAssetId(uint256 _chainId) external override {
-        if (baseTokenAssetId[_chainId] != bytes32(0)) {
-            return;
-        }
-        address token = __DEPRECATED_baseToken[_chainId];
-        if (token == address(0)) {
-            revert TokenNotSet();
-        }
-        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
-    }
-
-    /// @notice Used to set the legacy chain address for the upgrade.
+    /// @notice Used to set the legacy chain data for the upgrade.
     /// @param _chainId The chainId of the legacy chain we are migrating.
-    function setLegacyChainAddress(uint256 _chainId) external override {
+    function registerLegacyChain(uint256 _chainId) external override {
         address ctm = chainTypeManager[_chainId];
         if (ctm == address(0)) {
             revert ChainNotLegacy();
@@ -241,11 +228,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (zkChainMap.contains(_chainId)) {
             revert ChainIdAlreadyPresent();
         }
+
+        // From now on, since `zkChainMap` did not contain the chain, we assume
+        // that the chain is a legacy chain in the process of migration, i.e.
+        // its stored `baseTokenAssetId`, etc.
+
+        address token = __DEPRECATED_baseToken[_chainId];
+        require(token != address(0), "BH: token not set");
+
+        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
+
         address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
         if (chainAddress == address(0)) {
             revert ChainNotPresentInCTM();
         }
         _registerNewZKChain(_chainId, chainAddress, false);
+        messageRoot.addNewChain(_chainId);
+        settlementLayer[_chainId] = block.chainid;
     }
 
     //// Registry
