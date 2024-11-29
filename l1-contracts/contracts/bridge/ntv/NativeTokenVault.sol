@@ -149,7 +149,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         _handleChainBalanceDecrease(_originChainId, _assetId, amount, false);
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
-        emit BridgeMint(_originChainId, _assetId, receiver, amount);
     }
 
     function _bridgeMintNativeToken(
@@ -163,7 +162,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         _handleChainBalanceDecrease(_originChainId, _assetId, amount, true);
         _withdrawFunds(_assetId, receiver, token, amount);
-        emit BridgeMint(_originChainId, _assetId, receiver, amount);
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
