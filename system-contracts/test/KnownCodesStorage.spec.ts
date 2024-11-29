@@ -89,12 +89,13 @@ describe("KnownCodesStorage tests", function () {
     let deployerAccount: ethers.Signer;
 
     const ValidBytecode = "0x0000000000000000000000000000000000000000000000000000000000000000";
-    const InvalidBytecode = "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    const InvalidBytecode =
+      "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
-    beforeEach(async() => {
+    beforeEach(async () => {
       deployerAccount = await ethers.getImpersonatedSigner(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
-    })
-    
+    });
+
     it("non-deployer failed to call", async () => {
       await expect(knownCodesStorage.publishEVMBytecode("0x00")).to.be.revertedWithCustomError(
         knownCodesStorage,
@@ -103,10 +104,9 @@ describe("KnownCodesStorage tests", function () {
     });
 
     it("bytecode with even length failed to publish", async () => {
-      await expect(knownCodesStorage.connect(deployerAccount).publishEVMBytecode(InvalidBytecode)).to.be.revertedWithCustomError(
-        knownCodesStorage,
-        "MalformedBytecode"
-      );
+      await expect(
+        knownCodesStorage.connect(deployerAccount).publishEVMBytecode(InvalidBytecode)
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
 
     it("invalid length bytecode failed to call", async () => {
