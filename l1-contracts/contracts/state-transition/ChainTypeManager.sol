@@ -432,17 +432,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return IZKChain(getZKChain(_chainId)).getProtocolVersion();
     }
 
-    /// @param _newSettlementLayerChainId the chainId of the chain
-    /// @param _isWhitelisted whether the chain is whitelisted
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
-        require(_newSettlementLayerChainId != 0, "Bad chain id");
-
-        // Currently, we require that the sync layer is deployed by the same CTM.
-        require(getZKChain(_newSettlementLayerChainId) != address(0), "CTM: sync layer not registered");
-
-        IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
-    }
-
     /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
     /// @param _chainId The chain id of the chain to be migrated.
     /// @param _data The data needed to perform the migration.
