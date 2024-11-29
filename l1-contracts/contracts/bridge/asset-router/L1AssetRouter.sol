@@ -525,8 +525,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             bytes memory bridgeMintCalldata;
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
-
             bridgeMintCalldata = _burn({
                 _chainId: ERA_CHAIN_ID,
                 _nextMsgValue: 0,
