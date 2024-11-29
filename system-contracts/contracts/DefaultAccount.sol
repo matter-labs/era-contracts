@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
-import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol";
+import {TransactionHelper, Transaction, L1_TO_L2_TX_TYPE} from "./libraries/TransactionHelper.sol";
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -139,15 +139,20 @@ contract DefaultAccount is IAccount {
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
 
-        if ((_transaction.reserved[1] != 0) && (to == address(0))) {
-            // Note, that createEVM can only be called with "isSystem" flag.
-            SystemContractsCaller.systemCallWithPropagatedRevert(
-                uint32(gasleft()),
-                address(DEPLOYER_SYSTEM_CONTRACT),
-                value,
-                abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
-            );
-            return;
+        if (to == address(0)) {
+            // for L1 to L2 txs we use reserved[2], for other types reserved[1]
+            bool isEvmDeployTx = _transaction.reserved[_transaction.txType == L1_TO_L2_TX_TYPE ? 2 : 1] == 1;
+
+            if (isEvmDeployTx) {
+                // Note, that createEVM can only be called with "isSystem" flag.
+                SystemContractsCaller.systemCallWithPropagatedRevert(
+                    uint32(gasleft()),
+                    address(DEPLOYER_SYSTEM_CONTRACT),
+                    value,
+                    abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
+                );
+                return;
+            }
         }
 
         // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
