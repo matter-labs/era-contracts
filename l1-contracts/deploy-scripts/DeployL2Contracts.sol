@@ -93,7 +93,6 @@ contract DeployL2Script is Script {
         deploySharedBridge();
         deploySharedBridgeProxy(legacyBridge);
         initializeChain();
-        finalizeRegistration();
 
         saveOutput();
     }
