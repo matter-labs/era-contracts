@@ -539,7 +539,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external nonReentrant onlyValidator {
+    function revertBatchesSharedBridge(
+        uint256,
+        uint256 _newLastBatch
+    ) external nonReentrant onlyValidatorOrChainTypeManager {
         _revertBatches(_newLastBatch);
     }
 
