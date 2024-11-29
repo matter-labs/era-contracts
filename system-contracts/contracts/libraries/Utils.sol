@@ -51,15 +51,15 @@ library Utils {
     }
 
     /// @return codeLength The bytecode length in bytes
-    function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLength) {
+    function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLengthInBytes) {
         unchecked {
             uint256 decodedCodeLength = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
             if (isCodeHashEVM(_bytecodeHash)) {
                 // length is encoded in bytes
-                codeLengthInWords = decodedCodeLength;
+                codeLengthInBytes = decodedCodeLength;
             } else {
                 // length is encoded in words
-                codeLengthInWords = decodedCodeLength << 5; // * 32
+                codeLengthInBytes = decodedCodeLength << 5; // * 32
             }
         }
     }
