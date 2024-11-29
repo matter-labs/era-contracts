@@ -45,12 +45,12 @@ library Utils {
         return uint24(_x);
     }
 
-    /// @return codeLength If this bytecode hash for EVM contract or not
+    /// @return If this bytecode hash for EVM contract or not
     function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
         return (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG);
     }
 
-    /// @return codeLength The bytecode length in bytes
+    /// @return codeLengthInBytes The bytecode length in bytes
     function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLengthInBytes) {
         unchecked {
             uint256 decodedCodeLength = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
