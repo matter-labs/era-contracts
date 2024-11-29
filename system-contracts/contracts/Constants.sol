@@ -164,5 +164,7 @@ uint256 constant BLOB_SIZE_BYTES = 126_976;
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 
+/// @dev Marker of EraVM bytecode
 uint8 constant ERA_VM_BYTECODE_FLAG = 1;
+/// @dev Marker of EVM bytecode
 uint8 constant EVM_BYTECODE_FLAG = 2;
