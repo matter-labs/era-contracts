@@ -40,6 +40,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev The address of the WETH token on L1.
     address public immutable override L1_WETH_TOKEN;
 
+    /// @dev The assetId of the base token.
+    bytes32 public immutable ETH_TOKEN_ASSET_ID;
+
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
@@ -97,6 +100,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy.
@@ -374,6 +378,16 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             (address, uint256, address)
         );
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+
+        if (assetId == ETH_TOKEN_ASSET_ID) {
+            // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
+            // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
+
+            if (_depositAmount == 0) {
+                _depositAmount = msg.value;
+            }
+        }
+
         return (assetId, abi.encode(_depositAmount, _l2Receiver));
     }
 
