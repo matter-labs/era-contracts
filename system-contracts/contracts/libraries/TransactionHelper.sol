@@ -165,9 +165,10 @@ library TransactionHelper {
             encodedGasParam = bytes.concat(encodedGasPrice, encodedGasLimit);
         }
 
-        bytes memory encodedTo = _transaction.reserved[1] == 0
-            ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
-            : bytes(hex"80");
+        // "to" field is empty if it is EVM deploy tx
+        bytes memory encodedTo = _transaction.reserved[1] == 1
+            ? bytes(hex"80")
+            : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
         bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
         // Encode only the length of the transaction data, and not the data itself,
         // so as not to copy to memory a potentially huge transaction data twice.
@@ -236,9 +237,10 @@ library TransactionHelper {
             bytes memory encodedNonce = RLPEncoder.encodeUint256(_transaction.nonce);
             bytes memory encodedGasPrice = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
-            bytes memory encodedTo = _transaction.reserved[1] == 0
-                ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
-                : bytes(hex"80");
+            // "to" field is empty if it is EVM deploy tx
+            bytes memory encodedTo = _transaction.reserved[1] == 1
+                ? bytes(hex"80")
+                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
@@ -311,9 +313,10 @@ library TransactionHelper {
             bytes memory encodedMaxPriorityFeePerGas = RLPEncoder.encodeUint256(_transaction.maxPriorityFeePerGas);
             bytes memory encodedMaxFeePerGas = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
-            bytes memory encodedTo = _transaction.reserved[1] == 0
-                ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
-                : bytes(hex"80");
+            // "to" field is empty if it is EVM deploy tx
+            bytes memory encodedTo = _transaction.reserved[1] == 1
+                ? bytes(hex"80")
+                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(

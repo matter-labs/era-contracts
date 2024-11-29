@@ -45,25 +45,36 @@ library Utils {
         return uint24(_x);
     }
 
+    /// @return codeLength If this bytecode hash for EVM contract or not
     function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
         return (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG);
     }
 
     /// @return codeLength The bytecode length in bytes
     function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLength) {
-        if (uint8(_bytecodeHash[0]) == ERA_VM_BYTECODE_FLAG) {
-            codeLength = bytecodeLenInWords(_bytecodeHash) << 5; // _bytecodeHash * 32
-        } else if (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG) {
-            codeLength = bytecodeLenInWords(_bytecodeHash);
-        } else {
-            codeLength = 0;
+        unchecked {
+            uint256 decodedCodeLength = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
+            if (isCodeHashEVM(_bytecodeHash)) {
+                // length is encoded in bytes
+                codeLengthInWords = decodedCodeLength;
+            } else {
+                // length is encoded in words
+                codeLengthInWords = decodedCodeLength << 5; // * 32
+            }
         }
     }
 
     /// @return codeLengthInWords The bytecode length in machine words
     function bytecodeLenInWords(bytes32 _bytecodeHash) internal pure returns (uint256 codeLengthInWords) {
         unchecked {
-            codeLengthInWords = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
+            uint256 decodedCodeLength = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
+            if (isCodeHashEVM(_bytecodeHash)) {
+                // length is encoded in bytes
+                codeLengthInWords = (decodedCodeLength + 31) / 32; // rounded up
+            } else {
+                // length is encoded in words
+                codeLengthInWords = decodedCodeLength;
+            }
         }
     }
 
