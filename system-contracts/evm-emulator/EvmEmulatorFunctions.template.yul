@@ -1064,6 +1064,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
                 addr := 0
                 gasLeft := _saveReturndataAfterEVMCall(0, 0)
                 resetEvmFrame()
+                _eraseReturndataPointer()
             }
             default {
                 gasLeft, addr := _saveConstructorReturnGas()

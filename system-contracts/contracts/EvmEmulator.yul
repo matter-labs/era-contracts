@@ -1126,6 +1126,7 @@ object "EvmEmulator" {
                         addr := 0
                         gasLeft := _saveReturndataAfterEVMCall(0, 0)
                         resetEvmFrame()
+                        _eraseReturndataPointer()
                     }
                     default {
                         gasLeft, addr := _saveConstructorReturnGas()
@@ -4174,6 +4175,7 @@ object "EvmEmulator" {
                             addr := 0
                             gasLeft := _saveReturndataAfterEVMCall(0, 0)
                             resetEvmFrame()
+                            _eraseReturndataPointer()
                         }
                         default {
                             gasLeft, addr := _saveConstructorReturnGas()
