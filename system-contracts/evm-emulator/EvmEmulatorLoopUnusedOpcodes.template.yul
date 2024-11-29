@@ -61,11 +61,11 @@ case 0x2E { // Unused opcode
 case 0x2F { // Unused opcode
     $llvm_NoInline_llvm$_panic()
 }
-case 0x49 { // Unused opcode
-    $llvm_NoInline_llvm$_panic()
+case 0x49 { // Unused opcode BLOBHASH
+    forbiddenOpcode(0x49)
 }
-case 0x4A { // Unused opcode
-    $llvm_NoInline_llvm$_panic()
+case 0x4A { // Unused opcode BLOBBASEFEE
+    forbiddenOpcode(0x4A)
 }
 case 0x4B { // Unused opcode
     $llvm_NoInline_llvm$_panic()
@@ -307,8 +307,8 @@ case 0xEE { // Unused opcode
 case 0xEF { // Unused opcode
     $llvm_NoInline_llvm$_panic()
 }
-case 0xF2 { // Unused opcode
-    $llvm_NoInline_llvm$_panic()
+case 0xF2 { // Unused opcode, CALLCODE
+    forbiddenOpcode(0xF2)
 }
 case 0xF6 { // Unused opcode
     $llvm_NoInline_llvm$_panic()
@@ -328,6 +328,6 @@ case 0xFB { // Unused opcode
 case 0xFC { // Unused opcode
     $llvm_NoInline_llvm$_panic()
 }
-case 0xFF { // Unused opcode
-    $llvm_NoInline_llvm$_panic()
+case 0xFF { // Unused SELFDESTRUCT
+    forbiddenOpcode(0xFF)
 }

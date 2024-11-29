@@ -203,6 +203,18 @@ object "EvmEmulator" {
             revert(0, 0)
         }
         
+        function forbiddenOpcode(opcode) {
+            let systemPanicLabel := shl(200, 1)
+            mstore(0, or(opcode, systemPanicLabel))
+            revert(1, 31)
+        }
+        
+        function forbiddenPrecompile(precompile) {
+            let systemPanicLabel := shl(199, 1)
+            mstore(0, or(precompile, systemPanicLabel))
+            revert(1, 31)
+        }
+        
         function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
             mstore(0, 0)
             revert(0, 32)
@@ -923,6 +935,7 @@ object "EvmEmulator" {
                 case 0x03 { // RIPEMD-160
                     // We do not support RIPEMD-160
                     gasToCharge := 0
+                    forbiddenPrecompile(0x0003)
                 }
                 case 0x04 { // identity
                     let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
@@ -931,6 +944,7 @@ object "EvmEmulator" {
                 case 0x05 { // modexp
                     // We do not support modexp
                     gasToCharge := 0
+                    forbiddenPrecompile(0x0005)
                 }
                 // ecAdd ecMul ecPairing EIP below
                 // https://eips.ethereum.org/EIPS/eip-1108
@@ -953,10 +967,12 @@ object "EvmEmulator" {
                 case 0x09 { // blake2f
                     // We do not support blake2f
                     gasToCharge := 0
+                    forbiddenPrecompile(0x0009)
                 }
                 case 0x0a { // kzg point evaluation
                     // We do not support kzg point evaluation
                     gasToCharge := 0
+                    forbiddenPrecompile(0x000a)
                 }
                 default {
                     gasToCharge := 0
@@ -977,7 +993,14 @@ object "EvmEmulator" {
                 case 0 {
                     // Unexpected return data.
                     // Most likely out-of-ergs or unexpected error in the emulator or system contracts
-                    abortEvmEnvironment()
+                    if iszero(rtsz) {
+                        abortEvmEnvironment()
+                    }
+        
+                    // propagate system panic
+                    returndatacopy(0, 0, rtsz)
+                    revert(0, rtsz)
+                    
                 }
                 default {
                     returndatacopy(0, 0, 32)
@@ -2783,11 +2806,11 @@ object "EvmEmulator" {
                 case 0x2F { // Unused opcode
                     $llvm_NoInline_llvm$_panic()
                 }
-                case 0x49 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                case 0x49 { // Unused opcode BLOBHASH
+                    forbiddenOpcode(0x49)
                 }
-                case 0x4A { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                case 0x4A { // Unused opcode BLOBBASEFEE
+                    forbiddenOpcode(0x4A)
                 }
                 case 0x4B { // Unused opcode
                     $llvm_NoInline_llvm$_panic()
@@ -3029,8 +3052,8 @@ object "EvmEmulator" {
                 case 0xEF { // Unused opcode
                     $llvm_NoInline_llvm$_panic()
                 }
-                case 0xF2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                case 0xF2 { // Unused opcode, CALLCODE
+                    forbiddenOpcode(0xF2)
                 }
                 case 0xF6 { // Unused opcode
                     $llvm_NoInline_llvm$_panic()
@@ -3050,8 +3073,8 @@ object "EvmEmulator" {
                 case 0xFC { // Unused opcode
                     $llvm_NoInline_llvm$_panic()
                 }
-                case 0xFF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                case 0xFF { // Unused SELFDESTRUCT
+                    forbiddenOpcode(0xFF)
                 }
                 default {
                     $llvm_NoInline_llvm$_panic()
@@ -3249,6 +3272,18 @@ object "EvmEmulator" {
             // abort the whole EVM execution environment, including parent frames
             function abortEvmEnvironment() {
                 revert(0, 0)
+            }
+            
+            function forbiddenOpcode(opcode) {
+                let systemPanicLabel := shl(200, 1)
+                mstore(0, or(opcode, systemPanicLabel))
+                revert(1, 31)
+            }
+            
+            function forbiddenPrecompile(precompile) {
+                let systemPanicLabel := shl(199, 1)
+                mstore(0, or(precompile, systemPanicLabel))
+                revert(1, 31)
             }
             
             function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
@@ -3971,6 +4006,7 @@ object "EvmEmulator" {
                     case 0x03 { // RIPEMD-160
                         // We do not support RIPEMD-160
                         gasToCharge := 0
+                        forbiddenPrecompile(0x0003)
                     }
                     case 0x04 { // identity
                         let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
@@ -3979,6 +4015,7 @@ object "EvmEmulator" {
                     case 0x05 { // modexp
                         // We do not support modexp
                         gasToCharge := 0
+                        forbiddenPrecompile(0x0005)
                     }
                     // ecAdd ecMul ecPairing EIP below
                     // https://eips.ethereum.org/EIPS/eip-1108
@@ -4001,10 +4038,12 @@ object "EvmEmulator" {
                     case 0x09 { // blake2f
                         // We do not support blake2f
                         gasToCharge := 0
+                        forbiddenPrecompile(0x0009)
                     }
                     case 0x0a { // kzg point evaluation
                         // We do not support kzg point evaluation
                         gasToCharge := 0
+                        forbiddenPrecompile(0x000a)
                     }
                     default {
                         gasToCharge := 0
@@ -4025,7 +4064,14 @@ object "EvmEmulator" {
                     case 0 {
                         // Unexpected return data.
                         // Most likely out-of-ergs or unexpected error in the emulator or system contracts
-                        abortEvmEnvironment()
+                        if iszero(rtsz) {
+                            abortEvmEnvironment()
+                        }
+            
+                        // propagate system panic
+                        returndatacopy(0, 0, rtsz)
+                        revert(0, rtsz)
+                        
                     }
                     default {
                         returndatacopy(0, 0, 32)
@@ -5831,11 +5877,11 @@ object "EvmEmulator" {
                     case 0x2F { // Unused opcode
                         $llvm_NoInline_llvm$_panic()
                     }
-                    case 0x49 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                    case 0x49 { // Unused opcode BLOBHASH
+                        forbiddenOpcode(0x49)
                     }
-                    case 0x4A { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                    case 0x4A { // Unused opcode BLOBBASEFEE
+                        forbiddenOpcode(0x4A)
                     }
                     case 0x4B { // Unused opcode
                         $llvm_NoInline_llvm$_panic()
@@ -6077,8 +6123,8 @@ object "EvmEmulator" {
                     case 0xEF { // Unused opcode
                         $llvm_NoInline_llvm$_panic()
                     }
-                    case 0xF2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                    case 0xF2 { // Unused opcode, CALLCODE
+                        forbiddenOpcode(0xF2)
                     }
                     case 0xF6 { // Unused opcode
                         $llvm_NoInline_llvm$_panic()
@@ -6098,8 +6144,8 @@ object "EvmEmulator" {
                     case 0xFC { // Unused opcode
                         $llvm_NoInline_llvm$_panic()
                     }
-                    case 0xFF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                    case 0xFF { // Unused SELFDESTRUCT
+                        forbiddenOpcode(0xFF)
                     }
                     default {
                         $llvm_NoInline_llvm$_panic()
