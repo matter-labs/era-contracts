@@ -18,7 +18,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-import {Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
+import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -354,7 +354,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ) internal returns (address zkChainAddress) {
         if (getZKChain(_chainId) != address(0)) {
             // ZKChain already registered
-            return getZKChain(_chainId);
+            revert ChainAlreadyLive();
         }
 
         // check not registered
