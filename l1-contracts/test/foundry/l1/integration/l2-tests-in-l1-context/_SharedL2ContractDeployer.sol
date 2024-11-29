@@ -150,8 +150,15 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
             new bytes[](0)
         );
 
+        uint256 currentChainId = block.chainid;
+
+        // This function is available only on L1 (and it is correct),
+        // but inside testing we need to call this function to recreate commitment
+        vm.chainId(L1_CHAIN_ID);
         vm.prank(chainAdmin);
         AdminFacet(chainAddress).setTokenMultiplier(1, 1);
+
+        vm.chainId(currentChainId);
 
         // Now, let's also append a priority transaction for a more representative example
         bytes[] memory deps = new bytes[](0);

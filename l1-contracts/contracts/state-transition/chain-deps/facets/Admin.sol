@@ -80,7 +80,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager {
+    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
         if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
             revert TooMuchGas();
         }
@@ -111,7 +111,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager {
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager onlyL1 {
         if (_denominator == 0) {
             revert DenominatorIsZero();
         }
