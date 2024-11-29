@@ -24,6 +24,8 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
+import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
+
 import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed, OriginChainIdNotFound} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -193,7 +195,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenNotPaused {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
         (uint256 _amount, ) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
         if (_amount == 0) {

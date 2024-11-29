@@ -25,6 +25,8 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
+import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The Bridgehub contract serves as the primary entry point for L1<->L2 communication,
@@ -32,7 +34,7 @@ import {MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLeg
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, AssetHandlerModifiers {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice the asset id of Eth. This is only used on L1.
@@ -689,11 +691,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _data the data for the migration
     function bridgeBurn(
         uint256 _settlementChainId,
-        uint256, // msgValue
+        uint256 _l2MsgValue,
         bytes32 _assetId,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (bytes memory bridgehubMintData) {
+    )
+        external
+        payable
+        override
+        requireZeroValue(_l2MsgValue + msg.value)
+        onlyAssetRouter
+        whenMigrationsNotPaused
+        returns (bytes memory bridgehubMintData)
+    {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
@@ -734,7 +744,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override onlyAssetRouter whenMigrationsNotPaused {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenMigrationsNotPaused {
         BridgehubMintCTMAssetData memory bridgehubData = abi.decode(_bridgehubMintData, (BridgehubMintCTMAssetData));
 
         address ctm = ctmAssetIdToAddress[_assetId];
@@ -771,7 +781,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter onlyL1 {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
         settlementLayer[bridgehubData.chainId] = block.chainid;

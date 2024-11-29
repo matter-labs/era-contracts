@@ -22,12 +22,19 @@ import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
 import {AssetIdAlreadyRegistered, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress, DeployingBridgedTokenForNativeToken} from "../../common/L1ContractErrors.sol";
+import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
+abstract contract NativeTokenVault is
+    INativeTokenVault,
+    IAssetHandler,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable,
+    AssetHandlerModifiers
+{
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
@@ -118,7 +125,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenNotPaused {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
         address receiver;
         uint256 amount;
         // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
@@ -175,11 +182,19 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _receiver.
     function bridgeBurn(
         uint256 _chainId,
-        uint256,
+        uint256 _l2MsgValue,
         bytes32 _assetId,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory _bridgeMintData) {
+    )
+        external
+        payable
+        override
+        requireZeroValue(_l2MsgValue)
+        onlyAssetRouter
+        whenNotPaused
+        returns (bytes memory _bridgeMintData)
+    {
         if (originChainId[_assetId] != block.chainid) {
             _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _originalCaller, _data);
         } else {
@@ -198,7 +213,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         address _originalCaller,
         bytes calldata _data
-    ) internal returns (bytes memory _bridgeMintData) {
+    ) internal requireZeroValue(msg.value) returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _receiver) = abi.decode(_data, (uint256, address));
         if (_amount == 0) {
             // "Amount cannot be zero");
