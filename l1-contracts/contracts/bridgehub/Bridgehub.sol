@@ -236,7 +236,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // its stored `baseTokenAssetId`, etc.
 
         address token = __DEPRECATED_baseToken[_chainId];
-        require(token != address(0), "BH: token not set");
+        if (token == address(0)) {
+            revert ChainNotLegacy();
+        }
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, token);
 

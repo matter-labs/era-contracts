@@ -23,7 +23,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
