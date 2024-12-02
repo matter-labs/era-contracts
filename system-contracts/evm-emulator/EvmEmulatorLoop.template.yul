@@ -1153,7 +1153,7 @@ for { } true { } {
     }
     case 0x80 { // OP_DUP1 
         evmGasLeft := chargeGas(evmGasLeft, 3)
-        sp, stackHead := pushStackItem(sp, stackHead, stackHead)
+        sp, stackHead := pushStackItem(sp, accessStackHead(sp, stackHead), stackHead)
         ip := add(ip, 1)
     }
     case 0x81 { // OP_DUP2
