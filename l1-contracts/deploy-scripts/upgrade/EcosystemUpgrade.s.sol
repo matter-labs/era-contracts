@@ -368,7 +368,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function getNewProtocolVersion() public returns (uint256) {
-        return 0x1900000000;
+        return 0x1b00000000;
     }
 
     function getOldProtocolDeadline() public returns (uint256) {
@@ -378,7 +378,12 @@ contract EcosystemUpgrade is Script {
     }
 
     function getOldProtocolVersion() public returns (uint256) {
-        return 0x1800000002;
+        // Mainnet is the only network that has not been upgraded.
+        if (block.chainid == 1) {
+            return 0x1800000002;
+        } else {
+            return 0x1900000000; 
+        }
     }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
