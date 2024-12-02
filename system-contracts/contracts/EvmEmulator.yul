@@ -835,6 +835,7 @@ object "EvmEmulator" {
                 }
                 default {
                     frameGasLeft := gasToPass
+                    _eraseReturndataPointer()
                 }
             }
         }
@@ -3890,6 +3891,7 @@ object "EvmEmulator" {
                     }
                     default {
                         frameGasLeft := gasToPass
+                        _eraseReturndataPointer()
                     }
                 }
             }

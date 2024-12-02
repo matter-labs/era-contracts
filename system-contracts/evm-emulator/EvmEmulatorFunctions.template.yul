@@ -773,6 +773,7 @@ function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, r
         }
         default {
             frameGasLeft := gasToPass
+            _eraseReturndataPointer()
         }
     }
 }
