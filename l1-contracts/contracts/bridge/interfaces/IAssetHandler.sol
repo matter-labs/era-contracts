@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {NonEmptyMsgValue} from "../../common/L1ContractErrors.sol";
-
 /// @title Asset Handler contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

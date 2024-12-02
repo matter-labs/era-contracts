@@ -426,6 +426,10 @@ error InvalidProofLengthForFinalNode();
 error TokenIsNotLegacy();
 // 0xa51fa558
 error TokenIsLegacy();
+// 0x29963361
+error LegacyBridgeUsesNonNativeToken();
+// 0x11832de8
+error AssetRouterAllowanceNotZero();
 // 0xb20b58ce
 error NoLegacySharedBridge();
 
