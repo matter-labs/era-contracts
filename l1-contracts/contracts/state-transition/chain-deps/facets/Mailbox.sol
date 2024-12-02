@@ -118,16 +118,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
 
-    // /// @inheritdoc IMailbox
-    function proveL1ToL2TransactionStatusViaGateway(
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) public view returns (bool) {}
-
     function _parseProofMetadata(
         bytes32[] calldata _proof
     )

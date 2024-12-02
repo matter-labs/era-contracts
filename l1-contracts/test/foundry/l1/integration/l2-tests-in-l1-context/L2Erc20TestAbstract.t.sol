@@ -13,7 +13,7 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -30,6 +30,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     function performDeposit(address depositor, address receiver, uint256 amount) internal {
@@ -96,5 +97,21 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         vm.expectRevert();
         vm.prank(ownerWallet);
         BridgedStandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 20);
+    }
+
+    function test_withdrawToken() external {
+        TestnetERC20Token l2NativeToken = new TestnetERC20Token("token", "T", 18);
+
+        l2NativeToken.mint(address(this), 100);
+        l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, 100);
+
+        // Basically we want all L2->L1 transactions to pass
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSignature("sendToL1(bytes)"),
+            abi.encode(bytes32(uint256(1)))
+        );
+
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawToken(address(l2NativeToken), abi.encode(100, address(1)));
     }
 }

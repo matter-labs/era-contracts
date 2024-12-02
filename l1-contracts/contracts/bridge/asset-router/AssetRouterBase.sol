@@ -85,9 +85,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
             revert Unauthorized(msg.sender);
         }
-        assetHandlerAddress[assetId] = _assetHandlerAddress;
+        _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
-        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _assetRegistrationData, sender);
+        emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, sender);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -95,7 +95,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public virtual;
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable virtual;
 
     function _finalizeDeposit(
         uint256 _chainId,
@@ -106,16 +106,24 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         address assetHandler = assetHandlerAddress[_assetId];
 
         if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
+            IAssetHandler(assetHandler).bridgeMint{value: msg.value}(_chainId, _assetId, _transferData);
         } else {
-            assetHandlerAddress[_assetId] = _nativeTokenVault;
-            IAssetHandler(_nativeTokenVault).bridgeMint(_chainId, _assetId, _transferData);
+            _setAssetHandler(_assetId, _nativeTokenVault);
+            // Native token vault may not support non-zero `msg.value`, but we still provide it here to
+            // prevent the passed ETH from being stuck in the asset router and also for consistency.
+            // So the decision on whether to support non-zero `msg.value` is done at the asset handler layer.
+            IAssetHandler(_nativeTokenVault).bridgeMint{value: msg.value}(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
         }
     }
 
     /*//////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
+
+    function _setAssetHandler(bytes32 _assetId, address _assetHandlerAddress) internal {
+        assetHandlerAddress[_assetId] = _assetHandlerAddress;
+        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
+    }
 
     /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.

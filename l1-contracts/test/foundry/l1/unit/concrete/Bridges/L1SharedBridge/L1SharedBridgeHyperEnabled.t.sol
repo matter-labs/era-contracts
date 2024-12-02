@@ -61,7 +61,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         sharedBridge.bridgehubDeposit{value: amount}({
             _chainId: chainId,
             _originalCaller: alice,
-            _value: amount,
+            _value: 0,
             _data: abi.encode(ETH_TOKEN_ADDRESS, amount, bob)
         });
     }

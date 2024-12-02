@@ -12,10 +12,15 @@ import {InvalidPubdataSource, PubdataCommitmentsEmpty, InvalidPubdataCommitments
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
+/// @dev The number of blocks within each we allow blob to be used for DA.
+/// On Ethereum blobs expire within 4096 slots, i.e. 4096 * 32 blocks. We reserve
+/// half of the time in order to ensure reader's ability to read the blob's content.
+uint256 constant BLOB_EXPIRATION_BLOCKS = (4096 * 32) / 2;
+
 contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
-    /// @dev The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash
+    /// @notice The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash
     /// is *not* checked in this contract, but is expected to be checked at the verification stage of the ZK contract.
-    mapping(bytes32 blobCommitment => bool isPublished) public publishedBlobCommitments;
+    mapping(bytes32 blobCommitment => uint256 blockOfPublishing) public publishedBlobCommitments;
 
     /// @notice Publishes certain blobs, marking commitments to them as published.
     /// @param _pubdataCommitments The commitments to the blobs to be published.
@@ -36,9 +41,17 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
                 versionedHashIndex,
                 _pubdataCommitments[i:i + PUBDATA_COMMITMENT_SIZE]
             );
-            publishedBlobCommitments[blobCommitment] = true;
+            publishedBlobCommitments[blobCommitment] = block.number;
             ++versionedHashIndex;
         }
+    }
+
+    function isBlobAvailable(bytes32 _blobCommitment) public view returns (bool) {
+        uint256 blockOfPublishing = publishedBlobCommitments[_blobCommitment];
+
+        // While `block.number` on all used L1 networks is much higher than `BLOB_EXPIRATION_BLOCKS`,
+        // we still check that `blockOfPublishing > 0` just in case.
+        return blockOfPublishing > 0 && block.number - blockOfPublishing <= BLOB_EXPIRATION_BLOCKS;
     }
 
     /// @inheritdoc IL1DAValidator
@@ -143,7 +156,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
             if (prepublishedCommitment != bytes32(0)) {
                 // We double check that this commitment has indeed been published.
                 // If that is the case, we do not care about the actual underlying data.
-                if (!publishedBlobCommitments[prepublishedCommitment]) {
+                if (!isBlobAvailable(prepublishedCommitment)) {
                     revert BlobCommitmentNotPublished();
                 }
                 blobsCommitments[i] = prepublishedCommitment;
