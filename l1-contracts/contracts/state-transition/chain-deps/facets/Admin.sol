@@ -342,18 +342,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function forwardedBridgeRecoverFailedTransfer(
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
-        address _depositSender,
+        address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyBridgehub {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
         require(s.settlementLayer != address(0), "Af: not migrated");
-        // Sanity check that the _depositSender is the chain admin.
-        require(_depositSender == s.admin, "Af: not chainAdmin");
 
         uint256 currentProtocolVersion = s.protocolVersion;
-
         require(currentProtocolVersion == protocolVersion, "CTM: protocolVersion not up to date");
 
         s.settlementLayer = address(0);
