@@ -416,6 +416,8 @@ error NotBridgehub(address addr);
 error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
+// 0x02181a13
+error SettlementLayersMustSettleOnL1();
 // 0x1850b46b
 error TokenNotLegacy();
 // 0x1929b7de

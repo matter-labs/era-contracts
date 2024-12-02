@@ -23,7 +23,7 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
+import {SettlementLayersMustSettleOnL1, MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 
@@ -309,6 +309,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256 _newSettlementLayerChainId,
         bool _isWhitelisted
     ) external onlyOwner onlyL1 {
+        if (settlementLayer[_newSettlementLayerChainId] != block.chainid) {
+            revert SettlementLayersMustSettleOnL1();
+        }
         whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
         emit SettlementLayerRegistered(_newSettlementLayerChainId, _isWhitelisted);
     }
@@ -713,6 +716,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(_assetId == ctmAssetIdFromChainId(bridgehubData.chainId), "BH: assetInfo 1");
         require(settlementLayer[bridgehubData.chainId] == block.chainid, "BH: not current SL");
         settlementLayer[bridgehubData.chainId] = _settlementChainId;
+
+        if (whitelistedSettlementLayers[bridgehubData.chainId]) {
+            revert SettlementLayersMustSettleOnL1();
+        }
 
         address zkChain = zkChainMap.get(bridgehubData.chainId);
         require(zkChain != address(0), "BH: zkChain not registered");
