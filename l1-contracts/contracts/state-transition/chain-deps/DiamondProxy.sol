@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors
 
 import {Diamond} from "../libraries/Diamond.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 /// @title Diamond Proxy Contract (EIP-2535)
 /// @author Matter Labs

@@ -169,7 +169,7 @@ contract DeployL1Script is Script {
 
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-l1.toml");
+        string memory path = string.concat(root, "/deploy-script-config-template/config-deploy-l1.toml");
         string memory toml = vm.readFile(path);
 
         config.l1ChainId = block.chainid;
@@ -338,7 +338,7 @@ contract DeployL1Script is Script {
     }
 
     function deployTransparentProxyAdmin() internal {
-        vm.startBroadcast();
+        vm.startBroadcast(msg.sender);
         ProxyAdmin proxyAdmin = new ProxyAdmin();
         proxyAdmin.transferOwnership(addresses.governance);
         vm.stopBroadcast();
@@ -505,14 +505,14 @@ contract DeployL1Script is Script {
 
     function registerStateTransitionManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast();
+        vm.broadcast(msg.sender);
         bridgehub.addStateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         console.log("StateTransitionManager registered");
     }
 
     function setStateTransitionManagerInValidatorTimelock() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-        vm.broadcast();
+        vm.broadcast(msg.sender);
         validatorTimelock.setStateTransitionManager(
             IStateTransitionManager(addresses.stateTransition.stateTransitionProxy)
         );
@@ -576,7 +576,7 @@ contract DeployL1Script is Script {
 
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast();
+        vm.startBroadcast(msg.sender);
         bridgehub.addToken(ADDRESS_ONE);
         bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         vm.stopBroadcast();
@@ -606,13 +606,13 @@ contract DeployL1Script is Script {
 
     function updateSharedBridge() internal {
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
-        vm.broadcast();
+        vm.broadcast(msg.sender);
         sharedBridge.setL1Erc20Bridge(addresses.bridges.erc20BridgeProxy);
         console.log("SharedBridge updated with ERC20Bridge address");
     }
 
     function updateOwners() internal {
-        vm.startBroadcast();
+        vm.startBroadcast(msg.sender);
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
