@@ -85,9 +85,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
             revert Unauthorized(msg.sender);
         }
-        assetHandlerAddress[assetId] = _assetHandlerAddress;
+        _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
-        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _assetRegistrationData, sender);
+        emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, sender);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -108,7 +108,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         if (assetHandler != address(0)) {
             IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
         } else {
-            assetHandlerAddress[_assetId] = _nativeTokenVault;
+            _setAssetHandler(_assetId, _nativeTokenVault);
             IAssetHandler(_nativeTokenVault).bridgeMint(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
         }
     }
@@ -116,6 +116,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /*//////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
+
+    function _setAssetHandler(bytes32 _assetId, address _assetHandlerAddress) internal {
+        assetHandlerAddress[_assetId] = _assetHandlerAddress;
+        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
+    }
 
     /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.

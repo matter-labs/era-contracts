@@ -31,4 +31,9 @@ interface IL2AssetRouter is IAssetRouterBase {
     /// @dev Used to set the assedAddress for a given assetId.
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetAddress) external;
+
+    /// @notice Function that allows native token vault to register itself as the asset handler for
+    /// a legacy asset.
+    /// @param _assetId The assetId of the legacy token.
+    function setLegacyTokenAssetHandler(bytes32 _assetId) external;
 }

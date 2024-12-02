@@ -39,9 +39,8 @@ interface IAssetRouterBase {
         bytes32 assetDataHash // Todo: What's the point of emitting hash?
     );
 
-    event AssetHandlerRegisteredInitial(
+    event AssetDeploymentTrackerRegistered(
         bytes32 indexed assetId,
-        address indexed assetHandlerAddress,
         bytes32 indexed additionalData,
         address assetDeploymentTracker
     );

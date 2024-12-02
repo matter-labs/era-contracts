@@ -122,7 +122,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         require(address(_nativeTokenVault) != address(0), "AR: native token vault 0");
         nativeTokenVault = _nativeTokenVault;
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
-        assetHandlerAddress[ethAssetId] = address(nativeTokenVault);
+        _setAssetHandler(ethAssetId, address(_nativeTokenVault));
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.

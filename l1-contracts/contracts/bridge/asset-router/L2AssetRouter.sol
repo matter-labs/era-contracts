@@ -67,6 +67,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _;
     }
 
+    modifier onlyNTV() {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Disable the initialization to prevent Parity hack.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
@@ -83,7 +90,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             revert EmptyAddress();
         }
         l1AssetRouter = _l1AssetRouter;
-        assetHandlerAddress[_baseTokenAssetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
+
+        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
         _transferOwnership(_aliasedOwner);
@@ -95,8 +104,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes32 _assetId,
         address _assetAddress
     ) external override onlyAssetRouterCounterpart(_originChainId) {
-        assetHandlerAddress[_assetId] = _assetAddress;
-        emit AssetHandlerRegistered(_assetId, _assetAddress);
+        _setAssetHandler(_assetId, _assetAddress);
     }
 
     /// @inheritdoc IAssetRouterBase
@@ -105,6 +113,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _assetHandlerAddress
     ) external override(AssetRouterBase, IAssetRouterBase) {
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
+    }
+
+    function setLegacyTokenAssetHandler(bytes32 _assetId) external override onlyNTV {
+        // Note, that it is an asset handler, but not asset deployment tracker,
+        // which is located on L1.
+        _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
     }
 
     /*//////////////////////////////////////////////////////////////

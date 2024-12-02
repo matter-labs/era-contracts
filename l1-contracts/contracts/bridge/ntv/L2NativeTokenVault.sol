@@ -15,6 +15,7 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
+import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 
 import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
@@ -22,7 +23,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -85,8 +86,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
+            revert NoLegacySharedBridge();
+        }
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
+        if (l1TokenAddress == address(0)) {
+            revert TokenIsNotLegacy();
+        }
+
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
         tokenAddress[newAssetId] = _l2TokenAddress;
         assetId[_l2TokenAddress] = newAssetId;
         originChainId[newAssetId] = L1_CHAIN_ID;
@@ -242,6 +251,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _isNative
     ) internal override {
         // on L2s we don't track the balance
+    }
+
+    function _registerToken(address _nativeToken) internal override {
+        if (
+            address(L2_LEGACY_SHARED_BRIDGE) != address(0) &&
+            L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_nativeToken) != address(0)
+        ) {
+            // Legacy tokens should be registered via `setLegacyTokenAssetId`.
+            revert TokenIsLegacy();
+        }
+        super._registerToken(_nativeToken);
     }
 
     /*//////////////////////////////////////////////////////////////

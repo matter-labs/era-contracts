@@ -422,6 +422,12 @@ error TokenNotLegacy();
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
+// 0x7acd7817
+error TokenIsNotLegacy();
+// 0xa51fa558
+error TokenIsLegacy();
+// 0xb20b58ce
+error NoLegacySharedBridge();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

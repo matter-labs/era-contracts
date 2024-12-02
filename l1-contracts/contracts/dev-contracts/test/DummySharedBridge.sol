@@ -219,7 +219,7 @@ contract DummySharedBridge is PausableUpgradeable {
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         // assetDeploymentTracker[assetId] = sender;
-        // emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
+        // emit AssetDeploymentTrackerRegistered(assetId, _assetHandlerAddress, _additionalData, sender);
     }
 
     // add this to be excluded from coverage report

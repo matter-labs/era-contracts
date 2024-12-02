@@ -75,6 +75,8 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
 
     bytes internal exampleChainCommitment;
 
+    address internal sharedBridgeLegacy;
+
     IChainTypeManager internal chainTypeManager;
 
     function setUp() public {
@@ -90,7 +92,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
             beaconProxyBytecodeHash := extcodehash(beaconProxy)
         }
 
-        address l2SharedBridge = deployL2SharedBridgeLegacy(
+        sharedBridgeLegacy = deployL2SharedBridgeLegacy(
             L1_CHAIN_ID,
             ERA_CHAIN_ID,
             ownerWallet,
@@ -105,7 +107,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
-                legacySharedBridge: l2SharedBridge,
+                legacySharedBridge: sharedBridgeLegacy,
                 l2TokenBeacon: address(beacon),
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,

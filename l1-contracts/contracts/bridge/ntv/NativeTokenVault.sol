@@ -94,7 +94,7 @@ abstract contract NativeTokenVault is
         _registerToken(_nativeToken);
     }
 
-    function _registerToken(address _nativeToken) internal {
+    function _registerToken(address _nativeToken) internal virtual {
         if (_nativeToken == WETH_TOKEN) {
             revert TokenNotSupported(WETH_TOKEN);
         }
