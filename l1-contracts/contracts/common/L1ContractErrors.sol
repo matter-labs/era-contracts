@@ -430,6 +430,8 @@ error TokenIsLegacy();
 error LegacyBridgeUsesNonNativeToken();
 // 0x11832de8
 error AssetRouterAllowanceNotZero();
+// 0xaa5f6180
+error BurningNativeWETHNotSupported();
 // 0xb20b58ce
 error NoLegacySharedBridge();
 

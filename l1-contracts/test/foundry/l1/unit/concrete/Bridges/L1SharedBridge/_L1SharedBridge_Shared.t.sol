@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -108,7 +109,7 @@ contract L1AssetRouterTest is Test {
         bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
-        l1WethAddress = makeAddr("weth");
+        l1WethAddress = address(new ERC20("Wrapped ETH", "WETH"));
         l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
         l2SharedBridge = makeAddr("l2SharedBridge");
 

@@ -21,7 +21,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {AssetIdAlreadyRegistered, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress, DeployingBridgedTokenForNativeToken} from "../../common/L1ContractErrors.sol";
+import {BurningNativeWETHNotSupported, AssetIdAlreadyRegistered, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress, DeployingBridgedTokenForNativeToken} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
@@ -95,7 +95,11 @@ abstract contract NativeTokenVault is
     }
 
     function _registerToken(address _nativeToken) internal virtual {
-        if (_nativeToken == WETH_TOKEN) {
+        // We allow registering `WETH_TOKEN` inside `NativeTokenVault` only for L1 native token vault.
+        // It is needed to allow withdrawing such assets. We restrict all WETH-related
+        // operations to deposits from L1 only to be able to upgrade their logic more easily in the
+        // future.
+        if (_nativeToken == WETH_TOKEN && block.chainid != L1_CHAIN_ID) {
             revert TokenNotSupported(WETH_TOKEN);
         }
         require(_nativeToken.code.length > 0, "NTV: empty token");
@@ -268,6 +272,11 @@ abstract contract NativeTokenVault is
         (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
 
         address nativeToken = tokenAddress[_assetId];
+        if (nativeToken == WETH_TOKEN) {
+            // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
+            // It can only be withdrawn from the chain where it has already gotten.
+            revert BurningNativeWETHNotSupported();
+        }
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             if (_depositAmount != msg.value) {
                 revert ValueMismatch(_depositAmount, msg.value);
