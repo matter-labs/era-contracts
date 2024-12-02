@@ -62,7 +62,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// This variable (together with eraLegacyBridgeLastDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
-    uint256 internal eraLegacyBridgeLastDepositTxNumber;
+    uint256 internal eraLegacyBridgeLastDepositTxNumberPlusOne;
 
     /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
     IL1ERC20Bridge public override legacyBridge;
@@ -198,9 +198,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _eraLegacyBridgeLastDepositTxNumber
     ) external onlyOwner {
         require(eraLegacyBridgeLastDepositBatch == 0, "ShB: eLOBDB already set");
-        require(eraLegacyBridgeLastDepositTxNumber == 0, "ShB: eLOBDTN already set");
+        require(eraLegacyBridgeLastDepositTxNumberPlusOne == 0, "ShB: eLOBDTN already set");
         eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
-        eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
+        eraLegacyBridgeLastDepositTxNumberPlusOne = _eraLegacyBridgeLastDepositTxNumber;
     }
 
     /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
@@ -547,7 +547,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         return
             (_chainId == ERA_CHAIN_ID) &&
             (_l2BatchNumber < eraLegacyBridgeLastDepositBatch ||
-                (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumber &&
+                (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumberPlusOne &&
                     _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
     }
 
