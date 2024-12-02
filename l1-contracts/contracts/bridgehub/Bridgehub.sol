@@ -246,7 +246,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address token = __DEPRECATED_baseToken[_chainId];
         require(token != address(0), "BH: token not set");
 
-        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, token);
+
+        baseTokenAssetId[_chainId] = assetId;
+        assetIdIsRegistered[assetId] = true;
 
         address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
         if (chainAddress == address(0)) {
