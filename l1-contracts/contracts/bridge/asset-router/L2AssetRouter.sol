@@ -19,7 +19,7 @@ import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -304,7 +304,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress(_l2Token));
+        address l1Address = l1TokenAddress(_l2Token);
+        if (l1Address == address(0)) {
+            revert TokenNotLegacy();
+        }
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Address);
         bytes memory data = abi.encode(_amount, _l1Receiver);
         _withdrawSender(assetId, data, _sender, false);
     }
@@ -313,6 +317,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _l2Token The address of token on L2.
     /// @return The address of token on L1.
     function l1TokenAddress(address _l2Token) public view returns (address) {
+        bytes32 assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2Token);
+        if (assetId == bytes32(0)) {
+            return address(0);
+        }
+        uint256 originChainId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(assetId);
+        if (originChainId != L1_CHAIN_ID) {
+            return address(0);
+        }
+
         return IBridgedStandardToken(_l2Token).l1Address();
     }
 
