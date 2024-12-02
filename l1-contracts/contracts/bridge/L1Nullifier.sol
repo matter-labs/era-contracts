@@ -64,7 +64,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
     uint256 internal eraLegacyBridgeLastDepositBatch;
 
-    /// @dev The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
+    /// @dev The tx number in the _eraLegacyBridgeLastDepositBatch that comes *right after* the last deposit tx initiated by the legacy bridge.
     /// This variable (together with eraLegacyBridgeLastDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
@@ -500,7 +500,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         return
             (_chainId == ERA_CHAIN_ID) &&
             (_l2BatchNumber < eraLegacyBridgeLastDepositBatch ||
-                (_l2TxNumberInBatch <= eraLegacyBridgeLastDepositTxNumber &&
+                (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumber &&
                     _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
     }
 
