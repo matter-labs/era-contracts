@@ -144,12 +144,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
             address bridgehubStmForChain = bridgehub.chainTypeManager(chainId);
             bytes32 bridgehubBaseAssetIdForChain = bridgehub.baseTokenAssetId(chainId);
-            address bridgehubChainAddressedForChain = bridgehub.getZKChain(chainId);
+            address bridgehubChainAddressForChain = bridgehub.getZKChain(chainId);
             address bhAddr = IZKChain(chain).getBridgehub();
 
             assertEq(bridgehubStmForChain, stmAddr);
             assertEq(bridgehubBaseAssetIdForChain, baseTokenAssetId);
-            assertEq(bridgehubChainAddressedForChain, chain);
+            assertEq(bridgehubChainAddressForChain, chain);
             assertEq(bhAddr, address(bridgehub));
         }
 

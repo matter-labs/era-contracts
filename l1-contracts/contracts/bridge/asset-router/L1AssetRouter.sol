@@ -148,7 +148,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetRegistrationData,
         address _assetDeploymentTracker
     ) external onlyOwner {
-        bytes32 assetId = keccak256(abi.encode(block.chainid, _assetDeploymentTracker, _assetRegistrationData));
+        bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, _assetDeploymentTracker);
         assetDeploymentTracker[assetId] = _assetDeploymentTracker;
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
