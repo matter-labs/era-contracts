@@ -211,7 +211,6 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
-
         string memory path = string.concat(
             "/../system-contracts/zkout/",
             filename,

@@ -382,7 +382,7 @@ contract EcosystemUpgrade is Script {
         if (block.chainid == 1) {
             return 0x1800000002;
         } else {
-            return 0x1900000000; 
+            return 0x1900000000;
         }
     }
 
