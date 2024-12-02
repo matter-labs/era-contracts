@@ -68,5 +68,5 @@ interface IAssetRouterBase {
     /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
     /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
     /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external;
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external payable;
 }

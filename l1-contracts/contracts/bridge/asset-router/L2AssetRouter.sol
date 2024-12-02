@@ -133,7 +133,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
+    ) public payable override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
@@ -251,7 +251,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,
@@ -287,7 +287,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
-        this.finalizeDeposit(L1_CHAIN_ID, assetId, data);
+        this.finalizeDeposit{value: msg.value}(L1_CHAIN_ID, assetId, data);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
