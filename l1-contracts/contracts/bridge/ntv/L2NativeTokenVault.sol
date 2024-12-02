@@ -103,7 +103,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
-        if(assetId[_l2TokenAddress] != bytes32(0)) {
+        if (assetId[_l2TokenAddress] != bytes32(0)) {
             revert AssetIdAlreadyRegistered();
         }
 
@@ -115,7 +115,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
     }
 
-    function _registerLegacyTokenAssetId(address _l2TokenAddress, address _l1TokenAddress) internal returns (bytes32 newAssetId) {
+    function _registerLegacyTokenAssetId(
+        address _l2TokenAddress,
+        address _l1TokenAddress
+    ) internal returns (bytes32 newAssetId) {
         // FIXME: this function does not register asset handler addr
 
         newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);

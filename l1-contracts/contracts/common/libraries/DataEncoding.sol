@@ -25,13 +25,9 @@ library DataEncoding {
 
     // todo
     function decodeBridgeBurnData(
-        bytes memory _data  
-    ) internal pure returns (
-        uint256 amount,
-        address receiver,
-        address maybeTokenAddress
-    ) {
-        if(_data.length != 96) {
+        bytes memory _data
+    ) internal pure returns (uint256 amount, address receiver, address maybeTokenAddress) {
+        if (_data.length != 96) {
             // For better error handling
             revert InvalidNTVBurnData();
         }
@@ -142,7 +138,7 @@ library DataEncoding {
                 revert IncorrectTokenAddressFromNTV(_assetId, tokenAddress);
             }
 
-            (uint256 depositAmount, ,) = decodeBridgeBurnData(_transferData);
+            (uint256 depositAmount, , ) = decodeBridgeBurnData(_transferData);
             txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
         } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.

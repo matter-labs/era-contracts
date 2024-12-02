@@ -165,7 +165,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // solhint-disable-next-line no-unused-vars
         bool _depositChecked,
         uint256 _depositAmount,
-        address _receiver ,
+        address _receiver,
         address _tokenAddress
     ) internal override returns (bytes memory _bridgeMintData) {
         bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
@@ -195,7 +195,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _depositSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenNotPaused {
-        (uint256 _amount, ,) = DataEncoding.decodeBridgeBurnData(_data);
+        (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];
         if (_amount == 0) {
             revert NoFundsTransferred();
@@ -229,7 +229,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /*//////////////////////////////////////////////////////////////
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
 
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
         // There are no legacy tokens present on L1.

@@ -185,24 +185,28 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory _bridgeMintData) {
         (uint256 amount, address receiver, address tokenAddress) = _decodeBurnAndCheckAssetId(_data, _assetId);
         if (originChainId[_assetId] != block.chainid) {
-            _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _originalCaller, amount, receiver, tokenAddress);
+            _bridgeMintData = _bridgeBurnBridgedToken(
+                _chainId,
+                _assetId,
+                _originalCaller,
+                amount,
+                receiver,
+                tokenAddress
+            );
         } else {
             _bridgeMintData = _bridgeBurnNativeToken({
                 _chainId: _chainId,
                 _assetId: _assetId,
                 _originalCaller: _originalCaller,
                 _depositChecked: false,
-                _depositAmount: amount, 
-                _receiver: receiver, 
+                _depositAmount: amount,
+                _receiver: receiver,
                 _tokenAddress: tokenAddress
             });
         }
     }
 
-     function tryRegisterTokenFromBurnData(
-        bytes calldata _data,
-        bytes32 _expectedAssetId
-    ) external {
+    function tryRegisterTokenFromBurnData(bytes calldata _data, bytes32 _expectedAssetId) external {
         (uint256 amount, address receiver, address tokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (tokenAddress == address(0)) {
@@ -211,13 +215,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
 
         bytes32 storedAssetId = assetId[tokenAddress];
-        if(storedAssetId != bytes32(0)) {
+        if (storedAssetId != bytes32(0)) {
             revert("asset id already registered");
         }
 
-        // This token has not been registered within this NTV yet. Usually this means that the 
+        // This token has not been registered within this NTV yet. Usually this means that the
         // token is native to the chain and the user would prefer to get it registered as such.
-        // However, there are exceptions (e.g. bridged legacy ERC20 tokens on L2) when the 
+        // However, there are exceptions (e.g. bridged legacy ERC20 tokens on L2) when the
         // assetId has not been stored yet. We will ask the implementor to double check that the token
         // is not legacy.
 
@@ -230,21 +234,17 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         if (newAssetId != _expectedAssetId) {
             // todo
-            revert ("bad asset id");
+            revert("bad asset id");
         }
     }
 
     function _decodeBurnAndCheckAssetId(
         bytes calldata _data,
         bytes32 _expectedAssetId
-    ) internal returns (
-        uint256 amount, 
-        address receiver, 
-        address parsedTokenAddress
-    ) {
+    ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
         (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
-        if(parsedTokenAddress == address(0)) {
+        if (parsedTokenAddress == address(0)) {
             // This means that the wants the native token vault to resolve the
             // address. In this case, it is assumed that the assetId is already registered.
             parsedTokenAddress = tokenAddress[_expectedAssetId];

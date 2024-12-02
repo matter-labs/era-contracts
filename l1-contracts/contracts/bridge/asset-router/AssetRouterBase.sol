@@ -143,8 +143,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             // The Native Token Vault is trusted to correctly return whether an asset belongs to it.
             //
             // Note, that it may "pollute" error handling a bit: instead of getting error for asset handler not being
-            // present, the user will get whatever error the native token vault will return, however, providing 
-            // more advanced error handling requires more extensive code and will be added in the future releases. 
+            // present, the user will get whatever error the native token vault will return, however, providing
+            // more advanced error handling requires more extensive code and will be added in the future releases.
             INativeTokenVault(_nativeTokenVault).tryRegisterTokenFromBurnData(_transferData, _assetId);
 
             // We do not do any additional transformations here (like setting `assetHandler` in the mapping),

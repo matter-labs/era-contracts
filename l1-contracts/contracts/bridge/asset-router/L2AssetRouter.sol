@@ -177,7 +177,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             _passValue: false,
             _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
         });
-    
+
         bytes memory message;
         if (_alwaysNewMessageFormat || L2_LEGACY_SHARED_BRIDGE == address(0)) {
             message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
