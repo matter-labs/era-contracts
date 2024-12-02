@@ -142,6 +142,28 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         emit DepositFinalizedAssetRouter(L1_CHAIN_ID, _assetId, _transferData);
     }
 
+    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// where tokens would be unlocked
+    /// @dev IMPORTANT: this method will be deprecated in one of the future releases, so contracts
+    /// that rely on it must be upgradeable.
+    /// @param _assetId The asset id of the withdrawn asset
+    /// @param _assetData The data that is passed to the asset handler contract
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override returns (bytes32) {
+        return _withdrawSender(_assetId, _assetData, msg.sender, true);
+    }
+
+    /// @dev IMPORTANT: this method will be deprecated in one of the future releases, so contracts
+    /// that rely on it must be upgradeable.
+    function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
+        bytes32 recordedAssetId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2NativeToken);
+        uint256 recordedOriginChainId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(recordedAssetId);
+        if (recordedOriginChainId == L1_CHAIN_ID) {
+            revert AssetIdNotSupported(recordedAssetId);
+        }
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
+        return _withdrawSender(assetId, _assetData, msg.sender, true);
+    }
+
     /*//////////////////////////////////////////////////////////////
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
@@ -156,25 +178,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @dev do not rely on this function, it will be deprecated in the future
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override returns (bytes32) {
-        return _withdrawSender(_assetId, _assetData, msg.sender, true);
-    }
-
-    function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
-        bytes32 recordedAssetId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2NativeToken);
-        uint256 recordedOriginChainId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(recordedAssetId);
-        if (recordedOriginChainId == L1_CHAIN_ID) {
-            revert AssetIdNotSupported(recordedAssetId);
-        }
-        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
-        return _withdrawSender(assetId, _assetData, msg.sender, true);
-    }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
