@@ -200,7 +200,6 @@ abstract contract NativeTokenVault is
         whenNotPaused
         returns (bytes memory _bridgeMintData)
     {
-        
         (uint256 amount, address receiver, address tokenAddress) = _decodeBurnAndCheckAssetId(_data, _assetId);
         if (originChainId[_assetId] != block.chainid) {
             _bridgeMintData = _bridgeBurnBridgedToken(
@@ -336,14 +335,13 @@ abstract contract NativeTokenVault is
         address _receiver,
         address _tokenAddress
     ) internal virtual returns (bytes memory _bridgeMintData) {
-
         address nativeToken = tokenAddress[_assetId];
         if (nativeToken == WETH_TOKEN) {
             // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
             // It can only be withdrawn from the chain where it has already gotten.
             revert BurningNativeWETHNotSupported();
         }
-        
+
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             if (_depositAmount != msg.value) {
                 revert ValueMismatch(_depositAmount, msg.value);
