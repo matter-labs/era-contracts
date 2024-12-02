@@ -361,6 +361,9 @@ error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
 
+// 0xde4c0b96
+error InvalidNTVBurnData();
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

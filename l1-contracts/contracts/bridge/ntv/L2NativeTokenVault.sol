@@ -22,7 +22,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -83,13 +83,42 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
+        // In zkEVM immutables are stored in a storage of a system contract,
+        // so it makes sense to cache them for efficiency.
+        address legacyBridge = address(L2_LEGACY_SHARED_BRIDGE);
+        if (legacyBridge == address(0)) {
+            // No legacy bridge, the token must be native
+            return bytes32(0);
+        }
+
+        address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_tokenAddress);
+        if (l1TokenAddress == address(0)) {
+            // The token is not legacy
+            return bytes32(0);
+        }
+
+        return _registerLegacyTokenAssetId(_tokenAddress, l1TokenAddress);
+    }
+
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
+        if(assetId[_l2TokenAddress] != bytes32(0)) {
+            revert AssetIdAlreadyRegistered();
+        }
+
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         if (l1TokenAddress == address(0)) {
             revert ZeroAddress();
         }
-        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
+
+        _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
+    }
+
+    function _registerLegacyTokenAssetId(address _l2TokenAddress, address _l1TokenAddress) internal returns (bytes32 newAssetId) {
+        // FIXME: this function does not register asset handler addr
+
+        newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
         tokenAddress[newAssetId] = _l2TokenAddress;
         assetId[_l2TokenAddress] = newAssetId;
         originChainId[newAssetId] = L1_CHAIN_ID;

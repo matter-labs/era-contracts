@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
-import {IncorrectTokenAddressFromNTV, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {IncorrectTokenAddressFromNTV, UnsupportedEncodingVersion, InvalidNTVBurnData} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -13,6 +13,32 @@ import {IncorrectTokenAddressFromNTV, UnsupportedEncodingVersion} from "../L1Con
  * @notice Helper library for transfer data encoding and decoding to reduce possibility of errors.
  */
 library DataEncoding {
+    // todo
+    function encodeBridgeBurnData(
+        uint256 _amount,
+        address _receiver,
+        address _maybeTokenAddress
+    ) internal pure returns (bytes memory) {
+        // todo: maybe make the same as legacy data just for the sake of reusing more things
+        return abi.encode(_amount, _receiver, _maybeTokenAddress);
+    }
+
+    // todo
+    function decodeBridgeBurnData(
+        bytes memory _data  
+    ) internal pure returns (
+        uint256 amount,
+        address receiver,
+        address maybeTokenAddress
+    ) {
+        if(_data.length != 96) {
+            // For better error handling
+            revert InvalidNTVBurnData();
+        }
+
+        (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
+    }
+
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
     /// @param _originalCaller The address which initiated the transfer.
     /// @param _remoteReceiver The address which to receive tokens on remote chain.
@@ -116,7 +142,7 @@ library DataEncoding {
                 revert IncorrectTokenAddressFromNTV(_assetId, tokenAddress);
             }
 
-            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
+            (uint256 depositAmount, ,) = decodeBridgeBurnData(_transferData);
             txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
         } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.

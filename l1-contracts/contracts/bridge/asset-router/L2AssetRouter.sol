@@ -143,16 +143,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         return _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 
-    function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
-        bytes32 recordedAssetId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2NativeToken);
-        uint256 recordedOriginChainId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(recordedAssetId);
-        if (recordedOriginChainId == L1_CHAIN_ID) {
-            revert AssetIdNotSupported(recordedAssetId);
-        }
-        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
-        return _withdrawSender(assetId, _assetData, msg.sender, true);
-    }
-
     /*//////////////////////////////////////////////////////////////
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
@@ -178,18 +168,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _sender,
         bool _alwaysNewMessageFormat
     ) internal returns (bytes32 txHash) {
-        address assetHandler = assetHandlerAddress[_assetId];
-        bytes memory _l1bridgeMintData = IAssetHandler(assetHandler).bridgeBurn({
+        bytes memory l1bridgeMintData = _burn({
             _chainId: L1_CHAIN_ID,
-            _msgValue: 0,
+            _nextMsgValue: 0,
             _assetId: _assetId,
             _originalCaller: _sender,
-            _data: _assetData
+            _transferData: _assetData,
+            _passValue: false,
+            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
         });
-
+    
         bytes memory message;
         if (_alwaysNewMessageFormat || L2_LEGACY_SHARED_BRIDGE == address(0)) {
-            message = _getAssetRouterWithdrawMessage(_assetId, _l1bridgeMintData);
+            message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
             // slither-disable-next-line unused-return
             txHash = L2ContractHelper.sendMessageToL1(message);
         } else {
@@ -199,7 +190,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             if (l1Token == address(0)) {
                 revert AssetIdNotSupported(_assetId);
             }
-            (uint256 amount, address l1Receiver) = abi.decode(_assetData, (uint256, address));
+            (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
             txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
         }
@@ -314,7 +305,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress(_l2Token));
-        bytes memory data = abi.encode(_amount, _l1Receiver);
+        bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, _l2Token);
         _withdrawSender(assetId, data, _sender, false);
     }
 
