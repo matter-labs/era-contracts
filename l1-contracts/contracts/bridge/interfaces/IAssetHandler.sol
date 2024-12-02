@@ -22,6 +22,9 @@ interface IAssetHandler {
     /// @param _chainId the chainId that the message is from
     /// @param _assetId the assetId of the asset being bridged
     /// @param _data the actual data specified for the function
+    /// @dev Note, that while payable, this function will only receive base token on L2 chains,
+    /// while L1 the provided msg.value is always 0. However, this may change in the future,
+    /// so if your AssetHandler implementation relies on it, it is better to explicitly check it.
     function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 
     /// @notice Burns bridged tokens and returns the calldata for L2 <-> L1 message.

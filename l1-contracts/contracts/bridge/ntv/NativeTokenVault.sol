@@ -19,14 +19,21 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {InvalidNTVBurnData, AssetIdAlreadyRegistered, DeployingBridgedTokenForNativeToken, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {EmptyToken} from "../L1BridgeContractErrors.sol";
+import {BurningNativeWETHNotSupported, AssetIdAlreadyRegistered, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress, DeployingBridgedTokenForNativeToken} from "../../common/L1ContractErrors.sol";
+import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
+abstract contract NativeTokenVault is
+    INativeTokenVault,
+    IAssetHandler,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable,
+    AssetHandlerModifiers
+{
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
@@ -86,8 +93,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         _registerToken(_nativeToken);
     }
 
-    function _registerToken(address _nativeToken) internal returns (bytes32 newAssetId) {
-        if (_nativeToken == WETH_TOKEN) {
+    function _registerToken(address _nativeToken) internal virtual returns (bytes32 newAssetId) {
+        // We allow registering `WETH_TOKEN` inside `NativeTokenVault` only for L1 native token vault.
+        // It is needed to allow withdrawing such assets. We restrict all WETH-related
+        // operations to deposits from L1 only to be able to upgrade their logic more easily in the
+        // future.
+        if (_nativeToken == WETH_TOKEN && block.chainid != L1_CHAIN_ID) {
             revert TokenNotSupported(WETH_TOKEN);
         }
         if (_nativeToken.code.length == 0) {
@@ -119,7 +130,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenNotPaused {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
         address receiver;
         uint256 amount;
         // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
@@ -150,7 +161,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         _handleChainBalanceDecrease(_originChainId, _assetId, amount, false);
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
-        emit BridgeMint(_originChainId, _assetId, receiver, amount);
     }
 
     function _bridgeMintNativeToken(
@@ -164,7 +174,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         _handleChainBalanceDecrease(_originChainId, _assetId, amount, true);
         _withdrawFunds(_assetId, receiver, token, amount);
-        emit BridgeMint(_originChainId, _assetId, receiver, amount);
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
@@ -178,11 +187,20 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _receiver.
     function bridgeBurn(
         uint256 _chainId,
-        uint256,
+        uint256 _l2MsgValue,
         bytes32 _assetId,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory _bridgeMintData) {
+    )
+        external
+        payable
+        override
+        requireZeroValue(_l2MsgValue)
+        onlyAssetRouter
+        whenNotPaused
+        returns (bytes memory _bridgeMintData)
+    {
+        
         (uint256 amount, address receiver, address tokenAddress) = _decodeBurnAndCheckAssetId(_data, _assetId);
         if (originChainId[_assetId] != block.chainid) {
             _bridgeMintData = _bridgeBurnBridgedToken(
@@ -266,7 +284,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256 _amount,
         address _receiver,
         address _tokenAddress
-    ) internal returns (bytes memory _bridgeMintData) {
+    ) internal requireZeroValue(msg.value) returns (bytes memory _bridgeMintData) {
         if (_amount == 0) {
             // "Amount cannot be zero");
             revert AmountMustBeGreaterThanZero();
@@ -318,6 +336,14 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _receiver,
         address _tokenAddress
     ) internal virtual returns (bytes memory _bridgeMintData) {
+
+        address nativeToken = tokenAddress[_assetId];
+        if (nativeToken == WETH_TOKEN) {
+            // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
+            // It can only be withdrawn from the chain where it has already gotten.
+            revert BurningNativeWETHNotSupported();
+        }
+        
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             if (_depositAmount != msg.value) {
                 revert ValueMismatch(_depositAmount, msg.value);

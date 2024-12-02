@@ -356,10 +356,28 @@ error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
 
 // 0xce63ce17
 error NoCTMForAssetId(bytes32 assetId);
+// 0x02181a13
+error SettlementLayersMustSettleOnL1();
+// 0x1850b46b
+error TokenNotLegacy();
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
+// 0x7acd7817
+error TokenIsNotLegacy();
+// 0xa51fa558
+error TokenIsLegacy();
+// 0x29963361
+error LegacyBridgeUsesNonNativeToken();
+// 0x11832de8
+error AssetRouterAllowanceNotZero();
+// 0xaa5f6180
+error BurningNativeWETHNotSupported();
+// 0xb20b58ce
+error NoLegacySharedBridge();
+// 0x78d2ed02
+error ChainAlreadyLive();
 
 // 0xde4c0b96
 error InvalidNTVBurnData();
