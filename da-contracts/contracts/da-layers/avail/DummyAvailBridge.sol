@@ -1,12 +1,12 @@
 import {IAvailBridge} from "./IAvailBridge.sol";
 import {IVectorx} from "./IVectorx.sol";
-import {MockVectorX} from "./MockVectorX.sol";
+import {DummyVectorX} from "./DummyVectorX.sol";
 
-contract MockAvailBridge is IAvailBridge {
+contract DummyAvailBridge is IAvailBridge {
     IVectorx vectorxContract;
 
     constructor() {
-        vectorxContract = new MockVectorX();
+        vectorxContract = new DummyVectorX();
     }
 
     function setPaused(bool status) external {}

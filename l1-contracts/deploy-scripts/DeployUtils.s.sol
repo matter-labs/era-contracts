@@ -159,6 +159,7 @@ struct ContractsConfig {
     bytes diamondCutData;
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
+    address availL1DAValidator;
 }
 
 struct TokensConfig {
@@ -228,6 +229,10 @@ contract DeployUtils is Script {
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
         config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+
+        if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
+            config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
+        }
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }

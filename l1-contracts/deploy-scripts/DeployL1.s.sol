@@ -188,9 +188,15 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("L1NoDAValidiumDAValidator deployed at:", noDAValidator);
         addresses.daAddresses.noDAValidiumL1DAValidator = noDAValidator;
 
-        address availBridge = deployViaCreate2(Utils.readMockAvailBridgeBytecode(), "");
-        address availDAValidator = deployViaCreate2(Utils.readAvailL1DAValidatorBytecode(), abi.encode(availBridge));
-        console.log("AvailL1DAValidator deployed at:", availDAValidator);
+        address availDAValidator;
+        if (config.contracts.availL1DAValidator == address(0)) {
+            address availBridge = deployViaCreate2(Utils.readDummyAvailBridgeBytecode(), "");
+            availDAValidator = deployViaCreate2(Utils.readAvailL1DAValidatorBytecode(), abi.encode(availBridge));
+            console.log("AvailL1DAValidator deployed at:", availDAValidator);
+        } else {
+            availDAValidator = config.contracts.availL1DAValidator;
+        }
+
         addresses.daAddresses.availL1DAValidator = availDAValidator;
 
         vm.startBroadcast(msg.sender);
