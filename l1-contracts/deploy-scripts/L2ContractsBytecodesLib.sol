@@ -82,7 +82,7 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL2("AvailL2DAValidator.sol", "AvailL2DAValidator");
     }
 
-    /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for Avail.
+    /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for NoDA validium.
     /// @return The bytecode of the ValidiumL2DAValidator contract.
     function readNoDAL2DAValidatorBytecode() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
