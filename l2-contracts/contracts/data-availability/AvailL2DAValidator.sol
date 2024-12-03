@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 
-/// Rollup DA validator. It will publish data that would allow to use either calldata or blobs.
+/// Avail L2 DA validator. It will create a commitment to the pubdata that can later be verified during settlement.
 contract AvailL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
@@ -19,7 +19,7 @@ contract AvailL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
         // Operator data, that is related to the DA itself
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash) {
-        (bytes32 stateDiffHash, bytes calldata _totalPubdata, bytes calldata leftover) = _produceStateDiffPubdata(
+        (bytes32 _, bytes calldata _totalPubdata, bytes calldata _) = _produceStateDiffPubdata(
             _chainedMessagesHash,
             _chainedBytecodesHash,
             _totalL2ToL1PubdataAndStateDiffs

@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: MIT
+
 import {IAvailBridge} from "./IAvailBridge.sol";
 import {IVectorx} from "./IVectorx.sol";
 import {DummyVectorX} from "./DummyVectorX.sol";
 
 contract DummyAvailBridge is IAvailBridge {
-    IVectorx vectorxContract;
+    IVectorx public vectorxContract;
 
     constructor() {
         vectorxContract = new DummyVectorX();
@@ -13,7 +15,7 @@ contract DummyAvailBridge is IAvailBridge {
         return vectorxContract;
     }
 
-    function verifyBlobLeaf(MerkleProofInput calldata input) external view returns (bool) {
+    function verifyBlobLeaf(MerkleProofInput calldata _) external view returns (bool) {
         return true;
     }
 }
