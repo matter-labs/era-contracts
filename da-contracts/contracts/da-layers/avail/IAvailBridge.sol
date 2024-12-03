@@ -40,42 +40,6 @@ interface IAvailBridge {
         uint256 leafIndex;
     }
 
-    event MessageReceived(bytes32 indexed from, address indexed to, uint256 messageId);
-    event MessageSent(address indexed from, bytes32 indexed to, uint256 messageId);
-
-    error AlreadyBridged();
-    error ArrayLengthMismatch();
-    error BlobRootEmpty();
-    error BridgeRootEmpty();
-    error DataRootCommitmentEmpty();
-    error FeeTooLow();
-    error InvalidAssetId();
-    error InvalidDataLength();
-    error InvalidDataRootProof();
-    error InvalidDomain();
-    error InvalidDestinationOrAmount();
-    error InvalidFungibleTokenTransfer();
-    error InvalidLeaf();
-    error InvalidMerkleProof();
-    error InvalidMessage();
-    error UnlockFailed();
-    error WithdrawFailed();
-
-    function setPaused(bool status) external;
-    function updateVectorx(address newVectorx) external;
-    function updateTokens(bytes32[] calldata assetIds, address[] calldata tokenAddresses) external;
-    function updateFeePerByte(uint256 newFeePerByte) external;
-    function updateFeeRecipient(address newFeeRecipient) external;
-    function withdrawFees() external;
-    function receiveMessage(Message calldata message, MerkleProofInput calldata input) external;
-    function receiveAVAIL(Message calldata message, MerkleProofInput calldata input) external;
-    function receiveETH(Message calldata message, MerkleProofInput calldata input) external;
-    function receiveERC20(Message calldata message, MerkleProofInput calldata input) external;
-    function sendMessage(bytes32 recipient, bytes calldata data) external payable;
-    function sendAVAIL(bytes32 recipient, uint256 amount) external;
-    function sendETH(bytes32 recipient) external payable;
-    function sendERC20(bytes32 assetId, bytes32 recipient, uint256 amount) external;
     function vectorx() external view returns (IVectorx vectorx);
     function verifyBlobLeaf(MerkleProofInput calldata input) external view returns (bool);
-    function verifyBridgeLeaf(MerkleProofInput calldata input) external view returns (bool);
 }
