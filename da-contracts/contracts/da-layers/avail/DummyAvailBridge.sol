@@ -15,7 +15,7 @@ contract DummyAvailBridge is IAvailBridge {
         return vectorxContract;
     }
 
-    function verifyBlobLeaf(MerkleProofInput calldata _) external view returns (bool) {
+    function verifyBlobLeaf(MerkleProofInput calldata input) external view returns (bool) {
         return true;
     }
 }
