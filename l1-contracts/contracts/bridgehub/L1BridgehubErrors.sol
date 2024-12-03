@@ -8,9 +8,6 @@ error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xf306a770
 error NotAssetRouter(address msgSender, address sharedBridge);
 
-// 0x4b62f013
-error TokenNotSet();
-
 // 0xff514c10
 error ChainIdAlreadyPresent();
 
