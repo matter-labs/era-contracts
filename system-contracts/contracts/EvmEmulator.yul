@@ -786,33 +786,32 @@ object "EvmEmulator" {
             // memory_expansion_cost
             gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
         
-            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+            newGasLeft := chargeGas(evmGasLeft, gasUsed)
         
             // it is also not possible to delegatecall precompiles
-            if iszero(isEvmContract(addr)) {
-                revertWithGas(evmGasLeft)
+            if isEvmContract(addr) {
+                gasToPass := capGasForCall(newGasLeft, gasToPass)
+                newGasLeft := sub(newGasLeft, gasToPass)
+        
+                pushEvmFrame(gasToPass, isStatic)
+                let success := delegatecall(
+                    gas(), // pass all remaining native gas
+                    addr,
+                    add(MEM_OFFSET(), argsOffset),
+                    argsSize,
+                    0,
+                    0
+                )
+        
+                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
+                if iszero(success) {
+                    resetEvmFrame()
+                }
+        
+                newGasLeft := add(evmGasLeft, frameGasLeft)
+        
+                stackHead := success
             }
-        
-            gasToPass := capGasForCall(evmGasLeft, gasToPass)
-            evmGasLeft := sub(evmGasLeft, gasToPass)
-        
-            pushEvmFrame(gasToPass, isStatic)
-            let success := delegatecall(
-                gas(), // pass all remaining native gas
-                addr,
-                add(MEM_OFFSET(), argsOffset),
-                argsSize,
-                0,
-                0
-            )
-        
-            let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
-            if iszero(success) {
-                resetEvmFrame()
-            }
-        
-            newGasLeft := add(evmGasLeft, frameGasLeft)
-            stackHead := success
         }
         
         function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
@@ -3846,33 +3845,32 @@ object "EvmEmulator" {
                 // memory_expansion_cost
                 gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
             
-                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+                newGasLeft := chargeGas(evmGasLeft, gasUsed)
             
                 // it is also not possible to delegatecall precompiles
-                if iszero(isEvmContract(addr)) {
-                    revertWithGas(evmGasLeft)
+                if isEvmContract(addr) {
+                    gasToPass := capGasForCall(newGasLeft, gasToPass)
+                    newGasLeft := sub(newGasLeft, gasToPass)
+            
+                    pushEvmFrame(gasToPass, isStatic)
+                    let success := delegatecall(
+                        gas(), // pass all remaining native gas
+                        addr,
+                        add(MEM_OFFSET(), argsOffset),
+                        argsSize,
+                        0,
+                        0
+                    )
+            
+                    let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
+                    if iszero(success) {
+                        resetEvmFrame()
+                    }
+            
+                    newGasLeft := add(evmGasLeft, frameGasLeft)
+            
+                    stackHead := success
                 }
-            
-                gasToPass := capGasForCall(evmGasLeft, gasToPass)
-                evmGasLeft := sub(evmGasLeft, gasToPass)
-            
-                pushEvmFrame(gasToPass, isStatic)
-                let success := delegatecall(
-                    gas(), // pass all remaining native gas
-                    addr,
-                    add(MEM_OFFSET(), argsOffset),
-                    argsSize,
-                    0,
-                    0
-                )
-            
-                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
-                if iszero(success) {
-                    resetEvmFrame()
-                }
-            
-                newGasLeft := add(evmGasLeft, frameGasLeft)
-                stackHead := success
             }
             
             function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
