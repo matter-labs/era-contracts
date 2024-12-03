@@ -352,7 +352,7 @@ contract EcosystemUpgrade is Script {
             maxFeePerGas: 0,
             maxPriorityFeePerGas: 0,
             paymaster: uint256(uint160(address(0))),
-            nonce: 25,
+            nonce: getProtocolUpgradeNonce(),
             value: 0,
             reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
             // Note, that the data is empty, it will be fully composed inside the `GatewayUpgrade` contract
@@ -369,6 +369,10 @@ contract EcosystemUpgrade is Script {
 
     function getNewProtocolVersion() public returns (uint256) {
         return 0x1b00000000;
+    }
+
+    function getProtocolUpgradeNonce() public returns (uint256) {
+        return (getNewProtocolVersion() >> 32);
     }
 
     function getOldProtocolDeadline() public returns (uint256) {
