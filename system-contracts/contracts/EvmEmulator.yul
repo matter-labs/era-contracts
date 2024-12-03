@@ -396,8 +396,7 @@ object "EvmEmulator" {
             isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
         }
         
-        function isConstructedEvmContract(addr) -> isConstructedEVM {
-            let rawCodeHash := getRawCodeHash(addr)
+        function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
             let version := shr(248, rawCodeHash)
             let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
             isConstructedEVM := and(eq(version, 2), isConstructedFlag)
@@ -758,23 +757,35 @@ object "EvmEmulator" {
         
             newGasLeft := sub(newGasLeft, gasToPass)
         
-            let success := 1 // delegatecall to empty contract succeds
+            let success
             let frameGasLeft := gasToPass
         
-            switch shr(248, getRawCodeHash(addr)) // check version of called bytecode
-            case 1 {
+            let rawCodeHash := getRawCodeHash(addr)
+            switch isHashOfConstructedEvmContract(rawCodeHash)
+            case 0 {
+                // Not a constructed EVM contract
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                 switch precompileCost
                 case 0 {
-                    // We forbid delegatecalls to EraVM native contracts
-                    success := 0
+                    // Not a precompile
+                    switch eq(1, shr(248, rawCodeHash))
+                    case 0 {
+                        // Empty contract or EVM contract being constructed
+                        success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, 0, 0)
+                        _saveReturndataAfterZkEVMCall()
+                    }
+                    default {
+                        // We forbid delegatecalls to EraVM native contracts
+                        _eraseReturndataPointer()
+                    }
                 } 
                 default {
-                    // precompile
+                    // Precompile. Simlate using staticcall, since EraVM behavior differs here
                     success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
                 }
             }
-            case 2 {
+            default {
+                // Constructed EVM contract
                 pushEvmFrame(gasToPass, isStatic)
                 // pass all remaining native gas
                 success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, 0, 0)
@@ -805,7 +816,7 @@ object "EvmEmulator" {
         }
         
         function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-            switch isConstructedEvmContract(addr)
+            switch isHashOfConstructedEvmContract(getRawCodeHash(addr))
             case 0 {
                 // zkEVM native call
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -3445,8 +3456,7 @@ object "EvmEmulator" {
                 isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
             }
             
-            function isConstructedEvmContract(addr) -> isConstructedEVM {
-                let rawCodeHash := getRawCodeHash(addr)
+            function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
                 let version := shr(248, rawCodeHash)
                 let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
                 isConstructedEVM := and(eq(version, 2), isConstructedFlag)
@@ -3807,23 +3817,35 @@ object "EvmEmulator" {
             
                 newGasLeft := sub(newGasLeft, gasToPass)
             
-                let success := 1 // delegatecall to empty contract succeds
+                let success
                 let frameGasLeft := gasToPass
             
-                switch shr(248, getRawCodeHash(addr)) // check version of called bytecode
-                case 1 {
+                let rawCodeHash := getRawCodeHash(addr)
+                switch isHashOfConstructedEvmContract(rawCodeHash)
+                case 0 {
+                    // Not a constructed EVM contract
                     let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                     switch precompileCost
                     case 0 {
-                        // We forbid delegatecalls to EraVM native contracts
-                        success := 0
+                        // Not a precompile
+                        switch eq(1, shr(248, rawCodeHash))
+                        case 0 {
+                            // Empty contract or EVM contract being constructed
+                            success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, 0, 0)
+                            _saveReturndataAfterZkEVMCall()
+                        }
+                        default {
+                            // We forbid delegatecalls to EraVM native contracts
+                            _eraseReturndataPointer()
+                        }
                     } 
                     default {
-                        // precompile
+                        // Precompile. Simlate using staticcall, since EraVM behavior differs here
                         success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
                     }
                 }
-                case 2 {
+                default {
+                    // Constructed EVM contract
                     pushEvmFrame(gasToPass, isStatic)
                     // pass all remaining native gas
                     success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, 0, 0)
@@ -3854,7 +3876,7 @@ object "EvmEmulator" {
             }
             
             function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-                switch isConstructedEvmContract(addr)
+                switch isHashOfConstructedEvmContract(getRawCodeHash(addr))
                 case 0 {
                     // zkEVM native call
                     let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
