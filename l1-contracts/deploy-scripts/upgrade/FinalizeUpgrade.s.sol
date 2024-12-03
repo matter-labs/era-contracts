@@ -41,12 +41,7 @@ contract FinalizeUpgrade is Script {
 
             if (bh.baseTokenAssetId(chains[i]) == bytes32(0)) {
                 vm.broadcast();
-                Bridgehub(bridgehub).setLegacyBaseTokenAssetId(chains[i]);
-            }
-
-            if (bh.getZKChain(chains[i]) == address(0)) {
-                vm.broadcast();
-                Bridgehub(bridgehub).setLegacyChainAddress(chains[i]);
+                Bridgehub(bridgehub).registerLegacyChain(chains[i]);
             }
         }
     }

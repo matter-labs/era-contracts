@@ -1153,7 +1153,6 @@ contract EcosystemUpgrade is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
-                config.eraChainId,
                 config.contracts.oldSharedBridgeProxyAddress
             )
         );
