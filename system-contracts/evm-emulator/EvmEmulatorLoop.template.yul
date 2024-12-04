@@ -477,6 +477,8 @@ for { } true { } {
         dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+
+        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
     
         checkMemIsAccessible(dstOffset, len)
     
