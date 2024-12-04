@@ -9,7 +9,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
 /// Knowledge (PLONK) verifier.
 /// Modifications have been made to optimize the proof system for ZKsync hyperchain circuits.
-/// @dev Contract was generated from a verification key with a hash of 0x14f97b81e54b35fe673d8708cc1a19e1ea5b5e348e12d31e39824ed4f42bbca2
+/// @dev Contract was generated from a verification key with a hash of 0x3eb90315bdf49798288980905013d18c3cc73c0a2be4595b568530907f54035b
 /// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
 /// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
@@ -284,14 +284,14 @@ contract VerifierPlonk is IVerifier {
     function _loadVerificationKey() internal pure virtual {
         assembly {
             // gate setup commitments
-            mstore(VK_GATE_SETUP_0_X_SLOT, 0x110deb1e0863737f9a3d7b4de641a03aa00a77bc9f1a05acc9d55b76ab9fdd4d)
-            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x2c9dc252441e9298b7f6df6335a252517b7bccb924adf537b87c5cd3383fd7a9)
-            mstore(VK_GATE_SETUP_1_X_SLOT, 0x04659caf7b05471ba5ba85b1ab62267aa6c456836e625f169f7119d55b9462d2)
-            mstore(VK_GATE_SETUP_1_Y_SLOT, 0x0ea63403692148d2ad22189a1e5420076312f4d46e62036a043a6b0b84d5b410)
+            mstore(VK_GATE_SETUP_0_X_SLOT, 0x110273d976234f8fce32393c3615ccf85ca5440ffcdaae8b82063c50bea35190)
+            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x12d36f3474c7b133e043f24e7de7144ffc84ae45fa07ade20c755839df84bc45)
+            mstore(VK_GATE_SETUP_1_X_SLOT, 0x237b3a20dfa89a705064f5c98e087ccd28b776a7aebcbd10b948b2b9f8a3ee83)
+            mstore(VK_GATE_SETUP_1_Y_SLOT, 0x2602c4f6321c7e15348ec8b2eca496928d6d7997400fa7daa2daf9eb73e2bde4)
             mstore(VK_GATE_SETUP_2_X_SLOT, 0x0e6696d09d65fce1e42805be03fca1f14aea247281f688981f925e77d4ce2291)
             mstore(VK_GATE_SETUP_2_Y_SLOT, 0x0228f6cf8fe20c1e07e5b78bf8c41d50e55975a126d22a198d1e56acd4bbb3dd)
-            mstore(VK_GATE_SETUP_3_X_SLOT, 0x14685dafe340b1dec5eafcd5e7faddaf24f3781ddc53309cc25d0b42c00541dd)
-            mstore(VK_GATE_SETUP_3_Y_SLOT, 0x0e651cff9447cb360198899b80fa23e89ec13bc94ff161729aa841d2b55ea5be)
+            mstore(VK_GATE_SETUP_3_X_SLOT, 0x08fd28a8dd326e0283a9dd7e800d6319154c149ec25f0a417fed06fe37c5ea1d)
+            mstore(VK_GATE_SETUP_3_Y_SLOT, 0x07a4285fcb5378079c0a3209fbcd365d77cb149e15467da3ef33bdba2a03b718)
             mstore(VK_GATE_SETUP_4_X_SLOT, 0x16e9ef76cb68f2750eb0ee72382dd9911a982308d0ab10ef94dada13c382ae73)
             mstore(VK_GATE_SETUP_4_Y_SLOT, 0x22e404bc91350f3bc7daad1d1025113742436983c85eac5ab7b42221a181b81e)
             mstore(VK_GATE_SETUP_5_X_SLOT, 0x0d9b29613037a5025655c82b143d2b7449c98f3aea358307c8529249cc54f3b9)
@@ -308,14 +308,14 @@ contract VerifierPlonk is IVerifier {
             mstore(VK_GATE_SELECTORS_1_Y_SLOT, 0x305f4137fee253dff8b2bfe579038e8f25d5bd217865072af5d89fc8800ada24)
 
             // permutation commitments
-            mstore(VK_PERMUTATION_0_X_SLOT, 0x13a600154b369ff3237706d00948e465ee1c32c7a6d3e18bccd9c4a15910f2e5)
-            mstore(VK_PERMUTATION_0_Y_SLOT, 0x138aa24fbf4cdddc75114811b3d59040394c218ecef3eb46ef9bd646f7e53776)
-            mstore(VK_PERMUTATION_1_X_SLOT, 0x277fff1f80c409357e2d251d79f6e3fd2164b755ce69cfd72de5c690289df662)
-            mstore(VK_PERMUTATION_1_Y_SLOT, 0x25235588e28c70eea3e35531c80deac25cd9b53ea3f98993f120108bc7abf670)
+            mstore(VK_PERMUTATION_0_X_SLOT, 0x204194e46016e07773251216e49d4b758d7f2082779818bf2eedca2ce8fa00a0)
+            mstore(VK_PERMUTATION_0_Y_SLOT, 0x008862c9e4d71ae1c38e77e1570c5f4e2263888518aa859090a1f61fa00b8830)
+            mstore(VK_PERMUTATION_1_X_SLOT, 0x0b1616e4930dc9441d02f355aa589dc2f5c1398ced7ba307e262937e16f2a322)
+            mstore(VK_PERMUTATION_1_Y_SLOT, 0x2047001ad53963c96019118f0782f905bda93fdadde1fb97fd57d49f9a249516)
             mstore(VK_PERMUTATION_2_X_SLOT, 0x0990e07a9b001048b947d0e5bd6157214c7359b771f01bf52bd771ba563a900e)
             mstore(VK_PERMUTATION_2_Y_SLOT, 0x05e5fb090dd40914c8606d875e301167ae3047d684a02b44d9d36f1eaf43d0b4)
-            mstore(VK_PERMUTATION_3_X_SLOT, 0x1d4656690b33299db5631401a282afab3e16c78ee2c9ad9efea628171dcbc6bc)
-            mstore(VK_PERMUTATION_3_Y_SLOT, 0x0ebda2ebe582f601f813ec1e3970d13ef1500c742a85cce9b7f190f333de03b0)
+            mstore(VK_PERMUTATION_3_X_SLOT, 0x209ab1fed24cc2a6cecf52304540bbb5b76cc7ca80178ae18ff2c9641941665c)
+            mstore(VK_PERMUTATION_3_Y_SLOT, 0x125801dbbb931c758779a99212d64978dd41df445db101a8debdfa1c7141921d)
 
             // lookup tables commitments
             mstore(VK_LOOKUP_TABLE_0_X_SLOT, 0x2c513ed74d9d57a5ec901e074032741036353a2c4513422e96e7b53b302d765b)
