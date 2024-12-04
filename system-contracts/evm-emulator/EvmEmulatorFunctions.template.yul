@@ -218,10 +218,12 @@ function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
 }
 
 function checkMemIsAccessible(relativeOffset, size) {
-    checkOverflow(relativeOffset, size)
+    if size {
+        checkOverflow(relativeOffset, size)
 
-    if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
-        panic()
+        if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
+            panic()
+        }   
     }
 }
 
