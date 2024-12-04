@@ -493,6 +493,8 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
+        dstOffset := add(dstOffset, MEM_OFFSET())
+
         if gt(srcOffset, MAX_UINT64()) {
             srcOffset := MAX_UINT64()
         } 
@@ -501,7 +503,7 @@ for { } true { } {
             let copiedLen
             if getRawCodeHash(addr) {
                  // Gets the code from the addr
-                 copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
+                 copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
             }
 
             if lt(copiedLen, len) {
