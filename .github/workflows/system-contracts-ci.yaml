@@ -99,8 +99,6 @@ jobs:
 
       - name: Run anvil-zksync
         uses: dutterbutter/anvil-zksync-action@v1.1.0
-        with:
-          releaseTag: v0.0.1-vm1.5.0
 
       - name: Install dependencies
         run: yarn
