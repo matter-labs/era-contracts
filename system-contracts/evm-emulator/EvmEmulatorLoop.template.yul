@@ -502,11 +502,8 @@ for { } true { } {
         } 
         
         if gt(len, 0) {
-            let copiedLen
-            if getRawCodeHash(addr) {
-                 // Gets the code from the addr
-                 copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
-            }
+            // Gets the code from the addr
+            let copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
 
             if lt(copiedLen, len) {
                 $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))

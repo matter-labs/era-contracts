@@ -408,29 +408,34 @@ object "EvmEmulator" {
         function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
             let codeHash := getRawCodeHash(addr)
             mstore(0, codeHash)
-            // The first word of returndata is the true length of the bytecode
-            let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
+            
+            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+            // it fails if we don't have any code deployed at this address
+            if success {
+                // The first word of returndata is the true length of the bytecode
+                let codeLen := mload(0)
         
-            if gt(len, codeLen) {
-                len := codeLen
-            }
-        
-            let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
-        
-            let _returndatasize := returndatasize()
-            if gt(shiftedSrcOffset, _returndatasize) {
-                shiftedSrcOffset := _returndatasize
-            }
-        
-            if gt(add(len, shiftedSrcOffset), _returndatasize) {
-                len := sub(_returndatasize, shiftedSrcOffset)
-            }
-        
-            if len {
-                returndatacopy(dstOffset, shiftedSrcOffset, len)
-            }
-        
-            copiedLen := len
+                if gt(len, codeLen) {
+                    len := codeLen
+                }
+            
+                let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
+            
+                let _returndatasize := returndatasize()
+                if gt(shiftedSrcOffset, _returndatasize) {
+                    shiftedSrcOffset := _returndatasize
+                }
+            
+                if gt(add(len, shiftedSrcOffset), _returndatasize) {
+                    len := sub(_returndatasize, shiftedSrcOffset)
+                }
+            
+                if len {
+                    returndatacopy(dstOffset, shiftedSrcOffset, len)
+                }
+            
+                copiedLen := len
+            } 
         }
         
         // Returns the length of the EVM bytecode.
@@ -1726,11 +1731,8 @@ object "EvmEmulator" {
                     } 
                     
                     if gt(len, 0) {
-                        let copiedLen
-                        if getRawCodeHash(addr) {
-                             // Gets the code from the addr
-                             copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
-                        }
+                        // Gets the code from the addr
+                        let copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
             
                         if lt(copiedLen, len) {
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))
@@ -3484,29 +3486,34 @@ object "EvmEmulator" {
             function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
                 let codeHash := getRawCodeHash(addr)
                 mstore(0, codeHash)
-                // The first word of returndata is the true length of the bytecode
-                let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
+                
+                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+                // it fails if we don't have any code deployed at this address
+                if success {
+                    // The first word of returndata is the true length of the bytecode
+                    let codeLen := mload(0)
             
-                if gt(len, codeLen) {
-                    len := codeLen
-                }
-            
-                let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
-            
-                let _returndatasize := returndatasize()
-                if gt(shiftedSrcOffset, _returndatasize) {
-                    shiftedSrcOffset := _returndatasize
-                }
-            
-                if gt(add(len, shiftedSrcOffset), _returndatasize) {
-                    len := sub(_returndatasize, shiftedSrcOffset)
-                }
-            
-                if len {
-                    returndatacopy(dstOffset, shiftedSrcOffset, len)
-                }
-            
-                copiedLen := len
+                    if gt(len, codeLen) {
+                        len := codeLen
+                    }
+                
+                    let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
+                
+                    let _returndatasize := returndatasize()
+                    if gt(shiftedSrcOffset, _returndatasize) {
+                        shiftedSrcOffset := _returndatasize
+                    }
+                
+                    if gt(add(len, shiftedSrcOffset), _returndatasize) {
+                        len := sub(_returndatasize, shiftedSrcOffset)
+                    }
+                
+                    if len {
+                        returndatacopy(dstOffset, shiftedSrcOffset, len)
+                    }
+                
+                    copiedLen := len
+                } 
             }
             
             // Returns the length of the EVM bytecode.
@@ -4802,11 +4809,8 @@ object "EvmEmulator" {
                         } 
                         
                         if gt(len, 0) {
-                            let copiedLen
-                            if getRawCodeHash(addr) {
-                                 // Gets the code from the addr
-                                 copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
-                            }
+                            // Gets the code from the addr
+                            let copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
                 
                             if lt(copiedLen, len) {
                                 $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))
