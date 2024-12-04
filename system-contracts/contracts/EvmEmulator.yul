@@ -1717,6 +1717,8 @@ object "EvmEmulator" {
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
+                    dstOffset := add(dstOffset, MEM_OFFSET())
+            
                     if gt(srcOffset, MAX_UINT64()) {
                         srcOffset := MAX_UINT64()
                     } 
@@ -1725,7 +1727,7 @@ object "EvmEmulator" {
                         let copiedLen
                         if getRawCodeHash(addr) {
                              // Gets the code from the addr
-                             copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
+                             copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
                         }
             
                         if lt(copiedLen, len) {
@@ -4789,6 +4791,8 @@ object "EvmEmulator" {
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
+                        dstOffset := add(dstOffset, MEM_OFFSET())
+                
                         if gt(srcOffset, MAX_UINT64()) {
                             srcOffset := MAX_UINT64()
                         } 
@@ -4797,7 +4801,7 @@ object "EvmEmulator" {
                             let copiedLen
                             if getRawCodeHash(addr) {
                                  // Gets the code from the addr
-                                 copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
+                                 copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
                             }
                 
                             if lt(copiedLen, len) {
