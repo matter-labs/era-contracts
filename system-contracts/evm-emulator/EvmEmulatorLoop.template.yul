@@ -1454,14 +1454,17 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(offset, size)
+        if size {
+            checkMemIsAccessible(offset, size)
 
-        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+    
+            returnLen := size
+            
+            // Don't check overflow here since previous checks are enough to ensure this is safe
+            returnOffset := add(MEM_OFFSET(), offset)
+        }
 
-        returnLen := size
-        
-        // Don't check overflow here since previous checks are enough to ensure this is safe
-        returnOffset := add(MEM_OFFSET(), offset)
         break
     }
     case 0xF4 { // OP_DELEGATECALL
@@ -1488,12 +1491,19 @@ for { } true { } {
         popStackCheck(sp, 2)
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-
-        checkMemIsAccessible(offset, size)
-        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
-
-        // Don't check overflow here since previous checks are enough to ensure this is safe
-        offset := add(offset, MEM_OFFSET())
+        
+        switch iszero(size)
+        case 0 {
+            checkMemIsAccessible(offset, size)
+            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+            
+            // Don't check overflow here since previous checks are enough to ensure this is safe
+            offset := add(offset, MEM_OFFSET())
+        }
+        default {
+            offset := MEM_OFFSET()
+        }
+        
 
         if eq(isCallerEVM, 1) {
             offset := sub(offset, 32)

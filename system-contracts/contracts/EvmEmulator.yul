@@ -280,10 +280,12 @@ object "EvmEmulator" {
         }
         
         function checkMemIsAccessible(relativeOffset, size) {
-            checkOverflow(relativeOffset, size)
+            if size {
+                checkOverflow(relativeOffset, size)
         
-            if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
-                panic()
+                if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
+                    panic()
+                }   
             }
         }
         
@@ -2676,14 +2678,17 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemIsAccessible(offset, size)
+                    if size {
+                        checkMemIsAccessible(offset, size)
             
-                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                
+                        returnLen := size
+                        
+                        // Don't check overflow here since previous checks are enough to ensure this is safe
+                        returnOffset := add(MEM_OFFSET(), offset)
+                    }
             
-                    returnLen := size
-                    
-                    // Don't check overflow here since previous checks are enough to ensure this is safe
-                    returnOffset := add(MEM_OFFSET(), offset)
                     break
                 }
                 case 0xF4 { // OP_DELEGATECALL
@@ -2710,12 +2715,19 @@ object "EvmEmulator" {
                     popStackCheck(sp, 2)
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, size)
-                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
-            
-                    // Don't check overflow here since previous checks are enough to ensure this is safe
-                    offset := add(offset, MEM_OFFSET())
+                    
+                    switch iszero(size)
+                    case 0 {
+                        checkMemIsAccessible(offset, size)
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                        
+                        // Don't check overflow here since previous checks are enough to ensure this is safe
+                        offset := add(offset, MEM_OFFSET())
+                    }
+                    default {
+                        offset := MEM_OFFSET()
+                    }
+                    
             
                     if eq(isCallerEVM, 1) {
                         offset := sub(offset, 32)
@@ -3340,10 +3352,12 @@ object "EvmEmulator" {
             }
             
             function checkMemIsAccessible(relativeOffset, size) {
-                checkOverflow(relativeOffset, size)
+                if size {
+                    checkOverflow(relativeOffset, size)
             
-                if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
-                    panic()
+                    if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
+                        panic()
+                    }   
                 }
             }
             
@@ -5736,14 +5750,17 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemIsAccessible(offset, size)
+                        if size {
+                            checkMemIsAccessible(offset, size)
                 
-                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                    
+                            returnLen := size
+                            
+                            // Don't check overflow here since previous checks are enough to ensure this is safe
+                            returnOffset := add(MEM_OFFSET(), offset)
+                        }
                 
-                        returnLen := size
-                        
-                        // Don't check overflow here since previous checks are enough to ensure this is safe
-                        returnOffset := add(MEM_OFFSET(), offset)
                         break
                     }
                     case 0xF4 { // OP_DELEGATECALL
@@ -5770,12 +5787,19 @@ object "EvmEmulator" {
                         popStackCheck(sp, 2)
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, size)
-                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
-                
-                        // Don't check overflow here since previous checks are enough to ensure this is safe
-                        offset := add(offset, MEM_OFFSET())
+                        
+                        switch iszero(size)
+                        case 0 {
+                            checkMemIsAccessible(offset, size)
+                            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                            
+                            // Don't check overflow here since previous checks are enough to ensure this is safe
+                            offset := add(offset, MEM_OFFSET())
+                        }
+                        default {
+                            offset := MEM_OFFSET()
+                        }
+                        
                 
                         if eq(isCallerEVM, 1) {
                             offset := sub(offset, 32)
