@@ -498,7 +498,12 @@ object "EvmEmulator" {
                 // system call to MsgValueSimulator, but call to "to" will be non-system
                 let farCallAbi := build_farcall_abi(1, gas, dataStart, dataLength)
                 success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, to, 0, 0)
-                // TODO copy returndata
+                if success {
+                    let rtdz := returndatasize()
+                    switch lt(rtdz, outputLen)
+                    case 0 { returndatacopy(outputOffset, 0, outputLen) }
+                    default { returndatacopy(outputOffset, 0, rtdz) }
+                }
             }
             default {
                 // not a system call
@@ -3594,7 +3599,12 @@ object "EvmEmulator" {
                     // system call to MsgValueSimulator, but call to "to" will be non-system
                     let farCallAbi := build_farcall_abi(1, gas, dataStart, dataLength)
                     success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, to, 0, 0)
-                    // TODO copy returndata
+                    if success {
+                        let rtdz := returndatasize()
+                        switch lt(rtdz, outputLen)
+                        case 0 { returndatacopy(outputOffset, 0, outputLen) }
+                        default { returndatacopy(outputOffset, 0, rtdz) }
+                    }
                 }
                 default {
                     // not a system call
