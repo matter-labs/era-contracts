@@ -406,6 +406,16 @@ function getMax(a, b) -> max {
     }
 }
 
+function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
+    farCallAbi := shl(248, isSystemCall)
+    // dataOffset is 0
+    farCallAbi := or(farCallAbi, shl(64, dataStart))
+    farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+    farCallAbi :=  or(farCallAbi, shl(192, gas))
+    // shardId is 0
+    // forwardingMode is 0
+}
+
 function performSystemCall(to, dataLength) {
     let success := performSystemCallRevertable(to, dataLength)
 
@@ -416,16 +426,37 @@ function performSystemCall(to, dataLength) {
 }
 
 function performSystemCallRevertable(to, dataLength) -> success {
-    let farCallAbi := shl(248, 1) // system call
-    // dataOffset is 0
-    // dataStart is 0
-    farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-    farCallAbi :=  or(farCallAbi, shl(192, gas()))
-    // shardId is 0
-    // forwardingMode is 0
-    // not constructor call
-
+    // system call, dataStart is 0
+    let farCallAbi := build_farcall_abi(1, gas(), 0, dataLength)
     success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+}
+
+function rawCall(gas, to, value, dataStart, dataLength, outputOffset, outputLen) -> success {
+    switch iszero(value)
+    case 0 {
+        // system call to MsgValueSimulator, but call to "to" will be non-system
+        let farCallAbi := build_farcall_abi(1, gas, dataStart, dataLength)
+        success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, to, 0, 0)
+        if outputLen {
+            if success {
+                let rtdz := returndatasize()
+                switch lt(rtdz, outputLen)
+                case 0 { returndatacopy(outputOffset, 0, outputLen) }
+                default { returndatacopy(outputOffset, 0, rtdz) }
+            }
+        }
+    }
+    default {
+        // not a system call
+        let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+        success := verbatim_4i_1o("raw_call", to, farCallAbi, outputOffset, outputLen)
+    }
+}
+
+function rawStaticcall(gas, to, dataStart, dataLength, outputOffset, outputLen) -> success {
+    // not a system call
+    let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+    success := verbatim_4i_1o("raw_static_call", to, farCallAbi, outputOffset, outputLen)
 }
 
 ////////////////////////////////////////////////////////////////
@@ -802,10 +833,10 @@ function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, args
 
     switch isStatic
     case 0 {
-        success := call(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+        success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
     }
     default {
-        success := staticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+        success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
     }
     
     _saveReturndataAfterZkEVMCall()
@@ -1079,14 +1110,8 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
 }
 
 function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
-    let farCallAbi := shl(248, 1) // system call
-    // dataOffset is 0
-    farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
-    farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-    farCallAbi :=  or(farCallAbi, shl(192, gas()))
-    // shardId is 0
-    // forwardingMode is 0
-    // not constructor call (ContractDeployer will call constructor)
+    // system call, not constructor call (ContractDeployer will call constructor)
+    let farCallAbi := build_farcall_abi(1, gas(), bytecodeStart, bytecodeLen) 
 
     switch iszero(value)
     case 0 {
