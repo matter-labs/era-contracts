@@ -398,8 +398,7 @@ object "EvmEmulator" {
             isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
         }
         
-        function isConstructedEvmContract(addr) -> isConstructedEVM {
-            let rawCodeHash := getRawCodeHash(addr)
+        function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
             let version := shr(248, rawCodeHash)
             let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
             isConstructedEVM := and(eq(version, 2), isConstructedFlag)
@@ -688,20 +687,15 @@ object "EvmEmulator" {
         ////////////////////////////////////////////////////////////////
         
         function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
-            let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
+            let gasToPass, rawAddr, value, argsOffset, argsSize, retOffset, retSize
         
             popStackCheck(oldSp, 7)
             gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-        
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
-            checkMemIsAccessible(argsOffset, argsSize)
-            checkMemIsAccessible(retOffset, retSize)
         
             // static_gas = 0
             // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -710,13 +704,7 @@ object "EvmEmulator" {
             // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called.
             // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
         
-            let gasUsed := 100 // warm address access cost
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600 // cold address access cost
-            }
-        
-            // memory_expansion_cost
-            gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+            let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
         
             if gt(value, 0) {
                 if isStatic {
@@ -754,27 +742,16 @@ object "EvmEmulator" {
         }
         
         function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-            let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+            let gasToPass, rawAddr, argsOffset, argsSize, retOffset, retSize
         
             popStackCheck(oldSp, 6)
             gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+            rawAddr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
             argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
         
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
-            checkMemIsAccessible(argsOffset, argsSize)
-            checkMemIsAccessible(retOffset, retSize)
-        
-            let gasUsed := 100 // warm address access cost
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600 // cold address access cost
-            }
-        
-            // memory_expansion_cost
-            gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+            let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
         
             evmGasLeft := chargeGas(evmGasLeft, gasUsed)
             gasToPass := capGasForCall(evmGasLeft, gasToPass)
@@ -797,62 +774,88 @@ object "EvmEmulator" {
         
         
         function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGasLeft, sp, stackHead {
-            let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
+            let gasToPass, rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize
         
             popStackCheck(oldSp, 6)
             gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            rawArgsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+            rawRetOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
         
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+            let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize)
+        
+            newGasLeft := chargeGas(evmGasLeft, gasUsed)
+            gasToPass := capGasForCall(newGasLeft, gasToPass)
+        
+            newGasLeft := sub(newGasLeft, gasToPass)
+        
+            let success
+            let frameGasLeft := gasToPass
+        
+            let retOffset := add(MEM_OFFSET(), rawRetOffset)
+            let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+        
+            let rawCodeHash := getRawCodeHash(addr)
+            switch isHashOfConstructedEvmContract(rawCodeHash)
+            case 0 {
+                // Not a constructed EVM contract
+                let precompileCost := getGasForPrecompiles(addr, argsSize)
+                switch precompileCost
+                case 0 {
+                    // Not a precompile
+                    switch eq(1, shr(248, rawCodeHash))
+                    case 0 {
+                        // Empty contract or EVM contract being constructed
+                        success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
+                        _saveReturndataAfterZkEVMCall()
+                    }
+                    default {
+                        // We forbid delegatecalls to EraVM native contracts
+                        _eraseReturndataPointer()
+                    }
+                } 
+                default {
+                    // Precompile. Simlate using staticcall, since EraVM behavior differs here
+                    success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
+                }
+            }
+            default {
+                // Constructed EVM contract
+                pushEvmFrame(gasToPass, isStatic)
+                // pass all remaining native gas
+                success := delegatecall(gas(), addr, argsOffset, argsSize, 0, 0)
+        
+                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                if iszero(success) {
+                    resetEvmFrame()
+                }
+            }
+        
+            newGasLeft := add(newGasLeft, frameGasLeft)
+            stackHead := success
+        }
+        
+        function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
+            addr := and(rawAddr, 0xffffffffffffffffffffffffffffffffffffffff)
         
             checkMemIsAccessible(argsOffset, argsSize)
             checkMemIsAccessible(retOffset, retSize)
         
-            let gasUsed := 100 // warm address access cost
+            gasUsed := 100 // warm address access cost
             if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                 gasUsed := 2600 // cold address access cost
             }
         
             // memory_expansion_cost
             gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
-        
-            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-        
-            // it is also not possible to delegatecall precompiles
-            if iszero(isEvmContract(addr)) {
-                revertWithGas(evmGasLeft)
-            }
-        
-            gasToPass := capGasForCall(evmGasLeft, gasToPass)
-            evmGasLeft := sub(evmGasLeft, gasToPass)
-        
-            pushEvmFrame(gasToPass, isStatic)
-            let success := delegatecall(
-                gas(), // pass all remaining native gas
-                addr,
-                add(MEM_OFFSET(), argsOffset),
-                argsSize,
-                0,
-                0
-            )
-        
-            let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
-            if iszero(success) {
-                resetEvmFrame()
-            }
-        
-            newGasLeft := add(evmGasLeft, frameGasLeft)
-            stackHead := success
         }
         
         function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-            switch isConstructedEvmContract(addr)
+            switch isHashOfConstructedEvmContract(getRawCodeHash(addr))
             case 0 {
                 // zkEVM native call
-                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                let precompileCost := getGasForPrecompiles(addr, argsSize)
                 switch precompileCost
                 case 0 {
                     // just smart contract
@@ -945,8 +948,7 @@ object "EvmEmulator" {
         // The gas cost mentioned here is purely the cost of the contract, 
         // and does not consider the cost of the call itself nor the instructions 
         // to put the parameters in memory. 
-        // Take into account MEM_OFFSET() when passing the argsOffset
-        function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
+        function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
             switch addr
                 case 0x01 { // ecRecover
                     gasToCharge := 3000
@@ -3499,8 +3501,7 @@ object "EvmEmulator" {
                 isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
             }
             
-            function isConstructedEvmContract(addr) -> isConstructedEVM {
-                let rawCodeHash := getRawCodeHash(addr)
+            function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
                 let version := shr(248, rawCodeHash)
                 let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
                 isConstructedEVM := and(eq(version, 2), isConstructedFlag)
@@ -3789,20 +3790,15 @@ object "EvmEmulator" {
             ////////////////////////////////////////////////////////////////
             
             function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
-                let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
+                let gasToPass, rawAddr, value, argsOffset, argsSize, retOffset, retSize
             
                 popStackCheck(oldSp, 7)
                 gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-            
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
-                checkMemIsAccessible(argsOffset, argsSize)
-                checkMemIsAccessible(retOffset, retSize)
             
                 // static_gas = 0
                 // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -3811,13 +3807,7 @@ object "EvmEmulator" {
                 // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called.
                 // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
             
-                let gasUsed := 100 // warm address access cost
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600 // cold address access cost
-                }
-            
-                // memory_expansion_cost
-                gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+                let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
             
                 if gt(value, 0) {
                     if isStatic {
@@ -3855,27 +3845,16 @@ object "EvmEmulator" {
             }
             
             function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-                let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+                let gasToPass, rawAddr, argsOffset, argsSize, retOffset, retSize
             
                 popStackCheck(oldSp, 6)
                 gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+                rawAddr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
                 argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
             
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
-                checkMemIsAccessible(argsOffset, argsSize)
-                checkMemIsAccessible(retOffset, retSize)
-            
-                let gasUsed := 100 // warm address access cost
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600 // cold address access cost
-                }
-            
-                // memory_expansion_cost
-                gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+                let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
             
                 evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                 gasToPass := capGasForCall(evmGasLeft, gasToPass)
@@ -3898,62 +3877,88 @@ object "EvmEmulator" {
             
             
             function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGasLeft, sp, stackHead {
-                let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
+                let gasToPass, rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize
             
                 popStackCheck(oldSp, 6)
                 gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                rawArgsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+                rawRetOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
             
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize)
+            
+                newGasLeft := chargeGas(evmGasLeft, gasUsed)
+                gasToPass := capGasForCall(newGasLeft, gasToPass)
+            
+                newGasLeft := sub(newGasLeft, gasToPass)
+            
+                let success
+                let frameGasLeft := gasToPass
+            
+                let retOffset := add(MEM_OFFSET(), rawRetOffset)
+                let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+            
+                let rawCodeHash := getRawCodeHash(addr)
+                switch isHashOfConstructedEvmContract(rawCodeHash)
+                case 0 {
+                    // Not a constructed EVM contract
+                    let precompileCost := getGasForPrecompiles(addr, argsSize)
+                    switch precompileCost
+                    case 0 {
+                        // Not a precompile
+                        switch eq(1, shr(248, rawCodeHash))
+                        case 0 {
+                            // Empty contract or EVM contract being constructed
+                            success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
+                            _saveReturndataAfterZkEVMCall()
+                        }
+                        default {
+                            // We forbid delegatecalls to EraVM native contracts
+                            _eraseReturndataPointer()
+                        }
+                    } 
+                    default {
+                        // Precompile. Simlate using staticcall, since EraVM behavior differs here
+                        success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
+                    }
+                }
+                default {
+                    // Constructed EVM contract
+                    pushEvmFrame(gasToPass, isStatic)
+                    // pass all remaining native gas
+                    success := delegatecall(gas(), addr, argsOffset, argsSize, 0, 0)
+            
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                    if iszero(success) {
+                        resetEvmFrame()
+                    }
+                }
+            
+                newGasLeft := add(newGasLeft, frameGasLeft)
+                stackHead := success
+            }
+            
+            function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
+                addr := and(rawAddr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                 checkMemIsAccessible(argsOffset, argsSize)
                 checkMemIsAccessible(retOffset, retSize)
             
-                let gasUsed := 100 // warm address access cost
+                gasUsed := 100 // warm address access cost
                 if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                     gasUsed := 2600 // cold address access cost
                 }
             
                 // memory_expansion_cost
                 gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
-            
-                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-            
-                // it is also not possible to delegatecall precompiles
-                if iszero(isEvmContract(addr)) {
-                    revertWithGas(evmGasLeft)
-                }
-            
-                gasToPass := capGasForCall(evmGasLeft, gasToPass)
-                evmGasLeft := sub(evmGasLeft, gasToPass)
-            
-                pushEvmFrame(gasToPass, isStatic)
-                let success := delegatecall(
-                    gas(), // pass all remaining native gas
-                    addr,
-                    add(MEM_OFFSET(), argsOffset),
-                    argsSize,
-                    0,
-                    0
-                )
-            
-                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
-                if iszero(success) {
-                    resetEvmFrame()
-                }
-            
-                newGasLeft := add(evmGasLeft, frameGasLeft)
-                stackHead := success
             }
             
             function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-                switch isConstructedEvmContract(addr)
+                switch isHashOfConstructedEvmContract(getRawCodeHash(addr))
                 case 0 {
                     // zkEVM native call
-                    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                    let precompileCost := getGasForPrecompiles(addr, argsSize)
                     switch precompileCost
                     case 0 {
                         // just smart contract
@@ -4046,8 +4051,7 @@ object "EvmEmulator" {
             // The gas cost mentioned here is purely the cost of the contract, 
             // and does not consider the cost of the call itself nor the instructions 
             // to put the parameters in memory. 
-            // Take into account MEM_OFFSET() when passing the argsOffset
-            function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
+            function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
                 switch addr
                     case 0x01 { // ecRecover
                         gasToCharge := 3000
