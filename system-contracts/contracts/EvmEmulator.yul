@@ -771,7 +771,7 @@ object "EvmEmulator" {
                     switch eq(1, shr(248, rawCodeHash))
                     case 0 {
                         // Empty contract or EVM contract being constructed
-                        success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, 0, 0)
+                        success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, retOffset, retSize)
                         _saveReturndataAfterZkEVMCall()
                     }
                     default {
@@ -3831,7 +3831,7 @@ object "EvmEmulator" {
                         switch eq(1, shr(248, rawCodeHash))
                         case 0 {
                             // Empty contract or EVM contract being constructed
-                            success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, 0, 0)
+                            success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, retOffset, retSize)
                             _saveReturndataAfterZkEVMCall()
                         }
                         default {
