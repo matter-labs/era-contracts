@@ -1534,21 +1534,27 @@ object "EvmEmulator" {
                 case 0x20 { // OP_KECCAK256
                     evmGasLeft := chargeGas(evmGasLeft, 30)
             
-                    let offset, size
+                    let rawOffset, size
             
                     popStackCheck(sp, 2)
-                    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
+                    rawOffset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemIsAccessible(offset, size)
+                    checkMemIsAccessible(rawOffset, size)
             
                     // When an offset is first accessed (either read or write), memory may trigger 
                     // an expansion, which costs gas.
                     // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
-                    let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
+                    let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(rawOffset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    stackHead := keccak256(add(MEM_OFFSET(), offset), size)
+                    let offset
+                    if size {
+                        // use 0 as offset if size is 0
+                        offset := add(MEM_OFFSET(), rawOffset)
+                    }
+            
+                    stackHead := keccak256(offset, size)
             
                     ip := add(ip, 1)
                 }
@@ -4639,21 +4645,27 @@ object "EvmEmulator" {
                     case 0x20 { // OP_KECCAK256
                         evmGasLeft := chargeGas(evmGasLeft, 30)
                 
-                        let offset, size
+                        let rawOffset, size
                 
                         popStackCheck(sp, 2)
-                        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
+                        rawOffset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemIsAccessible(offset, size)
+                        checkMemIsAccessible(rawOffset, size)
                 
                         // When an offset is first accessed (either read or write), memory may trigger 
                         // an expansion, which costs gas.
                         // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
-                        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
+                        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(rawOffset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        stackHead := keccak256(add(MEM_OFFSET(), offset), size)
+                        let offset
+                        if size {
+                            // use 0 as offset if size is 0
+                            offset := add(MEM_OFFSET(), rawOffset)
+                        }
+                
+                        stackHead := keccak256(offset, size)
                 
                         ip := add(ip, 1)
                     }
