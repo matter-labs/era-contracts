@@ -679,16 +679,16 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
 
 
 function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGasLeft, sp, stackHead {
-    let gasToPass, rawAddr, argsOffset, argsSize, retOffset, retSize
+    let gasToPass, rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize
 
     popStackCheck(oldSp, 6)
     gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
     rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    rawArgsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+    rawRetOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
-    let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
+    let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize)
 
     newGasLeft := chargeGas(evmGasLeft, gasUsed)
     gasToPass := capGasForCall(newGasLeft, gasToPass)
@@ -698,18 +698,21 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
     let success
     let frameGasLeft := gasToPass
 
+    let retOffset := add(MEM_OFFSET(), rawRetOffset)
+    let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+
     let rawCodeHash := getRawCodeHash(addr)
     switch isHashOfConstructedEvmContract(rawCodeHash)
     case 0 {
         // Not a constructed EVM contract
-        let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+        let precompileCost := getGasForPrecompiles(addr, argsSize)
         switch precompileCost
         case 0 {
             // Not a precompile
             switch eq(1, shr(248, rawCodeHash))
             case 0 {
                 // Empty contract or EVM contract being constructed
-                success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, retOffset, retSize)
+                success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
             }
             default {
@@ -726,9 +729,9 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
         // Constructed EVM contract
         pushEvmFrame(gasToPass, isStatic)
         // pass all remaining native gas
-        success := delegatecall(gas(), addr, add(MEM_OFFSET(), argsOffset), argsSize, 0, 0)
+        success := delegatecall(gas(), addr, argsOffset, argsSize, 0, 0)
 
-        frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
+        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
         if iszero(success) {
             resetEvmFrame()
         }
@@ -757,7 +760,7 @@ function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, r
     switch isHashOfConstructedEvmContract(getRawCodeHash(addr))
     case 0 {
         // zkEVM native call
-        let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+        let precompileCost := getGasForPrecompiles(addr, argsSize)
         switch precompileCost
         case 0 {
             // just smart contract
@@ -850,8 +853,7 @@ function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
 // The gas cost mentioned here is purely the cost of the contract, 
 // and does not consider the cost of the call itself nor the instructions 
 // to put the parameters in memory. 
-// Take into account MEM_OFFSET() when passing the argsOffset
-function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
+function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
     switch addr
         case 0x01 { // ecRecover
             gasToCharge := 3000
