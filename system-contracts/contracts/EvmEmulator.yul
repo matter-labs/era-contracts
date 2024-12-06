@@ -191,6 +191,11 @@ object "EvmEmulator" {
         
         function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
         
+        function EMPTY_KECCAK() -> value {  // keccak("")
+            value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+        }
+        
+        
         ////////////////////////////////////////////////////////////////
         //                  GENERAL FUNCTIONS
         ////////////////////////////////////////////////////////////////
@@ -1818,20 +1823,39 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
                     }
             
-                    ip := add(ip, 1)
-                    if iszero(addr) {
-                        stackHead := 0
-                        continue
-                    }
-            
-                    switch isEvmContract(addr)
+                    let rawCodeHash := getRawCodeHash(addr)
+                    switch isHashOfConstructedEvmContract(rawCodeHash)
                     case 0 {
-                        stackHead := extcodehash(addr)
+                        let codeLen := and(shr(224, rawCodeHash), 0xffff)
+            
+                        if codeLen {
+                            if lt(addr, 0x100) {
+                                // precompiles and 0x00
+                                codeLen := 0
+                            }
+                        }
+            
+                        switch codeLen
+                        case 0 {
+                            stackHead := EMPTY_KECCAK()
+            
+                            if iszero(getRawNonce(addr)) {
+                                if iszero(balance(addr)) {
+                                    stackHead := 0
+                                }
+                            }
+                        }
+                        default {
+                            // zkVM contract
+                            stackHead := rawCodeHash
+                        }
                     }
                     default {
+                        // Get precalculated keccak of EVM code
                         stackHead := getEvmExtcodehash(addr)
                     }
                     
+                    ip := add(ip, 1)
                 }
                 case 0x40 { // OP_BLOCKHASH
                     evmGasLeft := chargeGas(evmGasLeft, 20)
@@ -3302,6 +3326,11 @@ object "EvmEmulator" {
             function OVERHEAD() -> overhead { overhead := 2000 }
             
             function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+            
+            function EMPTY_KECCAK() -> value {  // keccak("")
+                value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+            }
+            
             
             ////////////////////////////////////////////////////////////////
             //                  GENERAL FUNCTIONS
@@ -4930,20 +4959,39 @@ object "EvmEmulator" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500) 
                         }
                 
-                        ip := add(ip, 1)
-                        if iszero(addr) {
-                            stackHead := 0
-                            continue
-                        }
-                
-                        switch isEvmContract(addr)
+                        let rawCodeHash := getRawCodeHash(addr)
+                        switch isHashOfConstructedEvmContract(rawCodeHash)
                         case 0 {
-                            stackHead := extcodehash(addr)
+                            let codeLen := and(shr(224, rawCodeHash), 0xffff)
+                
+                            if codeLen {
+                                if lt(addr, 0x100) {
+                                    // precompiles and 0x00
+                                    codeLen := 0
+                                }
+                            }
+                
+                            switch codeLen
+                            case 0 {
+                                stackHead := EMPTY_KECCAK()
+                
+                                if iszero(getRawNonce(addr)) {
+                                    if iszero(balance(addr)) {
+                                        stackHead := 0
+                                    }
+                                }
+                            }
+                            default {
+                                // zkVM contract
+                                stackHead := rawCodeHash
+                            }
                         }
                         default {
+                            // Get precalculated keccak of EVM code
                             stackHead := getEvmExtcodehash(addr)
                         }
                         
+                        ip := add(ip, 1)
                     }
                     case 0x40 { // OP_BLOCKHASH
                         evmGasLeft := chargeGas(evmGasLeft, 20)
