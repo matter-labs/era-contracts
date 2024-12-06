@@ -561,20 +561,39 @@ for { } true { } {
             evmGasLeft := chargeGas(evmGasLeft, 2500) 
         }
 
-        ip := add(ip, 1)
-        if iszero(addr) {
-            stackHead := 0
-            continue
-        }
-
-        switch isEvmContract(addr)
+        let rawCodeHash := getRawCodeHash(addr)
+        switch isHashOfConstructedEvmContract(rawCodeHash)
         case 0 {
-            stackHead := extcodehash(addr)
+            let codeLen := and(shr(224, rawCodeHash), 0xffff)
+
+            if codeLen {
+                if lt(addr, 0x100) {
+                    // precompiles and 0x00
+                    codeLen := 0
+                }
+            }
+
+            switch codeLen
+            case 0 {
+                stackHead := EMPTY_KECCAK()
+
+                if iszero(getRawNonce(addr)) {
+                    if iszero(balance(addr)) {
+                        stackHead := 0
+                    }
+                }
+            }
+            default {
+                // zkVM contract
+                stackHead := rawCodeHash
+            }
         }
         default {
+            // Get precalculated keccak of EVM code
             stackHead := getEvmExtcodehash(addr)
         }
         
+        ip := add(ip, 1)
     }
     case 0x40 { // OP_BLOCKHASH
         evmGasLeft := chargeGas(evmGasLeft, 20)
