@@ -176,7 +176,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE` opcode.
     /// @param _initCode The init code for the contract.
     /// Note: this method may be callable only in system mode.
-    function createEVM(bytes calldata _initCode) external payable override onlySystemCall returns (address) {
+    /// @return The amount of EVM gas used.
+    /// @return The address of created contract.
+    function createEVM(bytes calldata _initCode) external payable override onlySystemCall returns (uint256, address) {
         uint256 senderNonce;
         // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
         if (msg.sender == tx.origin) {
@@ -189,27 +191,29 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
 
-        _evmDeployOnAddress(msg.sender, newAddress, _initCode);
+        uint256 evmGasUsed = _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
-        return newAddress;
+        return (evmGasUsed, newAddress);
     }
 
     /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE2` opcode.
     /// @param _salt The CREATE2 salt.
     /// @param _initCode The init code for the contract.
     /// Note: this method may be callable only in system mode.
+    /// @return The amount of EVM gas used.
+    /// @return The address of created contract.
     function create2EVM(
         bytes32 _salt,
         bytes calldata _initCode
-    ) external payable override onlySystemCall returns (address) {
+    ) external payable override onlySystemCall returns (uint256, address) {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         // No collision is possible with the zksync's non-EVM CREATE2, since the prefixes are different
         bytes32 bytecodeHash = EfficientCall.keccak(_initCode);
         address newAddress = Utils.getNewAddressCreate2EVM(msg.sender, _salt, bytecodeHash);
 
-        _evmDeployOnAddress(msg.sender, newAddress, _initCode);
+        uint256 evmGasUsed = _evmDeployOnAddress(msg.sender, newAddress, _initCode);
 
-        return newAddress;
+        return (evmGasUsed, newAddress);
     }
 
     /// @notice Method used by EVM emulator to check if contract can be deployed.

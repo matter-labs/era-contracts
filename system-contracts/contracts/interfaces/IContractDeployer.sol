@@ -102,9 +102,12 @@ interface IContractDeployer {
     /// @notice Can be called by an account to update its nonce ordering
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external;
 
-    function createEVM(bytes calldata _initCode) external payable returns (address newAddress);
+    function createEVM(bytes calldata _initCode) external payable returns (uint256 evmGasUsed, address newAddress);
 
-    function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable returns (address);
+    function create2EVM(
+        bytes32 _salt,
+        bytes calldata _initCode
+    ) external payable returns (uint256 evmGasUsed, address newAddress);
 
     /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
     function evmCodeHash(address) external view returns (bytes32);
