@@ -28,6 +28,8 @@
     "@types/lodash": "^4.14.199",
     "@types/mocha": "^8.2.3",
     "@types/node": "^17.0.34",
+    "bs58": "^6.0.0",
+    "bech32": "^2.0.0",
     "chai": "^4.3.10",
     "elliptic": "^6.5.4",
     "hardhat-typechain": "^0.3.3",
