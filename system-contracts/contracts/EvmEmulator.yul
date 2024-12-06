@@ -166,9 +166,9 @@ object "EvmEmulator" {
         }
         
         // Used to simplify gas calculations for memory expansion.
-        // The cost to increase the memory to 4 MB is close to 30M gas
+        // The cost to increase the memory to 12 MB is close to 277M EVM gas
         function MAX_POSSIBLE_MEM_LEN() -> max {
-            max := 0x400000 // 4MB
+            max := 0xC00000 // 12MB
         }
         
         function MAX_UINT() -> max_uint {
@@ -3278,9 +3278,9 @@ object "EvmEmulator" {
             }
             
             // Used to simplify gas calculations for memory expansion.
-            // The cost to increase the memory to 4 MB is close to 30M gas
+            // The cost to increase the memory to 12 MB is close to 277M EVM gas
             function MAX_POSSIBLE_MEM_LEN() -> max {
-                max := 0x400000 // 4MB
+                max := 0xC00000 // 12MB
             }
             
             function MAX_UINT() -> max_uint {
