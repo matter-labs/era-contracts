@@ -1134,9 +1134,15 @@ object "EvmEmulator" {
         function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
             let gasForTheCall := capGasForCall(evmGasLeftOld, evmGasLeftOld) // pass 63/64 of remaining gas
         
-            let bytecodeHash := 0
+            let bytecodeHash
             if isCreate2 {
-                bytecodeHash := keccak256(offset, size)
+                switch size
+                case 0 {
+                    bytecodeHash := EMPTY_KECCAK()
+                }
+                default {
+                    bytecodeHash := keccak256(offset, size)
+                }
             }
         
             // we want to calculate the address of new contract, and if it is deployable (no collision),
@@ -1146,22 +1152,35 @@ object "EvmEmulator" {
             mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
             mstore(4, salt)
             mstore(36, bytecodeHash)
-            let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
+            let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
         
-            if iszero(precreateResult) {
-                // Collision, nonce overflow or EVM not allowed.
-                // This is *internal* panic, consuming all passed gas.
-                // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
-                evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
-            }
-        
-            if precreateResult {
+            if canBeDeployed {
                 returndatacopy(0, 0, 32)
                 addr := mload(0)
             
                 pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
                 // so even if constructor reverts, nonce stays incremented and addr stays warm
-            
+        
+                // check for code collision
+                canBeDeployed := 0
+                if iszero(getRawCodeHash(addr)) {
+                    // check for nonce collision
+                    if iszero(getRawNonce(addr)) {
+                        canBeDeployed := 1
+                    }     
+                }
+            }
+        
+            if iszero(canBeDeployed) {
+                // Nonce overflow, EVM not allowed or collision.
+                // This is *internal* panic, consuming all passed gas.
+                // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
+                evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
+                addr := 0
+            }
+        
+        
+            if canBeDeployed {
                 // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
                 pushEvmFrame(gasForTheCall, false)
         
@@ -4292,9 +4311,15 @@ object "EvmEmulator" {
             function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
                 let gasForTheCall := capGasForCall(evmGasLeftOld, evmGasLeftOld) // pass 63/64 of remaining gas
             
-                let bytecodeHash := 0
+                let bytecodeHash
                 if isCreate2 {
-                    bytecodeHash := keccak256(offset, size)
+                    switch size
+                    case 0 {
+                        bytecodeHash := EMPTY_KECCAK()
+                    }
+                    default {
+                        bytecodeHash := keccak256(offset, size)
+                    }
                 }
             
                 // we want to calculate the address of new contract, and if it is deployable (no collision),
@@ -4304,22 +4329,35 @@ object "EvmEmulator" {
                 mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
                 mstore(4, salt)
                 mstore(36, bytecodeHash)
-                let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
+                let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
             
-                if iszero(precreateResult) {
-                    // Collision, nonce overflow or EVM not allowed.
-                    // This is *internal* panic, consuming all passed gas.
-                    // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
-                    evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
-                }
-            
-                if precreateResult {
+                if canBeDeployed {
                     returndatacopy(0, 0, 32)
                     addr := mload(0)
                 
                     pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
                     // so even if constructor reverts, nonce stays incremented and addr stays warm
-                
+            
+                    // check for code collision
+                    canBeDeployed := 0
+                    if iszero(getRawCodeHash(addr)) {
+                        // check for nonce collision
+                        if iszero(getRawNonce(addr)) {
+                            canBeDeployed := 1
+                        }     
+                    }
+                }
+            
+                if iszero(canBeDeployed) {
+                    // Nonce overflow, EVM not allowed or collision.
+                    // This is *internal* panic, consuming all passed gas.
+                    // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
+                    evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
+                    addr := 0
+                }
+            
+            
+                if canBeDeployed {
                     // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
                     pushEvmFrame(gasForTheCall, false)
             
