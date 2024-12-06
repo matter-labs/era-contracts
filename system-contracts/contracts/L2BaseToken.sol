@@ -69,7 +69,7 @@ contract L2BaseToken is IBaseToken, ISystemContract {
 
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
-    function withdraw(bytes calldata _l1Receiver) external payable override {
+    function withdraw(bytes32 _l1Receiver) external payable override {
         uint256 amount = _burnMsgValue();
 
         // Send the L2 log, a user could use it as proof of the withdrawal
@@ -109,7 +109,7 @@ contract L2BaseToken is IBaseToken, ISystemContract {
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
-    function _getL1WithdrawMessage(bytes calldata _to, uint256 _amount) internal pure returns (bytes memory) {
+    function _getL1WithdrawMessage(bytes32 _to, uint256 _amount) internal pure returns (bytes memory) {
         return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount);
     }
 
