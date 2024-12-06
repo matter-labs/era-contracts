@@ -350,6 +350,7 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
     let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
     // it fails if we don't have any code deployed at this address
     if success {
+        returndatacopy(0, 0, 32)
         // The first word of returndata is the true length of the bytecode
         let codeLen := mload(0)
 
@@ -357,7 +358,7 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
             len := codeLen
         }
     
-        let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
+        let shiftedSrcOffset := add(32, srcOffset) // first 32 bytes is length
     
         let _returndatasize := returndatasize()
         if gt(shiftedSrcOffset, _returndatasize) {
