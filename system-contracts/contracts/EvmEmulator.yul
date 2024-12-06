@@ -863,14 +863,15 @@ object "EvmEmulator" {
         }
         
         function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-            switch isHashOfConstructedEvmContract(getRawCodeHash(addr))
+            let rawCodeHash := getRawCodeHash(addr)
+            switch isHashOfConstructedEvmContract(rawCodeHash)
             case 0 {
                 // zkEVM native call
                 let precompileCost := getGasForPrecompiles(addr, argsSize)
                 switch precompileCost
                 case 0 {
                     // just smart contract
-                    success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                    success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash)
                 } 
                 default {
                     // precompile
@@ -919,8 +920,19 @@ object "EvmEmulator" {
         }
         
         // Call native ZkVm contract from EVM context
-        function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
+        function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
             let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
+        
+            let additionalStipend
+            if iszero(and(shr(224, rawCodeHash), 0xffff)) { // if codelen is zero
+                additionalStipend := 6000 // should cover first access to empty account
+            }
+        
+            if value {
+                additionalStipend := 27000 // Stipend for MsgValueSimulator. Covered by positive_value_cost
+            }
+        
+            zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
         
             if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
                 zkEvmGasToPass := UINT32_MAX()
@@ -937,10 +949,20 @@ object "EvmEmulator" {
             let zkEvmGasUsed := sub(zkEvmGasBefore, gas())
         
             _saveReturndataAfterZkEVMCall()
-            
+        
             if gt(zkEvmGasUsed, zkEvmGasBefore) { // overflow case
-                zkEvmGasUsed := zkEvmGasToPass // should never happen
+                zkEvmGasUsed := 0 // should never happen
             }
+        
+            switch gt(zkEvmGasUsed, additionalStipend)
+            case 0 {
+                zkEvmGasUsed := 0
+            }
+            default {
+                zkEvmGasUsed := sub(zkEvmGasUsed, additionalStipend)
+            }
+        
+            zkEvmGasToPass := sub(zkEvmGasToPass, additionalStipend)
         
             // refund gas
             if gt(zkEvmGasToPass, zkEvmGasUsed) {
@@ -3999,14 +4021,15 @@ object "EvmEmulator" {
             }
             
             function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-                switch isHashOfConstructedEvmContract(getRawCodeHash(addr))
+                let rawCodeHash := getRawCodeHash(addr)
+                switch isHashOfConstructedEvmContract(rawCodeHash)
                 case 0 {
                     // zkEVM native call
                     let precompileCost := getGasForPrecompiles(addr, argsSize)
                     switch precompileCost
                     case 0 {
                         // just smart contract
-                        success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                        success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash)
                     } 
                     default {
                         // precompile
@@ -4055,8 +4078,19 @@ object "EvmEmulator" {
             }
             
             // Call native ZkVm contract from EVM context
-            function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
+            function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
                 let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
+            
+                let additionalStipend
+                if iszero(and(shr(224, rawCodeHash), 0xffff)) { // if codelen is zero
+                    additionalStipend := 6000 // should cover first access to empty account
+                }
+            
+                if value {
+                    additionalStipend := 27000 // Stipend for MsgValueSimulator. Covered by positive_value_cost
+                }
+            
+                zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
             
                 if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
                     zkEvmGasToPass := UINT32_MAX()
@@ -4073,10 +4107,20 @@ object "EvmEmulator" {
                 let zkEvmGasUsed := sub(zkEvmGasBefore, gas())
             
                 _saveReturndataAfterZkEVMCall()
-                
+            
                 if gt(zkEvmGasUsed, zkEvmGasBefore) { // overflow case
-                    zkEvmGasUsed := zkEvmGasToPass // should never happen
+                    zkEvmGasUsed := 0 // should never happen
                 }
+            
+                switch gt(zkEvmGasUsed, additionalStipend)
+                case 0 {
+                    zkEvmGasUsed := 0
+                }
+                default {
+                    zkEvmGasUsed := sub(zkEvmGasUsed, additionalStipend)
+                }
+            
+                zkEvmGasToPass := sub(zkEvmGasToPass, additionalStipend)
             
                 // refund gas
                 if gt(zkEvmGasToPass, zkEvmGasUsed) {
