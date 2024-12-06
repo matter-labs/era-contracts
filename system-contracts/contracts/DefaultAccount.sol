@@ -140,24 +140,17 @@ contract DefaultAccount is IAccount {
         uint32 gas = Utils.safeCastToU32(gasleft());
 
         if (to == address(0)) {
-            bool isEvmDeployTx;
-            if (_transaction.txType == EIP_712_TX_TYPE) {
-                // With EIP712 type user can't sign empty "to" field. So we consider tx to 0x00 with data as deploy
-                isEvmDeployTx = _transaction.data.length != 0;
-            } else {
-                // For L1 to L2 txs we use reserved[2], for other types reserved[1]
-                isEvmDeployTx = _transaction.reserved[_transaction.txType == L1_TO_L2_TX_TYPE ? 2 : 1] == 1;
-            }
-
-            if (isEvmDeployTx) {
-                // Note, that createEVM can only be called with "isSystem" flag.
-                SystemContractsCaller.systemCallWithPropagatedRevert(
-                    gas,
-                    address(DEPLOYER_SYSTEM_CONTRACT),
-                    value,
-                    abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
-                );
-                return;
+            if (_transaction.txType != EIP_712_TX_TYPE && _transaction.txType != L1_TO_L2_TX_TYPE) {
+                if (_transaction.reserved[1] == 1) {
+                    // Note, that createEVM can only be called with "isSystem" flag.
+                    SystemContractsCaller.systemCallWithPropagatedRevert(
+                        gas,
+                        address(DEPLOYER_SYSTEM_CONTRACT),
+                        value,
+                        abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
+                    );
+                    return;
+                }
             }
         }
 

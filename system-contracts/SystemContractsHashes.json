@@ -45,8 +45,8 @@
     "contractName": "DefaultAccount",
     "bytecodePath": "zkout/DefaultAccount.sol/DefaultAccount.json",
     "sourceCodePath": "contracts-preprocessed/DefaultAccount.sol",
-    "bytecodeHash": "0x0100050d33f6a197513ccb0df249162508e8be5c92bd2d15b5980d859dd489d9",
-    "sourceCodeHash": "0x63ee6c1d26248c235bc970e5c288f005281cc81d0300aea28e43360f53d0cf1d"
+    "bytecodeHash": "0x0100050b78c8bba8aa0816a1b754d8cd6647d84de85a00db0bf4fbb603524e51",
+    "sourceCodeHash": "0x300c864fcb3bc6a562875c7b1d83df15d466515da0a878a426b1aaeac26f3656"
   },
   {
     "contractName": "EmptyContract",
