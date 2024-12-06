@@ -1328,125 +1328,49 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0xA0 { // OP_LOG0
-        evmGasLeft := chargeGas(evmGasLeft, 375)
-
-        if isStatic {
-            panic()
-        }
-
         let offset, size
-        popStackCheck(sp, 2)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-
-        checkMemIsAccessible(offset, size)
-
-        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-
-        log0(add(offset, MEM_OFFSET()), size)
+        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 0, isStatic)
+        log0(offset, size)
         ip := add(ip, 1)
     }
     case 0xA1 { // OP_LOG1
-        evmGasLeft := chargeGas(evmGasLeft, 375)
-
-        if isStatic {
-            panic()
-        }
-
         let offset, size
-        popStackCheck(sp, 3)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-
-        checkMemIsAccessible(offset, size)
-
-        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-        dynamicGas := add(dynamicGas, 375)
-        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-
+        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 1, isStatic)
         {   
             let topic1
             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log1(add(offset, MEM_OFFSET()), size, topic1)
+            log1(offset, size, topic1)
         }
         ip := add(ip, 1)
     }
     case 0xA2 { // OP_LOG2
-        evmGasLeft := chargeGas(evmGasLeft, 375)
-
-        if isStatic {
-            panic()
-        }
-
         let offset, size
-        popStackCheck(sp, 4)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-
-        checkMemIsAccessible(offset, size)
-
-        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-        dynamicGas := add(dynamicGas, 750)
-        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 2, isStatic)
 
         {
             let topic1, topic2
             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log2(add(offset, MEM_OFFSET()), size, topic1, topic2)
+            log2(offset, size, topic1, topic2)
         }
         ip := add(ip, 1)
     }
     case 0xA3 { // OP_LOG3
-        evmGasLeft := chargeGas(evmGasLeft, 375)
-
-        if isStatic {
-            panic()
-        }
-
         let offset, size
-        popStackCheck(sp, 5)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-
-        checkMemIsAccessible(offset, size)
-
-        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-        dynamicGas := add(dynamicGas, 1125)
-        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 3, isStatic)
 
         {
             let topic1, topic2, topic3
             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log3(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3)
+            log3(offset, size, topic1, topic2, topic3)
         }     
         ip := add(ip, 1)
     }
     case 0xA4 { // OP_LOG4
-        evmGasLeft := chargeGas(evmGasLeft, 375)
-
-        if isStatic {
-            panic()
-        }
-
         let offset, size
-        popStackCheck(sp, 6)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-
-        checkMemIsAccessible(offset, size)
-
-        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-        dynamicGas := add(dynamicGas, 1500)
-        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 4, isStatic)
 
         {
             let topic1, topic2, topic3, topic4
@@ -1454,7 +1378,7 @@ for { } true { } {
             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            log4(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3, topic4)
+            log4(offset, size, topic1, topic2, topic3, topic4)
         }     
         ip := add(ip, 1)
     }
