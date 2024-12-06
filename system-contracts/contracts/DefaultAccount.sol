@@ -141,7 +141,7 @@ contract DefaultAccount is IAccount {
 
         if (to == address(0)) {
             if (_transaction.txType != EIP_712_TX_TYPE && _transaction.txType != L1_TO_L2_TX_TYPE) {
-                if ( _transaction.reserved[1] == 1) {
+                if (_transaction.reserved[1] == 1) {
                     // Note, that createEVM can only be called with "isSystem" flag.
                     SystemContractsCaller.systemCallWithPropagatedRevert(
                         gas,
