@@ -238,13 +238,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
         }
 
-        // Unfortunately we can not provide revert reason as it would break EVM compatibility
-        // we should not increase nonce in case of collision
-        // solhint-disable-next-line reason-string, gas-custom-errors
-        require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(newAddress) == 0x0);
-        // solhint-disable-next-line reason-string, gas-custom-errors
-        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(newAddress))) == 0x0);
-
         return newAddress;
     }
 
@@ -257,7 +250,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _newAddress,
         bytes calldata _initCode
     ) external payable onlySystemCallFromEvmEmulator returns (uint256, address) {
-        uint256 constructorReturnEvmGas = _evmDeployOnAddress(msg.sender, _newAddress, _initCode);
+        uint256 constructorReturnEvmGas = _performDeployOnAddressEVM(msg.sender, _newAddress, AccountAbstractionVersion.None, _initCode);
         return (constructorReturnEvmGas, _newAddress);
     }
 
