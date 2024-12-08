@@ -753,16 +753,19 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
         switch precompileCost
         case 0 {
             // Not a precompile
-            switch eq(1, shr(248, rawCodeHash))
-            case 0 {
-                // Empty contract or EVM contract being constructed
+            _eraseReturndataPointer()
+
+            let isCallToEmptyContract := iszero(addr) // 0x00 is always "empty"
+            if iszero(isCallToEmptyContract) {
+                isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
+            }
+
+            if isCallToEmptyContract {
                 success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
-                _saveReturndataAfterZkEVMCall()
+                _saveReturndataAfterZkEVMCall()               
             }
-            default {
-                // We forbid delegatecalls to EraVM native contracts
-                _eraseReturndataPointer()
-            }
+
+            // We forbid delegatecalls to EraVM native contracts
         } 
         default {
             // Precompile. Simlate using staticcall, since EraVM behavior differs here
@@ -861,12 +864,16 @@ function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, args
 function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
     let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
 
-    let additionalStipend
-    if iszero(and(shr(224, rawCodeHash), 0xffff)) { // if codelen is zero
-        additionalStipend := 6000 // should cover first access to empty account
+    let additionalStipend := 6000 // should cover first access to empty account
+    switch value 
+    case 0 {
+        if gt(addr, 0) { // zero address is always "empty"
+            if and(shr(224, rawCodeHash), 0xffff) { // if codelen is not zero
+                additionalStipend := 0
+            }
+        }
     }
-
-    if value {
+    default {
         additionalStipend := 27000 // Stipend for MsgValueSimulator. Covered by positive_value_cost
     }
 
