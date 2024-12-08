@@ -900,26 +900,29 @@ object "EvmEmulator" {
         }
         
         function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-            let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
-            if lt(gasToPass, precompileCost) {
-                zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
-                precompileCost := gasToPass // just in case
-            }
-        
-            switch isStatic
+            switch lt(gasToPass, precompileCost)
             case 0 {
-                success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
+        
+                switch isStatic
+                case 0 {
+                    success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                }
+                default {
+                    success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                }
+                
+                _saveReturndataAfterZkEVMCall()
+            
+                if success {
+                    frameGasLeft := sub(gasToPass, precompileCost)
+                }
+                // else consume all provided gas
             }
             default {
-                success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                // consume all provided gas
+                _eraseReturndataPointer()
             }
-            
-            _saveReturndataAfterZkEVMCall()
-        
-            if success {
-                frameGasLeft := sub(gasToPass, precompileCost)
-            }
-            // else consume all provided gas
         }
         
         // Call native ZkVm contract from EVM context
@@ -4037,26 +4040,29 @@ object "EvmEmulator" {
             }
             
             function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-                let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
-                if lt(gasToPass, precompileCost) {
-                    zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
-                    precompileCost := gasToPass // just in case
-                }
-            
-                switch isStatic
+                switch lt(gasToPass, precompileCost)
                 case 0 {
-                    success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
+            
+                    switch isStatic
+                    case 0 {
+                        success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    }
+                    default {
+                        success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                    }
+                    
+                    _saveReturndataAfterZkEVMCall()
+                
+                    if success {
+                        frameGasLeft := sub(gasToPass, precompileCost)
+                    }
+                    // else consume all provided gas
                 }
                 default {
-                    success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                    // consume all provided gas
+                    _eraseReturndataPointer()
                 }
-                
-                _saveReturndataAfterZkEVMCall()
-            
-                if success {
-                    frameGasLeft := sub(gasToPass, precompileCost)
-                }
-                // else consume all provided gas
             }
             
             // Call native ZkVm contract from EVM context
