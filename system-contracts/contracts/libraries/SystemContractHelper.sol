@@ -436,6 +436,8 @@ library SystemContractHelper {
     /// 1. Force-deploy `SloadContract` to the address.
     /// 2. Read the required slot.
     /// 3. Force-deploy the previous bytecode back.
+    /// @dev Note, that the function will overwrite the account states of the `_addr`, i.e. 
+    /// this function should NEVER be used against custom accounts.
     function forcedSload(address _addr, bytes32 _key) internal returns (bytes32 result) {
         bytes32 sloadContractBytecodeHash;
         address sloadContractAddress = SLOAD_CONTRACT_ADDRESS;
