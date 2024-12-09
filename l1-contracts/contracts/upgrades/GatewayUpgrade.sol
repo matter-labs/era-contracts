@@ -80,7 +80,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase {
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
-    function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
+    function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external override {
         super.upgrade(_proposedUpgrade);
     }
 }
