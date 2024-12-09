@@ -228,9 +228,9 @@ contract ChainTypeManager is IChainTypeManager, Ownable2StepUpgradeable {
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
-        if(!IBridgehub(BRIDGE_HUB).migrationPaused()){
-           revert MigrationsNotPaused();
-       }
+        if (!IBridgehub(BRIDGE_HUB).migrationPaused()) {
+            revert MigrationsNotPaused();
+        }
 
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;

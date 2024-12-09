@@ -149,7 +149,7 @@ contract MessageRoot is IMessageRoot {
     function _addNewChain(uint256 _chainId) internal {
         uint256 cachedChainCount = chainCount;
 
-        // Since only the bridgehub can add new chains to the message root, it is expected that 
+        // Since only the bridgehub can add new chains to the message root, it is expected that
         // it will be responsible for ensuring that the number of chains does not exceed the limit.
         ++chainCount;
         chainIndex[_chainId] = cachedChainCount;

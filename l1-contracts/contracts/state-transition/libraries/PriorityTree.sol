@@ -68,7 +68,7 @@ library PriorityTree {
 
     /// @notice Process the priority operations of a batch.
     /// @dev Note, that the function below only checks that a certain segment of items is present in the tree.
-    /// It does not check that e.g. there are no zero items inside the provided `itemHashes`, so in theory proofs 
+    /// It does not check that e.g. there are no zero items inside the provided `itemHashes`, so in theory proofs
     /// that include non-existing priority operations could be created. This function relies on the fact
     /// that the `itemHashes` of `_priorityOpsData` are hashes of valid priority transactions.
     /// This fact is ensures by the fact the rolling hash of those is sent to the Executor by the bootloader
