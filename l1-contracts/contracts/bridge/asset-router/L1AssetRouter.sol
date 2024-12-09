@@ -540,8 +540,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 revert LegacyBridgeUsesNonNativeToken();
             }
 
-            IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
-
             bridgeMintCalldata = _burn({
                 _chainId: ERA_CHAIN_ID,
                 _nextMsgValue: 0,
