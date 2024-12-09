@@ -1094,12 +1094,12 @@ object "Bootloader" {
                 gasPerPubdata,
                 basePubdataSpent
             ) -> canonicalL1TxHash, gasUsedOnPreparation {
+                let gasBeforePreparation := gas()
+                debugLog("gasBeforePreparation", gasBeforePreparation)
+
                 let innerTxDataOffset := add(txDataOffset, 32)
 
                 setPubdataInfo(gasPerPubdata, basePubdataSpent)
-
-                let gasBeforePreparation := gas()
-                debugLog("gasBeforePreparation", gasBeforePreparation)
 
                 // Even though the smart contracts on L1 should make sure that the L1->L2 provide enough gas to generate the hash
                 // we should still be able to do it even if this protection layer fails.
