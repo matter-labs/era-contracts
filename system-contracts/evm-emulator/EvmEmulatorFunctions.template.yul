@@ -1239,3 +1239,32 @@ function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
         $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
     }
 }
+
+////////////////////////////////////////////////////////////////
+//                 LOGS FUNCTIONALITY 
+////////////////////////////////////////////////////////////////
+
+function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmGasLeft, offset, size, newSp, newStackHead {
+    newEvmGasLeft := chargeGas(evmGasLeft, 375)
+
+    if isStatic {
+        panic()
+    }
+
+    let rawOffset
+    popStackCheck(sp, add(2, topicCount))
+    rawOffset, newSp, newStackHead := popStackItemWithoutCheck(sp, stackHead)
+    size, newSp, newStackHead := popStackItemWithoutCheck(newSp, newStackHead)
+
+    checkMemIsAccessible(rawOffset, size)
+
+    // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+    let dynamicGas := add(shl(3, size), expandMemory(rawOffset, size))
+    dynamicGas := add(dynamicGas, mul(375, topicCount))
+
+    newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
+
+    if size {
+        offset := add(rawOffset, MEM_OFFSET())
+    }
+}
