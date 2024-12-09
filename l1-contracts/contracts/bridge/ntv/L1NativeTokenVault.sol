@@ -311,11 +311,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _assetId The asset id
     /// @param _chainId An id of a chain which we test against.
     /// @return Whether The chain `_chainId` has infinite balance of the token
-    function _hasInfiniteBalance(
-        bool _isNative,
-        bytes32 _assetId,
-        uint256 _chainId
-    ) private view returns (bool) {
+    function _hasInfiniteBalance(bool _isNative, bytes32 _assetId, uint256 _chainId) private view returns (bool) {
         return !_isNative && originChainId[_assetId] == _chainId;
     }
 }
