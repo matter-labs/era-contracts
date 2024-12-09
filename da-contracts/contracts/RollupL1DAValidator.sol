@@ -150,7 +150,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         for (uint256 i = 0; i < _blobsProvided; ++i) {
             bytes calldata commitmentData = _operatorDAInput[:PUBDATA_COMMITMENT_SIZE];
             bytes32 prepublishedCommitment = bytes32(
-                _operatorDAInput[PUBDATA_COMMITMENT_SIZE:PUBDATA_COMMITMENT_SIZE + 32]
+                _operatorDAInput[PUBDATA_COMMITMENT_SIZE:BLOB_DA_INPUT_SIZE]
             );
 
             if (prepublishedCommitment != bytes32(0)) {
