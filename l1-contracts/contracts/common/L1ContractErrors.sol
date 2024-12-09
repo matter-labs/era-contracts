@@ -379,6 +379,9 @@ error MigrationsNotPaused();
 // 0xf20c5c2a
 error WrappedBaseTokenAlreadyRegistered();
 
+// 0xde4c0b96
+error InvalidNTVBurnData();
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

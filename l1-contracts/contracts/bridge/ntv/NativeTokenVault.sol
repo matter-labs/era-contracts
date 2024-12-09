@@ -93,7 +93,7 @@ abstract contract NativeTokenVault is
         _registerToken(_nativeToken);
     }
 
-    function _registerToken(address _nativeToken) internal virtual {
+    function _registerToken(address _nativeToken) internal virtual returns (bytes32 newAssetId) {
         // We allow registering `WETH_TOKEN` inside `NativeTokenVault` only for L1 native token vault.
         // It is needed to allow withdrawing such assets. We restrict all WETH-related
         // operations to deposits from L1 only to be able to upgrade their logic more easily in the
@@ -107,7 +107,7 @@ abstract contract NativeTokenVault is
         if (assetId[_nativeToken] != bytes32(0)) {
             revert AssetIdAlreadyRegistered();
         }
-        _unsafeRegisterNativeToken(_nativeToken);
+        newAssetId = _unsafeRegisterNativeToken(_nativeToken);
     }
 
     /// @inheritdoc INativeTokenVault
@@ -200,33 +200,98 @@ abstract contract NativeTokenVault is
         whenNotPaused
         returns (bytes memory _bridgeMintData)
     {
+        (uint256 amount, address receiver, address tokenAddress) = _decodeBurnAndCheckAssetId(_data, _assetId);
         if (originChainId[_assetId] != block.chainid) {
-            _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _originalCaller, _data);
+            _bridgeMintData = _bridgeBurnBridgedToken({
+                _chainId: _chainId,
+                _assetId: _assetId,
+                _originalCaller: _originalCaller,
+                _amount: amount,
+                _receiver: receiver,
+                _tokenAddress: tokenAddress
+            });
         } else {
             _bridgeMintData = _bridgeBurnNativeToken({
                 _chainId: _chainId,
                 _assetId: _assetId,
                 _originalCaller: _originalCaller,
                 _depositChecked: false,
-                _data: _data
+                _depositAmount: amount,
+                _receiver: receiver,
+                _nativeToken: tokenAddress
             });
         }
     }
+
+    function tryRegisterTokenFromBurnData(bytes calldata _data, bytes32 _expectedAssetId) external {
+        (uint256 amount, address receiver, address tokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
+
+        if (tokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+
+        bytes32 storedAssetId = assetId[tokenAddress];
+        if (storedAssetId != bytes32(0)) {
+            revert AssetIdAlreadyRegistered();
+        }
+
+        // This token has not been registered within this NTV yet. Usually this means that the
+        // token is native to the chain and the user would prefer to get it registered as such.
+        // However, there are exceptions (e.g. bridged legacy ERC20 tokens on L2) when the
+        // assetId has not been stored yet. We will ask the implementor to double check that the token
+        // is not legacy.
+
+        // We try to register it as legacy token. If it fails, we know
+        // it is a native one and so register it as a native token.
+        bytes32 newAssetId = _registerTokenIfBridgedLegacy(tokenAddress);
+        if (newAssetId == bytes32(0)) {
+            newAssetId = _registerToken(tokenAddress);
+        }
+
+        if (newAssetId != _expectedAssetId) {
+            revert AssetIdMismatch(_expectedAssetId, newAssetId);
+        }
+    }
+
+    function _decodeBurnAndCheckAssetId(
+        bytes calldata _data,
+        bytes32 _suppliedAssetId
+    ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
+        (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
+
+        if (parsedTokenAddress == address(0)) {
+            // This means that the user wants the native token vault to resolve the
+            // address. In this case, it is assumed that the assetId is already registered.
+            parsedTokenAddress = tokenAddress[_suppliedAssetId];
+        }
+
+        // If it is still zero, it means that the token has not been registered.
+        if (parsedTokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+
+        bytes32 storedAssetId = assetId[parsedTokenAddress];
+        if (_suppliedAssetId != storedAssetId) {
+            revert AssetIdMismatch(storedAssetId, _suppliedAssetId);
+        }
+    }
+
+    function _registerTokenIfBridgedLegacy(address _token) internal virtual returns (bytes32);
 
     function _bridgeBurnBridgedToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
-        bytes calldata _data
+        uint256 _amount,
+        address _receiver,
+        address _tokenAddress
     ) internal requireZeroValue(msg.value) returns (bytes memory _bridgeMintData) {
-        (uint256 _amount, address _receiver) = abi.decode(_data, (uint256, address));
         if (_amount == 0) {
             // "Amount cannot be zero");
             revert AmountMustBeGreaterThanZero();
         }
 
-        address bridgedToken = tokenAddress[_assetId];
-        IBridgedStandardToken(bridgedToken).bridgeBurn(_originalCaller, _amount);
+        IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _amount);
         _handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
 
         emit BridgeBurn({
@@ -244,11 +309,11 @@ abstract contract NativeTokenVault is
             if (originChainId == 0) {
                 revert ZeroAddress();
             }
-            erc20Metadata = getERC20Getters(bridgedToken, originChainId);
+            erc20Metadata = getERC20Getters(_tokenAddress, originChainId);
         }
         address originToken;
         {
-            originToken = IBridgedStandardToken(bridgedToken).originToken();
+            originToken = IBridgedStandardToken(_tokenAddress).originToken();
             if (originToken == address(0)) {
                 revert ZeroAddress();
             }
@@ -268,16 +333,17 @@ abstract contract NativeTokenVault is
         bytes32 _assetId,
         address _originalCaller,
         bool _depositChecked,
-        bytes calldata _data
+        uint256 _depositAmount,
+        address _receiver,
+        address _nativeToken
     ) internal virtual returns (bytes memory _bridgeMintData) {
-        (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
-
         address nativeToken = tokenAddress[_assetId];
         if (nativeToken == WETH_TOKEN) {
             // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
             // It can only be withdrawn from the chain where it has already gotten.
             revert BurningNativeWETHNotSupported();
         }
+
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             if (_depositAmount != msg.value) {
                 revert ValueMismatch(_depositAmount, msg.value);
@@ -291,7 +357,7 @@ abstract contract NativeTokenVault is
             }
             _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
             if (!_depositChecked) {
-                uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
+                uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(_nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
                 // The token has non-standard transfer logic
                 if (_depositAmount != expectedDepositAmount) {
                     revert TokensWithFeesNotSupported();
@@ -305,12 +371,12 @@ abstract contract NativeTokenVault is
 
         bytes memory erc20Metadata;
         {
-            erc20Metadata = getERC20Getters(nativeToken, originChainId[_assetId]);
+            erc20Metadata = getERC20Getters(_nativeToken, originChainId[_assetId]);
         }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
             _remoteReceiver: _receiver,
-            _originToken: nativeToken,
+            _originToken: _nativeToken,
             _amount: _depositAmount,
             _erc20Metadata: erc20Metadata
         });
@@ -351,8 +417,8 @@ abstract contract NativeTokenVault is
     /// @notice Registers a native token address for the vault.
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.
-    function _unsafeRegisterNativeToken(address _nativeToken) internal {
-        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
+    function _unsafeRegisterNativeToken(address _nativeToken) internal returns (bytes32 newAssetId) {
+        newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;

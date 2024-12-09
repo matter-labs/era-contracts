@@ -36,6 +36,4 @@ interface IL2AssetRouter is IAssetRouterBase {
     /// a legacy asset.
     /// @param _assetId The assetId of the legacy token.
     function setLegacyTokenAssetHandler(bytes32 _assetId) external;
-
-    function withdrawToken(address _l2NativeToken, bytes memory _assetData) external returns (bytes32);
 }
