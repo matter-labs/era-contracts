@@ -14,7 +14,6 @@ import {IChainTypeManager, ChainTypeManagerInitializeData, ChainCreationParams} 
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
@@ -24,7 +23,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 /// @title State Transition Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+contract ChainTypeManager is IChainTypeManager, Ownable2StepUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
@@ -65,7 +64,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _bridgehub) reentrancyGuardInitializer {
+    constructor(address _bridgehub) {
         BRIDGE_HUB = _bridgehub;
 
         // While this does not provide a protection in the production, it is needed for local testing
@@ -115,7 +114,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @dev initialize
-    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
+    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external {
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
         }

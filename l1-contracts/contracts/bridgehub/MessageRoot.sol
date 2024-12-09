@@ -6,7 +6,6 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, TooManyChains} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
@@ -27,7 +26,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-contract MessageRoot is IMessageRoot, ReentrancyGuard {
+contract MessageRoot is IMessageRoot {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
@@ -75,13 +74,13 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
         _initialize();
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
-    function initialize() external reentrancyGuardInitializer {
+    function initialize() external {
         _initialize();
     }
 
