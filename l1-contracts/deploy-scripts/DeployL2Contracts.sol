@@ -39,14 +39,10 @@ contract DeployL2Script is Script {
     }
 
     function run() public {
-        deploy(false);
+        deploy();
     }
 
-    function runWithLegacyBridge() public {
-        deploy(true);
-    }
-
-    function deploy(bool legacyBridge) public {
+    function deploy() public {
         initializeConfig();
 
         // Note, that it is important that the first transaction is for setting the L2 DA validator
