@@ -70,6 +70,8 @@ contract ChainTypeManager is IChainTypeManager, Ownable2StepUpgradeable {
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+
+        _disableInitializers();
     }
 
     /// @notice only the bridgehub can call

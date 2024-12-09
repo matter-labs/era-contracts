@@ -2473,7 +2473,7 @@ object "Bootloader" {
 
                 let ptr := NEW_FACTORY_DEPS_BEGIN_BYTE()
                 // Selector
-                mstore(ptr, {{MARK_BATCH_AS_REPUBLISHED_SELECTOR}})
+                mstore(ptr, {{MARK_FACTORY_DEPS_SELECTOR}})
                 ptr := add(ptr, 32)
 
                 // Saving whether the dependencies should be sent on L1
