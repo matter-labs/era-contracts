@@ -376,6 +376,8 @@ error BurningNativeWETHNotSupported();
 error NoLegacySharedBridge();
 // 0x78d2ed02
 error ChainAlreadyLive();
+// 0x4e98b356
+error MigrationsNotPaused();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
