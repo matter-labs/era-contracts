@@ -283,7 +283,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override {
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
-        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+        if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
             chainBalance[_chainId][_assetId] += _amount;
         }
     }
@@ -296,12 +296,26 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override {
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
-        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+        if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
             // Check that the chain has sufficient balance
             if (chainBalance[_chainId][_assetId] < _amount) {
                 revert InsufficientChainBalance();
             }
             chainBalance[_chainId][_assetId] -= _amount;
         }
+    }
+
+    /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.
+    /// it can be minted by it.
+    /// @param _isNative Whether the asset is native to the L1 chain.
+    /// @param _assetId The asset id
+    /// @param _chainId An id of a chain which we test against.
+    /// @return Whether The chain `_chainId` has infinite balance of the token
+    function _hasInfiniteBalance(
+        bool _isNative,
+        bytes32 _assetId,
+        uint256 _chainId
+    ) private view returns (bool) {
+        return !_isNative && originChainId[_assetId] == _chainId;
     }
 }

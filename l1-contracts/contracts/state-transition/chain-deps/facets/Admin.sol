@@ -133,7 +133,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
         s.feeParams.pubdataPricingMode = _pricingMode;
-        emit PubdataPricingModeUpdaate(_pricingMode);
+        emit PubdataPricingModeUpdate(_pricingMode);
     }
 
     /// @inheritdoc IAdmin
