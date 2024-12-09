@@ -17,7 +17,7 @@ import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 contract L2AdminFactory {
     /// @notice Emitted when an admin is deployed on the L2.
     /// @param admin The address of the newly deployed admin.
-    event AdminDeployed(address admin);
+    event AdminDeployed(address indexed admin);
 
     /// @dev We use storage instead of immutable variables due to the
     /// specifics of the zkEVM environment, where storage is actually cheaper.
@@ -49,6 +49,8 @@ contract L2AdminFactory {
         }
 
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
+
+        emit AdminDeployed(address(admin));
     }
 
     /// @notice Checks that the provided list of restrictions is correct.
