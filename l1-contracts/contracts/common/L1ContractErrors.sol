@@ -330,8 +330,6 @@ error NewDeadlineExceedsMaxDeadline();
 error AlreadyPermanentRollup();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0x6e3331f5
-error IncorrectPricingMode();
 // 0xd0266e26
 error NotSettlementLayer();
 // 0x7a4902ad

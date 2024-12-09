@@ -53,9 +53,6 @@ error ChainExists();
 // 0x913183d8
 error MessageRootNotRegistered();
 
-// 0x8b7d939c
-error TooManyChains(uint256 cachedChainCount, uint256 maxNumberOfChains);
-
 // 0x7f4316f3
 error NoEthAllowed();
 
