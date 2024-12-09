@@ -12,6 +12,7 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
@@ -99,7 +100,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         BridgedStandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 20);
     }
 
-    function test_withdrawToken() external {
+    function test_withdrawTokenNoRegistration() public {
         TestnetERC20Token l2NativeToken = new TestnetERC20Token("token", "T", 18);
 
         l2NativeToken.mint(address(this), 100);
@@ -112,6 +113,11 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes32(uint256(1)))
         );
 
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawToken(address(l2NativeToken), abi.encode(100, address(1)));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(l2NativeToken));
+
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(
+            assetId,
+            DataEncoding.encodeBridgeBurnData(100, address(1), address(l2NativeToken))
+        );
     }
 }

@@ -206,7 +206,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_bridgeRecoverFailedTransfer_Eth() public {
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
@@ -502,7 +502,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             _encodingVersion: LEGACY_ENCODING_VERSION,
             _originalCaller: alice,
             _assetId: nativeTokenVault.BASE_TOKEN_ASSET_ID(),
-            _transferData: abi.encode(amount, bob)
+            _transferData: abi.encode(amount, bob, ETH_TOKEN_ADDRESS)
         });
 
         assertEq(request.txDataHash, expectedTxHash);

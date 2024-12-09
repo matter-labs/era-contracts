@@ -352,7 +352,7 @@ contract EcosystemUpgrade is Script {
             maxFeePerGas: 0,
             maxPriorityFeePerGas: 0,
             paymaster: uint256(uint160(address(0))),
-            nonce: 25,
+            nonce: getProtocolUpgradeNonce(),
             value: 0,
             reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
             // Note, that the data is empty, it will be fully composed inside the `GatewayUpgrade` contract
@@ -368,7 +368,11 @@ contract EcosystemUpgrade is Script {
     }
 
     function getNewProtocolVersion() public returns (uint256) {
-        return 0x1900000000;
+        return 0x1b00000000;
+    }
+
+    function getProtocolUpgradeNonce() public returns (uint256) {
+        return (getNewProtocolVersion() >> 32);
     }
 
     function getOldProtocolDeadline() public returns (uint256) {
@@ -378,7 +382,12 @@ contract EcosystemUpgrade is Script {
     }
 
     function getOldProtocolVersion() public returns (uint256) {
-        return 0x1800000002;
+        // Mainnet is the only network that has not been upgraded.
+        if (block.chainid == 1) {
+            return 0x1800000002;
+        } else {
+            return 0x1900000000;
+        }
     }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
@@ -1144,7 +1153,6 @@ contract EcosystemUpgrade is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
-                config.eraChainId,
                 config.contracts.oldSharedBridgeProxyAddress
             )
         );

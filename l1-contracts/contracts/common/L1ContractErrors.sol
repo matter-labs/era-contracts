@@ -377,6 +377,9 @@ error NoLegacySharedBridge();
 // 0x78d2ed02
 error ChainAlreadyLive();
 
+// 0xde4c0b96
+error InvalidNTVBurnData();
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

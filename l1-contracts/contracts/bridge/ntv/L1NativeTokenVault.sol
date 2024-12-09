@@ -164,10 +164,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _originalCaller,
         // solhint-disable-next-line no-unused-vars
         bool _depositChecked,
-        bytes calldata _data
+        uint256 _depositAmount,
+        address _receiver,
+        address _nativeToken
     ) internal override returns (bytes memory _bridgeMintData) {
-        uint256 _depositAmount;
-        (_depositAmount, ) = abi.decode(_data, (uint256, address));
         bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
             _assetId,
             _depositAmount,
@@ -178,7 +178,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             _assetId: _assetId,
             _originalCaller: _originalCaller,
             _depositChecked: depositChecked,
-            _data: _data
+            _depositAmount: _depositAmount,
+            _receiver: _receiver,
+            _nativeToken: _nativeToken
         });
     }
 
@@ -193,7 +195,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _depositSender,
         bytes calldata _data
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
-        (uint256 _amount, ) = abi.decode(_data, (uint256, address));
+        // slither-disable-next-line unused-return
+        (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];
         if (_amount == 0) {
             revert NoFundsTransferred();
@@ -227,6 +230,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /*//////////////////////////////////////////////////////////////
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _registerTokenIfBridgedLegacy(address) internal override returns (bytes32) {
+        // There are no legacy tokens present on L1.
+        return bytes32(0);
+    }
 
     // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
     function calculateCreate2TokenAddress(
