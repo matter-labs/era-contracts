@@ -29,7 +29,7 @@ struct GatewayUpgradeEncodedInput {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase {
+contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase, IGatewayUpgrade {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
