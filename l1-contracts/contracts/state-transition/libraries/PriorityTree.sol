@@ -50,7 +50,8 @@ library PriorityTree {
 
     /// @notice Set up the tree
     function setup(Tree storage _tree, uint256 _startIndex) internal {
-        _tree.tree.setup(ZERO_LEAF_HASH);
+        bytes32 initialRoot = _tree.tree.setup(ZERO_LEAF_HASH);
+        _tree.historicalRoots[initialRoot] = true;
         _tree.startIndex = _startIndex;
     }
 
