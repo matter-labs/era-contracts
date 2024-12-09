@@ -132,10 +132,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
-        if (s.isPermanentRollup && _pricingMode != PubdataPricingMode.Rollup) {
-            revert IncorrectPricingMode();
-        }
-
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit PubdataPricingModeUpdaate(_pricingMode);
     }
@@ -183,11 +179,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
             // The correct data availability pair should be set beforehand.
             revert InvalidDAForPermanentRollup();
-        }
-
-        if (s.feeParams.pubdataPricingMode != PubdataPricingMode.Rollup) {
-            // The correct pubdata pricing mode should be set beforehand.
-            revert IncorrectPricingMode();
         }
 
         s.isPermanentRollup = true;
