@@ -6,12 +6,10 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, TooManyChains} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
-
-import {MAX_NUMBER_OF_ZK_CHAINS} from "../common/Config.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -150,10 +148,9 @@ contract MessageRoot is IMessageRoot {
     /// @param _chainId the chainId of the chain
     function _addNewChain(uint256 _chainId) internal {
         uint256 cachedChainCount = chainCount;
-        if (cachedChainCount >= MAX_NUMBER_OF_ZK_CHAINS) {
-            revert TooManyChains(cachedChainCount, MAX_NUMBER_OF_ZK_CHAINS);
-        }
 
+        // Since only the bridgehub can add new chains to the message root, it is expected that 
+        // it will be responsible for ensuring that the number of chains does not exceed the limit.
         ++chainCount;
         chainIndex[_chainId] = cachedChainCount;
         chainIndexToId[cachedChainCount] = _chainId;
