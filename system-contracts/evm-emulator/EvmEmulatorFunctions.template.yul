@@ -1265,6 +1265,6 @@ function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmG
     newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
 
     if size {
-        offset := add(offset, MEM_OFFSET())
+        offset := add(rawOffset, MEM_OFFSET())
     }
 }

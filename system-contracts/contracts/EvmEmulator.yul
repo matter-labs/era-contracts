@@ -1327,7 +1327,7 @@ object "EvmEmulator" {
             newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
         
             if size {
-                offset := add(offset, MEM_OFFSET())
+                offset := add(rawOffset, MEM_OFFSET())
             }
         }
 
@@ -4467,7 +4467,7 @@ object "EvmEmulator" {
                 newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
             
                 if size {
-                    offset := add(offset, MEM_OFFSET())
+                    offset := add(rawOffset, MEM_OFFSET())
                 }
             }
 
