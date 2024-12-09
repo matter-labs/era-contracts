@@ -62,7 +62,7 @@ interface IAdmin is IZKChainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the CTM can unfreeze Diamond Proxy
+    /// @dev Only the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
     function genesisUpgrade(
