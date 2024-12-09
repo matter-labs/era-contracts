@@ -107,7 +107,7 @@ interface IAdmin is IZKChainBase {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
     /// @notice Validium mode status changed
-    event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
+    event PubdataPricingModeUpdaate(PubdataPricingMode validiumMode);
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);

@@ -137,7 +137,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         s.feeParams.pubdataPricingMode = _pricingMode;
-        emit ValidiumModeStatusUpdate(_pricingMode);
+        emit PubdataPricingModeUpdaate(_pricingMode);
     }
 
     /// @inheritdoc IAdmin
@@ -242,6 +242,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         });
 
         Diamond.diamondCut(cutData);
+        emit ExecuteUpgrade(cutData);
     }
 
     /*//////////////////////////////////////////////////////////////
