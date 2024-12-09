@@ -8,8 +8,6 @@ import type { BigNumber } from "ethers";
 import { TEST_BOOTLOADER_FORMAL_ADDRESS, TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import { randomBytes } from "crypto";
-import { bech32, bech32m } from "bech32";
-import bs58 from "bs58";
 
 describe("L2BaseToken tests", () => {
   const richWallet = getWallets()[0];
@@ -170,19 +168,14 @@ describe("L2BaseToken tests", () => {
   });
 
   describe("withdraw", () => {
-    it("event, balance, totalsupply with P2PKH address", async () => {
+    it("event, balance, totalsupply", async () => {
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
-      // Example Base58 address (P2PKH address)
-      const base58Address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
-
-      // Decode Base58 address to bytes
-      const base85BtcAddressBytes = bs58.decode(base58Address);
-      const hexString = ethers.utils.hexlify(base85BtcAddressBytes);
-      const btcAddressBytes32 = ethers.utils.hexZeroPad(hexString, 32);
-
+      const btcAddress = ethers.utils.hexlify(
+        ethers.utils.toUtf8Bytes("bc1qy82gaw2htfd5sslplpgmz4ktf9y3k7pac2226k0wljlmw3atfw5qwm4av4")
+      );
       const message: string = ethers.utils.solidityPack(
         ["bytes4", "bytes", "uint256"],
-        [mailboxIface.getSighash("finalizeEthWithdrawal"), btcAddressBytes32, amountToWithdraw]
+        [mailboxIface.getSighash("finalizeEthWithdrawal"), btcAddress, amountToWithdraw]
       );
 
       await setResult("L1Messenger", "sendToL1", [message], {
@@ -197,87 +190,9 @@ describe("L2BaseToken tests", () => {
       const balanceBeforeWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
       const totalSupplyBefore = await L2BaseToken.totalSupply();
 
-      await expect(L2BaseToken.connect(richWallet).withdraw(btcAddressBytes32, { value: amountToWithdraw }))
+      await expect(L2BaseToken.connect(richWallet).withdraw(btcAddress, { value: amountToWithdraw }))
         .to.emit(L2BaseToken, "Withdrawal")
-        .withArgs(richWallet.address, btcAddressBytes32, amountToWithdraw);
-
-      const balanceAfterWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
-      const totalSupplyAfter = await L2BaseToken.totalSupply();
-
-      expect(balanceAfterWithdrawal).to.equal(balanceBeforeWithdrawal.sub(amountToWithdraw));
-      expect(totalSupplyAfter).to.equal(totalSupplyBefore.sub(amountToWithdraw));
-    });
-
-    it("event, balance, totalsupply with Bech32 address", async () => {
-      const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
-      const bech32Address = "bc1qy82gaw2htfd5sslplpgmz4ktf9y3k7pac2226k0wljlmw3atfw5qwm4av4";
-      const bech32DecodedAddress = bech32.decode(bech32Address, 90);
-      // Extract the payload (excluding the witness first byte)
-      const payload = bech32DecodedAddress.words.slice(1);
-      // Convert the payload from words to bytes
-      const payloadBytes = bech32.fromWords(payload);
-      const hexString = ethers.utils.hexlify(payloadBytes);
-      const btcAddressBytes32 = ethers.utils.hexZeroPad(hexString, 32);
-
-      const message: string = ethers.utils.solidityPack(
-        ["bytes4", "bytes", "uint256"],
-        [mailboxIface.getSighash("finalizeEthWithdrawal"), btcAddressBytes32, amountToWithdraw]
-      );
-
-      await setResult("L1Messenger", "sendToL1", [message], {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(message)]),
-      });
-
-      // To prevent underflow since initial values are 0's and we are subtracting from them
-      const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
-      await (await L2BaseToken.connect(bootloaderAccount).mint(L2BaseToken.address, amountToMint)).wait();
-
-      const balanceBeforeWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
-      const totalSupplyBefore = await L2BaseToken.totalSupply();
-
-      await expect(L2BaseToken.connect(richWallet).withdraw(btcAddressBytes32, { value: amountToWithdraw }))
-        .to.emit(L2BaseToken, "Withdrawal")
-        .withArgs(richWallet.address, btcAddressBytes32, amountToWithdraw);
-
-      const balanceAfterWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
-      const totalSupplyAfter = await L2BaseToken.totalSupply();
-
-      expect(balanceAfterWithdrawal).to.equal(balanceBeforeWithdrawal.sub(amountToWithdraw));
-      expect(totalSupplyAfter).to.equal(totalSupplyBefore.sub(amountToWithdraw));
-    });
-
-    it("event, balance, totalsupply with Bech32m address", async () => {
-      const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
-      const bech32mAddress = "bc1p5d7rjq7g6rdk2yhzks9smlaqtedr4dekq08ge8ztwac72sfr9rusxg3297";
-      const bech32mDecodedAddress = bech32m.decode(bech32mAddress, 90);
-      // Extract the payload (excluding the witness first byte)
-      const payload = bech32mDecodedAddress.words.slice(1);
-      // Convert the payload from words to bytes
-      const payloadBytes = bech32.fromWords(payload);
-      const hexString = ethers.utils.hexlify(payloadBytes);
-      const btcAddressBytes32 = ethers.utils.hexZeroPad(hexString, 32);
-
-      const message: string = ethers.utils.solidityPack(
-        ["bytes4", "bytes", "uint256"],
-        [mailboxIface.getSighash("finalizeEthWithdrawal"), btcAddressBytes32, amountToWithdraw]
-      );
-
-      await setResult("L1Messenger", "sendToL1", [message], {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(message)]),
-      });
-
-      // To prevent underflow since initial values are 0's and we are subtracting from them
-      const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
-      await (await L2BaseToken.connect(bootloaderAccount).mint(L2BaseToken.address, amountToMint)).wait();
-
-      const balanceBeforeWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
-      const totalSupplyBefore = await L2BaseToken.totalSupply();
-
-      await expect(L2BaseToken.connect(richWallet).withdraw(btcAddressBytes32, { value: amountToWithdraw }))
-        .to.emit(L2BaseToken, "Withdrawal")
-        .withArgs(richWallet.address, btcAddressBytes32, amountToWithdraw);
+        .withArgs(richWallet.address, btcAddress, amountToWithdraw);
 
       const balanceAfterWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
       const totalSupplyAfter = await L2BaseToken.totalSupply();
