@@ -378,6 +378,8 @@ error NoLegacySharedBridge();
 error ChainAlreadyLive();
 // 0x4e98b356
 error MigrationsNotPaused();
+// 0xf20c5c2a
+error WrappedBaseTokenAlreadyRegistered();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

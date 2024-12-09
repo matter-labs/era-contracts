@@ -29,7 +29,7 @@ abstract contract CalldataDAGateway is CalldataDA {
             revert PubdataTooLong(_pubdata.length, _blobsProvided * BLOB_SIZE_BYTES);
         }
         if (_fullPubdataHash != keccak256(_pubdata)) {
-            revert InvalidPubdataHash();
+            revert InvalidPubdataHash(_fullPubdataHash, keccak256(_pubdata));
         }
 
         bytes calldata providedCommitments = _pubdataInput[_pubdataInput.length -

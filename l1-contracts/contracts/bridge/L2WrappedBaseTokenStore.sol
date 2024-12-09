@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
-import {ZeroAddress, Unauthorized} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, Unauthorized, WrappedBaseTokenAlreadyRegistered} from "../common/L1ContractErrors.sol";
 
 /// @title L2WrappedBaseTokenStore
 /// @author Matter Labs
@@ -68,6 +68,9 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
     function initializeChain(uint256 _chainId, address _l2WBaseToken) external onlyOwnerOrAdmin {
         if (_l2WBaseToken == address(0)) {
             revert ZeroAddress();
+        }
+        if (l2WBaseTokenAddress[_chainId] != address(0)) {
+            revert WrappedBaseTokenAlreadyRegistered();
         }
         _setWBaseTokenAddress(_chainId, _l2WBaseToken);
     }
