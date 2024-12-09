@@ -273,6 +273,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 _amount,
         bool _isNative
     ) internal override {
+        // Note, that we do not update balances for chains where the assetId comes from,
+        // since these chains can mint new instances of the token.
         if ((_isNative) || (originChainId[_assetId] != _chainId)) {
             chainBalance[_chainId][_assetId] += _amount;
         }
@@ -284,6 +286,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 _amount,
         bool _isNative
     ) internal override {
+        // Note, that we do not update balances for chains where the assetId comes from,
+        // since these chains can mint new instances of the token.
         if ((_isNative) || (originChainId[_assetId] != _chainId)) {
             // Check that the chain has sufficient balance
             if (chainBalance[_chainId][_assetId] < _amount) {
