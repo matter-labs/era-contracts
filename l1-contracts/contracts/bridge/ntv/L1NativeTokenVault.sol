@@ -62,7 +62,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Accepts ether only from the contract that was the shared Bridge.
     receive() external payable {
-        if ((address(L1_NULLIFIER) != msg.sender) && (address(ASSET_ROUTER) != msg.sender)) {
+        if (address(L1_NULLIFIER) != msg.sender) {
             revert Unauthorized(msg.sender);
         }
     }
