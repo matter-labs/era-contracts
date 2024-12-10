@@ -49,6 +49,9 @@ library L2ContractHelper {
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
+    /// @dev Prefix used during derivation of account addresses using CREATE
+    bytes32 private constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
+
     /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
     /// @param _message Data to be sent to L1.
     /// @return keccak256 hash of the sent message.
@@ -129,6 +132,20 @@ library L2ContractHelper {
         );
 
         return address(uint160(uint256(data)));
+    }
+
+    /// @notice Calculates the address of a deployed contract via create
+    /// @param _sender The account that deploys the contract.
+    /// @param _senderNonce The deploy nonce of the sender's account.
+    /// NOTE: L2 create derivation is different from L1 derivation!
+    function computeCreateAddress(address _sender, uint256 _senderNonce) internal pure returns (address) {
+        // No collision is possible with the Ethereum's CREATE, since
+        // the prefix begins with 0x63....
+        bytes32 hash = keccak256(
+            bytes.concat(CREATE_PREFIX, bytes32(uint256(uint160(_sender))), bytes32(_senderNonce))
+        );
+
+        return address(uint160(uint256(hash)));
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader

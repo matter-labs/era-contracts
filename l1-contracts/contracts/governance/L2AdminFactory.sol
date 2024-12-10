@@ -31,7 +31,7 @@ contract L2AdminFactory {
     /// @notice Deploys a new L2 admin contract.
     /// @return admin The address of the deployed admin contract.
     // solhint-disable-next-line gas-calldata-parameters
-    function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
+    function deployAdmin(address[] memory _additionalRestrictions) external returns (address admin) {
         // Even though the chain admin will likely perform similar checks,
         // we keep those here just in case, since it is not expensive, while allowing to fail fast.
         _validateRestrctions(_additionalRestrictions);
@@ -45,7 +45,11 @@ contract L2AdminFactory {
             restrictions[requiredRestrictions.length + i] = _additionalRestrictions[i];
         }
 
-        admin = address(new ChainAdmin{salt: _salt}(restrictions));
+        // Note, that we are using CREATE instead of CREATE2 to prevent
+        // an attack where malicious deployer could select malicious `seed1` and `seed2` where
+        // this factory with `seed1` produces the same address as some other random factory with `seed2`,
+        // allowing to deploy a malicious contract.
+        admin = address(new ChainAdmin(restrictions));
     }
 
     /// @notice Checks that the provided list of restrictions is correct.

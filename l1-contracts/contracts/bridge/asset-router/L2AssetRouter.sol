@@ -157,7 +157,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
         bytes32 recordedAssetId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2NativeToken);
         uint256 recordedOriginChainId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(recordedAssetId);
-        if (recordedOriginChainId != block.chaind && recordedOriginChainId != 0) {
+        if (recordedOriginChainId != block.chainid && recordedOriginChainId != 0) {
             revert AssetIdNotSupported(recordedAssetId);
         }
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
