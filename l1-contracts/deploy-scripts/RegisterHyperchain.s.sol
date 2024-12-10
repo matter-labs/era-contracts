@@ -162,7 +162,7 @@ contract RegisterHyperchainScript is Script {
             : AllowedBytecodeTypes.EraVm;
 
         bytes memory initData = abi.encode(config.diamondCutData, allowedBytecodeTypesMode);
-        
+
         vm.recordLogs();
 
         bytes memory data = abi.encodeCall(
