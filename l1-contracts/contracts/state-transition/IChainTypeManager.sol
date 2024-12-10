@@ -78,6 +78,9 @@ interface IChainTypeManager {
     /// @notice New ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
+    /// @notice Updated ProtocolVersion deadline
+    event UpdateProtocolVersionDeadline(uint256 indexed protocolVersion, uint256 deadline);
+
     function BRIDGE_HUB() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;
@@ -85,6 +88,8 @@ interface IChainTypeManager {
     function acceptAdmin() external;
 
     function getZKChain(uint256 _chainId) external view returns (address);
+
+    function getHyperchain(uint256 _chainId) external view returns (address);
 
     function getZKChainLegacy(uint256 _chainId) external view returns (address);
 
@@ -152,8 +157,6 @@ interface IChainTypeManager {
     ) external;
 
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
-
-    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
     function forwardedBridgeBurn(
         uint256 _chainId,

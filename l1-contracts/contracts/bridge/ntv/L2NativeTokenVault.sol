@@ -17,13 +17,13 @@ import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -35,7 +35,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal l2TokenProxyBytecodeHash;
+    bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
@@ -65,7 +65,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             revert EmptyAddress();
         }
 
-        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
+        L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
 
         if (_contractsDeployedAlready) {
@@ -84,17 +84,45 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
+        // In zkEVM immutables are stored in a storage of a system contract,
+        // so it makes sense to cache them for efficiency.
+        IL2SharedBridgeLegacy legacyBridge = L2_LEGACY_SHARED_BRIDGE;
+        if (address(legacyBridge) == address(0)) {
+            // No legacy bridge, the token must be native
+            return bytes32(0);
+        }
+
+        address l1TokenAddress = legacyBridge.l1TokenAddress(_tokenAddress);
+        if (l1TokenAddress == address(0)) {
+            // The token is not legacy
+            return bytes32(0);
+        }
+
+        return _registerLegacyTokenAssetId(_tokenAddress, l1TokenAddress);
+    }
+
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
+        if (assetId[_l2TokenAddress] != bytes32(0)) {
+            revert AssetIdAlreadyRegistered();
+        }
         if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
             revert NoLegacySharedBridge();
         }
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
-        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
         if (l1TokenAddress == address(0)) {
             revert TokenIsNotLegacy();
         }
 
+        _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
+    }
+
+    function _registerLegacyTokenAssetId(
+        address _l2TokenAddress,
+        address _l1TokenAddress
+    ) internal returns (bytes32 newAssetId) {
+        newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
         tokenAddress[newAssetId] = _l2TokenAddress;
         assetId[_l2TokenAddress] = newAssetId;
@@ -154,8 +182,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         assetId[_expectedToken] = _assetId;
     }
 
-    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract or the legacy shared bridge.
-    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
+    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
+    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
     /// @param _tokenOriginChainId The origin chain id of the token.
@@ -169,11 +197,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
             (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
                 uint32(gasleft()),
-                DEPLOYER_SYSTEM_CONTRACT,
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
                 0,
                 abi.encodeCall(
                     IContractDeployer.create2,
-                    (_salt, l2TokenProxyBytecodeHash, abi.encode(address(bridgedTokenBeacon), ""))
+                    (_salt, L2_TOKEN_PROXY_BYTECODE_HASH, abi.encode(address(bridgedTokenBeacon), ""))
                 )
             );
 
@@ -203,23 +231,23 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
-    /// @param _tokenOriginChainId The chain id of the origin token.
-    /// @param _l1Token The address of token on L1.
+    /// @param _originChainId The chain id of the origin token.
+    /// @param _nonNativeToken The address of token on its origin chain..
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
-        uint256 _tokenOriginChainId,
-        address _l1Token
+        uint256 _originChainId,
+        address _nonNativeToken
     ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
-            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
             bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-            bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _l1Token);
+            bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
             return
                 L2ContractHelper.computeCreate2Address(
                     address(this),
                     salt,
-                    l2TokenProxyBytecodeHash,
+                    L2_TOKEN_PROXY_BYTECODE_HASH,
                     constructorInputHash
                 );
         }
@@ -253,7 +281,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         // on L2s we don't track the balance
     }
 
-    function _registerToken(address _nativeToken) internal override {
+    function _registerToken(address _nativeToken) internal override returns (bytes32) {
         if (
             address(L2_LEGACY_SHARED_BRIDGE) != address(0) &&
             L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_nativeToken) != address(0)
@@ -261,7 +289,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             // Legacy tokens should be registered via `setLegacyTokenAssetId`.
             revert TokenIsLegacy();
         }
-        super._registerToken(_nativeToken);
+        return super._registerToken(_nativeToken);
     }
 
     /*//////////////////////////////////////////////////////////////

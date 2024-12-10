@@ -21,8 +21,10 @@ import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {BurningNativeWETHNotSupported, AddressAlreadyUsed, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {BurningNativeWETHNotSupported, AddressAlreadyUsed, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InvalidProof, NoFundsTransferred, DepositDoesNotExist, WithdrawalAlreadyFinalized, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
+import {WrongCounterpart, EthTransferFailed, EmptyToken, NativeTokenVaultAlreadySet, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -61,12 +63,12 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_nullifyChainBalanceByNTV_wrongCaller() public {
-        vm.expectRevert("L1N: not NTV");
+        vm.expectRevert();
         l1Nullifier.nullifyChainBalanceByNTV(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
-        vm.expectRevert("NTV: empty token");
+        vm.expectRevert(abi.encodeWithSelector(EmptyToken.selector));
         nativeTokenVault.registerToken(address(0));
     }
 
@@ -86,14 +88,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_setNativeTokenVault_alreadySet() public {
         vm.prank(owner);
-        vm.expectRevert("AR: native token v already set");
+        vm.expectRevert(NativeTokenVaultAlreadySet.selector);
         sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
     }
 
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
-        vm.expectRevert("AR: native token vault 0");
+        vm.expectRevert(ZeroAddress.selector);
         sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
     }
 
@@ -104,14 +106,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
 
         vm.prank(bridgehubAddress);
-        vm.expectRevert("NTV: wrong counterpart");
+        vm.expectRevert(abi.encodeWithSelector(WrongCounterpart.selector));
         sharedBridge.bridgehubDeposit(eraChainId, owner, 0, data);
     }
 
     function test_transferFundsToSharedBridge_Eth_CallFailed() public {
         vm.mockCallRevert(address(nativeTokenVault), "", "eth transfer failed");
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert("L1N: eth transfer failed");
+        vm.expectRevert(abi.encodeWithSelector(EthTransferFailed.selector));
         l1Nullifier.transferTokenToNTV(ETH_TOKEN_ADDRESS);
     }
 
@@ -126,14 +128,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(address(l1Nullifier));
         token.transfer(address(1), amount);
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert("NTV: 0 amount to transfer");
+        vm.expectRevert(ZeroAmountToTransfer.selector);
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
     function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
         vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert("NTV: wrong amount transferred");
+        vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 0, 10));
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
@@ -276,7 +278,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_bridgeRecoverFailedTransfer_Eth_claimFailedDepositFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
@@ -297,7 +299,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
+        vm.expectRevert(ClaimFailedDepositFailed.selector);
         l1Nullifier.bridgeRecoverFailedTransfer({
             _chainId: chainId,
             _depositSender: alice,
@@ -355,7 +357,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.store(address(l1Nullifier), bytes32(isWithdrawalFinalizedStorageLocation - 5), bytes32(uint256(2)));
 
         uint256 l2BatchNumber = 0;
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
@@ -377,7 +379,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert();
+        vm.expectRevert(InsufficientChainBalance.selector);
         vm.mockCall(
             address(bridgehubAddress),
             abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),

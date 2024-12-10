@@ -35,6 +35,7 @@ contract DeployL2Script is Script {
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
         address multicall3;
+        address timestampAsserter;
     }
 
     function run() public {
@@ -55,6 +56,7 @@ contract DeployL2Script is Script {
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
         deployMulticall3();
+        deployTimestampAsserter();
 
         saveOutput();
     }
@@ -118,6 +120,7 @@ contract DeployL2Script is Script {
         vm.serializeAddress("root", "multicall3", deployed.multicall3);
         vm.serializeAddress("root", "consensus_registry_implementation", deployed.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", deployed.consensusRegistryProxy);
+        vm.serializeAddress("root", "timestamp_asserter", deployed.timestampAsserter);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", deployed.forceDeployUpgraderAddress);
 
         string memory root = vm.projectRoot();
@@ -133,7 +136,7 @@ contract DeployL2Script is Script {
             bytecode = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
         }
 
-        deployed.l2DaValidatorAddress = Utils.deployThroughL1({
+        deployed.l2DaValidatorAddress = Utils.deployThroughL1Deterministic({
             bytecode: bytecode,
             constructorargs: bytes(""),
             create2salt: "",
@@ -183,6 +186,19 @@ contract DeployL2Script is Script {
         deployed.multicall3 = Utils.deployThroughL1({
             bytecode: L2ContractsBytecodesLib.readMulticall3Bytecode(),
             constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deployTimestampAsserter() internal {
+        deployed.timestampAsserter = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readTimestampAsserterBytecode(),
+            constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: new bytes[](0),

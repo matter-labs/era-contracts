@@ -154,7 +154,6 @@ contract L1AssetRouterTest is Test {
         nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
             _l1AssetRouter: address(sharedBridge),
-            _eraChainId: eraChainId,
             _l1Nullifier: l1Nullifier
         });
         address tokenBeacon = makeAddr("tokenBeacon");

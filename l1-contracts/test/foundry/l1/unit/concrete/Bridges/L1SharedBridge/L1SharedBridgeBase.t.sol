@@ -17,6 +17,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contract
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1AssetRouterTestBase is L1AssetRouterTest {
@@ -205,7 +206,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_bridgeRecoverFailedTransfer_Eth() public {
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
@@ -501,7 +502,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             _encodingVersion: LEGACY_ENCODING_VERSION,
             _originalCaller: alice,
             _assetId: nativeTokenVault.BASE_TOKEN_ASSET_ID(),
-            _transferData: abi.encode(amount, bob)
+            _transferData: abi.encode(amount, bob, ETH_TOKEN_ADDRESS)
         });
 
         assertEq(request.txDataHash, expectedTxHash);

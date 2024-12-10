@@ -86,7 +86,7 @@ contract RegisterZKChainScript is Script {
 
         initializeConfig();
         // TODO: some chains may not want to have a legacy shared bridge
-        runInner("/script-out/output-register-zk-chain.toml", true);
+        runInner("/script-out/output-register-zk-chain.toml", false);
     }
 
     function runForTest() public {
@@ -288,7 +288,13 @@ contract RegisterZKChainScript is Script {
     function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
+        bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
+        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
+
+        if (baseTokenAssetId == bytes32(0)) {
+            baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        }
 
         if (bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
             console.log("Base token asset id already registered on Bridgehub");
@@ -308,13 +314,17 @@ contract RegisterZKChainScript is Script {
 
     function registerTokenOnNTV() internal {
         INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
-        // Ownable ownable = Ownable(config.nativeTokenVault);
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
+        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
+
+        // If it hasn't been registered already with ntv
+        if (baseTokenAssetId == bytes32(0)) {
+            baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        }
         config.baseTokenAssetId = baseTokenAssetId;
         if (ntv.tokenAddress(baseTokenAssetId) != address(0) || config.baseToken == ETH_TOKEN_ADDRESS) {
             console.log("Token already registered on NTV");
         } else {
-            // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));
             vm.broadcast();
             ntv.registerToken(config.baseToken);
             console.log("Token registered on NTV");
@@ -469,17 +479,20 @@ contract RegisterZKChainScript is Script {
     }
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
-        bytes[] memory factoryDeps = new bytes[](3);
+        bytes[] memory factoryDeps = new bytes[](4);
         factoryDeps[0] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
         factoryDeps[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
         factoryDeps[2] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
+        factoryDeps[3] = L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecodeFromSystemContracts();
         return factoryDeps;
     }
 
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-        vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
+        if (output.l2LegacySharedBridge != address(0)) {
+            vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
+        }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 

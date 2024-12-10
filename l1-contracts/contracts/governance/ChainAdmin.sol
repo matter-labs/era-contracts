@@ -22,6 +22,13 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
+    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
+    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
+
+    /// @notice The set of active restrictions.
+    EnumerableSet.AddressSet internal activeRestrictions;
+
     /// @notice Ensures that only the `ChainAdmin` contract itself can call the function.
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
     /// should be implemented in the restriction contracts.
@@ -39,13 +46,6 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
             }
         }
     }
-
-    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
-    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
-    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
-
-    /// @notice The set of active restrictions.
-    EnumerableSet.AddressSet internal activeRestrictions;
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() public view returns (address[] memory) {
@@ -107,9 +107,9 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
     receive() external payable {}
 
-    /// @notice Function that ensures that the current admin can perform the call.
-    /// @dev Reverts in case the call can not be performed. Successfully executes otherwise.
-    function _validateCall(Call calldata _call) internal view {
+    /// @notice Function that returns the current admin can perform the call.
+    /// @dev By default it always returns true, but can be overridden in derived contracts.
+    function _validateCall(Call calldata _call) private view {
         address[] memory restrictions = getRestrictions();
 
         unchecked {
@@ -121,7 +121,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
-    function _addRestriction(address _restriction) internal {
+    function _addRestriction(address _restriction) private {
         RestrictionValidator.validateRestriction(_restriction);
 
         if (!activeRestrictions.add(_restriction)) {

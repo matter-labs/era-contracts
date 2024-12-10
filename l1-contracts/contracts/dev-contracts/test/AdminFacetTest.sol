@@ -3,12 +3,13 @@
 pragma solidity 0.8.24;
 
 import {AdminFacet} from "../../state-transition/chain-deps/facets/Admin.sol";
+import {RollupDAManager} from "../../state-transition/data-availability/RollupDAManager.sol";
 
 contract AdminFacetTest is AdminFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor(uint256 _l1ChainId) AdminFacet(_l1ChainId) {
+    constructor(uint256 _l1ChainId) AdminFacet(_l1ChainId, RollupDAManager(address(0))) {
         s.admin = msg.sender;
         s.chainTypeManager = msg.sender;
     }

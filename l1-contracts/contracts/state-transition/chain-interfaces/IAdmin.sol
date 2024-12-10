@@ -53,7 +53,7 @@ interface IAdmin is IZKChainBase {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
-    /// @dev Only the current admin can execute the upgrade
+    /// @dev Only the ChainTypeManager contract can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
@@ -79,6 +79,13 @@ interface IAdmin is IZKChainBase {
     /// @param _l1DAValidator The address of the L1 DA validator
     /// @param _l2DAValidator The address of the L2 DA validator
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
+
+    /// @notice Makes the chain as permanent rollup.
+    /// @dev This is a security feature needed for chains that should be
+    /// trusted to keep their data available even if the chain admin becomes malicious
+    /// and tries to set the DA validator pair to something which does not publish DA to Ethereum.
+    /// @dev DANGEROUS: once activated, there is no way back!
+    function makePermanentRollup() external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
@@ -128,8 +135,6 @@ interface IAdmin is IZKChainBase {
     /// @notice New pair of DA validators set
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
-
-    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
     event BridgeMint(address indexed _account, uint256 _amount);
 

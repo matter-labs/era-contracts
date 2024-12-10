@@ -25,7 +25,7 @@ contract L1NativeTokenVaultTest is Test {
     function setUp() public {
         assetRouter = makeAddr("assetRouter");
 
-        ntv = new L1NativeTokenVault(makeAddr("wethToken"), assetRouter, uint256(0), IL1Nullifier(address(0)));
+        ntv = new L1NativeTokenVault(makeAddr("wethToken"), assetRouter, IL1Nullifier(address(0)));
 
         token = new SomeToken();
     }

@@ -122,7 +122,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         vm.prank(ownerWallet);
         l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-        l2Bridgehub.setAssetHandlerAddress(
+        l2Bridgehub.setCTMAssetAddress(
             bytes32(uint256(uint160(l1CTM))),
             address(addresses.stateTransition.chainTypeManagerProxy)
         );
@@ -143,6 +143,12 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
             abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
             abi.encode(address(0))
         );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
+            abi.encode(address(uint160(1)))
+        );
+
         vm.prank(L2_BRIDGEHUB_ADDR);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,

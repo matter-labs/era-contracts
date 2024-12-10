@@ -15,7 +15,8 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {Unauthorized, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
+import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -133,6 +134,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
     /// @param _passValue Boolean indicating whether to pass msg.value in the call.
+    /// @param _nativeTokenVault The address of the native token vault.
     /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     function _burn(
         uint256 _chainId,
@@ -140,11 +142,23 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         address _originalCaller,
         bytes memory _transferData,
-        bool _passValue
+        bool _passValue,
+        address _nativeTokenVault
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
         if (l1AssetHandler == address(0)) {
-            revert AssetHandlerDoesNotExist(_assetId);
+            // As a UX feature, whenever an asset handler is not present, we always try to register asset within native token vault.
+            // The Native Token Vault is trusted to revert in an asset does not belong to it.
+            //
+            // Note, that it may "pollute" error handling a bit: instead of getting error for asset handler not being
+            // present, the user will get whatever error the native token vault will return, however, providing
+            // more advanced error handling requires more extensive code and will be added in the future releases.
+            INativeTokenVault(_nativeTokenVault).tryRegisterTokenFromBurnData(_transferData, _assetId);
+
+            // We do not do any additional transformations here (like setting `assetHandler` in the mapping),
+            // because we expect that all those happened inside `tryRegisterTokenFromBurnData`
+
+            l1AssetHandler = _nativeTokenVault;
         }
 
         uint256 msgValue = _passValue ? msg.value : 0;

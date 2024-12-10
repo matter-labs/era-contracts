@@ -10,6 +10,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {EventOnFallback} from "contracts/dev-contracts/EventOnFallback.sol";
 import {Forwarder} from "contracts/dev-contracts/Forwarder.sol";
 import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
+import {EventOnFallbackTargetExpected} from "../../../../L1TestsErrors.sol";
 
 contract GovernanceTest is Test, EventOnFallback {
     address internal owner;
@@ -47,7 +48,9 @@ contract GovernanceTest is Test, EventOnFallback {
 
     function _checkEventBeforeExecution(IGovernance.Operation memory op) private {
         for (uint256 i = 0; i < op.calls.length; i++) {
-            require(op.calls[i].target == address(eventOnFallback), "EventOnFallback target expected");
+            if (op.calls[i].target != address(eventOnFallback)) {
+                revert EventOnFallbackTargetExpected();
+            }
             // Check event
             vm.expectEmit(false, false, false, true);
             emit Called(address(governance), op.calls[i].value, op.calls[i].data);

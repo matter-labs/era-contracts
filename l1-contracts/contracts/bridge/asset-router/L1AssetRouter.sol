@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -23,6 +21,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
@@ -114,12 +113,16 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _transferOwnership(_owner);
     }
 
-    /// @notice Sets the L1ERC20Bridge contract address.
+    /// @notice Sets the NativeTokenVault contract address.
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "AR: native token v already set");
-        require(address(_nativeTokenVault) != address(0), "AR: native token vault 0");
+        if (address(nativeTokenVault) != address(0)) {
+            revert NativeTokenVaultAlreadySet();
+        }
+        if (address(_nativeTokenVault) == address(0)) {
+            revert ZeroAddress();
+        }
         nativeTokenVault = _nativeTokenVault;
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _setAssetHandler(ethAssetId, address(_nativeTokenVault));
@@ -145,9 +148,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetRegistrationData,
         address _assetDeploymentTracker
     ) external onlyOwner {
-        bytes32 assetId = keccak256(
-            abi.encode(uint256(block.chainid), _assetDeploymentTracker, _assetRegistrationData)
-        );
+        bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, _assetDeploymentTracker);
         assetDeploymentTracker[assetId] = _assetDeploymentTracker;
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
@@ -161,7 +162,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Used to set the asset handler address for a given asset ID on a remote ZK chain
-    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
     /// @param _chainId The ZK chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The encoding of asset ID.
@@ -215,7 +215,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _msgValue: 0,
             _assetId: _assetId,
             _originalCaller: _originalCaller,
-            _data: abi.encode(_amount, address(0))
+            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
         });
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
@@ -267,17 +267,20 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             revert AssetIdNotSupported(assetId);
         }
 
+        address ntvCached = address(nativeTokenVault);
+
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
             _nextMsgValue: _value,
             _assetId: assetId,
             _originalCaller: _originalCaller,
             _transferData: transferData,
-            _passValue: true
+            _passValue: true,
+            _nativeTokenVault: ntvCached
         });
 
         bytes32 txDataHash = DataEncoding.encodeTxDataHash({
-            _nativeTokenVault: address(nativeTokenVault),
+            _nativeTokenVault: ntvCached,
             _encodingVersion: encodingVersion,
             _originalCaller: _originalCaller,
             _assetId: assetId,
@@ -392,7 +395,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             }
         }
 
-        return (assetId, abi.encode(_depositAmount, _l2Receiver));
+        return (assetId, DataEncoding.encodeBridgeBurnData(_depositAmount, _l2Receiver, _l1Token));
     }
 
     /// @notice Ensures that token is registered with native token vault.
@@ -526,7 +529,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         bytes32 _assetId;
         {
-            bytes memory bridgeMintCalldata;
+            // Note, that to keep the code simple, while avoiding "stack too deep" error,
+            // this `bridgeData` variable is reused in two places with different meanings:
+            // - Firstly, it denotes the bridgeBurn data to be used for the NativeTokenVault
+            // - Secondly, after the call to `_burn` function, it denotes the `bridgeMint` data that
+            // will be sent to the L2 counterpart of the L1NTV.
+            bytes memory bridgeData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
             // Legacy bridge is only expected to use native tokens for L1.
@@ -536,16 +544,18 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
             IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
 
-            bridgeMintCalldata = _burn({
+            // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
+            bridgeData = _burn({
                 _chainId: ERA_CHAIN_ID,
                 _nextMsgValue: 0,
                 _assetId: _assetId,
                 _originalCaller: _originalCaller,
-                _transferData: abi.encode(_amount, _l2Receiver),
-                _passValue: false
+                _transferData: bridgeData,
+                _passValue: false,
+                _nativeTokenVault: address(nativeTokenVault)
             });
 
-            bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, bridgeMintCalldata);
+            bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, bridgeData);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
@@ -567,7 +577,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
 
         {
-            bytes memory transferData = abi.encode(_amount, _l2Receiver);
+            bytes memory transferData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
             // Save the deposited amount to claim funds on L1 if the deposit failed on L2
             L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
                 ERA_CHAIN_ID,

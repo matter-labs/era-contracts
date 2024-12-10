@@ -19,6 +19,8 @@ import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfac
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
+import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
+import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -75,23 +77,22 @@ library Utils {
         );
         logs[2] = constructL2Log(
             true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            bytes32("")
-        );
-        logs[3] = constructL2Log(
-            true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             keccak256("")
         );
-        logs[4] = constructL2Log(
+        logs[3] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
-
+        logs[4] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
+            bytes32("")
+        );
         logs[5] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -516,8 +517,12 @@ library Utils {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        require(_blobCommitments.length == TOTAL_BLOBS_IN_COMMITMENT, "b10");
-        require(_blobHashes.length == TOTAL_BLOBS_IN_COMMITMENT, "b11");
+        if (_blobCommitments.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidBlobCommitmentsLength();
+        }
+        if (_blobHashes.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidBlobHashesLength();
+        }
 
         // for each blob we have:
         // linear hash (hash of preimage from system logs) and
@@ -583,6 +588,32 @@ library Utils {
         for (uint256 i = 0; i < len; ++i) {
             _ops[i] = info;
         }
+    }
+
+    function deployL1RollupDAValidatorBytecode() internal returns (address) {
+        bytes memory bytecode = DeployUtils.readRollupDAValidatorBytecode();
+
+        return deployViaCreate(bytecode);
+    }
+
+    /**
+     * @dev Deploys contract using CREATE.
+     */
+    function deployViaCreate(bytes memory _bytecode) internal returns (address addr) {
+        if (_bytecode.length == 0) {
+            revert("Bytecode is not set");
+        }
+
+        assembly {
+            // Allocate memory for the bytecode
+            let size := mload(_bytecode) // Load the size of the bytecode
+            let ptr := add(_bytecode, 0x20) // Skip the length prefix (32 bytes)
+
+            // Create the contract
+            addr := create(0, ptr, size)
+        }
+
+        require(addr != address(0), "Deployment failed");
     }
 
     // add this to be excluded from coverage report

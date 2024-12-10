@@ -15,6 +15,16 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -22,28 +32,29 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Install dependencies
         run: yarn
 
-      - name: Install l2 deps
-        working-directory: ./l2-contracts
-        run: yarn
+      - name: Build da contracts
+        working-directory: da-contracts
+        run: |
+          yarn build:foundry
 
-      - name: Install l1 deps
-        working-directory: ./l1-contracts
-        run: yarn
+      - name: Build l1 contracts
+        working-directory: l1-contracts
+        run: |
+          yarn build:foundry
 
-      - name: Build l2 artifacts
-        run: yarn l2 build
+      - name: Build l2 contracts
+        working-directory: l2-contracts
+        run: |
+          yarn build:foundry
 
-      - name: Build l1 artifacts
-        run: yarn l1 build
-
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
+      - name: Build system contracts
+        working-directory: system-contracts
+        run: |
+          yarn install
+          yarn build:foundry
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -51,13 +62,12 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
   lint:
     runs-on: ubuntu-latest
@@ -78,6 +88,9 @@ jobs:
       - name: Lint
         run: yarn lint:check
 
+      - name: Lint errors
+        run: yarn l1 errors-lint --check
+
   test-foundry:
     needs: [build, lint]
     runs-on: ubuntu-latest
@@ -88,14 +101,19 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
           cache: yarn
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: yarn
@@ -107,13 +125,12 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -135,11 +152,19 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
       - name: Install dependencies
         run: yarn
 
       - name: Build system contract artifacts
-        run: yarn sc build
+        run: yarn sc build:foundry
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -148,69 +173,16 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
-
-      - name: Install foundry zksync
-        run: |
-          wget https://github.com/matter-labs/foundry-zksync/releases/download/nightly-f908ce43834bc1ffb4de6576ea5600eaab49dddb/foundry_nightly_linux_amd64.tar.gz -O foundry-zksync.tar.gz
-          tar -xzf foundry-zksync.tar.gz
-          sudo mv forge /usr/local/bin/forge
-          sudo mv cast /usr/local/bin/cast
-          sudo chmod +x /usr/local/bin/forge
-          sudo chmod +x /usr/local/bin/cast
-          forge --version
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Run tests
         working-directory: ./l1-contracts
         run: FOUNDRY_PROFILE=default yarn test:zkfoundry
-
-  test-hardhat:
-    needs: [build, lint]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Install l1 deps
-        working-directory: ./l1-contracts
-        run: yarn
-
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
-          path: |
-            da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
-
-      - name: Build L2 contracts
-        run: yarn l2 build
-
-      - name: Run tests
-        run: yarn l1 test --no-compile
 
   check-verifier-generator-l1:
     runs-on: ubuntu-latest
@@ -246,14 +218,19 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
           cache: yarn
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: yarn
@@ -265,18 +242,17 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/artifacts
-            l1-contracts/artifacts-zk
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
 
-      # TODO: fix filtering directories
+      # TODO: for some reason filtering directories stopped working.
       # # To ignore coverage for certain directories modify the paths in this step as needed. The
       # # below default ignores coverage results for the test and script directories. Alternatively,
       # # to include coverage in all directories, comment out this step. Note that because this
@@ -309,55 +285,60 @@ jobs:
       #     working-directory: l1-contracts
       #     minimum-coverage: 85 # Set coverage threshold.
 
-  gas-report:
-    needs: [build, lint]
-    runs-on: ubuntu-latest
+  # FIXME: restore gas report CI
+  # gas-report:
+  #   needs: [build, lint]
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+  #     - name: Use Foundry
+  #       uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
+  #     - name: Use Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18.18.0
+  #         cache: yarn
 
-      - name: Install dependencies
-        run: yarn
+  #     - name: Install dependencies
+  #       run: yarn
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
-          path: |
-            l1-contracts/artifacts
-            l1-contracts/cache
-            l1-contracts/typechain
+  #     - name: Restore artifacts cache
+  #       uses: actions/cache/restore@v3
+  #       with:
+  #         fail-on-cache-miss: true
+  #         key: artifacts-l1-${{ github.sha }}
+  #         path: |
+  #           da-contracts/out
+  #           l1-contracts/cache-forge
+  #           l1-contracts/out
+  #           l1-contracts/zkout
+  #           l2-contracts/cache-forge
+  #           l2-contracts/zkout
+  #           system-contracts/zkout
 
-      # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
-      - name: Run tests
-        run: yarn l1 test:foundry --gas-report | tee gasreport.ansi # <- this file name should be unique in your repository!
+  #     # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
+  #     - name: Run tests
+  #       run: yarn l1 test:foundry --gas-report | tee gasreport.ansi # <- this file name should be unique in your repository!
 
-      - name: Compare gas reports
-        uses: Rubilmax/foundry-gas-diff@v3.18
-        with:
-          summaryQuantile: 0.0 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
-          sortCriteria: avg,max # sort diff rows by criteria
-          sortOrders: desc,asc # and directions
-          ignore: test-foundry/**/*,l1-contracts/contracts/dev-contracts/**/*,l1-contracts/lib/**/*,l1-contracts/contracts/common/Dependencies.sol
-        id: gas_diff
+  #     - name: Compare gas reports
+  #       uses: Rubilmax/foundry-gas-diff@v3.18
+  #       with:
+  #         summaryQuantile: 0.0 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
+  #         sortCriteria: avg,max # sort diff rows by criteria
+  #         sortOrders: desc,asc # and directions
+  #         ignore: test-foundry/**/*,l1-contracts/contracts/dev-contracts/**/*,l1-contracts/lib/**/*,l1-contracts/contracts/common/Dependencies.sol
+  #       id: gas_diff
 
-      - name: Add gas diff to sticky comment
-        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          # delete the comment in case changes no longer impact gas costs
-          delete: ${{ !steps.gas_diff.outputs.markdown }}
-          message: ${{ steps.gas_diff.outputs.markdown }}
+  #     - name: Add gas diff to sticky comment
+  #       if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+  #       uses: marocchino/sticky-pull-request-comment@v2
+  #       with:
+  #         # delete the comment in case changes no longer impact gas costs
+  #         delete: ${{ !steps.gas_diff.outputs.markdown }}
+  #         message: ${{ steps.gas_diff.outputs.markdown }}

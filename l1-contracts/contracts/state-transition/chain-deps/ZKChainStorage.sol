@@ -169,4 +169,6 @@ struct ZKChainStorage {
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
+    /// @dev Whether the chain is a permanent rollup
+    bool isPermanentRollup;
 }

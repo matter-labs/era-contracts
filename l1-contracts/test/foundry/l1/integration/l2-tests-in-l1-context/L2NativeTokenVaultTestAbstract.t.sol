@@ -31,7 +31,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {TokenIsLegacy, TokenIsNotLegacy, Unauthorized, UnimplementedMessage, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
+import {TokenIsLegacy, TokenIsNotLegacy, Unauthorized, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
 
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";

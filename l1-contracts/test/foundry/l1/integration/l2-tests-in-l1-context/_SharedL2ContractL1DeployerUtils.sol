@@ -89,7 +89,6 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         );
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
-        stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
 
         stdstore
             .target(L2_ASSET_ROUTER_ADDR)
@@ -121,7 +120,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         deployGenesisUpgrade();
         deployVerifier();
         deployValidatorTimelock();
-        deployChainTypeManagerContract();
+        deployChainTypeManagerContract(address(0));
     }
 
     // add this to be excluded from coverage report
