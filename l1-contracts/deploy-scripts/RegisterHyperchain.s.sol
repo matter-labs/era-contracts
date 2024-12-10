@@ -161,9 +161,10 @@ contract RegisterHyperchainScript is Script {
             ? AllowedBytecodeTypes.EraVmAndEVM
             : AllowedBytecodeTypes.EraVm;
 
-        bytes memory diamondCutEncoded = abi.encode(config.diamondCutData);
-
+        bytes memory initData = abi.encode(config.diamondCutData, allowedBytecodeTypesMode);
+        
         vm.recordLogs();
+
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
             (
@@ -172,7 +173,7 @@ contract RegisterHyperchainScript is Script {
                 config.baseToken,
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
-                abi.encode(diamondCutEncoded, allowedBytecodeTypesMode)
+                initData
             )
         );
 
