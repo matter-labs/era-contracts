@@ -163,7 +163,7 @@ describe("L2BaseToken tests", () => {
   describe("decimals", () => {
     it("correct decimals", async () => {
       const decimals = await L2BaseToken.decimals();
-      expect(decimals).to.equal(8);
+      expect(decimals).to.equal(18);
     });
   });
 
