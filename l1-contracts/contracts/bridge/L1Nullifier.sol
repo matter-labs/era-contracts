@@ -679,7 +679,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// method in `L1ERC20Bridge`.
     ///
     /// @param _depositSender The address of the deposit initiator.
-    /// @param _l1Asset The address of the deposited L1 ERC20 token.
+    /// @param _l1Token The address of the deposited L1 ERC20 token.
     /// @param _amount The amount of the deposit that failed.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
     /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
@@ -688,7 +688,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     function claimFailedDepositLegacyErc20Bridge(
         address _depositSender,
-        address _l1Asset,
+        address _l1Token,
         uint256 _amount,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
@@ -701,7 +701,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes memory assetData = DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0));
 
         /// the legacy bridge can only be used with L1 native tokens.
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Asset);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
 
         _verifyAndClearFailedTransfer({
             _checkedInLegacyBridge: true,
