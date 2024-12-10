@@ -383,6 +383,8 @@ error WrappedBaseTokenAlreadyRegistered();
 
 // 0xde4c0b96
 error InvalidNTVBurnData();
+// 0xbe7193d4
+error InvalidSystemLogsLength();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
