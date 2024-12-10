@@ -167,7 +167,7 @@ library BatchDecoder {
         }
 
         uint8 encodingVersion = uint8(_executeData[0]);
-        if (encodingVersion == 0) {
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
             (executeData, priorityOpsData) = abi.decode(
                 _executeData[1:],
                 (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[])
