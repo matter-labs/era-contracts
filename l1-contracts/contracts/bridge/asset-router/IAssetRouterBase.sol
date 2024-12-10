@@ -45,7 +45,7 @@ interface IAssetRouterBase {
         address assetDeploymentTracker
     );
 
-    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetHandlerAddress);
 
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
