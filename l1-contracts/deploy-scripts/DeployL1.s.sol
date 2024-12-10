@@ -215,6 +215,7 @@ contract DeployL1Script is Script {
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
         config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        config.contracts.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
