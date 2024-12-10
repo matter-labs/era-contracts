@@ -97,7 +97,7 @@ describe("L2GenesisUpgrade tests", function () {
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl)",
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address dangerousTestOnlyForcedBeacon)",
       ],
       [
         {
@@ -114,6 +114,7 @@ describe("L2GenesisUpgrade tests", function () {
           // For genesis upgrade these values will always be zero
           l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
           l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
+          dangerousTestOnlyForcedBeacon: ethers.constants.AddressZero,
         },
       ]
     );

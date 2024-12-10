@@ -372,6 +372,8 @@ error AssetRouterAllowanceNotZero();
 error BurningNativeWETHNotSupported();
 // 0xb20b58ce
 error NoLegacySharedBridge();
+// 0x8e3ce3cb
+error TooHighDeploymentNonce();
 // 0x78d2ed02
 error ChainAlreadyLive();
 // 0x4e98b356
