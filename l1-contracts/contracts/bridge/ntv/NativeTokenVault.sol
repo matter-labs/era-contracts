@@ -352,7 +352,6 @@ abstract contract NativeTokenVault is
 
             _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
         } else {
-            // The Bridgehub also checks this, but we want to be sure
             if (msg.value != 0) {
                 revert NonEmptyMsgValue();
             }
