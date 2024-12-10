@@ -145,7 +145,7 @@ abstract contract NativeTokenVault is
     }
 
     function _bridgeMintBridgedToken(
-        uint256 _originChainId,
+        uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) internal virtual returns (address receiver, uint256 amount) {
@@ -159,12 +159,12 @@ abstract contract NativeTokenVault is
         if (token == address(0)) {
             token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
-        _handleChainBalanceDecrease(_originChainId, _assetId, amount, false);
+        _handleChainBalanceDecrease(_chainId, _assetId, amount, false);
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
     }
 
     function _bridgeMintNativeToken(
-        uint256 _originChainId,
+        uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) internal returns (address receiver, uint256 amount) {
@@ -172,7 +172,7 @@ abstract contract NativeTokenVault is
         // slither-disable-next-line unused-return
         (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
 
-        _handleChainBalanceDecrease(_originChainId, _assetId, amount, true);
+        _handleChainBalanceDecrease(_chainId, _assetId, amount, true);
         _withdrawFunds(_assetId, receiver, token, amount);
     }
 
