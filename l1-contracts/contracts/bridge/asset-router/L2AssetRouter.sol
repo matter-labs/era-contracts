@@ -132,7 +132,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) nonReentrant {
+    )
+        public
+        payable
+        override(AssetRouterBase, IAssetRouterBase)
+        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
+        nonReentrant
+    {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
@@ -147,7 +153,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// that rely on it must be upgradeable.
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) nonReentrant public override returns (bytes32) {
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override nonReentrant returns (bytes32) {
         return _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 

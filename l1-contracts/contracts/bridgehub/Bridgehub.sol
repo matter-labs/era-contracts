@@ -769,7 +769,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenMigrationsNotPaused {
-        BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(_bridgehubMintData, (BridgehubMintCTMAssetData));
+        BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
+            _bridgehubMintData,
+            (BridgehubMintCTMAssetData)
+        );
 
         address ctm = ctmAssetIdToAddress[_assetId];
         if (ctm == address(0)) {
