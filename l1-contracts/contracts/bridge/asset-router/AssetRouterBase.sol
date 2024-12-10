@@ -50,7 +50,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[47] private __gap;
+    uint256[48] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
