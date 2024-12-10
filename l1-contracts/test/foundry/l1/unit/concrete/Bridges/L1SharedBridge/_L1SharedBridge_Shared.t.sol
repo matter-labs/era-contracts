@@ -14,6 +14,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
@@ -91,6 +92,7 @@ contract L1AssetRouterTest is Test {
     uint256 randomChainId;
     address eraDiamondProxy;
     address eraErc20BridgeAddress;
+    address l2LegacySharedBridgeAddr;
 
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
@@ -117,6 +119,7 @@ contract L1AssetRouterTest is Test {
         l2BatchNumber = 3; //uint256(uint160(makeAddr("l2BatchNumber")));
         l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
         l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
+        l2LegacySharedBridgeAddr = makeAddr("l2LegacySharedBridge");
         merkleProof = new bytes32[](1);
         eraPostUpgradeFirstBatch = 1;
 
@@ -127,7 +130,7 @@ contract L1AssetRouterTest is Test {
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        l1NullifierImpl = new L1Nullifier({
+        l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IBridgehub(bridgehubAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
@@ -137,6 +140,9 @@ contract L1AssetRouterTest is Test {
             proxyAdmin,
             abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
         );
+        L1NullifierDev(address(l1NullifierProxy)).setL2LegacySharedBridge(chainId, l2LegacySharedBridgeAddr);
+        L1NullifierDev(address(l1NullifierProxy)).setL2LegacySharedBridge(eraChainId, l2LegacySharedBridgeAddr);
+
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
         sharedBridgeImpl = new L1AssetRouter({
             _l1WethAddress: l1WethAddress,

@@ -292,20 +292,16 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
         vm.mockCall(
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
-                chainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
+            abi.encodeCall(
+                IBridgehub.proveL2MessageInclusion,
+                (chainId, l2BatchNumber, l2MessageIndex, l2ToL1Message, merkleProof)
             ),
             abi.encode(true)
         );
@@ -338,7 +334,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
@@ -427,7 +423,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         //alt base token
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 

@@ -9,7 +9,7 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 
 // note, this should be the same as where hyper is disabled
@@ -226,7 +226,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
@@ -268,7 +268,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
@@ -351,7 +351,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(bytes32(uint256(2))); //alt base token
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
