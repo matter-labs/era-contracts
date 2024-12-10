@@ -83,8 +83,8 @@ error PubdataTooSmall(uint256 pubdataInputLength, uint256 blobCommitmentSize);
 // 0xcba35a08
 error PubdataTooLong(uint256 pubdataLength, uint256 blobSizeBytes);
 
-// 0x1b0f562e
-error InvalidPubdataHash();
+// 0x5513177c
+error InvalidPubdataHash(bytes32 fullPubdataHash, bytes32 pubdata);
 
 // 0x5717f940
 error InvalidPubdataSource(uint8 pubdataSource);

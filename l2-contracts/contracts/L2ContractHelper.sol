@@ -22,7 +22,7 @@ interface IL2Messenger {
     /// @notice Sends an arbitrary length message to L1.
     /// @param _message The variable length message to be sent to L1.
     /// @return Returns the keccak256 hashed value of the message.
-    function sendToL1(bytes memory _message) external returns (bytes32);
+    function sendToL1(bytes calldata _message) external returns (bytes32);
 }
 
 /**

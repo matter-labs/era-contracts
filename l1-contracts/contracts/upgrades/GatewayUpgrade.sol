@@ -29,7 +29,7 @@ struct GatewayUpgradeEncodedInput {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase {
+contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase, IGatewayUpgrade {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
@@ -80,7 +80,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase {
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
-    function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
+    function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external override {
         super.upgrade(_proposedUpgrade);
     }
 }

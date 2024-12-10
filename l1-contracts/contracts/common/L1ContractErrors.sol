@@ -330,8 +330,6 @@ error NewDeadlineExceedsMaxDeadline();
 error AlreadyPermanentRollup();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0x6e3331f5
-error IncorrectPricingMode();
 // 0xd0266e26
 error NotSettlementLayer();
 // 0x7a4902ad
@@ -378,6 +376,10 @@ error NoLegacySharedBridge();
 error TooHighDeploymentNonce();
 // 0x78d2ed02
 error ChainAlreadyLive();
+// 0x4e98b356
+error MigrationsNotPaused();
+// 0xf20c5c2a
+error WrappedBaseTokenAlreadyRegistered();
 
 // 0xde4c0b96
 error InvalidNTVBurnData();

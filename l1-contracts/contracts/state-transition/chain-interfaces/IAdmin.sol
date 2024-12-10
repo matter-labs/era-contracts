@@ -62,7 +62,7 @@ interface IAdmin is IZKChainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the CTM can unfreeze Diamond Proxy
+    /// @dev Only the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
     function genesisUpgrade(
@@ -107,7 +107,7 @@ interface IAdmin is IZKChainBase {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
     /// @notice Validium mode status changed
-    event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
+    event PubdataPricingModeUpdate(PubdataPricingMode validiumMode);
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);

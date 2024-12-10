@@ -50,7 +50,8 @@ library PriorityTree {
 
     /// @notice Set up the tree
     function setup(Tree storage _tree, uint256 _startIndex) internal {
-        _tree.tree.setup(ZERO_LEAF_HASH);
+        bytes32 initialRoot = _tree.tree.setup(ZERO_LEAF_HASH);
+        _tree.historicalRoots[initialRoot] = true;
         _tree.startIndex = _startIndex;
     }
 
@@ -66,6 +67,12 @@ library PriorityTree {
     }
 
     /// @notice Process the priority operations of a batch.
+    /// @dev Note, that the function below only checks that a certain segment of items is present in the tree.
+    /// It does not check that e.g. there are no zero items inside the provided `itemHashes`, so in theory proofs
+    /// that include non-existing priority operations could be created. This function relies on the fact
+    /// that the `itemHashes` of `_priorityOpsData` are hashes of valid priority transactions.
+    /// This fact is ensures by the fact the rolling hash of those is sent to the Executor by the bootloader
+    /// and so assuming that zero knowledge proofs are correct, so is the structure of the `itemHashes`.
     function processBatch(Tree storage _tree, PriorityOpsBatchInfo memory _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {
             bytes32 expectedRoot = Merkle.calculateRootPaths(

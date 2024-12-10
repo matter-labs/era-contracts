@@ -8,7 +8,6 @@ import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol"
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
 import {OnlyBridgehub, CTMNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
@@ -20,7 +19,7 @@ bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
-contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable2StepUpgradeable {
+contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -45,7 +44,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IAssetRouterBase _l1AssetRouter) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, IAssetRouterBase _l1AssetRouter) {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L1_ASSET_ROUTER = _l1AssetRouter;
@@ -53,7 +52,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @notice used to initialize the contract
     /// @param _owner the owner of the contract
-    function initialize(address _owner) external reentrancyGuardInitializer {
+    function initialize(address _owner) external {
         _transferOwnership(_owner);
     }
 

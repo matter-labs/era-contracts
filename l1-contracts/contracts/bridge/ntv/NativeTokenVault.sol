@@ -224,7 +224,8 @@ abstract contract NativeTokenVault is
     }
 
     function tryRegisterTokenFromBurnData(bytes calldata _data, bytes32 _expectedAssetId) external {
-        (uint256 amount, address receiver, address tokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
+        // slither-disable-next-line unused-return
+        (, , address tokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (tokenAddress == address(0)) {
             revert ZeroAddress();

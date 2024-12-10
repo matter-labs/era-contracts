@@ -22,7 +22,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
+import {LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -436,8 +436,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             weCanTransfer = true;
         }
         if (weCanTransfer) {
+            uint256 balanceBefore = l1Token.balanceOf(address(nativeTokenVault));
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_originalCaller, address(nativeTokenVault), _amount);
+            uint256 balanceAfter = l1Token.balanceOf(address(nativeTokenVault));
+
+            if (balanceAfter - balanceBefore != _amount) {
+                revert TokensWithFeesNotSupported();
+            }
             return true;
         }
         return false;
@@ -541,8 +547,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             if (_assetId != DataEncoding.encodeNTVAssetId(block.chainid, _l1Token)) {
                 revert LegacyBridgeUsesNonNativeToken();
             }
-
-            IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
 
             // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
             bridgeData = _burn({
