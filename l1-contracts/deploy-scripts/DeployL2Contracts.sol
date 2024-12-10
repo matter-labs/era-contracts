@@ -34,6 +34,8 @@ contract DeployL2Script is Script {
         address multicall3;
         address forceDeployUpgraderAddress;
         address timestampAsserter;
+        address wethImpl;
+        address weth;
     }
 
     struct ContractsBytecodes {
@@ -47,6 +49,7 @@ contract DeployL2Script is Script {
         bytes multicall3Bytecode;
         bytes forceDeployUpgrader;
         bytes timestampAsserterBytecode;
+        bytes wethBytecode;
     }
 
     function run() public {
@@ -70,6 +73,8 @@ contract DeployL2Script is Script {
         deployConsensusRegistryProxy();
         deployMulticall3();
         deployTimestampAsserter();
+        deployWETH();
+        deployWETHProxy();
 
         saveOutput();
     }
@@ -131,6 +136,15 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployWETH() public {
+        initializeConfig();
+        loadContracts(false);
+
+        deployWETH();
+
+        saveOutput();
+    }
+
     function loadContracts(bool legacyBridge) internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readFoundryBytecode(
@@ -173,6 +187,10 @@ contract DeployL2Script is Script {
         contracts.timestampAsserterBytecode = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/TimestampAsserter.sol/TimestampAsserter.json"
         );
+
+        contracts.wethBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/L2WETH.sol/L2WETH.json"
+        );
     }
 
     function initializeConfig() internal {
@@ -195,6 +213,7 @@ contract DeployL2Script is Script {
         vm.serializeAddress("root", "consensus_registry_proxy", config.consensusRegistryProxy);
         vm.serializeAddress("root", "multicall3", config.multicall3);
         vm.serializeAddress("root", "timestamp_asserter", config.timestampAsserter);
+        vm.serializeAddress("root", "weth", config.weth);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
@@ -316,6 +335,50 @@ contract DeployL2Script is Script {
         config.timestampAsserter = Utils.deployThroughL1({
             bytecode: contracts.timestampAsserterBytecode,
             constructorargs: hex"",
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deployWETH() internal {
+        config.wethImpl = Utils.deployThroughL1({
+            bytecode: contracts.wethBytecode,
+            constructorargs: hex"",
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deployWETHProxy() internal {
+        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
+
+        string memory functionSignature;
+        functionSignature = "initialize(string,string)";
+        // solhint-disable-next-line func-named-parameters
+        bytes memory proxyInitializationParams = abi.encodeWithSignature(
+            functionSignature,
+            "Wrapped ETH",
+            "WETH"
+        );
+
+        bytes memory constructorData = abi.encode(
+            config.wethImpl,
+            l2GovernorAddress,
+            proxyInitializationParams
+        );
+
+        config.weth = Utils.deployThroughL1({
+            bytecode: contracts.l2SharedBridgeProxyBytecode,
+            constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: new bytes[](0),
