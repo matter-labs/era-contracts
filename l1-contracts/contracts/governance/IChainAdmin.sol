@@ -34,4 +34,6 @@ interface IChainAdmin {
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable;
 
     function setTokenMultiplier(IAdmin _chainContract, uint128 _nominator, uint128 _denominator) external;
+
+    function enableEvmEmulator(IAdmin _chainContract) external;
 }

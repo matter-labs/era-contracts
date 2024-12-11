@@ -76,11 +76,11 @@ contract AcceptAdmin is Script {
     }
 
     // This function should be called by the owner to update token multiplier setter role
-    function chainAllowEvmEmulation(address chainAdmin) public {
+    function chainAllowEvmEmulation(address chainAdmin, address target) public {
         IChainAdmin admin = IChainAdmin(chainAdmin);
 
         vm.startBroadcast();
-        admin.allowEvmEmulation();
+        admin.enableEvmEmulator(target);
         vm.stopBroadcast();
     }
 }

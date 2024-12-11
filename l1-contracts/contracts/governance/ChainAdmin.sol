@@ -48,6 +48,10 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
         emit UpdateUpgradeTimestamp(_protocolVersion, _upgradeTimestamp);
     }
 
+    function enableEvmEmulator(IAdmin _chainContract) external onlyOwner {
+        _chainContract.allowEvmEmulation();
+    }
+
     /// @notice Execute multiple calls as part of contract administration.
     /// @param _calls Array of Call structures defining target, value, and data for each call.
     /// @param _requireSuccess If true, reverts transaction on any call failure.
