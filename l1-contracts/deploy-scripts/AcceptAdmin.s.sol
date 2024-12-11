@@ -80,7 +80,7 @@ contract AcceptAdmin is Script {
         IChainAdmin admin = IChainAdmin(chainAdmin);
 
         vm.startBroadcast();
-        admin.enableEvmEmulator(target);
+        admin.enableEvmEmulator(IZkSyncHyperchain(target));
         vm.stopBroadcast();
     }
 }
