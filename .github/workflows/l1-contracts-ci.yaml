@@ -161,7 +161,7 @@ jobs:
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Install dependencies
-        run: ci_run yarn
+        run: yarn
 
       - name: Build system contract artifacts
         run: yarn sc build:foundry
