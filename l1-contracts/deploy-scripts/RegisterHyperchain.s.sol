@@ -157,9 +157,7 @@ contract RegisterHyperchainScript is Script {
     function registerHyperchain() internal {
         Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
-        AllowedBytecodeTypes allowedBytecodeTypesMode = config.allowEvmEmulator
-            ? AllowedBytecodeTypes.EraVmAndEVM
-            : AllowedBytecodeTypes.EraVm;
+        AllowedBytecodeTypes allowedBytecodeTypesMode = AllowedBytecodeTypes.EraVm;
 
         bytes memory initData = abi.encode(config.diamondCutData, allowedBytecodeTypesMode);
 
