@@ -374,7 +374,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             revert Unauthorized(msg.sender);
         }
 
-        if (uint256(_getAllowedBytecodeTypesMode()) != newAllowedBytecodeTypes) {
+        if (_getAllowedBytecodeTypesMode() != newAllowedBytecodeTypes) {
             assembly {
                 sstore(ALLOWED_BYTECODE_TYPES_MODE_SLOT, newAllowedBytecodeTypes)
             }

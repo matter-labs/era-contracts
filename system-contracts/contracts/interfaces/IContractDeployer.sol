@@ -114,5 +114,5 @@ interface IContractDeployer {
 
     /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
-    function setAllowedBytecodeTypesToDeploy(uint256 newAllowedBytecodeTypes) external;
+    function setAllowedBytecodeTypesToDeploy(AllowedBytecodeTypes newAllowedBytecodeTypes) external;
 }
