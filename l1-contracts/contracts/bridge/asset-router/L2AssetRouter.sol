@@ -13,6 +13,7 @@ import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
@@ -23,7 +24,7 @@ import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev The address of the L2 legacy shared bridge.
     address public immutable L2_LEGACY_SHARED_BRIDGE;
 
@@ -47,8 +48,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /// @notice Checks that the message sender is the L1 Asset Router.
-    modifier onlyAssetRouterCounterpartOrSelf(uint256 _originChainId) {
-        if (_originChainId == L1_CHAIN_ID) {
+    modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
+        if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
                 revert InvalidCaller(msg.sender);
@@ -84,7 +85,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) {
+    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) reentrancyGuardInitializer {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
@@ -131,7 +132,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
+    )
+        public
+        payable
+        override(AssetRouterBase, IAssetRouterBase)
+        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
+        nonReentrant
+    {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
@@ -146,7 +153,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// that rely on it must be upgradeable.
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override returns (bytes32) {
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override nonReentrant returns (bytes32) {
         return _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 
@@ -285,7 +292,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external nonReentrant {
         if (_amount == 0) {
             revert AmountMustBeGreaterThanZero();
         }
@@ -303,7 +310,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _l2Token,
         uint256 _amount,
         address _sender
-    ) external onlyLegacyBridge {
+    ) external onlyLegacyBridge nonReentrant {
         _withdrawLegacy(_l1Receiver, _l2Token, _amount, _sender);
     }
 

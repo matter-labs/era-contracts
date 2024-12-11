@@ -334,7 +334,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert CTMNotRegistered();
         }
 
-        bytes32 ctmAssetId = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
+        bytes32 ctmAssetId = DataEncoding.encodeAssetId(L1_CHAIN_ID, _additionalData, sender);
         ctmAssetIdToAddress[ctmAssetId] = _assetAddress;
         ctmAssetIdFromAddress[_assetAddress] = ctmAssetId;
         emit AssetRegistered(ctmAssetId, _assetAddress, _additionalData, msg.sender);
@@ -718,20 +718,20 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert SLNotWhitelisted();
         }
 
-        BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != ctmAssetIdFromChainId(bridgehubData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, ctmAssetIdFromChainId(bridgehubData.chainId));
+        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
+        if (_assetId != ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
+            revert IncorrectChainAssetId(_assetId, ctmAssetIdFromChainId(bridgehubBurnData.chainId));
         }
-        if (settlementLayer[bridgehubData.chainId] != block.chainid) {
-            revert NotCurrentSL(settlementLayer[bridgehubData.chainId], block.chainid);
+        if (settlementLayer[bridgehubBurnData.chainId] != block.chainid) {
+            revert NotCurrentSL(settlementLayer[bridgehubBurnData.chainId], block.chainid);
         }
-        settlementLayer[bridgehubData.chainId] = _settlementChainId;
+        settlementLayer[bridgehubBurnData.chainId] = _settlementChainId;
 
-        if (whitelistedSettlementLayers[bridgehubData.chainId]) {
+        if (whitelistedSettlementLayers[bridgehubBurnData.chainId]) {
             revert SettlementLayersMustSettleOnL1();
         }
 
-        address zkChain = zkChainMap.get(bridgehubData.chainId);
+        address zkChain = zkChainMap.get(bridgehubBurnData.chainId);
         if (zkChain == address(0)) {
             revert HyperchainNotRegistered();
         }
@@ -739,26 +739,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert IncorrectSender(_originalCaller, IZKChain(zkChain).getAdmin());
         }
 
-        bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeBurn(
-            bridgehubData.chainId,
-            bridgehubData.ctmData
+        bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgehubBurnData.chainId]).forwardedBridgeBurn(
+            bridgehubBurnData.chainId,
+            bridgehubBurnData.ctmData
         );
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == L1_CHAIN_ID
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
                 : zkChainMap.get(_settlementChainId),
             _originalCaller,
-            bridgehubData.chainData
+            bridgehubBurnData.chainData
         );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
-            chainId: bridgehubData.chainId,
-            baseTokenAssetId: baseTokenAssetId[bridgehubData.chainId],
+            chainId: bridgehubBurnData.chainId,
+            baseTokenAssetId: baseTokenAssetId[bridgehubBurnData.chainId],
             ctmData: ctmMintData,
             chainData: chainMintData
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
-        emit MigrationStarted(bridgehubData.chainId, _assetId, _settlementChainId);
+        emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
@@ -769,38 +769,41 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenMigrationsNotPaused {
-        BridgehubMintCTMAssetData memory bridgehubData = abi.decode(_bridgehubMintData, (BridgehubMintCTMAssetData));
+        BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
+            _bridgehubMintData,
+            (BridgehubMintCTMAssetData)
+        );
 
         address ctm = ctmAssetIdToAddress[_assetId];
         if (ctm == address(0)) {
             revert NoCTMForAssetId(_assetId);
         }
-        if (settlementLayer[bridgehubData.chainId] == block.chainid) {
+        if (settlementLayer[bridgehubMintData.chainId] == block.chainid) {
             revert AlreadyCurrentSL(block.chainid);
         }
 
-        settlementLayer[bridgehubData.chainId] = block.chainid;
-        chainTypeManager[bridgehubData.chainId] = ctm;
-        baseTokenAssetId[bridgehubData.chainId] = bridgehubData.baseTokenAssetId;
+        settlementLayer[bridgehubMintData.chainId] = block.chainid;
+        chainTypeManager[bridgehubMintData.chainId] = ctm;
+        baseTokenAssetId[bridgehubMintData.chainId] = bridgehubMintData.baseTokenAssetId;
         // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
         // It is assumed that if the bridging happened, the token was approved on L1 already.
-        assetIdIsRegistered[bridgehubData.baseTokenAssetId] = true;
+        assetIdIsRegistered[bridgehubMintData.baseTokenAssetId] = true;
 
-        address zkChain = getZKChain(bridgehubData.chainId);
+        address zkChain = getZKChain(bridgehubMintData.chainId);
         bool contractAlreadyDeployed = zkChain != address(0);
         if (!contractAlreadyDeployed) {
-            zkChain = IChainTypeManager(ctm).forwardedBridgeMint(bridgehubData.chainId, bridgehubData.ctmData);
+            zkChain = IChainTypeManager(ctm).forwardedBridgeMint(bridgehubMintData.chainId, bridgehubMintData.ctmData);
             if (zkChain == address(0)) {
-                revert ChainIdNotRegistered(bridgehubData.chainId);
+                revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
             // We want to allow any chain to be migrated,
-            _registerNewZKChain(bridgehubData.chainId, zkChain, false);
-            messageRoot.addNewChain(bridgehubData.chainId);
+            _registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            messageRoot.addNewChain(bridgehubMintData.chainId);
         }
 
-        IZKChain(zkChain).forwardedBridgeMint(bridgehubData.chainData, contractAlreadyDeployed);
+        IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
-        emit MigrationFinalized(bridgehubData.chainId, _assetId, zkChain);
+        emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
@@ -813,22 +816,22 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _depositSender,
         bytes calldata _data
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
-        BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
+        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        settlementLayer[bridgehubData.chainId] = block.chainid;
+        settlementLayer[bridgehubBurnData.chainId] = block.chainid;
 
-        IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubData.chainId,
+        IChainTypeManager(chainTypeManager[bridgehubBurnData.chainId]).forwardedBridgeRecoverFailedTransfer({
+            _chainId: bridgehubBurnData.chainId,
             _assetInfo: _assetId,
             _depositSender: _depositSender,
-            _ctmData: bridgehubData.ctmData
+            _ctmData: bridgehubBurnData.ctmData
         });
 
-        IZKChain(getZKChain(bridgehubData.chainId)).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubData.chainId,
+        IZKChain(getZKChain(bridgehubBurnData.chainId)).forwardedBridgeRecoverFailedTransfer({
+            _chainId: bridgehubBurnData.chainId,
             _assetInfo: _assetId,
             _originalCaller: _depositSender,
-            _chainData: bridgehubData.chainData
+            _chainData: bridgehubBurnData.chainData
         });
     }
 

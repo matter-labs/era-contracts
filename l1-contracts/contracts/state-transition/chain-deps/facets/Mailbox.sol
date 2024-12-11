@@ -412,7 +412,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub(s.bridgehub).forwardTransactionOnGateway,
+            IBridgehub.forwardTransactionOnGateway,
             (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return

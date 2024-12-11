@@ -601,7 +601,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             l2DepositTxHash: txHash,
             from: _originalCaller,
             to: _l2Receiver,
-            l1Asset: _l1Token,
+            l1Token: _l1Token,
             amount: _amount
         });
     }
