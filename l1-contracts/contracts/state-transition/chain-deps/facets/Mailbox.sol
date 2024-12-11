@@ -264,7 +264,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 l2Calldata: _l2Calldata,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
-                // Tx is free, no so refund recipient needed
+                // Tx is free, so no refund recipient needed
                 refundRecipient: address(0)
             })
         );
