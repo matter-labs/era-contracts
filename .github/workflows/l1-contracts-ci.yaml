@@ -161,7 +161,7 @@ jobs:
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Install dependencies
-        run: ci_run yarn
+        run: yarn
 
       - name: Build system contract artifacts
         run: yarn sc build:foundry
@@ -175,7 +175,7 @@ jobs:
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
+            l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
             system-contracts/zkout
