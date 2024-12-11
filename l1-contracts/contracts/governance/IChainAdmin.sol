@@ -35,5 +35,5 @@ interface IChainAdmin {
 
     function setTokenMultiplier(IAdmin _chainContract, uint128 _nominator, uint128 _denominator) external;
 
-    function enableEvmEmulator(IAdmin _chainContract) external;
+    function enableEvmEmulator(IAdmin _chainContract) external returns (bytes32 canonicalTxHash);
 }
