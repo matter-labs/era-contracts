@@ -9,7 +9,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -157,12 +156,7 @@ contract RegisterHyperchainScript is Script {
     function registerHyperchain() internal {
         Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
-        AllowedBytecodeTypes allowedBytecodeTypesMode = AllowedBytecodeTypes.EraVm;
-
-        bytes memory initData = abi.encode(config.diamondCutData, allowedBytecodeTypesMode);
-
         vm.recordLogs();
-
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
             (
@@ -171,7 +165,7 @@ contract RegisterHyperchainScript is Script {
                 config.baseToken,
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
-                initData
+                config.diamondCutData
             )
         );
 

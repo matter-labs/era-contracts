@@ -11,7 +11,8 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {IL2ContractDeployer, AllowedBytecodeTypes} from "../../../common/interfaces/IL2ContractDeployer.sol";
+
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
@@ -124,7 +125,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     function allowEvmEmulation() external onlyAdmin {
         IMailbox(address(this)).requestL2ServiceTransaction(
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, 1)
+            abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
         );
     }
 

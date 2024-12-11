@@ -46,6 +46,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external;
 
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data

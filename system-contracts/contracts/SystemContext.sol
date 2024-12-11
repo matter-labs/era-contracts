@@ -90,17 +90,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         chainId = _newChainId;
     }
 
-    /// @notice Set the chain configuration.
-    /// @param _newChainId The chainId
-    /// @param _newAllowedBytecodeTypes The new allowed bytecode types mode.
-    function setChainConfiguration(
-        uint256 _newChainId,
-        uint256 _newAllowedBytecodeTypes
-    ) external onlyCallFromForceDeployer {
-        chainId = _newChainId;
-        DEPLOYER_SYSTEM_CONTRACT.setAllowedBytecodeTypesToDeploy(_newAllowedBytecodeTypes);
-    }
-
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
 

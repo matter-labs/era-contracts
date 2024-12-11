@@ -107,10 +107,6 @@ async function main() {
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
 
-      const isEvmEmulatorSupported = !!cmd.allowEvmEmulation;
-
-      console.log(`EVM emulator: ${isEvmEmulatorSupported ? "SUPPORTED" : " NOT SUPPORTED"}`);
-
       await deployer.registerHyperchain(
         baseTokenAddress,
         cmd.validiumMode,
@@ -119,8 +115,7 @@ async function main() {
         null,
         null,
         null,
-        useGovernance,
-        isEvmEmulatorSupported
+        useGovernance
       );
       if (tokenMultiplierSetterAddress != "") {
         console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
