@@ -31,7 +31,7 @@ contract DeployL2Script is Script {
         address bridgehubAddress;
         address governance;
         address erc20BridgeProxy;
-        uint256 validiumType;
+        DAValidatorType validatorType;
         address consensusRegistryOwner;
     }
 
@@ -111,7 +111,6 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
         string memory toml = vm.readFile(path);
-        config.validiumType = toml.readUint("$.validium_type");
         config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.governance = toml.readAddress("$.governance");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
@@ -119,6 +118,10 @@ contract DeployL2Script is Script {
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
+
+        uint256 validatorTypeUint = toml.readUint("$.da_validator_type");
+        require(validatorTypeUint < 3, "Invalid DA validator type");
+        config.validatorType = DAValidatorType(validatorTypeUint);
     }
 
     function saveOutput() internal {
@@ -136,14 +139,14 @@ contract DeployL2Script is Script {
 
     function deployL2DaValidator() internal {
         bytes memory bytecode;
-        if (config.validiumType == DAValidatorType.Rollup) {
+        if (config.validatorType == DAValidatorType.Rollup) {
             bytecode = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
-        } else if (config.validiumType == DAValidatorType.NoDA) {
+        } else if (config.validatorType == DAValidatorType.NoDA) {
             bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
-        } else if (config.validiumType == DAValidatorType.Avail) {
+        } else if (config.validatorType == DAValidatorType.Avail) {
             bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
         } else {
-            revert("Invalid validium validator type");
+            revert("Invalid DA validator type");
         }
 
         deployed.l2DaValidatorAddress = Utils.deployThroughL1Deterministic({
