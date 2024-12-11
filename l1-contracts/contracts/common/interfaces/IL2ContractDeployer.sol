@@ -29,4 +29,8 @@ interface IL2ContractDeployer {
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata.
     function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external;
+
+    /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
+    /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
+    function setAllowedBytecodeTypesToDeploy(uint256 newAllowedBytecodeTypes) external;
 }

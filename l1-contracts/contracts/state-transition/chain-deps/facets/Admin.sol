@@ -3,13 +3,15 @@
 pragma solidity 0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
-
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
@@ -117,6 +119,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         address oldTransactionFilterer = s.transactionFilterer;
         s.transactionFilterer = _transactionFilterer;
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
+    }
+
+    function allowEvmEmulation() external onlyAdmin {
+        IMailbox(address(this)).requestL2ServiceTransaction(
+            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, 1)
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

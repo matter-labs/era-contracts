@@ -112,7 +112,7 @@ interface IContractDeployer {
     /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
     function evmCodeHash(address) external view returns (bytes32);
 
-    /// @notice Changes what types of bytecodes are allowed to be deployed on the chain. Can be used only during upgrades.
+    /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
     function setAllowedBytecodeTypesToDeploy(uint256 newAllowedBytecodeTypes) external;
 }

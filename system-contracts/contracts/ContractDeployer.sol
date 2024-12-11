@@ -364,7 +364,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         if (
             msg.sender != FORCE_DEPLOYER &&
             msg.sender != address(COMPLEX_UPGRADER_CONTRACT) &&
-            msg.sender != address(SYSTEM_CONTEXT_CONTRACT)
+            msg.sender != address(SYSTEM_CONTEXT_CONTRACT) &&
+            msg.sender != 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF
         ) {
             revert Unauthorized(msg.sender);
         }
