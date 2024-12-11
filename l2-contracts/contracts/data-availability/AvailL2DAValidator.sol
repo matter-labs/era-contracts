@@ -24,6 +24,8 @@ contract AvailL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
             _chainedBytecodesHash,
             _totalL2ToL1PubdataAndStateDiffs
         );
-        outputHash = keccak256(_totalPubdata);
+
+        bytes32 fullPubdataHash = keccak256(_totalPubdata);
+        outputHash = keccak256(abi.encodePacked(stateDiffHash, fullPubdataHash));
     }
 }

@@ -20,12 +20,13 @@ contract AvailL1DAValidator is IL1DAValidator, AvailAttestationLib {
         bytes calldata operatorDAInput,
         uint256 maxBlobsSupported
     ) external returns (L1DAValidatorOutput memory output) {
+        output.stateDiffHash = bytes32(operatorDAInput[: 32]);
+
         IAvailBridge.MerkleProofInput memory input = abi.decode(operatorDAInput[32:], (IAvailBridge.MerkleProofInput));
-        if (l2DAValidatorOutputHash != input.leaf) revert InvalidValidatorOutputHash();
+        if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(output.stateDiffHash, input.leaf))) revert InvalidValidatorOutputHash();
         _attest(input);
 
         // The rest of the fields that relate to blobs are empty.
-        output.stateDiffHash = bytes32(operatorDAInput[:32]);
         output.blobsLinearHashes = new bytes32[](maxBlobsSupported);
         output.blobsOpeningCommitments = new bytes32[](maxBlobsSupported);
     }
