@@ -184,29 +184,25 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("L1RollupDAValidator deployed at:", rollupDAValidator);
         addresses.daAddresses.l1RollupDAValidator = rollupDAValidator;
 
-        address noDAValidator = deployViaCreate2(type(ValidiumL1DAValidator).creationCode, "");
-        console.log("L1NoDAValidiumDAValidator deployed at:", noDAValidator);
-        addresses.daAddresses.noDAValidiumL1DAValidator = noDAValidator;
+        addresses.daAddresses.noDAValidiumL1DAValidator = deployViaCreate2(
+            type(ValidiumL1DAValidator).creationCode,
+            ""
+        );
+        console.log("L1NoDAValidiumDAValidator deployed at:", addresses.daAddresses.noDAValidiumL1DAValidator);
 
-        address availDAValidator;
         if (config.contracts.availL1DAValidator == address(0)) {
             address availBridge = deployViaCreate2(Utils.readDummyAvailBridgeBytecode(), "");
-            availDAValidator = deployViaCreate2(Utils.readAvailL1DAValidatorBytecode(), abi.encode(availBridge));
-            console.log("AvailL1DAValidator deployed at:", availDAValidator);
+            addresses.daAddresses.availL1DAValidator = deployViaCreate2(
+                Utils.readAvailL1DAValidatorBytecode(),
+                abi.encode(availBridge)
+            );
+            console.log("AvailL1DAValidator deployed at:", addresses.daAddresses.availL1DAValidator);
         } else {
-            availDAValidator = config.contracts.availL1DAValidator;
+            addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
-
-        addresses.daAddresses.availL1DAValidator = availDAValidator;
 
         vm.startBroadcast(msg.sender);
         RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), getRollupL2ValidatorAddress(), true);
-        RollupDAManager(rollupDAManager).updateDAPair(
-            address(noDAValidator),
-            getNoDAValidiumL2ValidatorAddress(),
-            true
-        );
-        RollupDAManager(rollupDAManager).updateDAPair(address(availDAValidator), getAvailL2ValidatorAddress(), true);
         vm.stopBroadcast();
     }
 
