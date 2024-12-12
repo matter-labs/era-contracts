@@ -22,8 +22,6 @@ import {Unauthorized, InvalidAllowedBytecodeTypesMode, InvalidNonceOrderingChang
  * do not need to be published anymore.
  */
 contract ContractDeployer is IContractDeployer, SystemContractBase {
-    /// @dev Prefix for EVM contracts hashes storage slots.
-    uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
     /// @dev keccak256("ALLOWED_BYTECODE_TYPES_MODE_SLOT").
     bytes32 private constant ALLOWED_BYTECODE_TYPES_MODE_SLOT =
         0xd70708d0b933e26eab552567ce3a8ad69e6fbec9a2a68f16d51bd417a47d9d3b;
@@ -42,11 +40,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Returns what types of bytecode are allowed to be deployed on this chain.
     function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode) {
         mode = _getAllowedBytecodeTypesMode();
-    }
-
-    /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
-    function evmCodeHash(address _address) external view returns (bytes32 _hash) {
-        _hash = _getEvmCodeHash(_address);
     }
 
     /// @notice Returns information about a certain account.
@@ -250,7 +243,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _newAddress,
         bytes calldata _initCode
     ) external payable onlySystemCallFromEvmEmulator returns (uint256, address) {
-        uint256 constructorReturnEvmGas = _performDeployOnAddressEVM(msg.sender, _newAddress, AccountAbstractionVersion.None, _initCode);
+        uint256 constructorReturnEvmGas = _performDeployOnAddressEVM(
+            msg.sender,
+            _newAddress,
+            AccountAbstractionVersion.None,
+            _initCode
+        );
         return (constructorReturnEvmGas, _newAddress);
     }
 
@@ -607,21 +605,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             evmBytecodeHash := keccak256(add(paddedBytecode, 0x40), bytecodeLen)
         }
 
-        _setEvmCodeHash(_newAddress, evmBytecodeHash);
+        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountEvmHash(_newAddress, evmBytecodeHash);
 
         emit ContractDeployed(_sender, versionedCodeHash, _newAddress);
-    }
-
-    function _setEvmCodeHash(address _address, bytes32 _hash) internal {
-        assembly {
-            sstore(or(EVM_HASHES_PREFIX, _address), _hash)
-        }
-    }
-
-    function _getEvmCodeHash(address _address) internal view returns (bytes32 _hash) {
-        assembly {
-            _hash := sload(or(EVM_HASHES_PREFIX, _address))
-        }
     }
 
     function _getAllowedBytecodeTypesMode() internal view returns (AllowedBytecodeTypes mode) {

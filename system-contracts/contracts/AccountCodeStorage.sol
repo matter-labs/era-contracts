@@ -23,6 +23,9 @@ import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErr
 contract AccountCodeStorage is IAccountCodeStorage {
     bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
+    /// @dev Prefix for EVM contracts hashes storage slots.
+    uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
+
     modifier onlyDeployer() {
         if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
             revert Unauthorized(msg.sender);
@@ -81,6 +84,16 @@ contract AccountCodeStorage is IAccountCodeStorage {
         }
     }
 
+    /// @notice Stores the keccak hash of constructed EVM contract.
+    /// @param _address The address of the account to set the hash to.
+    /// @param _hash The new keccak hash of the constructed EVM account.
+    /// @dev This method can be called only by ContractDeployer.
+    function storeAccountEvmHash(address _address, bytes32 _hash) external override onlyDeployer {
+        assembly {
+            sstore(or(EVM_HASHES_PREFIX, _address), _hash)
+        }
+    }
+
     /// @notice Get the codehash stored for an address.
     /// @param _address The address of the account of which the codehash to return
     /// @return codeHash The codehash stored for this account.
@@ -116,7 +129,7 @@ contract AccountCodeStorage is IAccountCodeStorage {
         else if (Utils.isContractConstructing(codeHash)) {
             codeHash = EMPTY_STRING_KECCAK;
         } else if (Utils.isCodeHashEVM(codeHash)) {
-            codeHash = DEPLOYER_SYSTEM_CONTRACT.evmCodeHash(account);
+            codeHash = _getEvmCodeHash(account);
         }
 
         return codeHash;
@@ -152,5 +165,16 @@ contract AccountCodeStorage is IAccountCodeStorage {
     function isAccountEVM(address _addr) external view override returns (bool) {
         bytes32 bytecodeHash = getRawCodeHash(_addr);
         return Utils.isCodeHashEVM(bytecodeHash);
+    }
+
+    /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
+    function getEvmCodeHash(address _address) external view override returns (bytes32 _hash) {
+        _hash = _getEvmCodeHash(_address);
+    }
+
+    function _getEvmCodeHash(address _address) internal view returns (bytes32 _hash) {
+        assembly {
+            _hash := sload(or(EVM_HASHES_PREFIX, _address))
+        }
     }
 }

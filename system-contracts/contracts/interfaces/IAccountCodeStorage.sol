@@ -9,11 +9,15 @@ interface IAccountCodeStorage {
 
     function markAccountCodeHashAsConstructed(address _address) external;
 
+    function storeAccountEvmHash(address _address, bytes32 _hash) external;
+
     function getRawCodeHash(address _address) external view returns (bytes32 codeHash);
 
     function getCodeHash(uint256 _input) external view returns (bytes32 codeHash);
 
     function getCodeSize(uint256 _input) external view returns (uint256 codeSize);
+
+    function getEvmCodeHash(address) external view returns (bytes32);
 
     function isAccountEVM(address _addr) external view returns (bool);
 }
