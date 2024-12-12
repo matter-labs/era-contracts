@@ -24,24 +24,19 @@ import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, E
 contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @dev Prefix for EVM contracts hashes storage slots.
     uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
-    /// @dev keccak256("ALLOWED_BYTECODE_TYPES_MODE_SLOT").
-    bytes32 private constant ALLOWED_BYTECODE_TYPES_MODE_SLOT =
-        0xd70708d0b933e26eab552567ce3a8ad69e6fbec9a2a68f16d51bd417a47d9d3b;
 
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
+
+    /// @notice What types of bytecode are allowed to be deployed on this chain.
+    AllowedBytecodeTypes public allowedBytecodeTypesToDeploy;
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
             revert Unauthorized(msg.sender);
         }
         _;
-    }
-
-    /// @notice Returns what types of bytecode are allowed to be deployed on this chain.
-    function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode) {
-        mode = _getAllowedBytecodeTypesMode();
     }
 
     /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
@@ -224,7 +219,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         bytes32 _salt,
         bytes32 _evmBytecodeHash
     ) public onlySystemCallFromEvmEmulator returns (address newAddress) {
-        if (_getAllowedBytecodeTypesMode() != AllowedBytecodeTypes.EraVmAndEVM) {
+        if (allowedBytecodeTypesToDeploy != AllowedBytecodeTypes.EraVmAndEVM) {
             revert EVMEmulationNotSupported();
         }
 
@@ -380,12 +375,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             revert Unauthorized(msg.sender);
         }
 
-        if (_getAllowedBytecodeTypesMode() != newAllowedBytecodeTypes) {
-            assembly {
-                sstore(ALLOWED_BYTECODE_TYPES_MODE_SLOT, newAllowedBytecodeTypes)
-            }
+        if (allowedBytecodeTypesToDeploy != newAllowedBytecodeTypes) {
+            allowedBytecodeTypesToDeploy = newAllowedBytecodeTypes;
 
-            emit AllowedBytecodeTypesModeUpdated(AllowedBytecodeTypes(newAllowedBytecodeTypes));
+            emit AllowedBytecodeTypesModeUpdated(newAllowedBytecodeTypes);
         }
     }
 
@@ -421,7 +414,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _newAddress,
         bytes calldata _initCode
     ) internal returns (uint256 constructorReturnEvmGas) {
-        if (_getAllowedBytecodeTypesMode() != AllowedBytecodeTypes.EraVmAndEVM) {
+        if (allowedBytecodeTypesToDeploy != AllowedBytecodeTypes.EraVmAndEVM) {
             revert EVMEmulationNotSupported();
         }
 
@@ -626,12 +619,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function _getEvmCodeHash(address _address) internal view returns (bytes32 _hash) {
         assembly {
             _hash := sload(or(EVM_HASHES_PREFIX, _address))
-        }
-    }
-
-    function _getAllowedBytecodeTypesMode() internal view returns (AllowedBytecodeTypes mode) {
-        assembly {
-            mode := sload(ALLOWED_BYTECODE_TYPES_MODE_SLOT)
         }
     }
 }
