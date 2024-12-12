@@ -151,6 +151,18 @@ function $llvm_NoInline_llvm$_invalid() { // revert consuming all EVM gas
     panic()
 }
 
+function forbiddenOpcode(opcode) {
+    let systemPanicLabel := shl(200, 1)
+    mstore(0, or(opcode, systemPanicLabel))
+    revert(1, 31)
+}
+
+function forbiddenPrecompile(precompile) {
+    let systemPanicLabel := shl(199, 1)
+    mstore(0, or(precompile, systemPanicLabel))
+    revert(1, 31)
+}
+
 function panic() { // revert consuming all EVM gas
     // we return empty 32 bytes encoding 0 gas left if caller is EVM, and 0 bytes if caller isn't EVM
     // it is done without if-else block so this function will be inlined
@@ -923,6 +935,7 @@ function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
         case 0x03 { // RIPEMD-160
             // We do not support RIPEMD-160
             gasToCharge := 0
+            forbiddenPrecompile(0x0003)
         }
         case 0x04 { // identity
             let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
@@ -931,6 +944,7 @@ function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
         case 0x05 { // modexp
             // We do not support modexp
             gasToCharge := 0
+            forbiddenPrecompile(0x0005)
         }
         // ecAdd ecMul ecPairing EIP below
         // https://eips.ethereum.org/EIPS/eip-1108
@@ -953,10 +967,12 @@ function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
         case 0x09 { // blake2f
             // We do not support blake2f
             gasToCharge := 0
+            forbiddenPrecompile(0x0009)
         }
         case 0x0a { // kzg point evaluation
             // We do not support kzg point evaluation
             gasToCharge := 0
+            forbiddenPrecompile(0x000a)
         }
         default {
             gasToCharge := 0
@@ -977,7 +993,14 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
         case 0 {
             // Unexpected return data.
             // Most likely out-of-ergs or unexpected error in the emulator or system contracts
-            abortEvmEnvironment()
+            if iszero(rtsz) {
+                abortEvmEnvironment()
+            }
+
+            // propagate system panic
+            returndatacopy(0, 0, rtsz)
+            revert(0, rtsz)
+            
         }
         default {
             returndatacopy(0, 0, 32)
@@ -1249,6 +1272,6 @@ function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmG
     newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
 
     if size {
-        offset := add(rawOffset, MEM_OFFSET())
+        offset := add(offset, MEM_OFFSET())
     }
 }
