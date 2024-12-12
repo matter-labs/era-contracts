@@ -41,6 +41,9 @@ import {AccessControlRestriction} from "contracts/governance/AccessControlRestri
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -154,6 +157,17 @@ contract GatewayPreparation is Script {
         saveOutput(output);
     }
 
+    function saveOutput() internal {
+        Output memory output = Output({
+            governanceL2TxHash: bytes32(0),
+            l2ChainAdminAddress: address(0),
+            gatewayTransactionFiltererImplementation: address(0),
+            gatewayTransactionFiltererProxy: address(0)
+        });
+
+        saveOutput(output);
+    }
+
     function saveOutput(
         address gatewayTransactionFiltererImplementation,
         address gatewayTransactionFiltererProxy
@@ -171,6 +185,7 @@ contract GatewayPreparation is Script {
     /// @dev Requires the sender to be the owner of the contract
     function governanceRegisterGateway() public {
         initializeConfig();
+        preRun(false);
 
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
 
@@ -195,6 +210,7 @@ contract GatewayPreparation is Script {
     /// @dev Requires the sender to be the owner of the contract
     function governanceWhitelistGatewayCTM(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
+        preRun(false);
 
         bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (gatewayCTMAddress));
 
@@ -216,6 +232,32 @@ contract GatewayPreparation is Script {
 
     function governanceSetCTMAssetHandler(bytes32 governanoceOperationSalt) public {
         initializeConfig();
+        preRun(false);
+
+        L1AssetRouter sharedBridge = L1AssetRouter(config.sharedBridgeProxy);
+        bytes memory data = abi.encodeCall(
+            sharedBridge.setAssetDeploymentTracker,
+            (bytes32(uint256(uint160(config.chainTypeManagerProxy))), address(config.ctmDeploymentTracker))
+        );
+        Utils.executeUpgrade({
+            _governor: config.governance,
+            _salt: bytes32(0),
+            _target: address(config.sharedBridgeProxy),
+            _data: data,
+            _value: 0,
+            _delay: 0
+        });
+
+        ICTMDeploymentTracker tracker = ICTMDeploymentTracker(config.ctmDeploymentTracker);
+        data = abi.encodeCall(tracker.registerCTMAssetOnL1, (config.chainTypeManagerProxy));
+        Utils.executeUpgrade({
+            _governor: config.governance,
+            _salt: bytes32(0),
+            _target: address(config.ctmDeploymentTracker),
+            _data: data,
+            _value: 0,
+            _delay: 0
+        });
 
         bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
 
@@ -247,6 +289,7 @@ contract GatewayPreparation is Script {
 
     function registerAssetIdInBridgehub(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
+        preRun(false);
 
         bytes memory secondBridgeData = abi.encodePacked(
             bytes1(0x01),
@@ -584,5 +627,75 @@ contract GatewayPreparation is Script {
             _data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (addr)),
             _value: 0
         });
+    }
+
+    function executeGovernanceTxs() public {
+        preRun(true);
+        saveOutput();
+    }
+
+    function preRun(bool skip_stage12) internal {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/gateway-deploy-governance-txs-1.json");
+
+        bool fileExists = vm.isFile(path);
+        if (fileExists) {
+            uint256 idxFrom = 0;
+            if (skip_stage12) {
+                vm.pauseGasMetering();
+                idxFrom = 4;
+            }
+            string memory json = vm.readFile(path);
+            for (uint i = idxFrom; i < 10000; ++i) {
+                string memory tmp = string.concat(".transactions[", vm.toString(i));
+                tmp = string.concat(tmp, "]");
+                bool exists = vm.keyExistsJson(json, tmp);
+                if (!exists) {
+                    break;
+                } else {
+                    address from = vm.parseJsonAddress(json, string.concat(tmp, ".transaction.from"));
+                    bool existsTo = vm.keyExistsJson(json, string.concat(tmp, ".transaction.to"));
+                    uint256 value = vm.parseJsonUint(json, string.concat(tmp, ".transaction.value"));
+                    if (existsTo) {
+                        bytes memory input = vm.parseJsonBytes(json, string.concat(tmp, ".transaction.input"));
+                        address to = vm.parseJsonAddress(json, string.concat(tmp, ".transaction.to"));
+                        vm.startBroadcast(from);
+                        to.call{value: value}(input);
+                        vm.stopBroadcast();
+                    } else {
+                        bytes memory input = vm.parseJsonBytes(json, string.concat(tmp, ".transaction.input"));
+                        vm.startBroadcast(from);
+                        address deployedAddress;
+                        assembly {
+                            deployedAddress := create(value, add(input, 0x20), mload(input))
+
+                            if iszero(extcodesize(deployedAddress)) {
+                                revert(0, 0)
+                            }
+                        }
+                        vm.stopBroadcast();
+                    }
+                }
+            }
+        }
+    }
+
+    function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) internal {
+        IGovernance governance = IGovernance(governanceAddr);
+        Ownable2Step ownable = Ownable2Step(governanceAddr);
+
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: bytes32(0)
+        });
+
+        vm.startPrank(ownable.owner());
+        governance.scheduleTransparent(operation, 0);
+        // We assume that the total value is 0
+        governance.execute{value: 0}(operation);
+        vm.stopPrank();
     }
 }

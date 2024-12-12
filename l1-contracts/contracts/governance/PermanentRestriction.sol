@@ -195,6 +195,10 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return;
         }
 
+        if (_call.data.length < 4) {
+            return;
+        }
+
         if (bytes4(_call.data[:4]) != IChainAdmin.removeRestriction.selector) {
             return;
         }

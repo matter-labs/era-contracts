@@ -21,8 +21,8 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-import {UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
+import {LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -38,6 +38,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @dev The address of the WETH token on L1.
     address public immutable override L1_WETH_TOKEN;
+
+    /// @dev The assetId of the base token.
+    bytes32 public immutable ETH_TOKEN_ASSET_ID;
 
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
@@ -96,6 +99,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy.
@@ -121,7 +125,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
         nativeTokenVault = _nativeTokenVault;
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
-        assetHandlerAddress[ethAssetId] = address(nativeTokenVault);
+        _setAssetHandler(ethAssetId, address(_nativeTokenVault));
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.
@@ -144,7 +148,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetRegistrationData,
         address _assetDeploymentTracker
     ) external onlyOwner {
-        bytes32 assetId = keccak256(abi.encode(block.chainid, _assetDeploymentTracker, _assetRegistrationData));
+        bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, _assetDeploymentTracker);
         assetDeploymentTracker[assetId] = _assetDeploymentTracker;
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
@@ -211,7 +215,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _msgValue: 0,
             _assetId: _assetId,
             _originalCaller: _originalCaller,
-            _data: abi.encode(_amount, address(0))
+            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
         });
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
@@ -239,6 +243,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
         // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
         if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
+            if (msg.value != 0 || _value != 0) {
+                revert NonEmptyMsgValue();
+            }
+
             (bytes32 _assetId, address _assetHandlerAddressOnCounterpart) = abi.decode(_data[1:], (bytes32, address));
             return
                 _setAssetHandlerAddressOnCounterpart(
@@ -259,17 +267,20 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             revert AssetIdNotSupported(assetId);
         }
 
+        address ntvCached = address(nativeTokenVault);
+
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
             _nextMsgValue: _value,
             _assetId: assetId,
             _originalCaller: _originalCaller,
             _transferData: transferData,
-            _passValue: true
+            _passValue: true,
+            _nativeTokenVault: ntvCached
         });
 
         bytes32 txDataHash = DataEncoding.encodeTxDataHash({
-            _nativeTokenVault: address(nativeTokenVault),
+            _nativeTokenVault: ntvCached,
             _encodingVersion: encodingVersion,
             _originalCaller: _originalCaller,
             _assetId: assetId,
@@ -310,7 +321,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public override(AssetRouterBase, IAssetRouterBase) onlyNullifier {
+    ) public payable override(AssetRouterBase, IAssetRouterBase) onlyNullifier {
         _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
         emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
     }
@@ -374,7 +385,17 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             (address, uint256, address)
         );
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-        return (assetId, abi.encode(_depositAmount, _l2Receiver));
+
+        if (assetId == ETH_TOKEN_ASSET_ID) {
+            // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
+            // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
+
+            if (_depositAmount == 0) {
+                _depositAmount = msg.value;
+            }
+        }
+
+        return (assetId, DataEncoding.encodeBridgeBurnData(_depositAmount, _l2Receiver, _l1Token));
     }
 
     /// @notice Ensures that token is registered with native token vault.
@@ -507,25 +528,29 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
 
         bytes32 _assetId;
-        bytes memory bridgeMintCalldata;
-
         {
+            // todo: add comment and explain why this is needed
+            bytes memory bridgeData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+            // Legacy bridge is only expected to use native tokens for L1.
+            if (_assetId != DataEncoding.encodeNTVAssetId(block.chainid, _l1Token)) {
+                revert LegacyBridgeUsesNonNativeToken();
+            }
+
             IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
 
-            bridgeMintCalldata = _burn({
+            bridgeData = _burn({
                 _chainId: ERA_CHAIN_ID,
                 _nextMsgValue: 0,
                 _assetId: _assetId,
                 _originalCaller: _originalCaller,
-                _transferData: abi.encode(_amount, _l2Receiver),
-                _passValue: false
+                _transferData: bridgeData,
+                _passValue: false,
+                _nativeTokenVault: address(nativeTokenVault)
             });
-        }
 
-        {
-            bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, bridgeMintCalldata);
+            bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, bridgeData);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
@@ -546,12 +571,21 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
-        // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
-            ERA_CHAIN_ID,
-            DataEncoding.encodeLegacyTxDataHash(_originalCaller, _l1Token, _amount),
-            txHash
-        );
+        {
+            bytes memory transferData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
+            // Save the deposited amount to claim funds on L1 if the deposit failed on L2
+            L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
+                ERA_CHAIN_ID,
+                DataEncoding.encodeTxDataHash({
+                    _encodingVersion: LEGACY_ENCODING_VERSION,
+                    _originalCaller: _originalCaller,
+                    _assetId: _assetId,
+                    _nativeTokenVault: address(nativeTokenVault),
+                    _transferData: transferData
+                }),
+                txHash
+            );
+        }
 
         emit LegacyDepositInitiated({
             chainId: ERA_CHAIN_ID,

@@ -251,6 +251,7 @@ contract EcosystemUpgrade is Script {
         publishBytecodes();
         initializeExpectedL2Addresses();
 
+        deployBlobVersionedHashRetriever();
         deployVerifier();
         deployDefaultUpgrade();
         deployGenesisUpgrade();
@@ -352,7 +353,7 @@ contract EcosystemUpgrade is Script {
             maxFeePerGas: 0,
             maxPriorityFeePerGas: 0,
             paymaster: uint256(uint160(address(0))),
-            nonce: 25,
+            nonce: getProtocolUpgradeNonce(),
             value: 0,
             reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
             // Note, that the data is empty, it will be fully composed inside the `GatewayUpgrade` contract
@@ -368,7 +369,11 @@ contract EcosystemUpgrade is Script {
     }
 
     function getNewProtocolVersion() public returns (uint256) {
-        return 0x1900000000;
+        return 0x1b00000000;
+    }
+
+    function getProtocolUpgradeNonce() public returns (uint256) {
+        return (getNewProtocolVersion() >> 32);
     }
 
     function getOldProtocolDeadline() public returns (uint256) {
@@ -378,7 +383,12 @@ contract EcosystemUpgrade is Script {
     }
 
     function getOldProtocolVersion() public returns (uint256) {
-        return 0x1800000002;
+        // Mainnet is the only network that has not been upgraded.
+        if (block.chainid == 1) {
+            return 0x1800000002;
+        } else {
+            return 0x1900000000;
+        }
     }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
@@ -1144,7 +1154,6 @@ contract EcosystemUpgrade is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
-                config.eraChainId,
                 config.contracts.oldSharedBridgeProxyAddress
             )
         );
@@ -1299,6 +1308,7 @@ contract EcosystemUpgrade is Script {
             initAddress: addresses.stateTransition.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
+        generatedData.diamondCutData = abi.encode(diamondCut);
 
         chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
@@ -1311,6 +1321,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function saveOutput(string memory outputPath) internal {
+        prepareNewChainCreationParams();
+
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
         vm.serializeAddress(
             "bridgehub",
@@ -1448,6 +1460,11 @@ contract EcosystemUpgrade is Script {
             addresses.daAddresses.l1ValidiumDAValidator
         );
         vm.serializeAddress("deployed_addresses", "l1_bytecodes_supplier_addr", addresses.bytecodesSupplier);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l2_wrapped_base_token_store_addr",
+            addresses.l2WrappedBaseTokenStore
+        );
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
@@ -1515,4 +1532,24 @@ contract EcosystemUpgrade is Script {
 
     // add this to be excluded from coverage report
     function test() internal {}
+
+    function addL2WethToStore(
+        address storeAddress,
+        ChainAdmin chainAdmin,
+        uint256 chainId,
+        address l2WBaseToken
+    ) public {
+        L2WrappedBaseTokenStore l2WrappedBaseTokenStore = L2WrappedBaseTokenStore(storeAddress);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: storeAddress,
+            value: 0,
+            data: abi.encodeCall(l2WrappedBaseTokenStore.initializeChain, (chainId, l2WBaseToken))
+        });
+
+        vm.startBroadcast();
+        chainAdmin.multicall(calls, true);
+        vm.stopBroadcast();
+    }
 }

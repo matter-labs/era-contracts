@@ -228,9 +228,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
         }
 
-        // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
-        // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
+        // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
+        // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
+        // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             if (processedLogs != 127) {
                 revert MissingSystemLogs(127, processedLogs);
@@ -360,6 +360,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             PriorityOperation memory priorityOp = s.priorityQueue.popFront();
             concatHash = keccak256(abi.encode(concatHash, priorityOp.canonicalTxHash));
         }
+
+        s.priorityTree.skipUntil(s.priorityQueue.getFirstUnprocessedPriorityTx());
     }
 
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
@@ -459,9 +461,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
-                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
-            } else {
+            if (_isPriorityQueueActive()) {
                 if (priorityOpsData[i].leftPath.length != 0) {
                     revert PriorityOpsDataLeftPathLengthIsNotZero();
                 }
@@ -471,7 +471,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (priorityOpsData[i].itemHashes.length != 0) {
                     revert PriorityOpsDataItemHashesLengthIsNotZero();
                 }
+
                 _executeOneBatch(batchesData[i], i);
+            } else {
+                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
             }
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
@@ -561,7 +564,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external nonReentrant onlyValidator {
+    function revertBatchesSharedBridge(
+        uint256,
+        uint256 _newLastBatch
+    ) external nonReentrant onlyValidatorOrChainTypeManager {
         _revertBatches(_newLastBatch);
     }
 

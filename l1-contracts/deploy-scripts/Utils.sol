@@ -211,24 +211,26 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat(
+            "/../system-contracts/zkout/",
+            filename,
+            ".yul/contracts-preprocessed/precompiles/",
+            filename,
+            ".yul.json"
+        );
+
         // It is the only exceptional case
         if (keccak256(abi.encodePacked(filename)) == keccak256(abi.encodePacked("EventWriter"))) {
-            return
-                vm.readFileBinary(
-                    // solhint-disable-next-line func-named-parameters
-                    string.concat("../system-contracts/contracts-preprocessed/artifacts/", filename, ".yul.zbin")
-                );
+            path = string.concat(
+                "/../system-contracts/zkout/",
+                filename,
+                ".yul/contracts-preprocessed/",
+                filename,
+                ".yul.json"
+            );
         }
 
-        return
-            vm.readFileBinary(
-                // solhint-disable-next-line func-named-parameters
-                string.concat(
-                    "../system-contracts/contracts-preprocessed/precompiles/artifacts/",
-                    filename,
-                    ".yul.zbin"
-                )
-            );
+        return readFoundryBytecode(path);
     }
 
     /**

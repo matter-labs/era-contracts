@@ -86,7 +86,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager {
+    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
         if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
             revert TooMuchGas();
         }
@@ -117,7 +117,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager {
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager onlyL1 {
         if (_denominator == 0) {
             revert DenominatorIsZero();
         }
@@ -381,6 +381,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }
+        _forceDeactivateQueue();
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
@@ -397,7 +398,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function forwardedBridgeRecoverFailedTransfer(
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
-        address _depositSender,
+        address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyBridgehub {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
@@ -406,11 +407,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.settlementLayer == address(0)) {
             revert NotMigrated();
         }
-        // Sanity check that the _depositSender is the chain admin.
-        if (_depositSender != s.admin) {
-            revert NotChainAdmin(_depositSender, s.admin);
-        }
-
         uint256 currentProtocolVersion = s.protocolVersion;
         if (currentProtocolVersion != protocolVersion) {
             revert OutdatedProtocolVersion(protocolVersion, currentProtocolVersion);
@@ -423,7 +419,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
     /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex) {
+        if (_isPriorityQueueActive()) {
             revert PriorityQueueNotReady();
         }
 

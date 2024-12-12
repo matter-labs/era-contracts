@@ -14,7 +14,6 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
-import {InvalidSelector} from "../../../common/L1ContractErrors.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -117,10 +116,10 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getFirstUnprocessedPriorityTx();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getFirstUnprocessedPriorityTx();
+        } else {
+            return s.priorityTree.getFirstUnprocessedPriorityTx();
         }
     }
 
@@ -131,11 +130,16 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getPriorityQueueSize() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getSize();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getSize();
+        } else {
+            return s.priorityTree.getSize();
         }
+    }
+
+    /// @inheritdoc IGetters
+    function isPriorityQueueActive() external view returns (bool) {
+        return _isPriorityQueueActive();
     }
 
     /// @inheritdoc IGetters
@@ -217,7 +221,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
-            revert InvalidSelector(_selector);
+            // The function does not exist
+            return false;
         }
         return ds.selectorToFacet[_selector].isFreezable;
     }

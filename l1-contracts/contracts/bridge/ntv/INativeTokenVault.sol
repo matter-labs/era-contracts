@@ -44,4 +44,7 @@ interface INativeTokenVault {
 
     /// @notice Used to get the expected bridged token address corresponding to its native counterpart
     function calculateCreate2TokenAddress(uint256 _originChainId, address _originToken) external view returns (address);
+
+    /// @notice Tries to register a token from the provided `_burnData` and reverts if it is not possible.
+    function tryRegisterTokenFromBurnData(bytes calldata _burnData, bytes32 _expectedAssetId) external;
 }

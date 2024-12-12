@@ -298,7 +298,7 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[1] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[2] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
@@ -306,6 +306,7 @@ library Utils {
         selectors[4] = MailboxFacet.requestL2Transaction.selector;
         selectors[5] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[6] = MailboxFacet.l2TransactionBaseCost.selector;
+        selectors[7] = MailboxFacet.proveL2LeafInclusion.selector;
         return selectors;
     }
 

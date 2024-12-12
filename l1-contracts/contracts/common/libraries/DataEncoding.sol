@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
-import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {IncorrectTokenAddressFromNTV, UnsupportedEncodingVersion, InvalidNTVBurnData} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -13,6 +13,28 @@ import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
  * @notice Helper library for transfer data encoding and decoding to reduce possibility of errors.
  */
 library DataEncoding {
+    // todo
+    function encodeBridgeBurnData(
+        uint256 _amount,
+        address _receiver,
+        address _maybeTokenAddress
+    ) internal pure returns (bytes memory) {
+        // todo: maybe make the same as legacy data just for the sake of reusing more things
+        return abi.encode(_amount, _receiver, _maybeTokenAddress);
+    }
+
+    // todo
+    function decodeBridgeBurnData(
+        bytes memory _data
+    ) internal pure returns (uint256 amount, address receiver, address maybeTokenAddress) {
+        if (_data.length != 96) {
+            // For better error handling
+            revert InvalidNTVBurnData();
+        }
+
+        (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
+    }
+
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
     /// @param _originalCaller The address which initiated the transfer.
     /// @param _remoteReceiver The address which to receive tokens on remote chain.
@@ -107,8 +129,17 @@ library DataEncoding {
     ) internal view returns (bytes32 txDataHash) {
         if (_encodingVersion == LEGACY_ENCODING_VERSION) {
             address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
-            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = encodeLegacyTxDataHash(_originalCaller, tokenAddress, depositAmount);
+
+            // This is a double check to ensure that the used token for the legacy encoding is correct.
+            // This revert should never be emitted and in real life and should only serve as a guard in
+            // case of inconsistent state of Native Token Vault.
+            bytes32 expectedAssetId = encodeNTVAssetId(block.chainid, tokenAddress);
+            if (_assetId != expectedAssetId) {
+                revert IncorrectTokenAddressFromNTV(_assetId, tokenAddress);
+            }
+
+            (uint256 depositAmount, , ) = decodeBridgeBurnData(_transferData);
+            txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
         } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.
             // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
@@ -118,20 +149,6 @@ library DataEncoding {
         } else {
             revert UnsupportedEncodingVersion();
         }
-    }
-
-    /// @notice Encodes the legacy transaction data hash.
-    /// @dev the encoding strats with 0t
-    /// @param _originalCaller The address of the entity that initiated the deposit.
-    /// @param _l1Token The address of the L1 token.
-    /// @param _amount The amount of the L1 token.
-    /// @return txDataHash The resulting encoded transaction data hash.
-    function encodeLegacyTxDataHash(
-        address _originalCaller,
-        address _l1Token,
-        uint256 _amount
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_originalCaller, _l1Token, _amount));
     }
 
     /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
