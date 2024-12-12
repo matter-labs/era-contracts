@@ -120,12 +120,16 @@ library DataEncoding {
         }
     }
 
-    /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @notice Decodes the token data
+    /// @dev Note that all the returned metadata of the token is ABI encoded.
+    /// @return chainId The chainId of the origin of the token
+    /// @return name The name of the token.
+    /// @return symbol The symbol of the token.
+    /// @return decimals The decimals of the token.
     function decodeTokenData(
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
         bytes1 encodingVersion = _tokenData[0];
-        // kl todo check correct
         if (encodingVersion == LEGACY_ENCODING_VERSION) {
             (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
         } else if (encodingVersion == NEW_ENCODING_VERSION) {
@@ -135,7 +139,8 @@ library DataEncoding {
         }
     }
 
-    /// @notice Encodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @notice Encodes the token data by combining chain id, and its metadata.
+    /// @dev Note that all the metadata of the token is expected to be ABI encoded.
     /// @param _chainId The id of the chain token is native to.
     /// @param _name The name of the token.
     /// @param _symbol The symbol of the token.

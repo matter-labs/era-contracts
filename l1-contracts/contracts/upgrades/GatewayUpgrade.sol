@@ -22,13 +22,15 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
+    /// @notice The address of this contract.
+    /// @dev needed as this address is delegateCalled, and we delegateCall it again.
     address public immutable THIS_ADDRESS;
 
     constructor() {
         THIS_ADDRESS = address(this);
     }
 
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
@@ -48,9 +50,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
             l2TxDataFinish
         );
         // slither-disable-next-line controlled-delegatecall
-        (bool success, ) = THIS_ADDRESS.delegatecall(
-            abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
-        );
+        (bool success, ) = THIS_ADDRESS.delegatecall(abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade));
         // solhint-disable-next-line gas-custom-errors
         require(success, "GatewayUpgrade: upgrade failed");
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
