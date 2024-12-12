@@ -9,13 +9,15 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
+import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
+import {ZeroAddress, NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainAdminTest is Test {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     GettersFacet internal gettersFacet;
+    DummyRestriction internal dummyRestriction;
 
     address internal owner;
     uint32 internal major;
@@ -33,6 +35,7 @@ contract ChainAdminTest is Test {
         chainAdmin = new ChainAdmin(restrictions);
 
         gettersFacet = new GettersFacet();
+        dummyRestriction = new DummyRestriction(true);
     }
 
     function test_getRestrictions() public {
@@ -49,18 +52,42 @@ contract ChainAdminTest is Test {
         address[] memory restrictions = chainAdmin.getRestrictions();
 
         vm.expectEmit(true, false, false, true);
-        emit IChainAdmin.RestrictionAdded(owner);
+        emit IChainAdmin.RestrictionAdded(address(dummyRestriction));
 
         vm.prank(address(chainAdmin));
-        chainAdmin.addRestriction(owner);
+        chainAdmin.addRestriction(address(dummyRestriction));
+    }
+
+    function test_addRestrictionRevertInvalidRestriction() public {
+        vm.startPrank(address(chainAdmin));
+        vm.expectRevert();
+        chainAdmin.addRestriction(makeAddr("emptyRestriction"));
+        vm.stopPrank();
+    }
+
+    function test_addRestrictionRevertInvalidRestrictionMagic() public {
+        DummyRestriction badRestriction = new DummyRestriction(false);
+
+        vm.startPrank(address(chainAdmin));
+        vm.expectRevert(abi.encodeWithSelector(NotARestriction.selector, address(badRestriction)));
+        chainAdmin.addRestriction(address(badRestriction));
+        vm.stopPrank();
+    }
+
+    function test_addRestrictionZeroAddress() public {
+        address[] memory restrictions = chainAdmin.getRestrictions();
+
+        vm.prank(address(chainAdmin));
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+        chainAdmin.addRestriction(address(0));
     }
 
     function test_addRestrictionRevert() public {
         vm.startPrank(address(chainAdmin));
-        chainAdmin.addRestriction(owner);
+        chainAdmin.addRestriction(address(dummyRestriction));
 
-        vm.expectRevert(abi.encodeWithSelector(RestrictionWasAlreadyPresent.selector, owner));
-        chainAdmin.addRestriction(owner);
+        vm.expectRevert(abi.encodeWithSelector(RestrictionWasAlreadyPresent.selector, address(dummyRestriction)));
+        chainAdmin.addRestriction(address(dummyRestriction));
         vm.stopPrank();
     }
 
@@ -68,12 +95,12 @@ contract ChainAdminTest is Test {
         address[] memory restrictions = chainAdmin.getRestrictions();
 
         vm.startPrank(address(chainAdmin));
-        chainAdmin.addRestriction(owner);
+        chainAdmin.addRestriction(address(dummyRestriction));
 
         vm.expectEmit(true, false, false, true);
-        emit IChainAdmin.RestrictionRemoved(owner);
+        emit IChainAdmin.RestrictionRemoved(address(dummyRestriction));
 
-        chainAdmin.removeRestriction(owner);
+        chainAdmin.removeRestriction(address(dummyRestriction));
         vm.stopPrank();
     }
 
@@ -81,11 +108,11 @@ contract ChainAdminTest is Test {
         address[] memory restrictions = chainAdmin.getRestrictions();
 
         vm.startPrank(address(chainAdmin));
-        chainAdmin.addRestriction(owner);
-        chainAdmin.removeRestriction(owner);
+        chainAdmin.addRestriction(address(dummyRestriction));
+        chainAdmin.removeRestriction(address(dummyRestriction));
 
-        vm.expectRevert(abi.encodeWithSelector(RestrictionWasNotPresent.selector, owner));
-        chainAdmin.removeRestriction(owner);
+        vm.expectRevert(abi.encodeWithSelector(RestrictionWasNotPresent.selector, dummyRestriction));
+        chainAdmin.removeRestriction(address(dummyRestriction));
         vm.stopPrank();
     }
 

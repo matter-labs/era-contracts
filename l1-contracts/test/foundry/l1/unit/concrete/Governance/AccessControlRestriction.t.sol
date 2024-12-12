@@ -10,7 +10,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IAccessControlRestriction} from "contracts/governance/IAccessControlRestriction.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
-import {NoCallsProvided, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress, NoCallsProvided, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 contract AccessRestrictionTest is Test {
@@ -44,6 +44,15 @@ contract AccessRestrictionTest is Test {
     function test_adminAsAddressZero() public {
         vm.expectRevert("AccessControl: 0 default admin");
         new AccessControlRestriction(0, address(0));
+    }
+
+    function test_setRequiredRoleForCallZeroTarget(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
+        vm.startPrank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+        restriction.setRequiredRoleForCall(address(0), bytes4(0), role);
+        vm.stopPrank();
     }
 
     function test_setRequiredRoleForCallByNotDefaultAdmin(bytes32 role) public {
@@ -109,6 +118,15 @@ contract AccessRestrictionTest is Test {
             data: abi.encodeCall(IChainAdmin.getRestrictions, ())
         });
         restriction.validateCall(call, randomCaller);
+    }
+
+    function test_setRequiredRoleForFallbackZeroTarget(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
+        vm.startPrank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+        restriction.setRequiredRoleForFallback(address(0), role);
+        vm.stopPrank();
     }
 
     function test_setRequiredRoleForFallbackByNotDefaultAdmin(bytes32 role) public {
