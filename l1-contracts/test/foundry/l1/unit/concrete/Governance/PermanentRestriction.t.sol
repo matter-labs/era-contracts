@@ -362,7 +362,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         // ctm deployer address is 0 in this test
         vm.startPrank(address(0));
-        bridgehub.setAssetHandlerAddress(
+        bridgehub.setCTMAssetAddress(
             bytes32(uint256(uint160(address(chainContractAddress)))),
             address(chainContractAddress)
         );

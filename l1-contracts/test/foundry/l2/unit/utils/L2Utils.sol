@@ -61,18 +61,20 @@ library L2Utils {
     /// @notice Deploys the L2AssetRouter contract.
     /// @param _l1ChainId The chain ID of the L1 chain.
     /// @param _eraChainId The chain ID of the era chain.
+    /// @param _aliasedOwner The address of the owner of asset router.
     /// @param _l1AssetRouter The address of the L1 asset router.
     /// @param _legacySharedBridge The address of the legacy shared bridge.
     function forceDeployAssetRouter(
         uint256 _l1ChainId,
         uint256 _eraChainId,
+        address _aliasedOwner,
         address _l1AssetRouter,
         address _legacySharedBridge
     ) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId);
+            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner);
         }
 
         bytes memory bytecode = readEraBytecode("L2AssetRouter");
@@ -85,7 +87,7 @@ library L2Utils {
             newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: true,
             value: 0,
-            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId)
+            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner)
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);

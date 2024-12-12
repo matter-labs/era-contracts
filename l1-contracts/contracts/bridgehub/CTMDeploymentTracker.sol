@@ -5,7 +5,6 @@ pragma solidity 0.8.24;
 // solhint-disable reason-string, gas-custom-errors
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
@@ -18,11 +17,11 @@ import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
-contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
     /// @dev The encoding version of the data.
@@ -44,10 +43,10 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IAssetRouterBase _sharedBridge) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, IAssetRouterBase _l1AssetRouter) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
-        L1_ASSET_ROUTER = _sharedBridge;
+        L1_ASSET_ROUTER = _l1AssetRouter;
     }
 
     /// @notice used to initialize the contract
@@ -63,7 +62,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
         require(BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress), "CTMDT: ctm not registered");
         L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
+        BRIDGE_HUB.setCTMAssetAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.
@@ -128,7 +127,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeCall(
-            IBridgehub.setAssetHandlerAddress,
+            IBridgehub.setCTMAssetAddress,
             (bytes32(uint256(uint160(_ctmL1Address))), _ctmL2Address)
         );
 

@@ -620,7 +620,7 @@ contract DeployL1Script is Script {
         vm.stopBroadcast();
         console.log("CTM registered in CTMDeploymentTracker");
 
-        bytes32 assetId = bridgehub.ctmAssetId(addresses.stateTransition.stateTransitionProxy);
+        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.stateTransitionProxy);
         // console.log(address(bridgehub.ctmDeployer()), addresses.bridgehub.ctmDeploymentTrackerProxy);
         // console.log(address(bridgehub.ctmDeployer().BRIDGE_HUB()), addresses.bridgehub.bridgehubProxy);
         console.log(
@@ -797,7 +797,6 @@ contract DeployL1Script is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
-                config.eraChainId,
                 addresses.bridges.l1NullifierProxy
             )
         );

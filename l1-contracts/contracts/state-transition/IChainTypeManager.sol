@@ -86,6 +86,8 @@ interface IChainTypeManager {
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
+    function getHyperchain(uint256 _chainId) external view returns (address);
+
     function getZKChainLegacy(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
@@ -155,8 +157,6 @@ interface IChainTypeManager {
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
-
-    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
     function forwardedBridgeBurn(
         uint256 _chainId,

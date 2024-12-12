@@ -34,9 +34,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
-    /// @dev Era's chainID
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -46,12 +43,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _l1WethAddress Address of WETH on deployed chain
     /// @param _l1AssetRouter Address of Asset Router on L1.
-    /// @param _eraChainId ID of Era.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     constructor(
         address _l1WethAddress,
         address _l1AssetRouter,
-        uint256 _eraChainId,
         IL1Nullifier _l1Nullifier
     )
         NativeTokenVault(
@@ -61,7 +56,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             block.chainid
         )
     {
-        ERA_CHAIN_ID = _eraChainId;
         L1_NULLIFIER = _l1Nullifier;
     }
 
@@ -191,9 +185,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
-        address _l1Token
+        address _nonNativeToken
     ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
+        bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         return
             Create2.computeAddress(
                 salt,
@@ -234,7 +228,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
     }
 
-    function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
+    function _deployBeaconProxy(bytes32 _salt, uint256) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(
             0,

@@ -32,13 +32,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
     /// @dev The address of the L1 asset router counterpart.
-    address public override l1AssetRouter;
+    address public immutable override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
+            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
@@ -51,9 +51,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) && (msg.sender != address(this))) {
+            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
                 revert InvalidCaller(msg.sender);
             }
+        } else {
+            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -67,32 +69,35 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /// @dev Disable the initialization to prevent Parity hack.
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
     constructor(
         uint256 _l1ChainId,
         uint256 _eraChainId,
         address _l1AssetRouter,
         address _legacySharedBridge,
-        bytes32 _baseTokenAssetId
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
     ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
-        l1AssetRouter = _l1AssetRouter;
+        L1_ASSET_ROUTER = _l1AssetRouter;
         assetHandlerAddress[_baseTokenAssetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
+        _transferOwnership(_aliasedOwner);
     }
 
     /// @inheritdoc IL2AssetRouter
     function setAssetHandlerAddress(
         uint256 _originChainId,
         bytes32 _assetId,
-        address _assetAddress
+        address _assetHandlerAddress
     ) external override onlyAssetRouterCounterpart(_originChainId) {
-        assetHandlerAddress[_assetId] = _assetAddress;
-        emit AssetHandlerRegistered(_assetId, _assetAddress);
+        assetHandlerAddress[_assetId] = _assetHandlerAddress;
+        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
     }
 
     /// @inheritdoc IAssetRouterBase
@@ -125,7 +130,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LEGACY FUNCTIONS
+                            INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -136,6 +141,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
         _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                     Internal & Helpers
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
@@ -180,9 +189,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function _getAssetRouterWithdrawMessage(
         bytes32 _assetId,
         bytes memory _l1bridgeMintData
-    ) internal pure returns (bytes memory) {
+    ) internal view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, _assetId, _l1bridgeMintData);
+        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, block.chainid, _assetId, _l1bridgeMintData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -194,6 +203,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            LEGACY FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Legacy finalizeDeposit.
     /// @dev Finalizes the deposit and mint funds.
@@ -278,6 +291,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @notice Returns the address of the L1 asset router.
     /// @dev The old name is kept for backward compatibility.
     function l1Bridge() external view returns (address) {
-        return l1AssetRouter;
+        return L1_ASSET_ROUTER;
     }
 }

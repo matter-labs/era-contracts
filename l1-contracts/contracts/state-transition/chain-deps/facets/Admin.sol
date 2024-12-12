@@ -320,7 +320,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             );
             require(_contractAlreadyDeployed, "Af: contract not deployed");
             require(s.settlementLayer != address(0), "Af: not migrated");
-            s.priorityTree.checkL1Reinit(_commitment.priorityTree);
+            s.priorityTree.l1Reinit(_commitment.priorityTree);
         } else if (_contractAlreadyDeployed) {
             require(s.settlementLayer != address(0), "Af: not migrated 2");
             s.priorityTree.checkGWReinit(_commitment.priorityTree);
@@ -341,7 +341,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    /// @dev Note that this function does not check that the caller is the chain admin.
     function forwardedBridgeRecoverFailedTransfer(
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,

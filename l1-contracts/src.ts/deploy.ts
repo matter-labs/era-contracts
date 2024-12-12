@@ -971,12 +971,11 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
-      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, eraChainId, this.addresses.Bridges.L1NullifierProxy],
+      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.L1NullifierProxy],
       create2Salt,
       ethTxOptions
     );
@@ -1565,10 +1564,9 @@ export class Deployer {
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, executionDelay, eraChainId],
+      [this.ownerAddress, executionDelay],
       create2Salt,
       ethTxOptions
     );
