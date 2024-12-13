@@ -13,6 +13,8 @@ abstract contract AvailAttestationLib {
     IAvailBridge public bridge;
     IVectorx public vectorx;
 
+    /// @dev Mapping from attestation leaf to attestation data.
+    /// It is necessary for recovery of the state from the onchain data.
     mapping(bytes32 => AttestationData) public attestations;
 
     error InvalidAttestationProof();
