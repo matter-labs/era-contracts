@@ -22,9 +22,6 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Install dependencies
         run: yarn
 
