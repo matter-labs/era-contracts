@@ -245,12 +245,12 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
 
             address bridgeHubStmForChain = bridgeHub.chainTypeManager(chainId);
             bytes32 bridgeHubBaseAssetIdForChain = bridgeHub.baseTokenAssetId(chainId);
-            address bridgeHubChainAddressdForChain = bridgeHub.getZKChain(chainId);
+            address bridgeHubChainAddressForChain = bridgeHub.getZKChain(chainId);
             address bhAddr = IZKChain(chain).getBridgehub();
 
             assertEq(bridgeHubStmForChain, stmAddr);
             assertEq(bridgeHubBaseAssetIdForChain, baseTokenAssetId);
-            assertEq(bridgeHubChainAddressdForChain, chain);
+            assertEq(bridgeHubChainAddressForChain, chain);
             assertEq(bhAddr, address(bridgeHub));
         }
 

@@ -28,7 +28,6 @@ const zkSyncBaseNetworkEnv =
 export default {
   defaultNetwork: "env",
   solidity: {
-    version: "0.8.24",
     settings: {
       optimizer: {
         enabled: true,
@@ -41,11 +40,12 @@ export default {
       },
       evmVersion: "cancun",
     },
+    eraVersion: "1.0.1",
   },
   zksolc: {
     compilerSource: "binary",
+    version: "1.5.8",
     settings: {
-      // compilerPath: getZksolcUrl(),
       isSystem: true,
     },
   },
