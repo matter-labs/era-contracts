@@ -41,11 +41,12 @@ export default {
       },
       evmVersion: "cancun",
     },
+    eraVersion: "1.0.1",
   },
   zksolc: {
     compilerSource: "binary",
+    version: "1.5.8",
     settings: {
-      // compilerPath: getZksolcUrl(),
       isSystem: true,
     },
   },
