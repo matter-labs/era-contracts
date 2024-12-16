@@ -1783,7 +1783,17 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    stackHead := extcodesize(addr)
+                    let rawCodeHash := getRawCodeHash(addr)
+                    switch shr(248, rawCodeHash)
+                    case 1 {
+                        stackHead := extcodesize(addr)
+                    }
+                    case 2 {
+                        stackHead := and(shr(224, rawCodeHash), 0xffff)
+                    }
+                    default {
+                        stackHead := 0
+                    }
             
                     ip := add(ip, 1)
                 }
@@ -4897,7 +4907,17 @@ object "EvmEmulator" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        stackHead := extcodesize(addr)
+                        let rawCodeHash := getRawCodeHash(addr)
+                        switch shr(248, rawCodeHash)
+                        case 1 {
+                            stackHead := extcodesize(addr)
+                        }
+                        case 2 {
+                            stackHead := and(shr(224, rawCodeHash), 0xffff)
+                        }
+                        default {
+                            stackHead := 0
+                        }
                 
                         ip := add(ip, 1)
                     }
