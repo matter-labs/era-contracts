@@ -138,35 +138,43 @@ library Utils {
     uint256 internal constant MAX_EVM_BYTECODE_LENGTH = (2 ** 16) - 1;
 
     /// @notice Validate the bytecode format and calculate its hash.
-    /// @param _bytecode The EVM bytecode to hash.
+    /// @param _evmBytecodeLen The length of original EVM bytecode in bytes
+    /// @param _paddedBytecode The padded EVM bytecode to hash.
     /// @return hashedEVMBytecode The 32-byte hash of the EVM bytecode.
     /// Note: The function reverts the execution if the bytecode has non expected format:
     /// - Bytecode bytes length is not a multiple of 32
     /// - Bytecode bytes length is greater than 2^16 - 1 bytes
     /// - Bytecode words length is not odd
-    function hashEVMBytecode(bytes calldata _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
+    function hashEVMBytecode(
+        uint256 _evmBytecodeLen,
+        bytes calldata _paddedBytecode
+    ) internal view returns (bytes32 hashedEVMBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
-        if (_bytecode.length % 32 != 0) {
+        if (_paddedBytecode.length % 32 != 0) {
             revert MalformedBytecode(BytecodeError.Length);
         }
 
-        if (_bytecode.length > MAX_EVM_BYTECODE_LENGTH) {
+        if (_evmBytecodeLen > _paddedBytecode.length) {
             revert MalformedBytecode(BytecodeError.EvmBytecodeLength);
         }
 
-        uint256 lengthInWords = _bytecode.length / 32;
+        if (_evmBytecodeLen > MAX_EVM_BYTECODE_LENGTH) {
+            revert MalformedBytecode(BytecodeError.EvmBytecodeLengthTooBig);
+        }
+
+        uint256 lengthInWords = _paddedBytecode.length / 32;
         // bytecode length in words must be odd
         if (lengthInWords % 2 == 0) {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
 
         hashedEVMBytecode =
-            EfficientCall.sha(_bytecode) &
+            EfficientCall.sha(_paddedBytecode) &
             0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
         // Setting the version of the hash
         hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(EVM_BYTECODE_FLAG) << 248));
-        hashedEVMBytecode = hashedEVMBytecode | bytes32(_bytecode.length << 224);
+        hashedEVMBytecode = hashedEVMBytecode | bytes32(_evmBytecodeLen << 224);
     }
 
     /// @notice Calculates the address of a deployed contract via create2 on the EVM
