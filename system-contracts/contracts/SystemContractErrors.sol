@@ -54,8 +54,6 @@ error IndexSizeError();
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0x1c26714c
 error InsufficientGas();
-// 0x8322ca79
-error InvalidAllowedBytecodeTypesMode();
 // 0xae962d4e
 error InvalidCall();
 // 0x6a84bc39

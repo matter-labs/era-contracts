@@ -8,7 +8,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, SystemLogKey} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -88,17 +88,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @param _newChainId The chainId
     function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
         chainId = _newChainId;
-    }
-
-    /// @notice Set the chain configuration.
-    /// @param _newChainId The chainId
-    /// @param _newAllowedBytecodeTypes The new allowed bytecode types mode.
-    function setChainConfiguration(
-        uint256 _newChainId,
-        uint256 _newAllowedBytecodeTypes
-    ) external onlyCallFromForceDeployer {
-        chainId = _newChainId;
-        DEPLOYER_SYSTEM_CONTRACT.setAllowedBytecodeTypesToDeploy(_newAllowedBytecodeTypes);
     }
 
     /// @notice Number of current transaction in block.
