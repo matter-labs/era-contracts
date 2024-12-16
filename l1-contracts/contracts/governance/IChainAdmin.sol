@@ -27,6 +27,9 @@ interface IChainAdmin {
     /// @notice Emitted when the new token multiplier address is set.
     event NewTokenMultiplierSetter(address _oldTokenMultiplierSetter, address _newTokenMultiplierSetter);
 
+    /// @notice The EVM emulator has been enabled
+    event EnableEvmEmulator();
+
     function setTokenMultiplierSetter(address _tokenMultiplierSetter) external;
 
     function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external;

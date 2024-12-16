@@ -108,4 +108,7 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @notice The EVM emulator has been enabled
+    event EnableEvmEmulator();
 }

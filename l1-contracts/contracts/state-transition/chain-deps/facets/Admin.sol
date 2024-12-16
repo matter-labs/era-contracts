@@ -128,6 +128,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
         );
+        emit EnableEvmEmulator();
     }
 
     /*//////////////////////////////////////////////////////////////

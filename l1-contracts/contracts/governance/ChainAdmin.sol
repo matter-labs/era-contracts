@@ -52,6 +52,7 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     /// @param _chainContract The chain contract address where the EVM emulator will be enabled.
     function enableEvmEmulator(IAdmin _chainContract) external onlyOwner returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _chainContract.allowEvmEmulation();
+        emit EnableEvmEmulator();
     }
 
     /// @notice Execute multiple calls as part of contract administration.
