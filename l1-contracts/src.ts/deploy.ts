@@ -212,13 +212,6 @@ export class Deployer {
       l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
       l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
     };
-    const messageRootDeployment = {
-      bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
-      newAddress: L2_MESSAGE_ROOT_ADDRESS,
-      callConstructor: true,
-      value: 0,
-      input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS]),
-    };
 
     return ethers.utils.defaultAbiCoder.encode([FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING], [fixedForceDeploymentsData]);
   }
