@@ -109,10 +109,9 @@ describe("KnownCodesStorage tests", function () {
     });
 
     it("invalid length bytecode failed to call", async () => {
-      await expect(knownCodesStorage.connect(deployerAccount).publishEVMBytecode(1, "0x00")).to.be.revertedWithCustomError(
-        knownCodesStorage,
-        "MalformedBytecode"
-      );
+      await expect(
+        knownCodesStorage.connect(deployerAccount).publishEVMBytecode(1, "0x00")
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
   });
 
