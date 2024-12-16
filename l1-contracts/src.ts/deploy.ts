@@ -734,7 +734,7 @@ export class Deployer {
     compareDiamondCutHash: boolean = false,
     nonce?,
     predefinedChainId?: string,
-    useGovernance: boolean = false
+    useGovernance: boolean = false,
   ) {
     const gasLimit = 10_000_000;
 
@@ -860,6 +860,19 @@ export class Deployer {
     if (this.verbose) {
       console.log(
         `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
+      );
+    }
+  }
+
+  public async enableEvmEmulation() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.allowEvmEmulation()).wait();
+    if (this.verbose) {
+      console.log(
+        `EVM emulation allowed, gas used: ${receipt.gasUsed.toString()}`
       );
     }
   }

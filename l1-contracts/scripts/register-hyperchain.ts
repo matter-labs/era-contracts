@@ -121,6 +121,12 @@ async function main() {
         console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
         await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
       }
+
+      if (cmd.allowEvmEmulation) {
+        console.log(`Allowing EVM emulation`);
+        await deployer.enableEvmEmulation();
+      }
+      
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
