@@ -142,9 +142,16 @@ library Utils {
     /// @return hashedEVMBytecode The 32-byte hash of the EVM bytecode.
     /// Note: The function reverts the execution if the bytecode has non expected format:
     /// - Bytecode bytes length is greater than 2^16 - 1 bytes
-    function hashEVMBytecode(bytes calldata _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
-        if (_bytecode.length > MAX_EVM_BYTECODE_LENGTH) {
+    function hashEVMBytecode(
+        uint256 evmBytecodeLen,
+        bytes calldata _bytecode
+    ) internal view returns (bytes32 hashedEVMBytecode) {
+        if (evmBytecodeLen > MAX_EVM_BYTECODE_LENGTH) {
             revert MalformedBytecode(BytecodeError.EvmBytecodeLength);
+        }
+
+        if (evmBytecodeLen > _bytecode.length) {
+            revert MalformedBytecode(BytecodeError.Length);
         }
 
         hashedEVMBytecode =
@@ -153,7 +160,7 @@ library Utils {
 
         // Setting the version of the hash
         hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(EVM_BYTECODE_FLAG) << 248));
-        hashedEVMBytecode = hashedEVMBytecode | bytes32(_bytecode.length << 224);
+        hashedEVMBytecode = hashedEVMBytecode | bytes32(evmBytecodeLen << 224);
     }
 
     /// @notice Calculates the address of a deployed contract via create2 on the EVM

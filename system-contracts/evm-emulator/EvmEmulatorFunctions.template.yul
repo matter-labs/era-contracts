@@ -349,33 +349,30 @@ function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
 
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
 function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-    let codeHash := getRawCodeHash(addr)
-    mstore(0, codeHash)
+    let rawCodeHash := getRawCodeHash(addr)
+    mstore(0, rawCodeHash)
     
     let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
     // it fails if we don't have any code deployed at this address
     if success {
-        returndatacopy(0, 0, 32)
-        // The first word of returndata is the true length of the bytecode
-        let codeLen := mload(0)
+        // The true length of the bytecode is encoded in bytecode hash
+        let codeLen := and(shr(224, rawCodeHash), 0xffff)
 
         if gt(len, codeLen) {
             len := codeLen
         }
     
-        let shiftedSrcOffset := add(32, srcOffset) // first 32 bytes is length
-    
         let _returndatasize := returndatasize()
-        if gt(shiftedSrcOffset, _returndatasize) {
-            shiftedSrcOffset := _returndatasize
+        if gt(srcOffset, _returndatasize) {
+            srcOffset := _returndatasize
         }
     
-        if gt(add(len, shiftedSrcOffset), _returndatasize) {
-            len := sub(_returndatasize, shiftedSrcOffset)
+        if gt(add(len, srcOffset), _returndatasize) {
+            len := sub(_returndatasize, srcOffset)
         }
     
         if len {
-            returndatacopy(dstOffset, shiftedSrcOffset, len)
+            returndatacopy(dstOffset, srcOffset, len)
         }
     
         copiedLen := len

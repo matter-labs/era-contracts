@@ -21,6 +21,25 @@ object "EvmEmulator" {
             copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
+        function padBytecode(offset, len) -> blobLen {
+            let trueLastByte := add(offset, len)
+
+            // clearing out additional bytes
+            mstore(trueLastByte, 0)
+            mstore(add(trueLastByte, 32), 0)
+
+            blobLen := len
+
+            if iszero(eq(mod(blobLen, 32), 0)) {
+                blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
+            }
+
+            // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
+            if iszero(eq(mod(blobLen, 64), 32)) {
+                blobLen := add(blobLen, 32)
+            }
+        }
+
         function validateBytecodeAndChargeGas(offset, deployedCodeLen, gasToReturn) -> returnGas {
             if deployedCodeLen {
                 // EIP-3860
@@ -77,9 +96,12 @@ object "EvmEmulator" {
 
         gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
 
-        mstore(add(offset, len), gasToReturn)
+        let blobLen := padBytecode(offset, len)
 
-        verbatim_2i_0o("return_deployed", offset, add(len, 32))
+        mstore(add(offset, blobLen), len)
+        mstore(add(offset, add(32, blobLen)), gasToReturn)
+
+        verbatim_2i_0o("return_deployed", offset, add(blobLen, 64))
     }
     object "EvmEmulator_deployed" {
         code {
