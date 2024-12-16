@@ -635,49 +635,49 @@ contract GatewayPreparation is Script {
     }
 
     function preRun(bool skip_stage12) internal {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/gateway-deploy-governance-txs-1.json");
+        // string memory root = vm.projectRoot();
+        // string memory path = string.concat(root, "/script-out/gateway-deploy-governance-txs-1.json");
 
-        bool fileExists = vm.isFile(path);
-        if (fileExists) {
-            uint256 idxFrom = 0;
-            if (skip_stage12) {
-                vm.pauseGasMetering();
-                idxFrom = 4;
-            }
-            string memory json = vm.readFile(path);
-            for (uint i = idxFrom; i < 10000; ++i) {
-                string memory tmp = string.concat(".transactions[", vm.toString(i));
-                tmp = string.concat(tmp, "]");
-                bool exists = vm.keyExistsJson(json, tmp);
-                if (!exists) {
-                    break;
-                } else {
-                    address from = vm.parseJsonAddress(json, string.concat(tmp, ".transaction.from"));
-                    bool existsTo = vm.keyExistsJson(json, string.concat(tmp, ".transaction.to"));
-                    uint256 value = vm.parseJsonUint(json, string.concat(tmp, ".transaction.value"));
-                    if (existsTo) {
-                        bytes memory input = vm.parseJsonBytes(json, string.concat(tmp, ".transaction.input"));
-                        address to = vm.parseJsonAddress(json, string.concat(tmp, ".transaction.to"));
-                        vm.startBroadcast(from);
-                        to.call{value: value}(input);
-                        vm.stopBroadcast();
-                    } else {
-                        bytes memory input = vm.parseJsonBytes(json, string.concat(tmp, ".transaction.input"));
-                        vm.startBroadcast(from);
-                        address deployedAddress;
-                        assembly {
-                            deployedAddress := create(value, add(input, 0x20), mload(input))
+        // bool fileExists = vm.isFile(path);
+        // if (fileExists) {
+        //     uint256 idxFrom = 0;
+        //     if (skip_stage12) {
+        //         vm.pauseGasMetering();
+        //         idxFrom = 4;
+        //     }
+        //     string memory json = vm.readFile(path);
+        //     for (uint i = idxFrom; i < 10000; ++i) {
+        //         string memory tmp = string.concat(".transactions[", vm.toString(i));
+        //         tmp = string.concat(tmp, "]");
+        //         bool exists = vm.keyExistsJson(json, tmp);
+        //         if (!exists) {
+        //             break;
+        //         } else {
+        //             address from = vm.parseJsonAddress(json, string.concat(tmp, ".transaction.from"));
+        //             bool existsTo = vm.keyExistsJson(json, string.concat(tmp, ".transaction.to"));
+        //             uint256 value = vm.parseJsonUint(json, string.concat(tmp, ".transaction.value"));
+        //             if (existsTo) {
+        //                 bytes memory input = vm.parseJsonBytes(json, string.concat(tmp, ".transaction.input"));
+        //                 address to = vm.parseJsonAddress(json, string.concat(tmp, ".transaction.to"));
+        //                 vm.startBroadcast(from);
+        //                 to.call{value: value}(input);
+        //                 vm.stopBroadcast();
+        //             } else {
+        //                 bytes memory input = vm.parseJsonBytes(json, string.concat(tmp, ".transaction.input"));
+        //                 vm.startBroadcast(from);
+        //                 address deployedAddress;
+        //                 assembly {
+        //                     deployedAddress := create(value, add(input, 0x20), mload(input))
 
-                            if iszero(extcodesize(deployedAddress)) {
-                                revert(0, 0)
-                            }
-                        }
-                        vm.stopBroadcast();
-                    }
-                }
-            }
-        }
+        //                     if iszero(extcodesize(deployedAddress)) {
+        //                         revert(0, 0)
+        //                     }
+        //                 }
+        //                 vm.stopBroadcast();
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) internal {

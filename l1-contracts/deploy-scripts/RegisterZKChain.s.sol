@@ -110,15 +110,15 @@ contract RegisterZKChainScript is Script {
         string memory root = vm.projectRoot();
 
         // kludge
-        string memory path = string.concat(root, "/script-out/gateway-upgrade-ecosystem.toml");
-        bool fileExists = vm.isFile(path);
-        if (config.chainChainId == 505 && fileExists) {
-            string memory toml = vm.readFile(path);
-            bytes memory calls1 = toml.readBytes("$.governance_stage1_calls");
-            bytes memory calls2 = toml.readBytes("$.governance_stage2_calls");
-            governanceExecuteCalls(calls1, config.governance);
-            governanceExecuteCalls(calls2, config.governance);
-        }
+        // string memory path = string.concat(root, "/script-out/gateway-upgrade-ecosystem.toml");
+        // bool fileExists = vm.isFile(path);
+        // if (config.chainChainId == 505 && fileExists) {
+        //     string memory toml = vm.readFile(path);
+        //     bytes memory calls1 = toml.readBytes("$.governance_stage1_calls");
+        //     bytes memory calls2 = toml.readBytes("$.governance_stage2_calls");
+        //     governanceExecuteCalls(calls1, config.governance);
+        //     governanceExecuteCalls(calls2, config.governance);
+        // }
 
         outputPath = string.concat(root, outputPath);
 
