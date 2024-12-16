@@ -277,8 +277,6 @@ error Unauthorized(address caller);
 error UndefinedDiamondCutAction();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
-// 0xa4dde386
-error UnimplementedMessage(string);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
 // 0x084a1449
