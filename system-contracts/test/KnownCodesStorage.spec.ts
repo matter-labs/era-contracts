@@ -86,7 +86,7 @@ describe("KnownCodesStorage tests", function () {
 
   describe("publishEVMBytecode", function () {
     it("non-deployer failed to call", async () => {
-      await expect(knownCodesStorage.publishEVMBytecode("0x00")).to.be.revertedWithCustomError(
+      await expect(knownCodesStorage.publishEVMBytecode(32, "0x00")).to.be.revertedWithCustomError(
         knownCodesStorage,
         "Unauthorized"
       );
