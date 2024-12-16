@@ -168,3 +168,5 @@ uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint8 constant ERA_VM_BYTECODE_FLAG = 1;
 /// @dev Marker of EVM bytecode
 uint8 constant EVM_BYTECODE_FLAG = 2;
+
+address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
