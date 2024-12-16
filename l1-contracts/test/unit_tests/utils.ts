@@ -10,9 +10,16 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
-import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+import {
+  ADDRESS_ONE,
+  PubdataPricingMode,
+  EMPTY_STRING_KECCAK,
+  STORED_BATCH_INFO_ABI_STRING,
+  COMMIT_BATCH_INFO_ABI_STRING,
+  PRIORITY_OPS_BATCH_INFO_ABI_STRING,
+} from "../../src.ts/utils";
 import { packSemver } from "../../scripts/utils";
-import { keccak256 } from "ethers/lib/utils";
+import { keccak256, hexConcat, defaultAbiCoder } from "ethers/lib/utils";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -30,7 +37,6 @@ export const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
 export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
 export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x0000000000000000000000000000000000008011";
-const PUBDATA_HASH = "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563";
 
 export const SYSTEM_UPGRADE_TX_TYPE = 254;
 
@@ -40,12 +46,13 @@ export function randomAddress() {
 
 export enum SYSTEM_LOG_KEYS {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
-  TOTAL_L2_TO_L1_PUBDATA_KEY,
-  STATE_DIFF_HASH_KEY,
   PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-  PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
+  // Note, that it is important that `PREV_BATCH_HASH_KEY` has position
+  // `4` since it is the same as it was in the previous protocol version and
+  // it is the only one that is emitted before the system contracts are upgraded.
+  PREV_BATCH_HASH_KEY,
   L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
   USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
@@ -213,19 +220,11 @@ export function createSystemLogs(
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
-    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
-    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
       ethers.constants.HashZero
-    ),
-    constructL2Log(
-      true,
-      L2_SYSTEM_CONTEXT_ADDRESS,
-      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
     ),
     constructL2Log(
       true,
@@ -239,7 +238,12 @@ export function createSystemLogs(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
-
+    constructL2Log(
+      true,
+      L2_SYSTEM_CONTEXT_ADDRESS,
+      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
+    ),
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
@@ -264,8 +268,6 @@ export function createSystemLogsWithUpgrade(
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
-    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
-    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
@@ -369,10 +371,17 @@ export interface CommitBatchInfo {
   operatorDAInput: BytesLike;
 }
 
+export interface PriorityOpsBatchInfo {
+  leftPath: Array<BytesLike>;
+  rightPath: Array<BytesLike>;
+  itemHashes: Array<BytesLike>;
+}
+
 export async function depositERC20(
   bridge: IL1ERC20Bridge,
   bridgehubContract: IBridgehub,
   chainId: string,
+  l1ChainId: number,
   l2Receiver: string,
   l1Token: string,
   amount: ethers.BigNumber,
@@ -509,14 +518,13 @@ export async function makeExecutedEqualCommitted(
   batchesToExecute = [...batchesToProve, ...batchesToExecute];
 
   await (
-    await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
-      recursiveAggregationInput: [],
-      serializedProof: [],
-    })
+    await proxyExecutor.proveBatchesSharedBridge(0, ...encodeProveBatchesData(prevBatchInfo, batchesToProve, []))
   ).wait();
 
   const dummyMerkleProofs = batchesToExecute.map(() => ({ leftPath: [], rightPath: [], itemHashes: [] }));
-  await (await proxyExecutor.executeBatches(batchesToExecute, dummyMerkleProofs)).wait();
+  await (
+    await proxyExecutor.executeBatchesSharedBridge(0, ...encodeExecuteBatchesData(batchesToExecute, dummyMerkleProofs))
+  ).wait();
 }
 
 export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
@@ -530,4 +538,41 @@ export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: stri
     timestamp: commitInfo.timestamp,
     commitment: commitment,
   };
+}
+
+export function encodeCommitBatchesData(
+  storedBatchInfo: StoredBatchInfo,
+  commitBatchInfos: Array<CommitBatchInfo>
+): [BigNumberish, BigNumberish, string] {
+  const encodedCommitDataWithoutVersion = defaultAbiCoder.encode(
+    [STORED_BATCH_INFO_ABI_STRING, `${COMMIT_BATCH_INFO_ABI_STRING}[]`],
+    [storedBatchInfo, commitBatchInfos]
+  );
+  const commitData = hexConcat(["0x00", encodedCommitDataWithoutVersion]);
+  return [commitBatchInfos[0].batchNumber, commitBatchInfos[commitBatchInfos.length - 1].batchNumber, commitData];
+}
+
+export function encodeProveBatchesData(
+  prevBatch: StoredBatchInfo,
+  committedBatches: Array<StoredBatchInfo>,
+  proof: Array<BigNumberish>
+): [BigNumberish, BigNumberish, string] {
+  const encodedProveDataWithoutVersion = defaultAbiCoder.encode(
+    [STORED_BATCH_INFO_ABI_STRING, `${STORED_BATCH_INFO_ABI_STRING}[]`, "uint256[]"],
+    [prevBatch, committedBatches, proof]
+  );
+  const proveData = hexConcat(["0x00", encodedProveDataWithoutVersion]);
+  return [committedBatches[0].batchNumber, committedBatches[committedBatches.length - 1].batchNumber, proveData];
+}
+
+export function encodeExecuteBatchesData(
+  batchesData: Array<StoredBatchInfo>,
+  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>
+): [BigNumberish, BigNumberish, string] {
+  const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
+    [`${STORED_BATCH_INFO_ABI_STRING}[]`, `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`],
+    [batchesData, priorityOpsBatchInfo]
+  );
+  const executeData = hexConcat(["0x00", encodedExecuteDataWithoutVersion]);
+  return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];
 }

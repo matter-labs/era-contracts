@@ -6,13 +6,15 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
+import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
+import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {Unauthorized, EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
+import {EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported, ETHDepositNotSupported, ApprovalFailed} from "../common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,10 +25,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
-    IL1AssetRouter public immutable override SHARED_BRIDGE;
+    IL1Nullifier public immutable override L1_NULLIFIER;
+
+    /// @dev The asset router, which holds deposited tokens.
+    IL1AssetRouter public immutable override L1_ASSET_ROUTER;
 
     /// @dev The native token vault, which holds deposited tokens.
-    IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
+    IL1NativeTokenVault public immutable override L1_NATIVE_TOKEN_VAULT;
 
     /// @dev The chainId of Era
     uint256 public immutable ERA_CHAIN_ID;
@@ -66,29 +71,19 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
-        IL1AssetRouter _sharedBridge,
+        IL1Nullifier _nullifier,
+        IL1AssetRouter _assetRouter,
         IL1NativeTokenVault _nativeTokenVault,
         uint256 _eraChainId
     ) reentrancyGuardInitializer {
-        SHARED_BRIDGE = _sharedBridge;
-        NATIVE_TOKEN_VAULT = _nativeTokenVault;
+        L1_NULLIFIER = _nullifier;
+        L1_ASSET_ROUTER = _assetRouter;
+        L1_NATIVE_TOKEN_VAULT = _nativeTokenVault;
         ERA_CHAIN_ID = _eraChainId;
     }
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
     function initialize() external reentrancyGuardInitializer {}
-
-    /*//////////////////////////////////////////////////////////////
-                            ERA LEGACY GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @return The L2 token address that would be minted for deposit of the given L1 token on ZKsync Era.
-    function l2TokenAddress(address _l1Token) external view returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
-        bytes32 salt = bytes32(uint256(uint160(_l1Token)));
-
-        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
-    }
 
     /*//////////////////////////////////////////////////////////////
                             ERA LEGACY FUNCTIONS
@@ -121,6 +116,36 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
             _refundRecipient: address(0)
         });
+    }
+
+    /// @notice Finalize the withdrawal and release funds
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
+    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    function finalizeWithdrawal(
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external nonReentrant {
+        if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
+            revert WithdrawalAlreadyFinalized();
+        }
+        // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
+
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
+            chainId: ERA_CHAIN_ID,
+            l2BatchNumber: _l2BatchNumber,
+            l2MessageIndex: _l2MessageIndex,
+            l2Sender: L1_NULLIFIER.l2BridgeAddress(ERA_CHAIN_ID),
+            l2TxNumberInBatch: _l2TxNumberInBatch,
+            message: _message,
+            merkleProof: _merkleProof
+        });
+        L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
@@ -156,18 +181,21 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
-        // empty deposit
         if (_amount == 0) {
+            // empty deposit amount
             revert EmptyDeposit();
         }
-        uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
-        // The token has non-standard transfer logic
+        if (_l1Token == ETH_TOKEN_ADDRESS) {
+            revert ETHDepositNotSupported();
+        }
+        uint256 amount = _approveFundsToAssetRouter(msg.sender, IERC20(_l1Token), _amount);
         if (amount != _amount) {
+            // The token has non-standard transfer logic
             revert TokensWithFeesNotSupported();
         }
 
-        l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
-            _prevMsgSender: msg.sender,
+        l2TxHash = L1_ASSET_ROUTER.depositLegacyErc20Bridge{value: msg.value}({
+            _originalCaller: msg.sender,
             _l2Receiver: _l2Receiver,
             _l1Token: _l1Token,
             _amount: _amount,
@@ -175,6 +203,11 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
             _refundRecipient: _refundRecipient
         });
+        // clearing approval
+        bool success = IERC20(_l1Token).approve(address(L1_ASSET_ROUTER), 0);
+        if (!success) {
+            revert ApprovalFailed();
+        }
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
             l2DepositTxHash: l2TxHash,
@@ -185,12 +218,20 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         });
     }
 
-    /// @dev Transfers tokens from the depositor address to the shared bridge address.
+    /*//////////////////////////////////////////////////////////////
+                            ERA LEGACY FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Transfers tokens from the depositor address to the native token vault address.
     /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(SHARED_BRIDGE));
-        _token.safeTransferFrom(_from, address(SHARED_BRIDGE), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(SHARED_BRIDGE));
+    function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(this));
+        _token.safeTransferFrom(_from, address(this), _amount);
+        bool success = _token.approve(address(L1_ASSET_ROUTER), _amount);
+        if (!success) {
+            revert ApprovalFailed();
+        }
+        uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;
     }
@@ -219,8 +260,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         }
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
-        SHARED_BRIDGE.claimFailedDeposit({
-            _chainId: ERA_CHAIN_ID,
+        L1_NULLIFIER.claimFailedDepositLegacyErc20Bridge({
             _depositSender: _depositSender,
             _l1Token: _l1Token,
             _amount: amount,
@@ -234,34 +274,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            ERA LEGACY FUNCTIONS
+                            ERA LEGACY GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
-    function finalizeWithdrawal(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external nonReentrant {
-        if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
-            revert WithdrawalAlreadyFinalized();
-        }
-        // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
-
-        (address l1Receiver, address l1Token, uint256 amount) = SHARED_BRIDGE.finalizeWithdrawalLegacyErc20Bridge({
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
-        emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+    /// @return The L2 token address that would be minted for deposit of the given L1 token on ZKsync Era.
+    function l2TokenAddress(address _l1Token) external view returns (address) {
+        bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
+        bytes32 salt = bytes32(uint256(uint160(_l1Token)));
+        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 }

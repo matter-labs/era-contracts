@@ -1,22 +1,41 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {DEPLOYER_SYSTEM_CONTRACT, SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
-import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
+import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
+import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
+
+import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
-/// @notice The contract that can be used for deterministic contract deployment.
+/// @notice The l2 component of the genesis upgrade.
 contract L2GenesisUpgrade is IL2GenesisUpgrade {
-    function genesisUpgrade(uint256 _chainId, bytes calldata _forceDeploymentsData) external payable {
-        // solhint-disable-next-line gas-custom-errors
-        require(_chainId != 0, "Invalid chainId");
+    /// @notice The function that is delegateCalled from the complex upgrader.
+    /// @dev It is used to set the chainId and to deploy the force deployments.
+    /// @param _chainId the chain id
+    /// @param _ctmDeployer the address of the ctm deployer
+    /// @param _fixedForceDeploymentsData the force deployments data
+    /// @param _additionalForceDeploymentsData the additional force deployments data
+    function genesisUpgrade(
+        uint256 _chainId,
+        address _ctmDeployer,
+        bytes calldata _fixedForceDeploymentsData,
+        bytes calldata _additionalForceDeploymentsData
+    ) external payable {
+        if (_chainId == 0) {
+            revert InvalidChainId();
+        }
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
-        ForceDeployment[] memory forceDeployments = abi.decode(_forceDeploymentsData, (ForceDeployment[]));
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(forceDeployments);
+
+        L2GatewayUpgradeHelper.performForceDeployedContractsInit(
+            _ctmDeployer,
+            _fixedForceDeploymentsData,
+            _additionalForceDeploymentsData
+        );
+
         emit UpgradeComplete(_chainId);
     }
 }

@@ -4,27 +4,48 @@ pragma solidity 0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION, HyperchainCommitment} from "../../../common/Config.sol";
-import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
+import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
-import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {ZKChainBase} from "./ZKChainBase.sol";
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, IncorrectPricingMode, InvalidDAForPermanentRollup, AlreadyPermanentRollup} from "../../../common/L1ContractErrors.sol";
+import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
+import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
+contract AdminFacet is ZKChainBase, IAdmin {
     using PriorityTree for PriorityTree.Tree;
     using PriorityQueue for PriorityQueue.Queue;
 
-    /// @inheritdoc IZkSyncHyperchainBase
+    /// @inheritdoc IZKChainBase
     string public constant override getName = "AdminFacet";
+
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
+    /// @notice The address that is responsible for determining whether a certain DA pair is allowed for rollups.
+    RollupDAManager internal immutable ROLLUP_DA_MANAGER;
+
+    constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager) {
+        L1_CHAIN_ID = _l1ChainId;
+        ROLLUP_DA_MANAGER = _rollupDAManager;
+    }
+
+    modifier onlyL1() {
+        if (block.chainid != L1_CHAIN_ID) {
+            revert NotL1(block.chainid);
+        }
+        _;
+    }
 
     /// @inheritdoc IAdmin
     function setPendingAdmin(address _newPendingAdmin) external onlyAdmin {
@@ -52,20 +73,20 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setValidator(address _validator, bool _active) external onlyStateTransitionManager {
+    function setValidator(address _validator, bool _active) external onlyChainTypeManager {
         s.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }
 
     /// @inheritdoc IAdmin
-    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyStateTransitionManager {
+    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyChainTypeManager {
         // Change the porter availability
         s.zkPorterIsAvailable = _zkPorterIsAvailable;
         emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
     }
 
     /// @inheritdoc IAdmin
-    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyStateTransitionManager {
+    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager {
         if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
             revert TooMuchGas();
         }
@@ -76,7 +97,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrStateTransitionManager {
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrChainTypeManager onlyL1 {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         if (_newFeeParams.maxPubdataPerBatch < _newFeeParams.priorityTxMaxPubdata) {
@@ -96,7 +117,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager {
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager {
         if (_denominator == 0) {
             revert DenominatorIsZero();
         }
@@ -110,17 +131,17 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin {
-        // Validium mode can be set only before the first batch is processed
-        if (s.totalBatchesCommitted != 0) {
-            revert ChainAlreadyLive();
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
+        if (s.isPermanentRollup && _pricingMode != PubdataPricingMode.Rollup) {
+            revert IncorrectPricingMode();
         }
+
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
 
     /// @inheritdoc IAdmin
-    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin {
+    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin onlyL1 {
         address oldTransactionFilterer = s.transactionFilterer;
         s.transactionFilterer = _transactionFilterer;
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
@@ -130,22 +151,46 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement
     /// layer, we set them to zero.
     function _setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) internal {
-        address oldL1DAValidator = s.l1DAValidator;
-        address oldL2DAValidator = s.l2DAValidator;
+        emit NewL1DAValidator(s.l1DAValidator, _l1DAValidator);
+        emit NewL2DAValidator(s.l2DAValidator, _l2DAValidator);
 
         s.l1DAValidator = _l1DAValidator;
         s.l2DAValidator = _l2DAValidator;
-
-        emit NewL1DAValidator(oldL1DAValidator, _l1DAValidator);
-        emit NewL2DAValidator(oldL2DAValidator, _l2DAValidator);
     }
 
     /// @inheritdoc IAdmin
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external onlyAdmin {
-        require(_l1DAValidator != address(0), "AdminFacet: L1DAValidator address is zero");
-        require(_l2DAValidator != address(0), "AdminFacet: L2DAValidator address is zero");
+        if (_l1DAValidator == address(0)) {
+            revert L1DAValidatorAddressIsZero();
+        }
+        if (_l2DAValidator == address(0)) {
+            revert L2DAValidatorAddressIsZero();
+        }
+
+        if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DAValidator)) {
+            revert InvalidDAForPermanentRollup();
+        }
 
         _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
+    }
+
+    /// @inheritdoc IAdmin
+    function makePermanentRollup() external onlyAdmin onlySettlementLayer {
+        if (s.isPermanentRollup) {
+            revert AlreadyPermanentRollup();
+        }
+
+        if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
+            // The correct data availability pair should be set beforehand.
+            revert InvalidDAForPermanentRollup();
+        }
+
+        if (s.feeParams.pubdataPricingMode != PubdataPricingMode.Rollup) {
+            // The correct pubdata pricing mode should be set beforehand.
+            revert IncorrectPricingMode();
+        }
+
+        s.isPermanentRollup = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -156,9 +201,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     function upgradeChainFromVersion(
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyAdminOrStateTransitionManager {
+    ) external onlyAdminOrChainTypeManager {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
-        bytes32 upgradeCutHash = IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion);
+        bytes32 upgradeCutHash = IChainTypeManager(s.chainTypeManager).upgradeCutHash(_oldProtocolVersion);
         if (cutHashInput != upgradeCutHash) {
             revert HashMismatch(upgradeCutHash, cutHashInput);
         }
@@ -174,7 +219,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyStateTransitionManager {
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyChainTypeManager {
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
     }
@@ -182,16 +227,17 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function genesisUpgrade(
         address _l1GenesisUpgrade,
+        address _ctmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
-    ) external onlyStateTransitionManager {
+    ) external onlyChainTypeManager {
         Diamond.FacetCut[] memory emptyArray;
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
             initCalldata: abi.encodeCall(
                 IL1GenesisUpgrade.genesisUpgrade,
-                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _forceDeploymentData, _factoryDeps)
+                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _ctmDeployer, _forceDeploymentData, _factoryDeps)
             )
         });
 
@@ -203,7 +249,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function freezeDiamond() external onlyStateTransitionManager {
+    function freezeDiamond() external onlyChainTypeManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         // diamond proxy is frozen already
@@ -216,7 +262,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function unfreezeDiamond() external onlyStateTransitionManager {
+    function unfreezeDiamond() external onlyChainTypeManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         // diamond proxy is not frozen
@@ -235,28 +281,50 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @inheritdoc IAdmin
     function forwardedBridgeBurn(
         address _settlementLayer,
-        address _prevMsgSender,
-        bytes calldata
+        address _originalCaller,
+        bytes calldata _data
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
-        // (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(s.settlementLayer == address(0), "Af: already migrated");
-        require(_prevMsgSender == s.admin, "Af: not chainAdmin");
-        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
+        if (s.settlementLayer != address(0)) {
+            revert AlreadyMigrated();
+        }
+        if (_originalCaller != s.admin) {
+            revert NotChainAdmin(_originalCaller, s.admin);
+        }
+        // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
+        uint256 protocolVersion = abi.decode(_data, (uint256));
 
-        // address chainBaseToken = hyperchain.getBaseToken();
         uint256 currentProtocolVersion = s.protocolVersion;
-        uint256 protocolVersion = stm.protocolVersion();
 
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        if (currentProtocolVersion != protocolVersion) {
+            revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
+        }
+
+        if (block.chainid != L1_CHAIN_ID) {
+            // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
+            // That's why we need to bound the gas that can be consumed during such a migration.
+            if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+                revert NotAllBatchesExecuted();
+            }
+        }
 
         s.settlementLayer = _settlementLayer;
-        chainBridgeMintData = abi.encode(_prepareChainCommitment());
+        chainBridgeMintData = abi.encode(prepareChainCommitment());
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeMint(bytes calldata _data) external payable override onlyBridgehub {
-        HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
+    function forwardedBridgeMint(
+        bytes calldata _data,
+        bool _contractAlreadyDeployed
+    ) external payable override onlyBridgehub {
+        ZKChainCommitment memory _commitment = abi.decode(_data, (ZKChainCommitment));
 
+        IChainTypeManager ctm = IChainTypeManager(s.chainTypeManager);
+
+        uint256 currentProtocolVersion = s.protocolVersion;
+        uint256 protocolVersion = ctm.protocolVersion();
+        if (currentProtocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, currentProtocolVersion);
+        }
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;
         uint256 batchesCommitted = _commitment.totalBatchesCommitted;
@@ -264,18 +332,22 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.totalBatchesCommitted = batchesCommitted;
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
+        s.isPermanentRollup = _commitment.isPermanentRollup;
 
         // Some consistency checks just in case.
-        require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
-        require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
+        if (batchesExecuted > batchesVerified) {
+            revert ExecutedIsNotConsistentWithVerified(batchesExecuted, batchesVerified);
+        }
+        if (batchesVerified > batchesCommitted) {
+            revert VerifiedIsNotConsistentWithCommitted(batchesVerified, batchesCommitted);
+        }
 
         // In the worst case, we may need to revert all the committed batches that were not executed.
         // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
         // there should be batchesCommitted - batchesExecuted + 1 hashes.
-        require(
-            _commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1,
-            "Invalid number of batch hashes"
-        );
+        if (_commitment.batchHashes.length != batchesCommitted - batchesExecuted + 1) {
+            revert InvalidNumberOfBatchHashes(_commitment.batchHashes.length, batchesCommitted - batchesExecuted + 1);
+        }
 
         // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
         // outstanding committed batches is not too long.
@@ -284,10 +356,37 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
-        s.priorityTree.initFromCommitment(_commitment.priorityTree);
+        if (block.chainid == L1_CHAIN_ID) {
+            // L1 PTree contains all L1->L2 transactions.
+            if (
+                !s.priorityTree.isHistoricalRoot(
+                    _commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]
+                )
+            ) {
+                revert NotHistoricalRoot();
+            }
+            if (!_contractAlreadyDeployed) {
+                revert ContractNotDeployed();
+            }
+            if (s.settlementLayer == address(0)) {
+                revert NotMigrated();
+            }
+            s.priorityTree.l1Reinit(_commitment.priorityTree);
+        } else if (_contractAlreadyDeployed) {
+            if (s.settlementLayer == address(0)) {
+                revert NotMigrated();
+            }
+            s.priorityTree.checkGWReinit(_commitment.priorityTree);
+            s.priorityTree.initFromCommitment(_commitment.priorityTree);
+        } else {
+            s.priorityTree.initFromCommitment(_commitment.priorityTree);
+        }
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
+
+        // Set the settlement to 0 - as this is the current settlement chain.
+        s.settlementLayer = address(0);
 
         _setDAValidatorPair(address(0), address(0));
 
@@ -295,16 +394,38 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeClaimFailedBurn(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable override onlyBridgehub {}
+    function forwardedBridgeRecoverFailedTransfer(
+        uint256 /* _chainId */,
+        bytes32 /* _assetInfo */,
+        address _depositSender,
+        bytes calldata _chainData
+    ) external payable override onlyBridgehub {
+        // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
+        uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
-    // todo make internal. For now useful for testing
-    function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
-        require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
+        if (s.settlementLayer == address(0)) {
+            revert NotMigrated();
+        }
+        // Sanity check that the _depositSender is the chain admin.
+        if (_depositSender != s.admin) {
+            revert NotChainAdmin(_depositSender, s.admin);
+        }
+
+        uint256 currentProtocolVersion = s.protocolVersion;
+        if (currentProtocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, currentProtocolVersion);
+        }
+
+        s.settlementLayer = address(0);
+    }
+
+    /// @notice Returns the commitment for a chain.
+    /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
+    /// @return commitment The commitment for the chain.
+    function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex) {
+            revert PriorityQueueNotReady();
+        }
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
@@ -312,16 +433,21 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
+        commitment.isPermanentRollup = s.isPermanentRollup;
 
         // just in case
-        require(
-            commitment.totalBatchesExecuted <= commitment.totalBatchesVerified,
-            "Verified is not consistent with executed"
-        );
-        require(
-            commitment.totalBatchesVerified <= commitment.totalBatchesCommitted,
-            "Verified is not consistent with committed"
-        );
+        if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
+            revert ExecutedIsNotConsistentWithVerified(
+                commitment.totalBatchesExecuted,
+                commitment.totalBatchesVerified
+            );
+        }
+        if (commitment.totalBatchesVerified > commitment.totalBatchesCommitted) {
+            revert VerifiedIsNotConsistentWithCommitted(
+                commitment.totalBatchesVerified,
+                commitment.totalBatchesCommitted
+            );
+        }
 
         uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
 
@@ -335,42 +461,4 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         commitment.batchHashes = batchHashes;
     }
-
-    /// @inheritdoc IAdmin
-    function readChainCommitment() external view override returns (bytes memory commitment) {
-        return abi.encode(_prepareChainCommitment());
-    }
-
-    // function recoverFromFailedMigrationToGateway(
-    //     uint256 _settlementLayerChainId,
-    //     uint256 _l2BatchNumber,
-    //     uint256 _l2MessageIndex,
-    //     uint16 _l2TxNumberInBatch,
-    //     bytes32[] calldata _merkleProof
-    // ) external onlyAdmin {
-    //     require(s.settlementLayerState == SettlementLayerState.MigratedFromL1, "not migrated L1");
-
-    //     bytes32 migrationHash = s.settlementLayerMigrationHash;
-    //     require(migrationHash != bytes32(0), "can not recover when there is no migration");
-
-    //     require(
-    //         IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
-    //             _settlementLayerChainId,
-    //             migrationHash,
-    //             _l2BatchNumber,
-    //             _l2MessageIndex,
-    //             _l2TxNumberInBatch,
-    //             _merkleProof,
-    //             TxStatus.Failure
-    //         ),
-    //         "Migration not failed"
-    //     );
-
-    //     s.settlementLayerState = SettlementLayerState.ActiveOnL1;
-    //     s.settlementLayerChainId = 0;
-    //     s.settlementLayerMigrationHash = bytes32(0);
-
-    //     // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
-    //     // while the chain is in the "migrated" state.
-    // }
 }

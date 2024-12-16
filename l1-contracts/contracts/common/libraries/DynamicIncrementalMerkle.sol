@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Merkle} from "./Merkle.sol";
-import {Arrays} from "@openzeppelin/contracts/utils/Arrays.sol";
+import {Arrays} from "@openzeppelin/contracts-v4/utils/Arrays.sol";
 
 /**
  * @dev Library for managing https://wikipedia.org/wiki/Merkle_Tree[Merkle Tree] data structures.

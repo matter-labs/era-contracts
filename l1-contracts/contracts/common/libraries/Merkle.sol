@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
-
-// solhint-disable gas-custom-errors
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds, MerklePathLengthMismatch, MerkleNothingToProve, MerkleIndexOrHeightMismatch} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -13,6 +12,7 @@ library Merkle {
 
     /// @dev Calculate Merkle root by the provided Merkle proof.
     /// NOTE: When using this function, check that the _path length is equal to the tree height to prevent shorter/longer paths attack
+    /// however, for chains settling on GW the proof includes the GW proof, so the path increases. See Mailbox for more details.
     /// @param _path Merkle path from the leaf to the root
     /// @param _index Leaf index in the tree
     /// @param _itemHash Hash of leaf content
@@ -23,9 +23,7 @@ library Merkle {
         bytes32 _itemHash
     ) internal pure returns (bytes32) {
         uint256 pathLength = _path.length;
-        require(pathLength > 0, "xc");
-        require(pathLength < 256, "bt");
-        require(_index < (1 << pathLength), "px");
+        _validatePathLengthForSingleProof(_index, pathLength);
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {
@@ -50,9 +48,7 @@ library Merkle {
         bytes32 _itemHash
     ) internal pure returns (bytes32) {
         uint256 pathLength = _path.length;
-        require(pathLength > 0, "xc");
-        require(pathLength < 256, "bt");
-        require(_index < (1 << pathLength), "px");
+        _validatePathLengthForSingleProof(_index, pathLength);
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {
@@ -73,19 +69,29 @@ library Merkle {
     /// @param _itemHashes Hashes of the elements in the range
     /// @return The Merkle root
     function calculateRootPaths(
-        bytes32[] calldata _startPath,
-        bytes32[] calldata _endPath,
+        bytes32[] memory _startPath,
+        bytes32[] memory _endPath,
         uint256 _startIndex,
-        bytes32[] calldata _itemHashes
+        bytes32[] memory _itemHashes
     ) internal pure returns (bytes32) {
         uint256 pathLength = _startPath.length;
-        require(pathLength == _endPath.length, "Merkle: path length mismatch");
-        require(pathLength < 256, "Merkle: path too long");
+        if (pathLength != _endPath.length) {
+            revert MerklePathLengthMismatch(pathLength, _endPath.length);
+        }
+        if (pathLength >= 256) {
+            revert MerklePathOutOfBounds();
+        }
         uint256 levelLen = _itemHashes.length;
         // Edge case: we want to be able to prove an element in a single-node tree.
-        require(pathLength > 0 || (_startIndex == 0 && levelLen == 1), "Merkle: empty paths");
-        require(levelLen > 0, "Merkle: nothing to prove");
-        require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index/height mismatch");
+        if (pathLength == 0 && (_startIndex != 0 || levelLen != 1)) {
+            revert MerklePathEmpty();
+        }
+        if (levelLen == 0) {
+            revert MerkleNothingToProve();
+        }
+        if (_startIndex + levelLen > (1 << pathLength)) {
+            revert MerkleIndexOrHeightMismatch();
+        }
         bytes32[] memory itemHashes = _itemHashes;
 
         for (uint256 level; level < pathLength; level = level.uncheckedInc()) {
@@ -113,6 +119,18 @@ library Merkle {
             mstore(0x00, _lhs)
             mstore(0x20, _rhs)
             result := keccak256(0x00, 0x40)
+        }
+    }
+
+    function _validatePathLengthForSingleProof(uint256 _index, uint256 _pathLength) private pure {
+        if (_pathLength == 0) {
+            revert MerklePathEmpty();
+        }
+        if (_pathLength >= 256) {
+            revert MerklePathOutOfBounds();
+        }
+        if (_index >= (1 << _pathLength)) {
+            revert MerkleIndexOutOfBounds();
         }
     }
 }

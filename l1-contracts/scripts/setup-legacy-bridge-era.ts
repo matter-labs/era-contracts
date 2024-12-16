@@ -118,7 +118,8 @@ async function main() {
       console.log("l2TokenBytecodeHash:", ethers.utils.hexlify(l2TokenBytecodeHash));
 
       // set storage values
-      const tx = await dummyBridge.setValues(l2SharedBridgeAddress, l2TokenBeacon, l2TokenBytecodeHash);
+      // FIXME(EVM-716): we provide the `L2NativeTokenVaultAddress` as the "shared bridge value" as it is only used for calculating of L2 token addresses.
+      const tx = await dummyBridge.setValues(L2NativeTokenVaultAddress, l2TokenBeacon, l2TokenBytecodeHash);
       await tx.wait();
 
       console.log("Set storage values for TestERC20Bridge");

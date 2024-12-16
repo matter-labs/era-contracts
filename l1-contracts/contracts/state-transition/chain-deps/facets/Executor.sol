@@ -2,40 +2,58 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, InvalidPubdataMode, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError, CalldataLengthTooBig, InvalidPubdataHash, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, PubdataCommitmentsEmpty, PointEvalCallFailed, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize} from "../../../common/L1ContractErrors.sol";
+import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {ChainWasMigrated, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
-/// @title ZKsync hyperchain Executor contract capable of processing events emitted in the ZKsync hyperchain protocol.
+/// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
+contract ExecutorFacet is ZKChainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
-    /// @inheritdoc IZkSyncHyperchainBase
+    /// @inheritdoc IZKChainBase
     string public constant override getName = "ExecutorFacet";
+
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
+    /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
+    modifier chainOnCurrentBridgehub() {
+        if (s.settlementLayer != address(0)) {
+            revert ChainWasMigrated();
+        }
+        _;
+    }
+
+    constructor(uint256 _l1ChainId) {
+        L1_CHAIN_ID = _l1ChainId;
+    }
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
     function _commitOneBatch(
         StoredBatchInfo memory _previousBatch,
-        CommitBatchInfo calldata _newBatch,
+        CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (StoredBatchInfo memory) {
         // only commit next batch
@@ -47,12 +65,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA(
-            s.chainId,
-            logOutput.l2DAValidatorOutputHash,
-            _newBatch.operatorDAInput,
-            TOTAL_BLOBS_IN_COMMITMENT
-        );
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+            _chainId: s.chainId,
+            _batchNumber: uint256(_newBatch.batchNumber),
+            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+            _operatorDAInput: _newBatch.operatorDAInput,
+            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        });
 
         if (_previousBatch.batchHash != logOutput.previousBatchHash) {
             revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
@@ -132,7 +151,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     ///      SystemLogKey enum in Constants.sol is processed per new batch.
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
-        CommitBatchInfo calldata _newBatch,
+        CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal view returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
@@ -186,10 +205,16 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 }
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "vk");
-                require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
+                    revert MismatchL2DAValidator();
+                }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lp2");
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.l2DAValidatorOutputHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 if (logSender != L2_BOOTLOADER_ADDRESS) {
@@ -203,40 +228,25 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         }
 
-        // FIXME: temporarily old logs were kept for backwards compatibility. This check cannot work now.
-        //
         // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            // require(processedLogs == 255, "b7");
-        } else {
-            // FIXME: do restore this code to the one that was before
-            require(_checkBit(processedLogs, uint8(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)), "b8");
+            if (processedLogs != 127) {
+                revert MissingSystemLogs(127, processedLogs);
+            }
+        } else if (processedLogs != 255) {
+            revert MissingSystemLogs(255, processedLogs);
         }
-    }
-
-    /// @inheritdoc IExecutor
-    function commitBatches(
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external nonReentrant onlyValidator {
-        _commitBatches(_lastCommittedBatchData, _newBatchesData);
     }
 
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
         uint256, // _chainId
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external nonReentrant onlyValidator {
-        _commitBatches(_lastCommittedBatchData, _newBatchesData);
-    }
-
-    function _commitBatches(
-        StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) internal {
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -244,35 +254,39 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
         // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
         // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
-        if (!IStateTransitionManager(s.stateTransitionManager).protocolVersionIsActive(s.protocolVersion)) {
+        if (!IChainTypeManager(s.chainTypeManager).protocolVersionIsActive(s.protocolVersion)) {
             revert InvalidProtocolVersion();
         }
+        (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
+            .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-        if (_newBatchesData.length != 1) {
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(_lastCommittedBatchData)) {
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
             // incorrect previous batch data
             revert BatchHashMismatch(
                 s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(_lastCommittedBatchData)
+                _hashStoredBatchInfo(lastCommittedBatchData)
             );
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
         if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
-            _commitBatchesWithoutSystemContractsUpgrade(_lastCommittedBatchData, _newBatchesData);
+            _commitBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
         } else {
             _commitBatchesWithSystemContractsUpgrade(
-                _lastCommittedBatchData,
-                _newBatchesData,
+                lastCommittedBatchData,
+                newBatchesData,
                 systemContractsUpgradeTxHash
             );
         }
 
-        s.totalBatchesCommitted = s.totalBatchesCommitted + _newBatchesData.length;
+        s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
     }
 
     /// @dev Commits new batches without any system contracts upgrade.
@@ -280,7 +294,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @param _newBatchesData An array of batch data that needs to be committed.
     function _commitBatchesWithoutSystemContractsUpgrade(
         StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
+        CommitBatchInfo[] memory _newBatchesData
     ) internal {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
@@ -302,7 +316,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @param _systemContractUpgradeTxHash The transaction hash of the system contract upgrade.
     function _commitBatchesWithSystemContractsUpgrade(
         StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData,
+        CommitBatchInfo[] memory _newBatchesData,
         bytes32 _systemContractUpgradeTxHash
     ) internal {
         // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
@@ -348,7 +362,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         }
     }
 
-    function _rollingHash(bytes32[] calldata _hashes) internal pure returns (bytes32) {
+    function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
         uint256 nHashes = _hashes.length;
         for (uint256 i = 0; i < nHashes; i = i.uncheckedInc()) {
@@ -375,7 +389,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             revert PriorityOperationsRollingHashMismatch();
         }
     }
-    
+
     /// @dev Executes one batch
     /// @dev 1. Processes all pending operations (Complete priority requests)
     /// @dev 2. Finalizes batch on Ethereum
@@ -388,25 +402,21 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-
-        // Once the batch is executed, we include its message to the message root.
-        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
-
-        // IBridgehub bridgehub = IBridgehub(s.bridgehub);
-        // bridgehub.messageRoot().addChainBatchRoot(
-        //     s.chainId,
-        //     _storedBatch.l2LogsTreeRoot,
-        //     block.chainid != bridgehub.L1_CHAIN_ID()
-        // );
+        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
+    /// @notice Executes one batch
+    /// @dev 1. Processes all pending operations (Complete priority requests)
+    /// @dev 2. Finalizes batch
+    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
-        PriorityOpsBatchInfo calldata _priorityOpsData,
+        PriorityOpsBatchInfo memory _priorityOpsData,
         uint256 _executedBatchIdx
     ) internal {
-        require(_priorityOpsData.itemHashes.length == _storedBatch.numberOfLayer1Txs, "zxc");
+        if (_priorityOpsData.itemHashes.length != _storedBatch.numberOfLayer1Txs) {
+            revert MismatchNumberOfLayer1Txs(_priorityOpsData.itemHashes.length, _storedBatch.numberOfLayer1Txs);
+        }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
         s.priorityTree.processBatch(_priorityOpsData);
@@ -414,47 +424,56 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         uint256 currentBatchNumber = _storedBatch.batchNumber;
 
         // Save root hash of L2 -> L1 logs tree
-        s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
+        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+    }
 
-        // Once the batch is executed, we include its message to the message root.
-        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+    /// @notice Appends the batch message root to the global message.
+    /// @param _batchNumber The number of the batch
+    /// @param _messageRoot The root of the merkle tree of the messages to L1.
+    /// @dev The logic of this function depends on the settlement layer as we support
+    /// message root aggregation only on non-L1 settlement layers for ease for migration.
+    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+        // During migration to the new protocol version, there will be a period when
+        // the bridgehub does not yet provide the `messageRoot` functionality.
+        // To ease up the migration, we never append messages to message root on L1.
+        if (block.chainid != L1_CHAIN_ID) {
+            // Once the batch is executed, we include its message to the message root.
+            IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+            messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
+        }
     }
 
     /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
-        uint256,
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData, _priorityOpsData);
-    }
-
-    /// @inheritdoc IExecutor
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData, _priorityOpsData);
-    }
-
-    function _executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) internal {
-        uint256 nBatches = _batchesData.length;
-        require(_batchesData.length == _priorityOpsData.length, "bp");
+        uint256, // _chainId
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _executeData
+    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+        (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
+            .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
+        uint256 nBatches = batchesData.length;
+        if (batchesData.length != priorityOpsData.length) {
+            revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
+        }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
-                _executeOneBatch(_batchesData[i], _priorityOpsData[i], i);
+                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
             } else {
-                require(_priorityOpsData[i].leftPath.length == 0, "le");
-                require(_priorityOpsData[i].rightPath.length == 0, "re");
-                require(_priorityOpsData[i].itemHashes.length == 0, "ih");
-                _executeOneBatch(_batchesData[i], i);
+                if (priorityOpsData[i].leftPath.length != 0) {
+                    revert PriorityOpsDataLeftPathLengthIsNotZero();
+                }
+                if (priorityOpsData[i].rightPath.length != 0) {
+                    revert PriorityOpsDataRightPathLengthIsNotZero();
+                }
+                if (priorityOpsData[i].itemHashes.length != 0) {
+                    revert PriorityOpsDataItemHashesLengthIsNotZero();
+                }
+                _executeOneBatch(batchesData[i], i);
             }
-            emit BlockExecution(_batchesData[i].batchNumber, _batchesData[i].batchHash, _batchesData[i].commitment);
+            emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
 
         uint256 newTotalBatchesExecuted = s.totalBatchesExecuted + nBatches;
@@ -471,55 +490,41 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function proveBatches(
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external nonReentrant onlyValidator {
-        _proveBatches(_prevBatch, _committedBatches, _proof);
-    }
-
-    /// @inheritdoc IExecutor
     function proveBatchesSharedBridge(
         uint256, // _chainId
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external nonReentrant onlyValidator {
-        _proveBatches(_prevBatch, _committedBatches, _proof);
-    }
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata _proofData
+    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+        (
+            StoredBatchInfo memory prevBatch,
+            StoredBatchInfo[] memory committedBatches,
+            uint256[] memory proof
+        ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
 
-    function _proveBatches(
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) internal {
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
-        uint256 committedBatchesLength = _committedBatches.length;
+        uint256 committedBatchesLength = committedBatches.length;
 
         // Initialize the array, that will be used as public input to the ZKP
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        if (_hashStoredBatchInfo(_prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            revert BatchHashMismatch(
-                s.storedBatchHashes[currentTotalBatchesVerified],
-                _hashStoredBatchInfo(_prevBatch)
-            );
+        if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
+            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
         }
 
-        bytes32 prevBatchCommitment = _prevBatch.commitment;
+        bytes32 prevBatchCommitment = prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            if (_hashStoredBatchInfo(_committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
+            if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
                 revert BatchHashMismatch(
                     s.storedBatchHashes[currentTotalBatchesVerified],
-                    _hashStoredBatchInfo(_committedBatches[i])
+                    _hashStoredBatchInfo(committedBatches[i])
                 );
             }
 
-            bytes32 currentBatchCommitment = _committedBatches[i].commitment;
+            bytes32 currentBatchCommitment = committedBatches[i].commitment;
             proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
 
             prevBatchCommitment = currentBatchCommitment;
@@ -528,23 +533,19 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             revert VerifiedBatchesExceedsCommittedBatches();
         }
 
-        _verifyProof(proofPublicInput, _proof);
+        _verifyProof(proofPublicInput, proof);
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
-    function _verifyProof(uint256[] memory proofPublicInput, ProofInput calldata _proof) internal view {
+    function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
         // We can only process 1 batch proof at a time.
         if (proofPublicInput.length != 1) {
             revert CanOnlyProcessOneBatch();
         }
 
-        bool successVerifyProof = s.verifier.verify(
-            proofPublicInput,
-            _proof.serializedProof,
-            _proof.recursiveAggregationInput
-        );
+        bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
             revert InvalidProof();
         }
@@ -560,16 +561,11 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidatorOrStateTransitionManager {
-        _revertBatches(_newLastBatch);
-    }
-
-    /// @inheritdoc IExecutor
     function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external nonReentrant onlyValidator {
         _revertBatches(_newLastBatch);
     }
 
-    function _revertBatches(uint256 _newLastBatch) internal {
+    function _revertBatches(uint256 _newLastBatch) internal chainOnCurrentBridgehub {
         if (s.totalBatchesCommitted <= _newLastBatch) {
             revert RevertedBatchNotAfterNewLastBatch();
         }
@@ -593,7 +589,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     /// @dev Creates batch commitment from its data
     function _createBatchCommitment(
-        CommitBatchInfo calldata _newBatchData,
+        CommitBatchInfo memory _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -607,7 +603,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
-    function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
+    function _batchPassThroughData(CommitBatchInfo memory _batch) internal pure returns (bytes memory) {
         return
             abi.encodePacked(
                 // solhint-disable-next-line func-named-parameters
@@ -631,7 +627,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     function _batchAuxiliaryOutput(
-        CommitBatchInfo calldata _batch,
+        CommitBatchInfo memory _batch,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -677,7 +673,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
+        for (uint256 i = 0; i < TOTAL_BLOBS_IN_COMMITMENT; ++i) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }

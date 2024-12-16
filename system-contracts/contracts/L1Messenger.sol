@@ -186,6 +186,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
     /// @notice Verifies that the {_operatorInput} reflects what occurred within the L1Batch and that
     ///         the compressed statediffs are equivalent to the full state diffs.
+    /// @param _l2DAValidator the address of the l2 da validator
     /// @param _operatorInput The total pubdata and uncompressed state diffs of transactions that were
     ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecode, and state diffs.
     /// @dev Function that should be called exactly once per L1 Batch by the bootloader.
@@ -245,6 +246,16 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             );
         }
         calldataPtr += 32;
+
+        uint256 offset = uint256(bytes32(_operatorInput[calldataPtr:calldataPtr + 32]));
+        // The length of the pubdata input should be stored right next to the calldata.
+        // We need to change offset by 32 - 4 = 28 bytes, since 32 bytes is the length of the offset
+        // itself and the 4 bytes are the selector which is not included inside the offset.
+        if (offset != calldataPtr + 28) {
+            revert ReconstructionMismatch(PubdataField.Offset, bytes32(calldataPtr + 28), bytes32(offset));
+        }
+        uint256 length = uint256(bytes32(_operatorInput[calldataPtr + 32:calldataPtr + 64]));
+
         // Shift calldata ptr past the pubdata offset and len
         calldataPtr += 64;
 
@@ -258,6 +269,15 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             );
         }
         calldataPtr += 4;
+
+        // We need to ensure that length is enough to read all logs
+        if (length < 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE) {
+            revert ReconstructionMismatch(
+                PubdataField.Length,
+                bytes32(4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE),
+                bytes32(length)
+            );
+        }
 
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
         bytes32 reconstructedChainedLogsHash = bytes32(0);

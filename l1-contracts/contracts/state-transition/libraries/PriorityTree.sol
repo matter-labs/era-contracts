@@ -2,11 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-// solhint-disable gas-custom-errors
-
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {PriorityTreeCommitment} from "../../common/Config.sol";
+import {RootMismatch, InvalidCommitment, InvalidStartIndex, InvalidUnprocessedIndex, InvalidNextLeafIndex} from "../L1StateTransitionErrors.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;
@@ -27,7 +26,7 @@ library PriorityTree {
         DynamicIncrementalMerkle.Bytes32PushTree tree;
     }
 
-    /// @notice Returns zero if and only if no operations were processed from the queue
+    /// @notice Returns zero if and only if no operations were processed from the tree
     /// @return Index of the oldest priority operation that wasn't processed yet
     function getFirstUnprocessedPriorityTx(Tree storage _tree) internal view returns (uint256) {
         return _tree.startIndex + _tree.unprocessedIndex;
@@ -60,8 +59,14 @@ library PriorityTree {
         return _tree.tree.root();
     }
 
+    /// @param _root The root to check.
+    /// @return Returns true if the root is a historical root.
+    function isHistoricalRoot(Tree storage _tree, bytes32 _root) internal view returns (bool) {
+        return _tree.historicalRoots[_root];
+    }
+
     /// @notice Process the priority operations of a batch.
-    function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
+    function processBatch(Tree storage _tree, PriorityOpsBatchInfo memory _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {
             bytes32 expectedRoot = Merkle.calculateRootPaths(
                 _priorityOpsData.leftPath,
@@ -69,7 +74,9 @@ library PriorityTree {
                 _tree.unprocessedIndex,
                 _priorityOpsData.itemHashes
             );
-            require(_tree.historicalRoots[expectedRoot], "PT: root mismatch");
+            if (!_tree.historicalRoots[expectedRoot]) {
+                revert RootMismatch();
+            }
             _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
         }
     }
@@ -77,7 +84,9 @@ library PriorityTree {
     /// @notice Initialize a chain from a commitment.
     function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         uint256 height = _commitment.sides.length; // Height, including the root node.
-        require(height > 0, "PT: invalid commitment");
+        if (height == 0) {
+            revert InvalidCommitment();
+        }
         _tree.startIndex = _commitment.startIndex;
         _tree.unprocessedIndex = _commitment.unprocessedIndex;
         _tree.tree._nextLeafIndex = _commitment.nextLeafIndex;
@@ -89,6 +98,34 @@ library PriorityTree {
             zero = Merkle.efficientHash(zero, zero);
         }
         _tree.historicalRoots[_tree.tree.root()] = true;
+    }
+
+    /// @notice Reinitialize the tree from a commitment on L1.
+    function l1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
+        if (_tree.startIndex != _commitment.startIndex) {
+            revert InvalidStartIndex(_tree.startIndex, _commitment.startIndex);
+        }
+        if (_tree.unprocessedIndex > _commitment.unprocessedIndex) {
+            revert InvalidUnprocessedIndex(_tree.unprocessedIndex, _commitment.unprocessedIndex);
+        }
+        if (_tree.tree._nextLeafIndex < _commitment.nextLeafIndex) {
+            revert InvalidNextLeafIndex(_tree.tree._nextLeafIndex, _commitment.nextLeafIndex);
+        }
+
+        _tree.unprocessedIndex = _commitment.unprocessedIndex;
+    }
+
+    /// @notice Reinitialize the tree from a commitment on GW.
+    function checkGWReinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal view {
+        if (_tree.startIndex != _commitment.startIndex) {
+            revert InvalidStartIndex(_tree.startIndex, _commitment.startIndex);
+        }
+        if (_tree.unprocessedIndex > _commitment.unprocessedIndex) {
+            revert InvalidUnprocessedIndex(_tree.unprocessedIndex, _commitment.unprocessedIndex);
+        }
+        if (_tree.tree._nextLeafIndex > _commitment.nextLeafIndex) {
+            revert InvalidNextLeafIndex(_tree.tree._nextLeafIndex, _commitment.nextLeafIndex);
+        }
     }
 
     /// @notice Returns the commitment to the priority tree.

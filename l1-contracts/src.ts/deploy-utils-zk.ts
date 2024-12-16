@@ -9,15 +9,26 @@ import type { Wallet as ZkWallet } from "zksync-ethers";
 import { utils as zkUtils, ContractFactory } from "zksync-ethers";
 // import { encode } from "querystring";
 // import { web3Provider, web3Url } from "../scripts/utils";
-import { ethersWalletToZkWallet, readBytecode, readInterface } from "./utils";
+import { ethersWalletToZkWallet, readBytecode, readContract, readInterface } from "./utils";
 
 export const BUILT_IN_ZKSYNC_CREATE2_FACTORY = "0x0000000000000000000000000000000000010000";
 
 const contractsHome = process.env.ZKSYNC_HOME ? path.join(process.env.ZKSYNC_HOME as string, "contracts/") : "../";
-const contractArtifactsPath = path.join(contractsHome, "l2-contracts/artifacts-zk/");
-const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
-export const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
-export const L2_SHARED_BRIDGE_PATH = contractArtifactsPath + "contracts/bridge";
+const contractArtifactsPath = path.join(contractsHome, "l1-contracts/artifacts-zk/");
+const openzeppelinBeaconProxyArtifactsPath = path.join(
+  contractArtifactsPath,
+  "@openzeppelin/contracts-v4/proxy/beacon"
+);
+const L2_SHARED_BRIDGE_PATH = contractArtifactsPath + "contracts/bridge";
+export const L2_STANDARD_ERC20_PROXY_FACTORY = readContract(openzeppelinBeaconProxyArtifactsPath, "UpgradeableBeacon");
+export const L2_STANDARD_ERC20_IMPLEMENTATION = readContract(L2_SHARED_BRIDGE_PATH, "BridgedStandardERC20");
+export const L2_STANDARD_TOKEN_PROXY = readContract(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
+
+export const L2_SHARED_BRIDGE_IMPLEMENTATION = readContract(L2_SHARED_BRIDGE_PATH, "L2SharedBridgeLegacy");
+export const L2_SHARED_BRIDGE_PROXY = readContract(
+  contractArtifactsPath + "@openzeppelin/contracts-v4/proxy/transparent",
+  "TransparentUpgradeableProxy"
+);
 
 export async function deployViaCreate2(
   deployWallet: ZkWallet,
