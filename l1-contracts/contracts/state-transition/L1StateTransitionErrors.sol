@@ -110,9 +110,6 @@ error AdminZero();
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
 
-// 0x8e7df0b6
-error ChainWasMigrated();
-
 // 0x87470e36
 error NotL1(uint256 blockChainId);
 

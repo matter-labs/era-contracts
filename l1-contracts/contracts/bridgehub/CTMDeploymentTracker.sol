@@ -52,7 +52,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
 
     /// @notice used to initialize the contract
     /// @param _owner the owner of the contract
-    function initialize(address _owner) external {
+    function initialize(address _owner) external initializer {
         _transferOwnership(_owner);
     }
 

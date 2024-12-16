@@ -20,10 +20,12 @@ import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgrad
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+
 /// @title State Transition Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ChainTypeManager is IChainTypeManager, Ownable2StepUpgradeable {
+contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
@@ -64,7 +66,12 @@ contract ChainTypeManager is IChainTypeManager, Ownable2StepUpgradeable {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _bridgehub) {
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
+    constructor(address _bridgehub) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
 
         // While this does not provide a protection in the production, it is needed for local testing
@@ -116,7 +123,12 @@ contract ChainTypeManager is IChainTypeManager, Ownable2StepUpgradeable {
     }
 
     /// @dev initialize
-    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external {
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
+    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
         }

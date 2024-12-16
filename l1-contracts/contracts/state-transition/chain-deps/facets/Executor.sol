@@ -16,7 +16,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
-import {ChainWasMigrated, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
+import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -35,14 +35,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
-
-    /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
-    modifier chainOnCurrentBridgehub() {
-        if (s.settlementLayer != address(0)) {
-            revert ChainWasMigrated();
-        }
-        _;
-    }
 
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
@@ -251,7 +243,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
-    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -457,7 +449,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
-    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
             .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
@@ -503,7 +495,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
-    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
@@ -576,7 +568,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _revertBatches(_newLastBatch);
     }
 
-    function _revertBatches(uint256 _newLastBatch) internal chainOnCurrentBridgehub {
+    function _revertBatches(uint256 _newLastBatch) internal onlySettlementLayer {
         if (s.totalBatchesCommitted <= _newLastBatch) {
             revert RevertedBatchNotAfterNewLastBatch();
         }

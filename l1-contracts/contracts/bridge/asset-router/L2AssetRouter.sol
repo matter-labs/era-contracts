@@ -337,7 +337,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
             return address(0);
         }
 
-        return IBridgedStandardToken(_l2Token).l1Address();
+        return IBridgedStandardToken(_l2Token).originToken();
     }
 
     /// @notice Legacy function used for backward compatibility to return L2 wrapped token

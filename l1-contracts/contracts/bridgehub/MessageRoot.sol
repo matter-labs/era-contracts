@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -24,7 +25,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-contract MessageRoot is IMessageRoot {
+contract MessageRoot is IMessageRoot, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
@@ -75,10 +76,11 @@ contract MessageRoot is IMessageRoot {
     constructor(IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
         _initialize();
+        _disableInitializers();
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
-    function initialize() external {
+    function initialize() external initializer {
         _initialize();
     }
 
