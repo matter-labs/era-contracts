@@ -64,8 +64,6 @@ import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploym
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
-    address expectedRollupL2DAValidator;
-
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 
     function run() public {
@@ -99,8 +97,6 @@ contract DeployL1Script is Script, DeployUtils {
 
         deployBytecodesSupplier();
 
-        initializeExpectedL2Addresses();
-
         deployVerifier();
 
         deployDefaultUpgrade();
@@ -129,7 +125,7 @@ contract DeployL1Script is Script, DeployUtils {
         initializeGeneratedData();
 
         deployBlobVersionedHashRetriever();
-        deployChainTypeManagerContract(addresses.daAddresses.rollupDAManager);
+        deployChainTypeManagerContract();
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
 
@@ -153,12 +149,31 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function initializeExpectedL2Addresses() internal {
-        expectedRollupL2DAValidator = Utils.getL2AddressViaCreate2Factory(
-            bytes32(0),
-            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
-            hex""
-        );
+    function getRollupL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
+                hex""
+            );
+    }
+
+    function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
+                hex""
+            );
+    }
+
+    function getAvailL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode()),
+                hex""
+            );
     }
 
     function deployDAValidators() internal {
@@ -170,13 +185,28 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("L1RollupDAValidator deployed at:", rollupDAValidator);
         addresses.daAddresses.l1RollupDAValidator = rollupDAValidator;
 
-        address validiumDAValidator = deployViaCreate2(type(ValidiumL1DAValidator).creationCode, "");
-        console.log("L1ValidiumDAValidator deployed at:", validiumDAValidator);
-        addresses.daAddresses.l1ValidiumDAValidator = validiumDAValidator;
+        addresses.daAddresses.noDAValidiumL1DAValidator = deployViaCreate2(
+            type(ValidiumL1DAValidator).creationCode,
+            ""
+        );
+        console.log("L1NoDAValidiumDAValidator deployed at:", addresses.daAddresses.noDAValidiumL1DAValidator);
 
-        vm.broadcast(msg.sender);
-        RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), expectedRollupL2DAValidator, true);
+        if (config.contracts.availL1DAValidator == address(0)) {
+            address availBridge = deployViaCreate2(Utils.readDummyAvailBridgeBytecode(), "");
+            addresses.daAddresses.availL1DAValidator = deployViaCreate2(
+                Utils.readAvailL1DAValidatorBytecode(),
+                abi.encode(availBridge)
+            );
+            console.log("AvailL1DAValidator deployed at:", addresses.daAddresses.availL1DAValidator);
+        } else {
+            addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
+        }
+
+        vm.startBroadcast(msg.sender);
+        RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), getRollupL2ValidatorAddress(), true);
+        vm.stopBroadcast();
     }
+
     function deployBridgehubContract() internal {
         address bridgehubImplementation = deployViaCreate2(
             type(Bridgehub).creationCode,
@@ -244,6 +274,7 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
         addresses.blobVersionedHashRetriever = contractAddress;
     }
+
     function registerChainTypeManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
@@ -668,8 +699,13 @@ contract DeployL1Script is Script, DeployUtils {
         );
         vm.serializeAddress(
             "deployed_addresses",
-            "validium_l1_da_validator_addr",
-            addresses.daAddresses.l1ValidiumDAValidator
+            "no_da_validium_l1_validator_addr",
+            addresses.daAddresses.noDAValidiumL1DAValidator
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "avail_l1_da_validator_addr",
+            addresses.daAddresses.availL1DAValidator
         );
 
         string memory deployedAddresses = vm.serializeAddress(
@@ -686,7 +722,9 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", expectedRollupL2DAValidator);
+        vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
+        vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
+        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);

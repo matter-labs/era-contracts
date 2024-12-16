@@ -26,7 +26,12 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Call} from "contracts/governance/Common.sol";
+
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {CreateAndTransfer} from "./CreateAndTransfer.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -54,6 +59,9 @@ struct Config {
     address l1Nullifier;
     address l1Erc20Bridge;
     bool initializeLegacyBridge;
+    address governance;
+    address create2FactoryAddress;
+    bytes32 create2Salt;
 }
 
 contract RegisterZKChainScript is Script {
@@ -100,6 +108,18 @@ contract RegisterZKChainScript is Script {
 
     function runInner(string memory outputPath) internal {
         string memory root = vm.projectRoot();
+
+        // kludge
+        string memory path = string.concat(root, "/script-out/gateway-upgrade-ecosystem.toml");
+        bool fileExists = vm.isFile(path);
+        if (config.chainChainId == 505 && fileExists) {
+            string memory toml = vm.readFile(path);
+            bytes memory calls1 = toml.readBytes("$.governance_stage1_calls");
+            bytes memory calls2 = toml.readBytes("$.governance_stage2_calls");
+            governanceExecuteCalls(calls1, config.governance);
+            governanceExecuteCalls(calls2, config.governance);
+        }
+
         outputPath = string.concat(root, outputPath);
 
         if (config.initializeLegacyBridge) {
@@ -168,6 +188,10 @@ contract RegisterZKChainScript is Script {
         config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
+
+        config.governance = toml.readAddress("$.governance");
+        config.create2FactoryAddress = toml.readAddress("$.create2_factory_address");
+        config.create2Salt = toml.readBytes32("$.create2_salt");
     }
 
     function getConfig() public view returns (Config memory) {
@@ -199,6 +223,10 @@ contract RegisterZKChainScript is Script {
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
+
+        config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
+        config.create2FactoryAddress = toml.readAddress("$.create2_factory_addr");
+        config.create2Salt = toml.readBytes32("$.create2_factory_salt");
 
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
@@ -301,27 +329,39 @@ contract RegisterZKChainScript is Script {
     }
 
     function deployGovernance() internal {
-        vm.broadcast();
-        Governance governance = new Governance(
+        bytes memory input = abi.encode(
             config.ownerAddress,
             config.governanceSecurityCouncilAddress,
             config.governanceMinDelay
         );
-        console.log("Governance deployed at:", address(governance));
-        output.governance = address(governance);
+        address governance = Utils.deployViaCreate2(
+            abi.encodePacked(type(Governance).creationCode, input),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
+        console.log("Governance deployed at:", governance);
+        output.governance = governance;
     }
 
     function deployChainAdmin() internal {
-        vm.broadcast();
-        AccessControlRestriction restriction = new AccessControlRestriction(0, config.ownerAddress);
-        output.accessControlRestrictionAddress = address(restriction);
+        bytes memory input = abi.encode(0, config.ownerAddress);
+        address restriction = Utils.deployViaCreate2(
+            abi.encodePacked(type(AccessControlRestriction).creationCode, input),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
+        output.accessControlRestrictionAddress = restriction;
 
         address[] memory restrictions = new address[](1);
-        restrictions[0] = address(restriction);
+        restrictions[0] = restriction;
 
-        vm.broadcast();
-        ChainAdmin chainAdmin = new ChainAdmin(restrictions);
-        output.chainAdmin = address(chainAdmin);
+        input = abi.encode(restrictions);
+        address chainAdmin = Utils.deployViaCreate2(
+            abi.encodePacked(type(ChainAdmin).creationCode, input),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
+        output.chainAdmin = chainAdmin;
     }
 
     function registerZKChain() internal {
@@ -406,10 +446,12 @@ contract RegisterZKChainScript is Script {
     }
 
     function deployChainProxyAddress() internal {
-        vm.startBroadcast();
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-        proxyAdmin.transferOwnership(output.chainAdmin);
-        vm.stopBroadcast();
+        bytes memory input = abi.encode(type(ProxyAdmin).creationCode, config.create2Salt, output.chainAdmin);
+        bytes memory encoded = abi.encodePacked(type(CreateAndTransfer).creationCode, input);
+        address createAndTransfer = Utils.deployViaCreate2(encoded, config.create2Salt, config.create2FactoryAddress);
+
+        address proxyAdmin = vm.computeCreate2Address(config.create2Salt, keccak256(encoded), createAndTransfer);
+
         console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
         output.chainProxyAdmin = address(proxyAdmin);
     }
@@ -467,5 +509,24 @@ contract RegisterZKChainScript is Script {
         string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
         console.log("Output saved at:", outputPath);
+    }
+
+    function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) internal {
+        IGovernance governance = IGovernance(governanceAddr);
+        Ownable2Step ownable = Ownable2Step(governanceAddr);
+
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: bytes32(0)
+        });
+
+        vm.startBroadcast(ownable.owner());
+        governance.scheduleTransparent(operation, 0);
+        // We assume that the total value is 0
+        governance.execute{value: 0}(operation);
+        vm.stopBroadcast();
     }
 }

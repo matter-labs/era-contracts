@@ -255,6 +255,7 @@ contract EcosystemUpgrade is Script {
         publishBytecodes();
         initializeExpectedL2Addresses();
 
+        deployBlobVersionedHashRetriever();
         deployVerifier();
         deployDefaultUpgrade();
         deployGenesisUpgrade();
@@ -818,7 +819,7 @@ contract EcosystemUpgrade is Script {
         // We do not know whether the chain will be a rollup or a validium, just in case, we'll deploy
         // both of the validators.
         upgradeSpecificDependencies[5] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
-        upgradeSpecificDependencies[6] = L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode();
+        upgradeSpecificDependencies[6] = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
 
         upgradeSpecificDependencies[7] = L2ContractsBytecodesLib
             .readTransparentUpgradeableProxyBytecodeFromSystemContracts();
@@ -1311,6 +1312,7 @@ contract EcosystemUpgrade is Script {
             initAddress: addresses.stateTransition.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
+        generatedData.diamondCutData = abi.encode(diamondCut);
 
         chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
@@ -1323,6 +1325,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function saveOutput(string memory outputPath) internal {
+        prepareNewChainCreationParams();
+
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
         vm.serializeAddress(
             "bridgehub",
@@ -1460,6 +1464,11 @@ contract EcosystemUpgrade is Script {
             addresses.daAddresses.l1ValidiumDAValidator
         );
         vm.serializeAddress("deployed_addresses", "l1_bytecodes_supplier_addr", addresses.bytecodesSupplier);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l2_wrapped_base_token_store_addr",
+            addresses.l2WrappedBaseTokenStore
+        );
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
@@ -1528,4 +1537,24 @@ contract EcosystemUpgrade is Script {
 
     // add this to be excluded from coverage report
     function test() internal {}
+
+    function addL2WethToStore(
+        address storeAddress,
+        ChainAdmin chainAdmin,
+        uint256 chainId,
+        address l2WBaseToken
+    ) public {
+        L2WrappedBaseTokenStore l2WrappedBaseTokenStore = L2WrappedBaseTokenStore(storeAddress);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: storeAddress,
+            value: 0,
+            data: abi.encodeCall(l2WrappedBaseTokenStore.initializeChain, (chainId, l2WBaseToken))
+        });
+
+        vm.startBroadcast();
+        chainAdmin.multicall(calls, true);
+        vm.stopBroadcast();
+    }
 }
