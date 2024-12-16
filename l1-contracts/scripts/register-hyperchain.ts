@@ -126,7 +126,7 @@ async function main() {
         console.log(`Allowing EVM emulation`);
         await deployer.enableEvmEmulation();
       }
-      
+
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 

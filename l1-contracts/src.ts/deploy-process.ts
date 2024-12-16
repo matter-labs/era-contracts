@@ -80,7 +80,7 @@ export async function registerHyperchain(
   gasPrice: BigNumberish,
   baseTokenName?: string,
   chainId?: string,
-  useGovernance: boolean = false,
+  useGovernance: boolean = false
 ) {
   const testnetTokens = getTokens();
 
