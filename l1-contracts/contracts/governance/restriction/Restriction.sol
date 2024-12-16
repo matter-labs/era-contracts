@@ -11,7 +11,7 @@ import {IRestriction, RESTRICTION_MAGIC} from "./IRestriction.sol";
 abstract contract Restriction is IRestriction {
     /// @notice A method used to check that the contract supports this interface.
     /// @return Returns the `RESTRICTION_MAGIC`
-    function getSupportsRestrictionMagic() external pure returns (bytes32) {
+    function getSupportsRestrictionMagic() external view returns (bytes32) {
         return RESTRICTION_MAGIC;
     }
 

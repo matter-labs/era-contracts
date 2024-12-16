@@ -25,7 +25,7 @@ import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 /// @notice This contract should be used by chains that wish to guarantee that certain security
 /// properties are preserved forever.
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
-/// @dev One of the instances of such contract is enough to ensure that a ZkSyncHyperchain is a rollup forever.
+/// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
@@ -59,7 +59,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev Expected to be delegatecalled by the `TransparentUpgradableProxy`
     /// upon initialization.
     function initialize(address _initialOwner) external initializer {
-        // solhint-disable-next-line gas-custom-errors, reason-string
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }
@@ -208,7 +207,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
-    /// @notice Function is internal for testing purposes only.
     /// @param _chain The address of the chain.
     function _isAdminOfAChain(address _chain) internal view returns (bool) {
         if (_chain == address(0)) {
@@ -220,6 +218,9 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         // - Query it for `chainId`. If it reverts, it is not a ZkSyncHyperchain.
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
+
+        // Note, that we do use assembly here to ensure that the function does not panic in case of
+        // either incorrect `_chain` address or in case the returndata is too large
 
         (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
 
@@ -241,17 +242,15 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         return admin == msg.sender;
     }
 
-    /// @notice Tries to call `IGetters.getChainId()` function on the `_chain`.
+    /// @notice Tries to call `IGetters.getChainId()` function on the `_potentialChainAddress`.
     /// It ensures that the returndata is of correct format and if not, it returns false.
     /// @param _chain The address of the potential chain
     /// @return chainId The chainId of the chain.
-    /// @return success Whether the call was successful.
+    /// @return success Whether the `chain` is indeed an address of a ZK Chain.
+    /// @dev Returns a tuple of the chainId and whether the call was successful.
     /// If the second item is `false`, the caller should ignore the first value.
     function _getChainIdUnffallibleCall(address _chain) private view returns (uint256 chainId, bool success) {
         bytes4 selector = IGetters.getChainId.selector;
-
-        // Note, that we do use assembly here to ensure that the function does not panic in case of
-        // either incorrect `_chain` address or in case the returndata is too large
         assembly {
             // We use scratch space here, so it is safe
             mstore(0, selector)
@@ -271,9 +270,8 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Tries to get the new admin from the migration.
-    /// @notice Function is internal for testing purposes only.
     /// @param _call The call data.
-    /// @return Returns a tuple of the new admin and whether the transaction is indeed the migration.
+    /// @return Returns a tuple of of the new admin and whether the transaction is indeed the migration.
     /// If the second item is `false`, the caller should ignore the first value.
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.

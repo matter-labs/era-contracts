@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 
 import {ChainAdmin} from "./ChainAdmin.sol";
 import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
-import {ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -25,7 +24,6 @@ contract L2AdminFactory {
     address[] public requiredRestrictions;
 
     constructor(address[] memory _requiredRestrictions) {
-        _validateZeroAddress(_requiredRestrictions);
         _validateRestrctions(_requiredRestrictions);
         requiredRestrictions = _requiredRestrictions;
     }
@@ -36,12 +34,9 @@ contract L2AdminFactory {
     function deployAdmin(address[] memory _additionalRestrictions, bytes32 _salt) external returns (address admin) {
         // Even though the chain admin will likely perform similar checks,
         // we keep those here just in case, since it is not expensive, while allowing to fail fast.
-        _validateZeroAddress(_additionalRestrictions);
         _validateRestrctions(_additionalRestrictions);
-
         uint256 cachedRequired = requiredRestrictions.length;
         uint256 cachedAdditional = _additionalRestrictions.length;
-
         address[] memory restrictions = new address[](cachedRequired + cachedAdditional);
 
         unchecked {
@@ -54,29 +49,12 @@ contract L2AdminFactory {
         }
 
         admin = address(new ChainAdmin{salt: _salt}(restrictions));
-
-        emit AdminDeployed(admin);
-    }
-
-    /// @notice Checks that the provided list of restrictions does not contain
-    /// any zero addresses.
-    /// @param _restrictions List of the restrictions to check.
-    /// @dev In case either of the restrictions is zero address, the function reverts.
-    function _validateZeroAddress(address[] memory _restrictions) private pure {
-        unchecked {
-            uint256 length = _restrictions.length;
-            for (uint256 i = 0; i < length; ++i) {
-                if (_restrictions[i] == address(0)) {
-                    revert ZeroAddress();
-                }
-            }
-        }
     }
 
     /// @notice Checks that the provided list of restrictions is correct.
     /// @param _restrictions List of the restrictions to check.
     /// @dev In case either of the restrictions is not correct, the function reverts.
-    function _validateRestrctions(address[] memory _restrictions) private view {
+    function _validateRestrctions(address[] memory _restrictions) internal view {
         unchecked {
             uint256 length = _restrictions.length;
             for (uint256 i = 0; i < length; ++i) {

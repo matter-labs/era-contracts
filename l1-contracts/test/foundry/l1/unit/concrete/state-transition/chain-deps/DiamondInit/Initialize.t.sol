@@ -11,7 +11,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
-import {MalformedCalldata, ZeroAddress, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
@@ -86,7 +86,6 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getBridgehub(), initializeData.bridgehub);
         assertEq(utilsFacet.util_getChainTypeManager(), initializeData.chainTypeManager);
         assertEq(utilsFacet.util_getBaseTokenAssetId(), initializeData.baseTokenAssetId);
-        assertEq(utilsFacet.util_getBaseTokenBridge(), initializeData.baseTokenBridge);
         assertEq(utilsFacet.util_getProtocolVersion(), initializeData.protocolVersion);
 
         assertEq(address(utilsFacet.util_getVerifier()), address(initializeData.verifier));

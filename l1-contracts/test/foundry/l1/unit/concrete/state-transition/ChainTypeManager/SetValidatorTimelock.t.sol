@@ -39,7 +39,7 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
         );
 
         vm.prank(notOwner);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notOwner));
+        vm.expectRevert("Ownable: caller is not the owner");
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
         chainContractAddress.setValidatorTimelock(newValidatorTimelock);
 

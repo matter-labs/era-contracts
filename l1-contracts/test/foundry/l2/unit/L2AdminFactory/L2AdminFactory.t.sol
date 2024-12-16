@@ -10,7 +10,6 @@ import {PermanentRestriction} from "contracts/governance/PermanentRestriction.so
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
 import {NotARestriction} from "contracts/common/L1ContractErrors.sol";
-import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract L2AdminFactoryTest is Test {
     address validRestriction1;
@@ -23,29 +22,6 @@ contract L2AdminFactoryTest is Test {
         validRestriction2 = address(new DummyRestriction(true));
 
         invalidRestriction = address(new DummyRestriction(false));
-    }
-
-    function testDeployL2AdminFactoryRevertZeroAddress() public {
-        address[] memory requiredRestrictions = new address[](2);
-        requiredRestrictions[0] = makeAddr("required");
-        requiredRestrictions[1] = address(0);
-
-        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
-        new L2AdminFactory(requiredRestrictions);
-    }
-
-    function testDeployL2AdminZeroAddress() public {
-        address[] memory requiredRestrictions = new address[](1);
-        requiredRestrictions[0] = validRestriction1;
-
-        L2AdminFactory factory = new L2AdminFactory(requiredRestrictions);
-
-        address[] memory additionalRestrictions = new address[](2);
-        additionalRestrictions[0] = validRestriction2;
-        additionalRestrictions[1] = address(0);
-
-        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
-        address admin = factory.deployAdmin(additionalRestrictions, bytes32(0));
     }
 
     function test_invalidInitialRestriction() public {

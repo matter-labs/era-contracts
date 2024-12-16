@@ -9,7 +9,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {NotAllowed, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {NotAllowed, NotEnoughGas, UnsupportedEncodingVersion, InvalidSelector, ZeroAddress, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -27,6 +27,7 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract TestPermanentRestriction is PermanentRestriction {
     constructor(IBridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
@@ -120,16 +121,16 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         return permRestriction.isAdminOfAChain(chainAddr);
     }
 
-    function test_tryCompareAdminOfAChainIsAddressZero() public {
-        assertFalse(isAddressAdmin(address(0), owner));
+    function test_isAdminOfAChainIsAddressZero() public {
+        assertFalse(permRestriction.isAdminOfAChain(address(0)));
     }
 
-    function test_tryCompareAdminOfAChainNotAHyperchain() public {
-        assertFalse(isAddressAdmin(makeAddr("random"), owner));
+    function test_isAdminOfAChainNotAHyperchain() public {
+        assertFalse(permRestriction.isAdminOfAChain(makeAddr("random")));
     }
 
-    function test_tryCompareAdminOfAChainNotAnAdmin() public {
-        assertFalse(isAddressAdmin(hyperchain, owner));
+    function test_isAdminOfAChainOfAChainNotAnAdmin() public {
+        assertFalse(permRestriction.isAdminOfAChain(hyperchain));
     }
 
     function test_tryCompareAdminOfAChain() public {
@@ -373,7 +374,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         // ctm deployer address is 0 in this test
         vm.startPrank(address(0));
-        bridgehub.setAssetHandlerAddress(
+        bridgehub.setCTMAssetAddress(
             bytes32(uint256(uint160(address(chainContractAddress)))),
             address(chainContractAddress)
         );
@@ -390,6 +391,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector),
             abi.encode(bridgehub)
         );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encode(baseToken)
+        );
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
+
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,

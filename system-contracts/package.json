@@ -15,11 +15,13 @@
     "fast-glob": "^3.3.2",
     "hardhat": "=2.22.2",
     "preprocess": "^3.2.0",
-    "zksync-ethers": "^5.9.0"
+    "zksync-ethers": "^5.9.0",
+    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@4.9.5",
+    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@4.9.5"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.2.0",
-    "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
+    "@matterlabs/hardhat-zksync-node": "^1.2.0",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@typechain/ethers-v5": "^2.0.0",
@@ -68,7 +70,7 @@
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-no-build": "hardhat test --network zkSyncTestNode",
-    "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
+    "test-node": "hardhat node-zksync --tag 0.1.0-alpha.29",
     "test:bootloader": "cd bootloader/test_infra && cargo run"
   }
 }
