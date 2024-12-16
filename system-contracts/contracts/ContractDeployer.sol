@@ -4,13 +4,13 @@ pragma solidity 0.8.24;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SERVICE_CALL_PSEUDO_CALLER} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Unauthorized, InvalidAllowedBytecodeTypesMode, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -360,23 +360,16 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
     /// @notice Changes what types of bytecodes are allowed to be deployed on the chain. Can be used only during upgrades.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
-    function setAllowedBytecodeTypesToDeploy(uint256 newAllowedBytecodeTypes) external {
+    function setAllowedBytecodeTypesToDeploy(AllowedBytecodeTypes newAllowedBytecodeTypes) external {
         if (
             msg.sender != FORCE_DEPLOYER &&
             msg.sender != address(COMPLEX_UPGRADER_CONTRACT) &&
-            msg.sender != address(SYSTEM_CONTEXT_CONTRACT)
+            msg.sender != SERVICE_CALL_PSEUDO_CALLER
         ) {
             revert Unauthorized(msg.sender);
         }
 
-        if (
-            newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVm) &&
-            newAllowedBytecodeTypes != uint256(AllowedBytecodeTypes.EraVmAndEVM)
-        ) {
-            revert InvalidAllowedBytecodeTypesMode();
-        }
-
-        if (uint256(_getAllowedBytecodeTypesMode()) != newAllowedBytecodeTypes) {
+        if (_getAllowedBytecodeTypesMode() != newAllowedBytecodeTypes) {
             assembly {
                 sstore(ALLOWED_BYTECODE_TYPES_MODE_SLOT, newAllowedBytecodeTypes)
             }
