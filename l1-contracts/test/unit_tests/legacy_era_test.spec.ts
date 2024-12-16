@@ -11,7 +11,6 @@ import {
   MailboxFacetFactory,
   GettersFacetFactory,
   MockExecutorFacetFactory,
-  L1NullifierFactory,
 } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
@@ -105,7 +104,6 @@ describe("Legacy Era tests", function () {
     const sharedBridge = await sharedBridgeFactory.deploy(
       l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
-      deployer.addresses.Bridges.L1NullifierProxy,
       deployer.chainId,
       deployer.addresses.StateTransition.DiamondProxy
     );
@@ -122,13 +120,6 @@ describe("Legacy Era tests", function () {
     if (deployer.verbose) {
       console.log("L1AssetRouter upgrade sent for testing");
     }
-
-    const setL1Erc20BridgeCalldata = L1NullifierFactory.connect(
-      deployer.addresses.Bridges.L1NullifierProxy,
-      deployWallet
-    ).interface.encodeFunctionData("setL1Erc20Bridge", [l1ERC20Bridge.address]);
-
-    await deployer.executeUpgrade(deployer.addresses.Bridges.L1NullifierProxy, 0, setL1Erc20BridgeCalldata);
 
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     getter = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
@@ -173,7 +164,6 @@ describe("Legacy Era tests", function () {
       l1ERC20Bridge.connect(randomSigner),
       bridgehub,
       chainId,
-      deployer.l1ChainId,
       depositorAddress,
       erc20TestToken.address,
       ethers.utils.parseUnits("800", 18),
@@ -188,7 +178,11 @@ describe("Legacy Era tests", function () {
         .connect(randomSigner)
         .finalizeWithdrawal(1, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
-    expect(revertReason).contains("L2WithdrawalMessageWrongLength(4)");
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: wrong msg len");
+=======
+    expect(revertReason).contains("MalformedMessage");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
@@ -197,13 +191,20 @@ describe("Legacy Era tests", function () {
         .connect(randomSigner)
         .finalizeWithdrawal(1, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: Incorrect message function selector");
+=======
     expect(revertReason).contains("InvalidSelector");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, dummyProof)
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("local root is 0");
+=======
     expect(revertReason).contains("BatchNotExecuted");
   });
 
@@ -215,14 +216,22 @@ describe("Legacy Era tests", function () {
       erc20TestToken.address,
       ethers.constants.HashZero,
     ]);
-    await expect(l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])).to.be.reverted;
+    const revertReason = await getCallRevertReason(
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
+    );
+    expect(revertReason).contains("MerklePathEmpty");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, dummyProof)
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: withd w proof");
+=======
     expect(revertReason).contains("InvalidProof");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   /////////// Mailbox. Note we have these two together because we need to fix ERA Diamond proxy Address
@@ -292,7 +301,11 @@ describe("Legacy Era tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
+<<<<<<< HEAD
+      expect(revertReason).equal("L1AR: withd w proof");
+=======
       expect(revertReason).contains("InvalidProof");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     });
 
     it("Successful deposit", async () => {
@@ -323,7 +336,11 @@ describe("Legacy Era tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
+<<<<<<< HEAD
+      expect(revertReason).equal("L1AR: Withdrawal is already finalized");
+=======
       expect(revertReason).contains("WithdrawalAlreadyFinalized");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     });
   });
 });

@@ -5,7 +5,6 @@ pragma abicoder v2;
 
 import {LOAD_LATEST_RETURNDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS} from "../libraries/SystemContractsCaller.sol";
 import {EfficientCall, KECCAK256_SYSTEM_CONTRACT} from "../libraries/EfficientCall.sol";
-import {CallToKeccakShouldHaveSucceeded, KeccakReturnDataSizeShouldBe32Bytes, KeccakResultIsNotCorrect, KeccakShouldStartWorkingAgain, KeccakMismatchBetweenNumberOfInputsAndOutputs, KeccakHashWasNotCalculatedCorrectly} from "contracts/SystemContractErrors.sol";
 
 // In this test it is important to actually change the real Keccak256's contract's bytecode,
 // which requires changes in the real AccountCodeStorage contract
@@ -63,17 +62,13 @@ contract KeccakTest {
         _loadReturnDataIntoActivePtr();
         _loadFarCallABIIntoActivePtr(1000000);
         bool success = rawCallByRef(KECCAK256_SYSTEM_CONTRACT);
-        if (!success) {
-            revert CallToKeccakShouldHaveSucceeded();
-        }
+        require(success, "The call to keccak should have succeeded");
 
         uint256 returndataSize = 0;
         assembly {
             returndataSize := returndatasize()
         }
-        if (returndataSize != 32) {
-            revert KeccakReturnDataSizeShouldBe32Bytes(returndataSize);
-        }
+        require(returndataSize == 32, "The return data size should be 32 bytes");
 
         bytes32 result;
         assembly {
@@ -81,9 +76,7 @@ contract KeccakTest {
             result := mload(0)
         }
 
-        if (result != EMPTY_STRING_KECCAK) {
-            revert KeccakResultIsNotCorrect(result);
-        }
+        require(result == EMPTY_STRING_KECCAK, "The result is not correct");
     }
 
     function keccakUpgradeTest(
@@ -117,9 +110,7 @@ contract KeccakTest {
 
         // Now it should work again
         hash = this.callKeccak(msg.data[0:0]);
-        if (hash != EMPTY_STRING_KECCAK) {
-            revert KeccakShouldStartWorkingAgain();
-        }
+        require(hash == EMPTY_STRING_KECCAK, "Keccak should start working again");
     }
 
     function keccakPerformUpgrade(bytes calldata upgradeCalldata) external {
@@ -143,9 +134,7 @@ contract KeccakTest {
         bytes[] calldata testInputs,
         bytes32[] calldata expectedOutputs
     ) external {
-        if (testInputs.length != expectedOutputs.length) {
-            revert KeccakMismatchBetweenNumberOfInputsAndOutputs(testInputs.length, expectedOutputs.length);
-        }
+        require(testInputs.length == expectedOutputs.length, "mismatch between number of inputs and outputs");
 
         // Firstly, we upgrade keccak256 bytecode to the correct version.
         EfficientCall.mimicCall({
@@ -165,9 +154,7 @@ contract KeccakTest {
         }
 
         for (uint256 i = 0; i < result.length; i++) {
-            if (result[i] != expectedOutputs[i]) {
-                revert KeccakHashWasNotCalculatedCorrectly(result[i], expectedOutputs[i]);
-            }
+            require(result[i] == expectedOutputs[i], "hash was not calculated correctly");
         }
 
         // Upgrading it back to the original version:

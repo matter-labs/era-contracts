@@ -30,17 +30,7 @@ contract WETH9 {
     function withdraw(uint256 wad) public {
         require(balanceOf[msg.sender] >= wad, "weth9, 1");
         balanceOf[msg.sender] -= wad;
-        // this is a hack so that zkfoundry works, but we are deploying WETH9 on L2 as well.
-        // payable(msg.sender).transfer(wad);
-        bool callSuccess;
-        address sender = msg.sender;
-        // Low-level assembly call, to avoid any memory copying (save gas)
-        assembly {
-            callSuccess := call(gas(), sender, wad, 0, 0, 0, 0)
-        }
-        if (!callSuccess) {
-            require(false, "Withdraw failed");
-        }
+        payable(msg.sender).transfer(wad);
         emit Withdrawal(msg.sender, wad);
     }
 
@@ -60,6 +50,7 @@ contract WETH9 {
 
     function transferFrom(address src, address dst, uint256 wad) public returns (bool) {
         require(balanceOf[src] >= wad, "weth9, 2");
+
         if (src != msg.sender && allowance[src][msg.sender] != type(uint256).max) {
             require(allowance[src][msg.sender] >= wad, "weth9, 3");
             allowance[src][msg.sender] -= wad;

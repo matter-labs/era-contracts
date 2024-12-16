@@ -53,36 +53,35 @@ jobs:
       - name: Run lint
         run: yarn lint:check
 
-  # FIXME: recover when used multivm is updated
-  # test-bootloader:
-  #   needs: [build, lint]
-  #   runs-on: ubuntu-latest
+  test-bootloader:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout the repository
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
 
-  #     - name: Install rust
-  #       uses: actions-rust-lang/setup-rust-toolchain@v1
-  #       with:
-  #         toolchain: nightly-2023-04-17
+      - name: Install rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2023-04-17
 
-  #     - name: Restore artifacts cache
-  #       uses: actions/cache/restore@v3
-  #       with:
-  #         fail-on-cache-miss: true
-  #         key: artifacts-system-${{ github.sha }}
-  #         path: |
-  #           system-contracts/artifacts-zk
-  #           system-contracts/cache-zk
-  #           system-contracts/typechain
-  #           system-contracts/contracts-preprocessed
-  #           system-contracts/bootloader/build
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts-preprocessed
+            system-contracts/bootloader/build
 
-  #     - name: Run bootloader tests
-  #       run: |
-  #         cd system-contracts/bootloader/test_infra
-  #         cargo run
+      - name: Run bootloader tests
+        run: |
+          cd system-contracts/bootloader/test_infra
+          cargo run
 
   test-contracts:
     needs: [build, lint]

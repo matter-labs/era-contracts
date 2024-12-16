@@ -105,7 +105,7 @@ describe("Mailbox tests", function () {
       )
     );
 
-    expect(revertReason).contains("LengthIsNotDivisibleBy32(63)");
+    expect(revertReason).contains("MalformedBytecode");
   });
 
   it("Should not accept bytecode of even length in words", async () => {
@@ -199,10 +199,7 @@ describe("Mailbox tests", function () {
 
     before(async () => {
       const mailboxTestContractFactory = await hardhat.ethers.getContractFactory("MailboxFacetTest");
-      const mailboxTestContract = await mailboxTestContractFactory.deploy(
-        chainId,
-        await mailboxTestContractFactory.signer.getChainId()
-      );
+      const mailboxTestContract = await mailboxTestContractFactory.deploy(chainId);
       testContract = MailboxFacetTestFactory.connect(mailboxTestContract.address, mailboxTestContract.signer);
 
       // Generating 10 more gas prices for test suit

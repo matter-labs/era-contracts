@@ -12,26 +12,25 @@ name: Codespell
 on: pull_request
 
 jobs:
-  # TODO: fix codespell CI
-  # codespell:
-  #   runs-on: ubuntu-latest
+  codespell:
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout the repository
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
 
-  #     - name: pip cache
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: ~/.cache/pip
-  #         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-  #         restore-keys: ${{ runner.os }}-pip-
+      - name: pip cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
 
-  #     - name: Install prerequisites
-  #       run: sudo pip install -r ./.codespell/requirements.txt
+      - name: Install prerequisites
+        run: sudo pip install -r ./.codespell/requirements.txt
 
-  #     - name: Spell check
-  #       run: codespell --config=./.codespell/.codespellrc
+      - name: Spell check
+        run: codespell --config=./.codespell/.codespellrc
 
   typos:
     runs-on: ubuntu-latest

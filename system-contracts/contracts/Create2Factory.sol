@@ -5,12 +5,11 @@ pragma solidity 0.8.24;
 import {REAL_DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
 /// @notice The contract that can be used for deterministic contract deployment.
-contract Create2Factory is ICreate2Factory {
+contract Create2Factory {
     /// @notice Function that calls the `create2` method of the `ContractDeployer` contract.
     /// @dev This function accepts the same parameters as the `create2` function of the ContractDeployer system contract,
     /// so that we could efficiently relay the calldata.

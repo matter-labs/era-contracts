@@ -3,15 +3,16 @@
 pragma solidity ^0.8.21;
 
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
-import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
+import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
-/// @param chainTypeManager contract's address
+/// @param stateTransitionManager contract's address
 /// @param protocolVersion initial protocol version
 /// @param validatorTimelock address of the validator timelock that delays execution
 /// @param admin address who can manage the contract
-/// @param baseTokenAssetId asset id of the base token of the chain
+/// @param baseToken address of the base token of the chain
+/// @param baseTokenBridge address of the L1 shared bridge contract
 /// @param storedBatchZero hash of the initial genesis batch
 /// @param verifier address of Verifier contract
 /// @param verifierParams Verifier config parameters that describes the circuit to be verified
@@ -24,11 +25,12 @@ import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 struct InitializeData {
     uint256 chainId;
     address bridgehub;
-    address chainTypeManager;
+    address stateTransitionManager;
     uint256 protocolVersion;
     address admin;
     address validatorTimelock;
-    bytes32 baseTokenAssetId;
+    address baseToken;
+    address baseTokenBridge;
     bytes32 storedBatchZero;
     IVerifier verifier;
     VerifierParams verifierParams;

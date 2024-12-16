@@ -161,7 +161,11 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
-    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: wrong msg len");
+=======
+    expect(revertReason).contains("MalformedMessage");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
@@ -177,39 +181,47 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: wrong msg len 2");
+=======
+    expect(revertReason).contains("MalformedMessage");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: Incorrect message function selector");
+=======
     expect(revertReason).contains("InvalidSelector");
   });
 
-  // it("Should deposit erc20 token successfully", async () => {
-  //   const amount = ethers.utils.parseEther("0.001");
-  //   const mintValue = ethers.utils.parseEther("0.002");
-  //   await l1Weth.connect(randomSigner).deposit({ value: amount });
-  //   await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-  //   bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
-  //     {
-  //       chainId,
-  //       mintValue,
-  //       l2Value: amount,
-  //       l2GasLimit: 1000000,
-  //       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  //       refundRecipient: ethers.constants.AddressZero,
-  //       secondBridgeAddress: l1SharedBridge.address,
-  //       secondBridgeValue: 0,
-  //       secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-  //         ["address", "uint256", "address"],
-  //         [l1Weth.address, amount, await randomSigner.getAddress()]
-  //       ),
-  //     },
-  //     { value: mintValue }
-  //   );
-  // });
+  it("Should deposit erc20 token successfully", async () => {
+    const amount = ethers.utils.parseEther("0.001");
+    const mintValue = ethers.utils.parseEther("0.002");
+    await l1Weth.connect(randomSigner).deposit({ value: amount });
+    await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
+    bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+      {
+        chainId,
+        mintValue,
+        l2Value: amount,
+        l2GasLimit: 1000000,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        refundRecipient: ethers.constants.AddressZero,
+        secondBridgeAddress: l1SharedBridge.address,
+        secondBridgeValue: 0,
+        secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
+          ["address", "uint256", "address"],
+          [l1Weth.address, amount, await randomSigner.getAddress()]
+        ),
+      },
+      { value: mintValue }
+    );
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
+  });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
@@ -217,7 +229,11 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
-    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: wrong msg len");
+=======
+    expect(revertReason).contains("MalformedMessage");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
@@ -226,7 +242,11 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: Incorrect message function selector");
+=======
     expect(revertReason).contains("InvalidSelector");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
@@ -240,13 +260,20 @@ describe("Shared Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, dummyProof)
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("local root is 0");
+=======
     expect(revertReason).contains("BatchNotExecuted");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
+<<<<<<< HEAD
       mailboxFunctionSignature,
+=======
+      functionSignature,
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
@@ -260,7 +287,8 @@ describe("Shared Bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
-      mailboxFunctionSignature,
+      functionSignature,
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
@@ -270,6 +298,24 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [dummyProof[0], dummyProof[1]])
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: withd w proof");
+  });
+
+  it("Should revert on finalizing a withdrawal with wrong proof", async () => {
+    const l1Receiver = await randomSigner.getAddress();
+    const l2ToL1message = ethers.utils.hexConcat([
+      mailboxFunctionSignature,
+      l1Receiver,
+      erc20TestToken.address,
+      ethers.constants.HashZero,
+    ]);
+    const revertReason = await getCallRevertReason(
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, dummyProof)
+    );
+    expect(revertReason).equal("L1AR: withd w proof");
+=======
     expect(revertReason).contains("InvalidProof");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 });

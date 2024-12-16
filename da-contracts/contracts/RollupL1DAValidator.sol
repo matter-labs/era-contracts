@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
-
-import {InvalidPubdataSource, PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed, BlobCommitmentNotPublished} from "./DAContractsErrors.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
@@ -22,12 +22,8 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// `_pubdataCommitments` is a packed list of commitments of the following format:
     /// opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)
     function publishBlobs(bytes calldata _pubdataCommitments) external {
-        if (_pubdataCommitments.length == 0) {
-            revert PubdataCommitmentsEmpty();
-        }
-        if (_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE != 0) {
-            revert InvalidPubdataCommitmentsSize();
-        }
+        require(_pubdataCommitments.length > 0, "zln");
+        require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bd");
 
         uint256 versionedHashIndex = 0;
         // solhint-disable-next-line gas-length-in-loops
@@ -44,7 +40,6 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// @inheritdoc IL1DAValidator
     function checkDA(
         uint256, // _chainId
-        uint256, // _batchNumber
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
@@ -65,19 +60,18 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             (blobCommitments, ) = _processCalldataDA(blobsProvided, fullPubdataHash, _maxBlobsSupported, l1DaInput[1:]);
         } else {
-            revert InvalidPubdataSource(pubdataSource);
+            revert("l1-da-validator/invalid-pubdata-source");
         }
 
         // We verify that for each set of blobHash/blobCommitment are either both empty
         // or there are values for both.
         // This is mostly a sanity check and it is not strictly required.
         for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
-            if (
-                (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] != bytes32(0)) ||
-                (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] == bytes32(0))
-            ) {
-                revert BlobHashCommitmentError(i, blobsLinearHashes[i] == bytes32(0), blobCommitments[i] == bytes32(0));
-            }
+            require(
+                (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
+                    (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
+                "bh"
+            );
         }
 
         output.stateDiffHash = stateDiffHash;
@@ -92,9 +86,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     function _getPublishedBlobCommitment(uint256 _index, bytes calldata _commitment) internal view returns (bytes32) {
         bytes32 blobVersionedHash = _getBlobVersionedHash(_index);
 
-        if (blobVersionedHash == bytes32(0)) {
-            revert EmptyBlobVersionHash(_index);
-        }
+        require(blobVersionedHash != bytes32(0), "vh");
 
         // First 16 bytes is the opening point. While we get the point as 16 bytes, the point evaluation precompile
         // requires it to be 32 bytes. The blob commitment must use the opening point as 16 bytes though.
@@ -127,9 +119,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // 144 bytes for commitment data
         // 32 bytes for the prepublished commitment. If it is non-zero, it means that it is expected that
         // such commitment was published before. Otherwise, it is expected that it is published in this transaction
-        if (_operatorDAInput.length != _blobsProvided * BLOB_DA_INPUT_SIZE) {
-            revert InvalidPubdataCommitmentsSize();
-        }
+        require(_operatorDAInput.length == _blobsProvided * BLOB_DA_INPUT_SIZE, "bd");
 
         uint256 versionedHashIndex = 0;
 
@@ -143,9 +133,8 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
             if (prepublishedCommitment != bytes32(0)) {
                 // We double check that this commitment has indeed been published.
                 // If that is the case, we do not care about the actual underlying data.
-                if (!publishedBlobCommitments[prepublishedCommitment]) {
-                    revert BlobCommitmentNotPublished();
-                }
+                require(publishedBlobCommitments[prepublishedCommitment], "not published");
+
                 blobsCommitments[i] = prepublishedCommitment;
             } else {
                 blobsCommitments[i] = _getPublishedBlobCommitment(versionedHashIndex, commitmentData);
@@ -159,9 +148,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // This check is required because we want to ensure that there aren't any extra blobs trying to be published.
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
         bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
-        if (versionedHash != bytes32(0)) {
-            revert NonEmptyBlobVersionHash(versionedHashIndex);
-        }
+        require(versionedHash == bytes32(0), "lh");
     }
 
     /// @notice Calls the point evaluation precompile and verifies the output
@@ -179,13 +166,9 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
 
         // We verify that the point evaluation precompile call was successful by testing the latter 32 bytes of the
         // response is equal to BLS_MODULUS as defined in https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
-        if (!success) {
-            revert PointEvalCallFailed(precompileInput);
-        }
+        require(success, "failed to call point evaluation precompile");
         (, uint256 result) = abi.decode(data, (uint256, uint256));
-        if (result != BLS_MODULUS) {
-            revert PointEvalFailed(abi.encode(result));
-        }
+        require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
     function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {

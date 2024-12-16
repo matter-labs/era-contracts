@@ -105,7 +105,7 @@ function TEST_systemLogKeys() {
     let numberOfLayer1TxsLogKey := numberOfLayer1TxsLogKey()
     let protocolUpgradeTxHashKey := protocolUpgradeTxHashKey()
 
-    testing_assertEq(chainedPriorityTxnHashLogKey, 3, "Invalid priority txn hash log key")
-    testing_assertEq(numberOfLayer1TxsLogKey, 4, "Invalid num layer 1 txns log key")
-    testing_assertEq(protocolUpgradeTxHashKey, 7, "Invalid protocol upgrade txn hash log key")
+    testing_assertEq(chainedPriorityTxnHashLogKey, 5, "Invalid priority txn hash log key")
+    testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
+    testing_assertEq(protocolUpgradeTxHashKey, 9, "Invalid protocol upgrade txn hash log key")
 }

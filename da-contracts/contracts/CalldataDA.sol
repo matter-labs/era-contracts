@@ -2,23 +2,19 @@
 
 pragma solidity 0.8.24;
 
-import {OperatorDAInputLengthTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OneBlobWithCalldata, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "./DAContractsErrors.sol";
+// solhint-disable gas-custom-errors, reason-string
 
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
-/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
-/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
-uint256 constant BLOB_SIZE_BYTES = 126_976;
+import {BLOB_SIZE_BYTES} from "./DAUtils.sol";
 
-/// @dev The state diff hash, hash of pubdata + the number of blobs.
+uint256 constant BLOBS_SUPPORTED = 6;
+
+// the state diff hash, hash of pubdata + the number of blobs.
 uint256 constant BLOB_DATA_OFFSET = 65;
 
-/// @dev The size of the commitment for a single blob.
-uint256 constant BLOB_COMMITMENT_SIZE = 32;
-
-/// @notice Contract that contains the functionality for process the calldata DA.
+/// @notice Contract that contains the functionality for processing the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
 abstract contract CalldataDA {
-    /// @notice Parses the input that the L2 DA validator has provided to the contract.
+    /// @notice Parses the input that the l2 DA validator has provided to the contract.
     /// @param _l2DAValidatorOutputHash The hash of the output of the L2 DA validator.
     /// @param _maxBlobsSupported The maximal number of blobs supported by the chain.
     /// @param _operatorDAInput The DA input by the operator provided on L1.
@@ -44,34 +40,31 @@ abstract contract CalldataDA {
         // - Then, there are linear hashes of the published blobs, 32 bytes each.
 
         // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
-        if (_operatorDAInput.length < BLOB_DATA_OFFSET) {
-            revert OperatorDAInputLengthTooSmall(_operatorDAInput.length, BLOB_DATA_OFFSET);
-        }
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET, "too small");
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);
         fullPubdataHash = bytes32(_operatorDAInput[32:64]);
         blobsProvided = uint256(uint8(_operatorDAInput[64]));
 
-        if (blobsProvided > _maxBlobsSupported) {
-            revert InvalidNumberOfBlobs(blobsProvided, _maxBlobsSupported);
-        }
+        require(blobsProvided <= _maxBlobsSupported, "invalid number of blobs");
 
         // Note that the API of the contract requires that the returned blobs linear hashes have length of
         // the `_maxBlobsSupported`
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
-        if (_operatorDAInput.length < BLOB_DATA_OFFSET + 32 * blobsProvided) {
-            revert InvalidBlobsHashes(_operatorDAInput.length, BLOB_DATA_OFFSET + 32 * blobsProvided);
-        }
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET + 32 * blobsProvided, "invalid blobs hashes");
 
-        _cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
+        assembly {
+            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+            let blobsPtr := add(blobsLinearHashes, 0x20)
+            let inputPtr := add(_operatorDAInput.offset, BLOB_DATA_OFFSET)
+            calldatacopy(blobsPtr, inputPtr, mul(blobsProvided, 32))
+        }
 
         uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
         // Now, we need to double check that the provided input was indeed returned by the L2 DA validator.
-        if (keccak256(_operatorDAInput[:ptr]) != _l2DAValidatorOutputHash) {
-            revert InvalidL2DAOutputHash();
-        }
+        require(keccak256(_operatorDAInput[:ptr]) == _l2DAValidatorOutputHash, "invalid l2 DA output hash");
 
         // The rest of the output was provided specifically by the operator
         l1DaInput = _operatorDAInput[ptr:];
@@ -88,40 +81,19 @@ abstract contract CalldataDA {
         bytes32 _fullPubdataHash,
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
-    ) internal pure virtual returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
-        if (_blobsProvided != 1) {
-            revert OneBlobWithCalldata();
-        }
-        if (_pubdataInput.length < BLOB_COMMITMENT_SIZE) {
-            revert PubdataInputTooSmall(_pubdataInput.length, BLOB_COMMITMENT_SIZE);
-        }
+    ) internal pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+        require(_blobsProvided == 1, "one blob with calldata");
 
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
 
         blobCommitments = new bytes32[](_maxBlobsSupported);
 
-        _pubdata = _pubdataInput[:_pubdataInput.length - BLOB_COMMITMENT_SIZE];
+        _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 
-        if (_pubdata.length > BLOB_SIZE_BYTES) {
-            revert PubdataLengthTooBig(_pubdata.length, BLOB_SIZE_BYTES);
-        }
-        if (_fullPubdataHash != keccak256(_pubdata)) {
-            revert InvalidPubdataHash(_fullPubdataHash, keccak256(_pubdata));
-        }
-        blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - BLOB_COMMITMENT_SIZE:_pubdataInput.length]);
-    }
-
-    /// @notice Method that clones a slice of calldata into a bytes32[] memory array.
-    /// @param _dst The destination array.
-    /// @param _input The input calldata.
-    /// @param _len The length of the slice in 32-byte words to clone.
-    function _cloneCalldata(bytes32[] memory _dst, bytes calldata _input, uint256 _len) internal pure {
-        assembly {
-            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
-            let dstPtr := add(_dst, 0x20)
-            let inputPtr := _input.offset
-            calldatacopy(dstPtr, inputPtr, mul(_len, 32))
-        }
+        // FIXME: allow larger lengths for Gateway-based chains.
+        require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
+        require(_fullPubdataHash == keccak256(_pubdata), "wp");
+        blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);
     }
 }

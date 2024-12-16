@@ -3,16 +3,13 @@
 pragma solidity ^0.8.21;
 
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {IZKChainBase} from "./IZKChainBase.sol";
+import {PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Most of the methods simply return the values that correspond to the current diamond proxy and possibly
-/// not to the ZK Chain as a whole. For example, if the chain is migrated to another settlement layer, the values returned
-/// by this facet will correspond to the values stored on this chain and possilbly not the canonical state of the chain.
-interface IGetters is IZKChainBase {
+interface IGetters is IZkSyncHyperchainBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -30,7 +27,7 @@ interface IGetters is IZKChainBase {
     function getBridgehub() external view returns (address);
 
     /// @return The address of the state transition
-    function getChainTypeManager() external view returns (address);
+    function getStateTransitionManager() external view returns (address);
 
     /// @return The chain ID
     function getChainId() external view returns (uint256);
@@ -38,8 +35,8 @@ interface IGetters is IZKChainBase {
     /// @return The address of the base token
     function getBaseToken() external view returns (address);
 
-    /// @return The address of the base token
-    function getBaseTokenAssetId() external view returns (bytes32);
+    /// @return The address of the base token bridge
+    function getBaseTokenBridge() external view returns (address);
 
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256);
@@ -50,15 +47,8 @@ interface IGetters is IZKChainBase {
     /// @return The total number of batches that were committed & verified & executed
     function getTotalBatchesExecuted() external view returns (uint256);
 
-    // @return Address of transaction filterer
-    function getTransactionFilterer() external view returns (address);
-
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
-
-    /// @return The start index of the priority tree, i.e. the index of the first priority operation that
-    /// was included into the priority tree.
-    function getPriorityTreeStartIndex() external view returns (uint256);
 
     /// @return The root hash of the priority tree
     function getPriorityTreeRoot() external view returns (bytes32);
@@ -160,6 +150,6 @@ interface IGetters is IZKChainBase {
     /// @return isFreezable Whether the facet can be frozen by the admin or always accessible
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
 
-    /// @return The address of the current settlement layer.
+    /// TODO
     function getSettlementLayer() external view returns (address);
 }

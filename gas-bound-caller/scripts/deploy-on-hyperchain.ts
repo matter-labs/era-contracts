@@ -44,8 +44,8 @@ async function main() {
 
   program
     .version("0.1.0")
-    .name("Deploy on ZK chain")
-    .description("Deploys the GasBoundCaller on a predetermined ZK chain network")
+    .name("Deploy on hyperchain")
+    .description("Deploys the GasBoundCaller on a predetermined Hyperchain network")
     .option("--private-key <private-key>")
     .option("--l2Rpc <l2Rpc>")
     .action(async (cmd) => {

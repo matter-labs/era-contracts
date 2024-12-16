@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
 import {COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
@@ -68,7 +68,7 @@ abstract contract StateDiffL2DAValidator {
             reconstructedChainedL1BytecodesRevealDataHash = keccak256(
                 abi.encode(
                     reconstructedChainedL1BytecodesRevealDataHash,
-                    L2ContractHelper.hashL2BytecodeCalldata(
+                    L2ContractHelper.hashL2Bytecode(
                         _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
                     )
                 )

@@ -8,7 +8,7 @@ contract DummyEraBaseTokenBridge {
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,
-        address _originalCaller,
+        address _prevMsgSender,
         address _l1Token,
         uint256 _amount
     ) external payable {}

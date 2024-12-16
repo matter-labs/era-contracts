@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-import {CodeOracleCallFailed, ReturnedBytecodeDoesNotMatchExpectedHash, SecondCallShouldHaveCostLessGas, ThirdCallShouldHaveSameGasCostAsSecondCall} from "contracts/SystemContractErrors.sol";
-
 address constant REAL_CODE_ORACLE_ADDR = 0x0000000000000000000000000000000000008011;
 
 contract CodeOracleTest {
@@ -21,14 +19,13 @@ contract CodeOracleTest {
         gasCost = gasBefore - gasleft();
 
         // Check the result
-        if (!success) {
-            revert CodeOracleCallFailed();
-        }
+        require(success, "CodeOracle call failed");
 
         // Check the returned bytecode
-        if (keccak256(returnedBytecode) != _expectedBytecodeHash) {
-            revert ReturnedBytecodeDoesNotMatchExpectedHash(keccak256(returnedBytecode), _expectedBytecodeHash);
-        }
+        require(
+            keccak256(returnedBytecode) == _expectedBytecodeHash,
+            "Returned bytecode does not match the expected hash"
+        );
     }
 
     function codeOracleTest(bytes32 _versionedHash, bytes32 _expectedBytecodeHash) external view {
@@ -38,11 +35,7 @@ contract CodeOracleTest {
         uint256 secondCallCost = this.callCodeOracle(_versionedHash, _expectedBytecodeHash);
         uint256 thirdCallCost = this.callCodeOracle(_versionedHash, _expectedBytecodeHash);
 
-        if (secondCallCost >= firstCallCost) {
-            revert SecondCallShouldHaveCostLessGas(secondCallCost, firstCallCost);
-        }
-        if (thirdCallCost != secondCallCost) {
-            revert ThirdCallShouldHaveSameGasCostAsSecondCall(thirdCallCost, secondCallCost);
-        }
+        require(secondCallCost < firstCallCost, "The second call should have cost less gas");
+        require(thirdCallCost == secondCallCost, "The third call should have the same gas cost as the second call");
     }
 }

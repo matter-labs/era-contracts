@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {Merkle} from "./Merkle.sol";
-import {MerkleWrongIndex, MerkleWrongLength} from "../L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -19,8 +20,10 @@ library FullMerkle {
     }
 
     /**
-     * @dev Initialize a {FullTree} using {Merkle.efficientHash} to hash internal nodes.
+     * @dev Initialize a {Bytes32PushTree} using {Merkle.efficientHash} to hash internal nodes.
      * The capacity of the tree (i.e. number of leaves) is set to `2**levels`.
+     *
+     * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
      *
      * IMPORTANT: The zero value should be carefully chosen since it will be stored in the tree representing
      * empty leaves. It should be a value that is not expected to be part of the tree.
@@ -71,10 +74,9 @@ library FullMerkle {
      * @param _itemHash The new hash of the leaf.
      */
     function updateLeaf(FullTree storage self, uint256 _index, bytes32 _itemHash) internal returns (bytes32) {
+        // solhint-disable-next-line gas-custom-errors
         uint256 maxNodeNumber = self._leafNumber - 1;
-        if (_index > maxNodeNumber) {
-            revert MerkleWrongIndex(_index, maxNodeNumber);
-        }
+        require(_index <= maxNodeNumber, "FMT, wrong index");
         self._nodes[0][_index] = _itemHash;
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < self._height; i = i.uncheckedInc()) {
@@ -98,9 +100,8 @@ library FullMerkle {
      * @param _newLeaves The new leaves to be added to the tree.
      */
     function updateAllLeaves(FullTree storage self, bytes32[] memory _newLeaves) internal returns (bytes32) {
-        if (_newLeaves.length != self._leafNumber) {
-            revert MerkleWrongLength(_newLeaves.length, self._leafNumber);
-        }
+        // solhint-disable-next-line gas-custom-errors
+        require(_newLeaves.length == self._leafNumber, "FMT, wrong length");
         return updateAllNodesAtHeight(self, 0, _newLeaves);
     }
 

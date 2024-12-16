@@ -13,18 +13,17 @@ describe("Admin facet tests", function () {
 
   before(async () => {
     const contractFactory = await hardhat.ethers.getContractFactory("AdminFacetTest");
-    const contract = await contractFactory.deploy(await contractFactory.signer.getChainId());
+    const contract = await contractFactory.deploy();
     adminFacetTest = AdminFacetTestFactory.connect(contract.address, contract.signer);
 
-    const governanceContract = await contractFactory.deploy(await contractFactory.signer.getChainId());
-
+    const governanceContract = await contractFactory.deploy();
     const governance = GovernanceFactory.connect(governanceContract.address, governanceContract.signer);
     await adminFacetTest.setPendingAdmin(governance.address);
 
     randomSigner = (await hardhat.ethers.getSigners())[1];
   });
 
-  it("ChainTypeManager successfully set validator", async () => {
+  it("StateTransitionManager successfully set validator", async () => {
     const validatorAddress = randomAddress();
     await adminFacetTest.setValidator(validatorAddress, true);
 
@@ -40,7 +39,7 @@ describe("Admin facet tests", function () {
     expect(revertReason).contains("Unauthorized");
   });
 
-  it("ChainTypeManager successfully set porter availability", async () => {
+  it("StateTransitionManager successfully set porter availability", async () => {
     await adminFacetTest.setPorterAvailability(true);
 
     const porterAvailability = await adminFacetTest.getPorterAvailability();
@@ -52,7 +51,7 @@ describe("Admin facet tests", function () {
     expect(revertReason).contains("Unauthorized");
   });
 
-  it("ChainTypeManager successfully set priority transaction max gas limit", async () => {
+  it("StateTransitionManager successfully set priority transaction max gas limit", async () => {
     const gasLimit = "12345678";
     await adminFacetTest.setPriorityTxMaxGasLimit(gasLimit);
 

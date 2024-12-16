@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-import {TransactionFailed, NotEnoughGas, TooMuchGas} from "contracts/SystemContractErrors.sol";
-
 contract TransferTest {
     function transfer(address payable to, uint256 amount, bool warmUpRecipient) public payable {
         if (warmUpRecipient) {
@@ -22,9 +20,7 @@ contract TransferTest {
 
         bool success = to.send(amount);
 
-        if (!success) {
-            revert TransactionFailed();
-        }
+        require(success, "Transaction failed");
     }
 
     receive() external payable {}
@@ -34,12 +30,8 @@ contract TransferTestRecipient {
     event Received(address indexed sender, uint256 amount);
 
     receive() external payable {
-        if (gasleft() < 2100) {
-            revert NotEnoughGas();
-        }
-        if (gasleft() > 2300) {
-            revert TooMuchGas();
-        }
+        require(gasleft() >= 2100, "Not enough gas");
+        require(gasleft() <= 2300, "Too much gas");
         emit Received(msg.sender, msg.value);
     }
 }

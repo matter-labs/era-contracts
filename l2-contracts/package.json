@@ -6,7 +6,6 @@
     "@matterlabs/hardhat-zksync-deploy": "^0.7.0",
     "@matterlabs/hardhat-zksync-solc": "^0.3.15",
     "@matterlabs/hardhat-zksync-verify": "^0.4.0",
-    "@matterlabs/hardhat-zksync-node": "^1.2.0",
     "@matterlabs/zksync-contracts": "^0.6.1",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
     "@nomicfoundation/hardhat-ethers": "^3.0.4",
@@ -34,10 +33,8 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "test:foundry": "forge test --zksync --gas-limit 2000000000",
     "clean": "hardhat clean",
     "test": "hardhat test",
-    "test-node": "hardhat node-zksync --tag 0.1.0-alpha.29",
     "verify": "hardhat run src/verify.ts",
     "deploy-testnet-paymaster-through-l1": "ts-node src/deploy-testnet-paymaster-through-l1.ts",
     "deploy-force-deploy-upgrader-through-l1": "ts-node src/deploy-force-deploy-upgrader-through-l1.ts",
@@ -47,8 +44,7 @@
     "deploy-l2-weth": "ts-node src/deploy-l2-weth.ts",
     "upgrade-bridge-contracts": "ts-node src/upgrade-bridge-impl.ts",
     "update-l2-erc20-metadata": "ts-node src/update-l2-erc20-metadata.ts",
-    "upgrade-consistency-checker": "ts-node src/upgrade-consistency-checker.ts",
-    "deploy-consensus-registry": "ts-node src/deploy-consensus-registry.ts"
+    "upgrade-consistency-checker": "ts-node src/upgrade-consistency-checker.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

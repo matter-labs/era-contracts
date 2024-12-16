@@ -10,17 +10,16 @@ import { BigNumber, ethers } from "ethers";
 import { utils } from "zksync-ethers";
 import type { FacetCut } from "../src.ts/diamondCut";
 import { getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
-import { encodeNTVAssetId } from "../src.ts/utils";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
-// 2. Getter methods in CTM.
+// 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
 const genesisUpgrade = process.env.CONTRACTS_GENESIS_UPGRADE_ADDR!;
 const validatorTimelockDeployTx = "0xde4ef2b77241b605acaa1658ff8815df0911bf81555a80c9cbdde42fbcaaea30";
 const validatorTimelock = process.env.CONTRACTS_VALIDATOR_TIMELOCK_ADDR!;
-const upgradeZKChains = process.env.CONTRACTS_ZK_CHAIN_UPGRADE_ADDR!;
+const upgradeHyperchains = process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR!;
 
 const verifier = process.env.CONTRACTS_VERIFIER_ADDR!;
 const proxyAdmin = process.env.CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR!;
@@ -36,10 +35,10 @@ const gettersFacet = process.env.CONTRACTS_GETTERS_FACET_ADDR!;
 
 const diamondInit = process.env.CONTRACTS_DIAMOND_INIT_ADDR!;
 
-const ctmImplDeployTx = "0xe01c0bb497017a25c92bfc712e370e8f900554b107fe0b6022976d05c349f2b6";
-const ctmImpl = process.env.CONTRACTS_STATE_TRANSITION_IMPL_ADDR!;
-const ctmDeployTx = "0x514bbf46d227eee8567825bf5c8ee1855aa8a1916f7fee7b191e2e3d5ecba849";
-const ctm = process.env.CONTRACTS_STATE_TRANSITION_PROXY_ADDR!;
+const stmImplDeployTx = "0xe01c0bb497017a25c92bfc712e370e8f900554b107fe0b6022976d05c349f2b6";
+const stmImpl = process.env.CONTRACTS_STATE_TRANSITION_IMPL_ADDR!;
+const stmDeployTx = "0x514bbf46d227eee8567825bf5c8ee1855aa8a1916f7fee7b191e2e3d5ecba849";
+const stm = process.env.CONTRACTS_STATE_TRANSITION_PROXY_ADDR!;
 
 const sharedBridgeImplDeployTx = "0x074204db79298c2f6beccae881c2ad7321c331e97fb4bd93adce2eb23bf17a17";
 const sharedBridgeImpl = process.env.CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR!;
@@ -53,10 +52,9 @@ const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
 const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
 const expectedDelay = "75600";
 const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID!;
-const l1ChainId = process.env.CONTRACTS_L1_CHAIN_ID!;
 const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
-const expectedZKChainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
-const maxNumberOfZKChains = 100;
+const expectedHyperchainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
+const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
 const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
 const expectedL1LegacyBridge = "0x57891966931Eb4Bb6FB81430E6cE0A03AAbDe063";
@@ -278,7 +276,7 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     throw new Error("L2 default account bytecode hash is not correct");
   }
 
-  console.log("CTM init data correct!");
+  console.log("STM init data correct!");
 }
 
 async function checkValidatorTimelock() {
@@ -290,9 +288,9 @@ async function checkValidatorTimelock() {
     throw new Error("ValidatorTimelock owner is not correct");
   }
 
-  const usedCtm = await contract.chainTypeManager();
-  if (usedCtm.toLowerCase() != ctm.toLowerCase()) {
-    throw new Error("ValidatorTimelock chainTypeManager is not correct");
+  const usedStm = await contract.stateTransitionManager();
+  if (usedStm.toLowerCase() != stm.toLowerCase()) {
+    throw new Error("ValidatorTimelock stateTransitionManager is not correct");
   }
 
   const validatorOneIsSet = await contract.validators(eraChainId, validatorOne);
@@ -328,9 +326,9 @@ async function checkBridgehub() {
     throw new Error("Bridgehub baseToken is not correct");
   }
 
-  const zkChain = await contract.getZKChain(eraChainId);
-  if (zkChain.toLowerCase() != expectedZKChainAddr.toLowerCase()) {
-    throw new Error("Bridgehub zkChain is not correct");
+  const hyperchain = await contract.getHyperchain(eraChainId);
+  if (hyperchain.toLowerCase() != expectedHyperchainAddr.toLowerCase()) {
+    throw new Error("Bridgehub hyperchain is not correct");
   }
 
   const sharedBridge = await contract.sharedBridge();
@@ -338,21 +336,17 @@ async function checkBridgehub() {
     throw new Error("Bridgehub sharedBridge is not correct");
   }
 
-  const usedCTM = await contract.chainTypeManager(eraChainId);
-  if (usedCTM.toLowerCase() != ctm.toLowerCase()) {
-    throw new Error("Bridgehub chainTypeManager is not correct");
+  const usedSTM = await contract.stateTransitionManager(eraChainId);
+  if (usedSTM.toLowerCase() != stm.toLowerCase()) {
+    throw new Error("Bridgehub stateTransitionManager is not correct");
   }
 
-  const isRegistered = await contract.chainTypeManagerIsRegistered(usedCTM);
+  const isRegistered = await contract.stateTransitionManagerIsRegistered(usedSTM);
   if (!isRegistered) {
-    throw new Error("Bridgehub chainTypeManager is not registered");
+    throw new Error("Bridgehub stateTransitionManager is not registered");
   }
 
-  const baseTokenAssetId = encodeNTVAssetId(
-    parseInt(l1ChainId),
-    ethers.utils.hexZeroPad(utils.ETH_ADDRESS_IN_CONTRACTS, 32)
-  );
-  const tokenIsRegistered = contract.assetIdIsRegistered(baseTokenAssetId);
+  const tokenIsRegistered = await contract.tokenIsRegistered(utils.ETH_ADDRESS_IN_CONTRACTS);
   if (!tokenIsRegistered) {
     throw new Error("Bridgehub token is not registered");
   }
@@ -368,47 +362,47 @@ async function checkMailbox() {
   console.log("Mailbox is correct!");
 }
 
-async function checkCTMImpl() {
-  const artifact = await hardhat.artifacts.readArtifact("ChainTypeManager");
-  const contract = new ethers.Contract(ctmImpl, artifact.abi, l1Provider);
+async function checkSTMImpl() {
+  const artifact = await hardhat.artifacts.readArtifact("StateTransitionManager");
+  const contract = new ethers.Contract(stmImpl, artifact.abi, l1Provider);
 
-  await checkCorrectInitCode(ctmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfZKChains]);
+  await checkCorrectInitCode(stmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfHyperchains]);
 
-  console.log("CTM impl correct!");
+  console.log("STM impl correct!");
 }
 
-async function checkCTM() {
-  const artifact = await hardhat.artifacts.readArtifact("ChainTypeManager");
+async function checkSTM() {
+  const artifact = await hardhat.artifacts.readArtifact("StateTransitionManager");
 
-  const contract = new ethers.Contract(ctm, artifact.abi, l1Provider);
+  const contract = new ethers.Contract(stm, artifact.abi, l1Provider);
 
   const usedBH = await contract.BRIDGE_HUB();
   if (usedBH.toLowerCase() != bridgeHub.toLowerCase()) {
-    throw new Error("CTM bridgeHub is not correct");
+    throw new Error("STM bridgeHub is not correct");
   }
-  const usedMaxNumberOfZKChains = (await contract.MAX_NUMBER_OF_ZK_CHAINS()).toNumber();
-  if (usedMaxNumberOfZKChains != maxNumberOfZKChains) {
-    throw new Error("CTM maxNumberOfZKChains is not correct");
+  const usedMaxNumberOfHyperchains = (await contract.MAX_NUMBER_OF_HYPERCHAINS()).toNumber();
+  if (usedMaxNumberOfHyperchains != maxNumberOfHyperchains) {
+    throw new Error("STM maxNumberOfHyperchains is not correct");
   }
 
   const genUpgrade = await contract.genesisUpgrade();
   if (genUpgrade.toLowerCase() != genesisUpgrade.toLowerCase()) {
-    throw new Error("CTM genesisUpgrade is not correct");
+    throw new Error("STM genesisUpgrade is not correct");
   }
 
   const storedBatchHashZero = await contract.storedBatchZero();
   if (storedBatchHashZero.toLowerCase() != expectedStoredBatchHashZero.toLowerCase()) {
-    throw new Error("CTM storedBatchHashZero is not correct");
+    throw new Error("STM storedBatchHashZero is not correct");
   }
 
   const currentOwner = await contract.owner();
   if (currentOwner.toLowerCase() != expectedOwner.toLowerCase()) {
-    throw new Error("CTM owner is not correct");
+    throw new Error("STM owner is not correct");
   }
 
-  console.log("CTM is correct!");
+  console.log("STM is correct!");
 
-  await extractProxyInitializationData(contract, (await l1Provider.getTransaction(ctmDeployTx)).data);
+  await extractProxyInitializationData(contract, (await l1Provider.getTransaction(stmDeployTx)).data);
 }
 
 async function checkL1AssetRouterImpl() {
@@ -419,7 +413,7 @@ async function checkL1AssetRouterImpl() {
     expectedL1WethAddress,
     bridgeHub,
     eraChainId,
-    expectedZKChainAddr,
+    expectedHyperchainAddr,
   ]);
 
   console.log("L1 shared bridge impl correct!");
@@ -482,7 +476,7 @@ async function main() {
 
   program.action(async () => {
     await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade");
-    await checkIdenticalBytecode(upgradeZKChains, "UpgradeZKChains");
+    await checkIdenticalBytecode(upgradeHyperchains, "UpgradeHyperchains");
     await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
     await checkIdenticalBytecode(adminFacet, "AdminFacet");
@@ -502,8 +496,8 @@ async function main() {
 
     await checkLegacyBridge();
 
-    await checkCTMImpl();
-    await checkCTM();
+    await checkSTMImpl();
+    await checkSTM();
   });
 
   await program.parseAsync(process.argv);

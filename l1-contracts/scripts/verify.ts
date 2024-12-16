@@ -88,7 +88,7 @@ async function main() {
   const promise3 = verifyPromise(process.env.CONTRACTS_DEFAULT_UPGRADE_ADDR);
   promises.push(promise3);
 
-  const promise4 = verifyPromise(process.env.CONTRACTS_ZK_CHAIN_UPGRADE_ADDR);
+  const promise4 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
   promises.push(promise4);
 
   const promise5 = verifyPromise(addresses.TransparentProxyAdmin);
@@ -108,7 +108,7 @@ async function main() {
   ]);
   promises.push(promise7);
 
-  // ctm
+  // stm
 
   // Contracts without constructor parameters
   for (const address of [
@@ -127,18 +127,18 @@ async function main() {
 
   const promise8 = verifyPromise(addresses.StateTransition.StateTransitionImplementation, [
     addresses.Bridgehub.BridgehubProxy,
-    getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_ZK_CHAINS"),
+    getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS"),
   ]);
   promises.push(promise8);
 
-  const chainTypeManager = new Interface(hardhat.artifacts.readArtifactSync("ChainTypeManager").abi);
+  const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
   const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
   const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
   const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
-  const diamondCut = await deployer.initialZkSyncZKChainDiamondCut([]);
+  const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
   const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
-  const initCalldata2 = chainTypeManager.encodeFunctionData("initialize", [
+  const initCalldata2 = stateTransitionManager.encodeFunctionData("initialize", [
     {
       owner: addresses.Governance,
       validatorTimelock: addresses.ValidatorTimeLock,

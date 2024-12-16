@@ -8,7 +8,7 @@ or re-auditing a single line of code. ZKsync Era also uses an LLVM-based compile
 write smart contracts in C++, Rust and other popular languages.
 
 This repository contains both L1 and L2 ZKsync smart contracts. For their description see the
-[system overview](docs/overview.md).
+[system overview](docs/Overview.md).
 
 ## Disclaimer
 

@@ -10,7 +10,7 @@ import { Provider } from "zksync-ethers";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
-// 2. Getter methods in CTM.
+// 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
 const l2BridgeImplAddr = "0x470afaacce2acdaefcc662419b74c79d76c914ae";

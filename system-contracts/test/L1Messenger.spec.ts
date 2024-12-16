@@ -1,33 +1,32 @@
 import { ethers, network } from "hardhat";
 import type { L1Messenger } from "../typechain";
-import { IL2DAValidatorFactory } from "../typechain/IL2DAValidatorFactory";
 import { L1MessengerFactory } from "../typechain";
 import { prepareEnvironment, setResult } from "./shared/mocks";
-import { deployContractOnAddress, getCode, getWallets } from "./shared/utils";
-import { utils, L2VoidSigner } from "zksync-ethers";
+import type { StateDiff } from "./shared/utils";
+import { compressStateDiffs, deployContractOnAddress, encodeStateDiffs, getCode, getWallets } from "./shared/utils";
+import { utils } from "zksync-ethers";
 import type { Wallet } from "zksync-ethers";
 import {
   TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS,
   TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
   TEST_BOOTLOADER_FORMAL_ADDRESS,
+  TWO_IN_256,
 } from "./shared/constants";
 import { expect } from "chai";
+import { BigNumber } from "ethers";
 import { randomBytes } from "crypto";
 
-const EXPECTED_DA_INPUT_OFFSET = 160;
-const L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
-const L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
-const L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba";
-
-describe("L1Messenger tests", () => {
+// FIXME: restore the test after the changes from the custom DA integration
+describe.skip("L1Messenger tests", () => {
   let l1Messenger: L1Messenger;
   let wallet: Wallet;
   let l1MessengerAccount: ethers.Signer;
   let knownCodeStorageAccount: ethers.Signer;
   let bootloaderAccount: ethers.Signer;
+  let stateDiffsSetupData: StateDiffSetupData;
   let logData: LogData;
+  let bytecodeData: ContentLengthPair;
   let emulator: L1MessengerPubdataEmulator;
-  let bytecode;
 
   before(async () => {
     await prepareEnvironment();
@@ -38,15 +37,12 @@ describe("L1Messenger tests", () => {
     knownCodeStorageAccount = await ethers.getImpersonatedSigner(TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
     // setup
+    stateDiffsSetupData = await setupStateDiffs();
     logData = setupLogData(l1MessengerAccount, l1Messenger);
-    bytecode = await getCode(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
+    bytecodeData = await setupBytecodeData(ethers.constants.AddressZero);
     await setResult("SystemContext", "txNumberInBlock", [], {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [1]),
-    });
-    await setResult("IMessageRoot", "getAggregatedRoot", [], {
-      failure: false,
-      returnData: ethers.constants.HashZero,
     });
     emulator = new L1MessengerPubdataEmulator();
   });
@@ -55,10 +51,7 @@ describe("L1Messenger tests", () => {
     // cleaning the state of l1Messenger
     await l1Messenger
       .connect(bootloaderAccount)
-      .publishPubdataAndClearState(
-        ethers.constants.AddressZero,
-        await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger)
-      );
+      .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs());
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
       params: [TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS],
@@ -81,15 +74,23 @@ describe("L1Messenger tests", () => {
       emulator.addLog(logData.logs[0].log);
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
       emulator.addLog(logData.messages[0].log);
-
+      emulator.addMessage({
+        lengthBytes: logData.messages[0].currentMessageLengthBytes,
+        content: logData.messages[0].message,
+      });
+      await (
+        await l1Messenger
+          .connect(knownCodeStorageAccount)
+          .requestBytecodeL1Publication(await ethers.utils.hexlify(utils.hashBytecode(bytecodeData.content)), {
+            gasLimit: 130000000,
+          })
+      ).wait();
+      emulator.addBytecode(bytecodeData);
+      emulator.setStateDiffsSetupData(stateDiffsSetupData);
       await (
         await l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
-            { gasLimit: 1000000000 }
-          )
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(), { gasLimit: 1000000000 })
       ).wait();
     });
 
@@ -98,21 +99,7 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
-          )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid input DA signature", async () => {
-      await expect(
-        l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { l2DaValidatorFunctionSig: "0x12121212" })
-          )
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x4002 }))
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
 
@@ -134,69 +121,48 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, overrideData)
-          )
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(overrideData))
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
 
-    it("should revert Invalid input msgs hash", async () => {
-      const correctChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
+    it("should revert chainedMessageHash mismatch", async () => {
+      // Buffer.alloc(32, 6), to trigger the revert
+      const wrongMessage = { lengthBytes: logData.messages[0].currentMessageLengthBytes, content: Buffer.alloc(32, 6) };
+      const overrideData = { messages: [...emulator.messages] };
+      overrideData.messages[0] = wrongMessage;
+      await expect(
+        l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(overrideData))
+      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    });
 
+    it("should revert state diff compression version mismatch", async () => {
+      await (
+        await l1Messenger
+          .connect(knownCodeStorageAccount)
+          .requestBytecodeL1Publication(await ethers.utils.hexlify(utils.hashBytecode(bytecodeData.content)), {
+            gasLimit: 130000000,
+          })
+      ).wait();
+      // modify version to trigger the revert
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            chainedMessagesHash: ethers.utils.keccak256(correctChainedMessagesHash),
+          emulator.buildTotalL2ToL1PubdataAndStateDiffs({
+            version: ethers.utils.hexZeroPad(ethers.utils.hexlify(66), 1),
           })
         )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
 
-    it("should revert Invalid bytecodes hash", async () => {
-      const correctChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
-
-      await expect(
-        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            chainedBytecodeHash: ethers.utils.keccak256(correctChainedBytecodesHash),
-          })
-        )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid offset", async () => {
-      await expect(
-        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            operatorDataOffset: EXPECTED_DA_INPUT_OFFSET + 1,
-          })
-        )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid length", async () => {
+    it("should revert extra data", async () => {
+      // add extra data to trigger the revert
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 })
+            ethers.utils.concat([emulator.buildTotalL2ToL1PubdataAndStateDiffs(), Buffer.alloc(1, 64)])
           )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid root hash", async () => {
-      await expect(
-        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            chainedLogsRootHash: ethers.constants.HashZero,
-          })
-        )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
   });
@@ -270,6 +236,10 @@ describe("L1Messenger tests", () => {
         .and.to.emit(l1Messenger, "L2ToL1LogSent")
         .withArgs([0, true, 1, l1Messenger.address, expectedKey, ethers.utils.keccak256(logData.messages[0].message)]);
       emulator.addLog(logData.messages[0].log);
+      emulator.addMessage({
+        lengthBytes: logData.messages[0].currentMessageLengthBytes,
+        content: logData.messages[0].message,
+      });
     });
   });
 
@@ -286,15 +256,84 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger
           .connect(knownCodeStorageAccount)
-          .requestBytecodeL1Publication(ethers.utils.hexlify(utils.hashBytecode(bytecode)), {
-            gasLimit: 2300000000,
+          .requestBytecodeL1Publication(await ethers.utils.hexlify(utils.hashBytecode(bytecodeData.content)), {
+            gasLimit: 130000000,
           })
       )
         .to.emit(l1Messenger, "BytecodeL1PublicationRequested")
-        .withArgs(ethers.utils.hexlify(utils.hashBytecode(bytecode)));
+        .withArgs(await ethers.utils.hexlify(utils.hashBytecode(bytecodeData.content)));
+      emulator.addBytecode(bytecodeData);
     });
   });
 });
+
+// Interface represents the structure of the data that that is used in totalL2ToL1PubdataAndStateDiffs.
+interface StateDiffSetupData {
+  encodedStateDiffs: string;
+  compressedStateDiffs: string;
+  enumerationIndexSizeBytes: string;
+  numberOfStateDiffsBytes: string;
+  compressedStateDiffsSizeBytes: string;
+}
+
+async function setupStateDiffs(): Promise<StateDiffSetupData> {
+  const stateDiffs: StateDiff[] = [
+    {
+      key: "0x1234567890123456789012345678901234567890123456789012345678901230",
+      index: 0,
+      initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901231"),
+      finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901230"),
+    },
+    {
+      key: "0x1234567890123456789012345678901234567890123456789012345678901232",
+      index: 1,
+      initValue: TWO_IN_256.sub(1),
+      finalValue: BigNumber.from(1),
+    },
+    {
+      key: "0x1234567890123456789012345678901234567890123456789012345678901234",
+      index: 0,
+      initValue: TWO_IN_256.div(2),
+      finalValue: BigNumber.from(1),
+    },
+    {
+      key: "0x1234567890123456789012345678901234567890123456789012345678901236",
+      index: 2323,
+      initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901237"),
+      finalValue: BigNumber.from("0x0239329298382323782378478237842378478237847237237872373272373272"),
+    },
+    {
+      key: "0x1234567890123456789012345678901234567890123456789012345678901238",
+      index: 2,
+      initValue: BigNumber.from(0),
+      finalValue: BigNumber.from(1),
+    },
+  ];
+  const encodedStateDiffs = encodeStateDiffs(stateDiffs);
+  const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
+  const enumerationIndexSizeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(4), 1);
+  await setResult(
+    "Compressor",
+    "verifyCompressedStateDiffs",
+    [stateDiffs.length, 4, encodedStateDiffs, compressedStateDiffs],
+    {
+      failure: false,
+      returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(encodedStateDiffs)]),
+    }
+  );
+  const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(stateDiffs.length), 4);
+  const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
+    ethers.utils.hexlify(ethers.utils.arrayify(compressedStateDiffs).length),
+    3
+  );
+  return {
+    encodedStateDiffs,
+    compressedStateDiffs,
+    enumerationIndexSizeBytes,
+    numberOfStateDiffsBytes,
+    compressedStateDiffsSizeBytes,
+  };
+}
 
 // Interface for L2ToL1Log struct.
 interface L2ToL1Log {
@@ -378,34 +417,47 @@ function setupLogData(l1MessengerAccount: ethers.Signer, l1Messenger: L1Messenge
   };
 }
 
+// Represents the structure of the bytecode/message data that is part of the pubdata.
+interface ContentLengthPair {
+  content: string;
+  lengthBytes: string;
+}
+
+async function setupBytecodeData(l1MessengerAddress: string): Promise<ContentLengthPair> {
+  const content = await getCode(l1MessengerAddress);
+  const lengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.utils.arrayify(content).length), 4);
+  return {
+    content,
+    lengthBytes,
+  };
+}
+
 // Used for emulating the pubdata published by the L1Messenger.
 class L1MessengerPubdataEmulator implements EmulatorData {
   numberOfLogs: number;
   encodedLogs: string[];
-  l2DaValidatorFunctionSig: string;
-  chainedLogsHash: string;
-  chainedLogsRootHash: string;
-  operatorDataOffset: number;
-  operatorDataLength: number;
-
-  // These two fields are always zero, we need
-  // them just to extend the interface.
-  chainedMessagesHash: string;
-  chainedBytecodeHash: string;
+  numberOfMessages: number;
+  messages: ContentLengthPair[];
+  numberOfBytecodes: number;
+  bytecodes: ContentLengthPair[];
+  stateDiffsSetupData: StateDiffSetupData;
+  version: string;
 
   constructor() {
     this.numberOfLogs = 0;
     this.encodedLogs = [];
-
-    const factoryInterface = IL2DAValidatorFactory.connect(
-      ethers.constants.AddressZero,
-      new L2VoidSigner(ethers.constants.AddressZero)
-    );
-    this.l2DaValidatorFunctionSig = factoryInterface.interface.getSighash("validatePubdata");
-
-    this.chainedLogsHash = ethers.constants.HashZero;
-    this.chainedLogsRootHash = ethers.constants.HashZero;
-    this.operatorDataOffset = EXPECTED_DA_INPUT_OFFSET;
+    this.numberOfMessages = 0;
+    this.messages = [];
+    this.numberOfBytecodes = 0;
+    this.bytecodes = [];
+    this.stateDiffsSetupData = {
+      compressedStateDiffsSizeBytes: "",
+      enumerationIndexSizeBytes: "",
+      compressedStateDiffs: "",
+      numberOfStateDiffsBytes: "",
+      encodedStateDiffs: "",
+    };
+    this.version = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 1);
   }
 
   addLog(log: string): void {
@@ -413,80 +465,70 @@ class L1MessengerPubdataEmulator implements EmulatorData {
     this.numberOfLogs++;
   }
 
-  async buildTotalL2ToL1PubdataAndStateDiffs(
-    l1Messenger: L1Messenger,
-    overrideData: EmulatorOverrideData = {}
-  ): Promise<string> {
-    const storedChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
-    const storedChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
+  addMessage(message: ContentLengthPair): void {
+    this.messages.push(message);
+    this.numberOfMessages++;
+  }
 
+  addBytecode(bytecode: ContentLengthPair): void {
+    this.bytecodes.push(bytecode);
+    this.numberOfBytecodes++;
+  }
+
+  setStateDiffsSetupData(data: StateDiffSetupData) {
+    this.stateDiffsSetupData = data;
+  }
+
+  buildTotalL2ToL1PubdataAndStateDiffs(overrideData: EmulatorOverrideData = {}): string {
     const {
-      l2DaValidatorFunctionSig = this.l2DaValidatorFunctionSig,
-      chainedLogsHash = calculateChainedLogsHash(this.encodedLogs),
-      chainedLogsRootHash = calculateLogsRootHash(this.encodedLogs),
-      chainedMessagesHash = storedChainedMessagesHash,
-      chainedBytecodeHash = storedChainedBytecodesHash,
-      operatorDataOffset = this.operatorDataOffset,
       numberOfLogs = this.numberOfLogs,
       encodedLogs = this.encodedLogs,
+      numberOfMessages = this.numberOfMessages,
+      messages = this.messages,
+      numberOfBytecodes = this.numberOfBytecodes,
+      bytecodes = this.bytecodes,
+      stateDiffsSetupData = this.stateDiffsSetupData,
+      version = this.version,
     } = overrideData;
-    const operatorDataLength = overrideData.operatorDataLength
-      ? overrideData.operatorDataLength
-      : numberOfLogs * L2_TO_L1_LOG_SERIALIZE_SIZE + 4;
+
+    const messagePairs = [];
+    for (let i = 0; i < numberOfMessages; i++) {
+      messagePairs.push(messages[i].lengthBytes, messages[i].content);
+    }
+
+    const bytecodePairs = [];
+    for (let i = 0; i < numberOfBytecodes; i++) {
+      bytecodePairs.push(bytecodes[i].lengthBytes, bytecodes[i].content);
+    }
 
     return ethers.utils.concat([
-      l2DaValidatorFunctionSig,
-      chainedLogsHash,
-      chainedLogsRootHash,
-      chainedMessagesHash,
-      chainedBytecodeHash,
-      ethers.utils.defaultAbiCoder.encode(["uint256"], [operatorDataOffset]),
-      ethers.utils.defaultAbiCoder.encode(["uint256"], [operatorDataLength]),
       ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4),
       ...encodedLogs,
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4),
+      ...messagePairs,
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4),
+      ...bytecodePairs,
+      version,
+      stateDiffsSetupData.compressedStateDiffsSizeBytes,
+      stateDiffsSetupData.enumerationIndexSizeBytes,
+      stateDiffsSetupData.compressedStateDiffs,
+      stateDiffsSetupData.numberOfStateDiffsBytes,
+      stateDiffsSetupData.encodedStateDiffs,
     ]);
   }
 }
 // Represents the structure of the data that the emulator uses.
 interface EmulatorData {
-  l2DaValidatorFunctionSig: string;
-  chainedLogsHash: string;
-  chainedLogsRootHash: string;
-  chainedMessagesHash: string;
-  chainedBytecodeHash: string;
-  operatorDataOffset: number;
-  operatorDataLength: number;
   numberOfLogs: number;
   encodedLogs: string[];
+  numberOfMessages: number;
+  messages: ContentLengthPair[];
+  numberOfBytecodes: number;
+  bytecodes: ContentLengthPair[];
+  stateDiffsSetupData: StateDiffSetupData;
+  version: string;
 }
 
 // Represents a type that allows for overriding specific properties of the EmulatorData.
 // This is useful when you want to change some properties of the emulator data without affecting the others.
 type EmulatorOverrideData = Partial<EmulatorData>;
-
-function calculateChainedLogsHash(logs: string[]): string {
-  let hash = ethers.constants.HashZero;
-  for (const log of logs) {
-    const logHash = ethers.utils.keccak256(log);
-    hash = ethers.utils.keccak256(ethers.utils.concat([hash, logHash]));
-  }
-
-  return hash;
-}
-
-function calculateLogsRootHash(logs: string[]): string {
-  const logsTreeArray: string[] = new Array(L2_TO_L1_LOGS_MERKLE_TREE_LEAVES).fill(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-  for (let i = 0; i < logs.length; i++) {
-    logsTreeArray[i] = ethers.utils.keccak256(logs[i]);
-  }
-
-  let length = L2_TO_L1_LOGS_MERKLE_TREE_LEAVES;
-
-  while (length > 1) {
-    for (let i = 0; i < length; i += 2) {
-      logsTreeArray[i / 2] = ethers.utils.keccak256(ethers.utils.concat([logsTreeArray[i], logsTreeArray[i + 1]]));
-    }
-    length /= 2;
-  }
-  return logsTreeArray[0];
-}

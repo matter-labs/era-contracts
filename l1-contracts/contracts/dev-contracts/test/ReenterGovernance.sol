@@ -3,7 +3,6 @@
 pragma solidity 0.8.24;
 
 import {IGovernance} from "../../governance/IGovernance.sol";
-import {Call} from "../../governance/Common.sol";
 
 contract ReenterGovernance {
     // add this to be excluded from coverage report
@@ -13,7 +12,7 @@ contract ReenterGovernance {
 
     // Store call, predecessor and salt separately,
     // because Operation struct can't be stored on storage.
-    Call call;
+    IGovernance.Call call;
     bytes32 predecessor;
     bytes32 salt;
 
@@ -46,7 +45,7 @@ contract ReenterGovernance {
     fallback() external payable {
         if (!alreadyReentered) {
             alreadyReentered = true;
-            Call[] memory calls = new Call[](1);
+            IGovernance.Call[] memory calls = new IGovernance.Call[](1);
             calls[0] = call;
             IGovernance.Operation memory op = IGovernance.Operation({
                 calls: calls,

@@ -108,7 +108,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setNewBatch(batchHash, batchData.batchTimestamp, batchData.batchNumber.add(1), 1)
-      ).to.be.revertedWithCustomError(systemContext, "TimestampsShouldBeIncremental");
+      ).to.be.rejectedWith("Timestamps should be incremental");
     });
 
     it("should revert wrong block number", async () => {
@@ -118,7 +118,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setNewBatch(batchHash, batchData.batchTimestamp.add(1), batchData.batchNumber, 1)
-      ).to.be.revertedWithCustomError(systemContext, "ProvidedBatchNumberIsNotCorrect");
+      ).to.be.rejectedWith("The provided batch number is not correct");
     });
 
     it("should set new batch", async () => {
@@ -173,7 +173,9 @@ describe("SystemContext tests", () => {
       const expectedBlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber]));
       await expect(
         systemContext.connect(bootloaderAccount).setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, true, 1)
-      ).to.be.revertedWithCustomError(systemContext, "L2BlockAndBatchTimestampMismatch");
+      ).to.be.rejectedWith(
+        "The timestamp of the L2 block must be greater than or equal to the timestamp of the current batch"
+      );
     });
 
     it("should revert There must be a virtual block created at the start of the batch", async () => {
@@ -183,7 +185,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(42), expectedBlockHash, true, 0)
-      ).to.be.revertedWithCustomError(systemContext, "NoVirtualBlocks");
+      ).to.be.rejectedWith("There must be a virtual block created at the start of the batch");
     });
 
     it("should revert Upgrade transaction must be first", async () => {
@@ -193,7 +195,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(42), expectedBlockHash, false, 1)
-      ).to.be.revertedWithCustomError(systemContext, "UpgradeTransactionMustBeFirst");
+      ).to.be.rejectedWith("Upgrade transaction must be first");
     });
 
     it("should revert L2 block number is never expected to be zero", async () => {
@@ -203,7 +205,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(0, blockData.blockTimestamp.add(42), expectedBlockHash, true, 1)
-      ).to.be.revertedWithCustomError(systemContext, "L2BlockNumberZero");
+      ).to.be.rejectedWith("L2 block number is never expected to be zero");
     });
 
     it("should revert The previous L2 block hash is incorrect", async () => {
@@ -213,7 +215,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(42), wrongBlockHash, true, 1)
-      ).to.be.revertedWithCustomError(systemContext, "PreviousL2BlockHashIsIncorrect");
+      ).to.be.rejectedWith("The previous L2 block hash is incorrect");
     });
 
     it("should set L2 block, check blockNumber & blockTimestamp change, also check getBlockHashEVM", async () => {
@@ -246,7 +248,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber, blockData.blockTimestamp.add(42), expectedBlockHash, true, 1)
-      ).to.be.revertedWithCustomError(systemContext, "CannotReuseL2BlockNumberFromPreviousBatch");
+      ).to.be.rejectedWith("Can not reuse L2 block number from the previous batch");
     });
 
     it("should revert The timestamp of the same L2 block must be same", async () => {
@@ -256,7 +258,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber, blockData.blockTimestamp.add(42), expectedBlockHash, false, 1)
-      ).to.be.revertedWithCustomError(systemContext, "IncorrectSameL2BlockTimestamp");
+      ).to.be.rejectedWith("The timestamp of the same L2 block must be same");
     });
 
     it("should revert The previous hash of the same L2 block must be same", async () => {
@@ -268,7 +270,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber, blockData.blockTimestamp, expectedBlockHash, false, 1)
-      ).to.be.revertedWithCustomError(systemContext, "IncorrectSameL2BlockPrevBlockHash");
+      ).to.be.rejectedWith("The previous hash of the same L2 block must be same");
     });
 
     it("should revert Can not create virtual blocks in the middle of the miniblock", async () => {
@@ -280,7 +282,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber, blockData.blockTimestamp, expectedBlockHash, false, 1)
-      ).to.be.revertedWithCustomError(systemContext, "IncorrectVirtualBlockInsideMiniblock");
+      ).to.be.rejectedWith("Can not create virtual blocks in the middle of the miniblock");
     });
 
     it("should set block again, no data changed", async () => {
@@ -305,7 +307,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(42), invalidBlockHash, false, 0)
-      ).to.be.revertedWithCustomError(systemContext, "IncorrectL2BlockHash");
+      ).to.be.rejectedWith("The current L2 block hash is incorrect");
     });
 
     it("should revert The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block", async () => {
@@ -324,7 +326,9 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, false, 0)
-      ).to.be.revertedWithCustomError(systemContext, "NonMonotonicL2BlockTimestamp");
+      ).to.be.rejectedWith(
+        "The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block"
+      );
     });
 
     it("should set block again and check blockNumber & blockTimestamp also check getBlockHashEVM", async () => {
@@ -359,7 +363,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(111), blockData.blockTimestamp.add(42), expectedBlockHash, false, 0)
-      ).to.be.revertedWithCustomError(systemContext, "InvalidNewL2BlockNumber");
+      ).to.be.rejectedWith("Invalid new L2 block number");
     });
 
     it("should update currentL2BlockTxsRollingHash", async () => {
@@ -380,9 +384,8 @@ describe("SystemContext tests", () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
       const baseFee = await systemContext.baseFee();
       await systemContext.connect(bootloaderAccount).unsafeOverrideBatch(batchData.batchTimestamp, 0, baseFee);
-      await expect(systemContext.connect(bootloaderAccount).publishTimestampDataToL1()).to.be.revertedWithCustomError(
-        systemContext,
-        "CurrentBatchNumberMustBeGreaterThanZero"
+      await expect(systemContext.connect(bootloaderAccount).publishTimestampDataToL1()).to.be.rejectedWith(
+        "The current batch number must be greater than 0"
       );
       await systemContext
         .connect(bootloaderAccount)

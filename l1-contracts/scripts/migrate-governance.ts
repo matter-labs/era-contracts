@@ -23,7 +23,7 @@ const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORIT
 
 const l2SharedBridgeABI = JSON.parse(
   fs
-    .readFileSync("../l2-contracts/artifacts-zk/contracts-preprocessed/bridge/L2AssetRouter.sol/L2SharedBridge.json")
+    .readFileSync("../l2-contracts/artifacts-zk/contracts-preprocessed/bridge/L2SharedBridge.sol/L2SharedBridge.json")
     .toString()
 ).abi;
 

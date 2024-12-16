@@ -73,7 +73,7 @@ describe("Custom base token chain and bridge tests", () => {
 
   it("Should have correct base token", async () => {
     // we should still be able to deploy the erc20 bridge
-    const baseTokenAddressInBridgehub = await bridgehub.baseToken(deployer.chainId);
+    const baseTokenAddressInBridgehub = await bridgehub.baseToken(chainId);
     expect(baseTokenAddress).equal(baseTokenAddressInBridgehub);
   });
 
@@ -92,7 +92,11 @@ describe("Custom base token chain and bridge tests", () => {
         )
     );
 
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: not legacy bridge");
+=======
     expect(revertReason).contains("Unauthorized");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should deposit base token successfully direct via bridgehub", async () => {
@@ -148,13 +152,21 @@ describe("Custom base token chain and bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
     );
-    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: wrong msg len");
+=======
+    expect(revertReason).contains("MalformedMessage");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
+<<<<<<< HEAD
+    expect(revertReason).equal("L1AR: Incorrect message function selector");
+=======
     expect(revertReason).contains("InvalidSelector");
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 });

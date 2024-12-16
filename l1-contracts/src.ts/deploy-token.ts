@@ -125,15 +125,13 @@ export async function deployTokens(
     }
 
     if (token.symbol !== "WETH" && mintTokens) {
-      await erc20.mint(wallet.address, parseEther("3000000000000"));
+      await erc20.mint(wallet.address, parseEther("3000000000"));
     }
     if (mintTokens) {
       for (let i = 0; i < 10; ++i) {
-        const testWalletAddress = mnemonic
-          ? Wallet.fromMnemonic(mnemonic as string, "m/44'/60'/0'/0/" + i).address
-          : wallet.address;
+        const testWalletAddress = Wallet.fromMnemonic(mnemonic as string, "m/44'/60'/0'/0/" + i).address;
         if (token.symbol !== "WETH") {
-          await erc20.mint(testWalletAddress, parseEther("3000000000000"));
+          await erc20.mint(testWalletAddress, parseEther("3000000000"));
         }
       }
     }
