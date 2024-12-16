@@ -8,7 +8,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, SystemLogKey} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";
 
 /**
  * @author Matter Labs

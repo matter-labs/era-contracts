@@ -123,7 +123,7 @@ async function main() {
       }
 
       if (cmd.allowEvmEmulation) {
-        console.log(`Allowing EVM emulation`);
+        console.log("Allowing EVM emulation");
         await deployer.enableEvmEmulation();
       }
 
