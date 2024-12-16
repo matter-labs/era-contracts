@@ -6,6 +6,7 @@ import { KnownCodesStorageFactory } from "../typechain";
 import {
   TEST_BOOTLOADER_FORMAL_ADDRESS,
   TEST_COMPRESSOR_CONTRACT_ADDRESS,
+  TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS,
 } from "./shared/constants";
 import { encodeCalldata, getMock, prepareEnvironment } from "./shared/mocks";
@@ -85,10 +86,32 @@ describe("KnownCodesStorage tests", function () {
   });
 
   describe("publishEVMBytecode", function () {
+    let deployerAccount: ethers.Signer;
+
+    const InvalidBytecode =
+      "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+
+    beforeEach(async () => {
+      deployerAccount = await ethers.getImpersonatedSigner(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
+    });
+
     it("non-deployer failed to call", async () => {
-      await expect(knownCodesStorage.publishEVMBytecode(32, "0x00")).to.be.revertedWithCustomError(
+      await expect(knownCodesStorage.publishEVMBytecode(1, "0x00")).to.be.revertedWithCustomError(
         knownCodesStorage,
         "Unauthorized"
+      );
+    });
+
+    it("bytecode with even length failed to publish", async () => {
+      await expect(
+        knownCodesStorage.connect(deployerAccount).publishEVMBytecode(64, InvalidBytecode)
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
+    });
+
+    it("invalid length bytecode failed to call", async () => {
+      await expect(knownCodesStorage.connect(deployerAccount).publishEVMBytecode(1, "0x00")).to.be.revertedWithCustomError(
+        knownCodesStorage,
+        "MalformedBytecode"
       );
     });
   });
