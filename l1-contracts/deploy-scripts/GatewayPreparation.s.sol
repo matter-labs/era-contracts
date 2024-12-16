@@ -637,7 +637,6 @@ contract GatewayPreparation is Script {
     function preRun(bool skip_stage12) internal {
         // string memory root = vm.projectRoot();
         // string memory path = string.concat(root, "/script-out/gateway-deploy-governance-txs-1.json");
-
         // bool fileExists = vm.isFile(path);
         // if (fileExists) {
         //     uint256 idxFrom = 0;
@@ -668,7 +667,6 @@ contract GatewayPreparation is Script {
         //                 address deployedAddress;
         //                 assembly {
         //                     deployedAddress := create(value, add(input, 0x20), mload(input))
-
         //                     if iszero(extcodesize(deployedAddress)) {
         //                         revert(0, 0)
         //                     }

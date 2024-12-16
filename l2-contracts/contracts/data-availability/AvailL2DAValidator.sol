@@ -19,7 +19,7 @@ contract AvailL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
         // Operator data, that is related to the DA itself
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash) {
-        (bytes32 stateDiffHash, bytes calldata _totalPubdata, bytes calldata leftover) = _produceStateDiffPubdata(
+        (bytes32 stateDiffHash, bytes calldata _totalPubdata, ) = _produceStateDiffPubdata(
             _chainedMessagesHash,
             _chainedBytecodesHash,
             _totalL2ToL1PubdataAndStateDiffs

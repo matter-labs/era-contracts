@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {IVectorx} from "./IVectorx.sol";
 
 interface IAvailBridge {
+    // solhint-disable-next-line gas-struct-packing
     struct Message {
         // single-byte prefix representing the message type
         bytes1 messageType;

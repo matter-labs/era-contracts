@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+pragma solidity 0.8.24;
+
 import {IAvailBridge} from "./IAvailBridge.sol";
 import {IVectorx} from "./IVectorx.sol";
 import {DummyVectorX} from "./DummyVectorX.sol";
@@ -15,7 +17,7 @@ contract DummyAvailBridge is IAvailBridge {
         return vectorxContract;
     }
 
-    function verifyBlobLeaf(MerkleProofInput calldata input) external view returns (bool) {
+    function verifyBlobLeaf(MerkleProofInput calldata) external view returns (bool) {
         return true;
     }
 }
