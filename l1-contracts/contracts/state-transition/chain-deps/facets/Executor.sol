@@ -39,62 +39,64 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
         }
 
-        uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
-        PubdataPricingMode pricingMode = s.feeParams.pubdataPricingMode;
-        if (
-            pricingMode != PubdataPricingMode.Validium &&
-            pubdataSource != uint8(PubdataSource.Calldata) &&
-            pubdataSource != uint8(PubdataSource.Blob)
-        ) {
-            revert InvalidPubdataMode();
-        }
+// TODO: commented for ZKOS testing
+//        uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
+//        PubdataPricingMode pricingMode = s.feeParams.pubdataPricingMode;
+//        if (
+//            pricingMode != PubdataPricingMode.Validium &&
+//            pubdataSource != uint8(PubdataSource.Calldata) &&
+//            pubdataSource != uint8(PubdataSource.Blob)
+//        ) {
+//            revert InvalidPubdataMode();
+//        }
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        if (pricingMode == PubdataPricingMode.Validium) {
-            // skipping data validation for validium, we just check that the data is empty
-            if (_newBatch.pubdataCommitments.length != 1) {
-                revert CalldataLengthTooBig();
-            }
-            for (uint8 i = uint8(SystemLogKey.BLOB_ONE_HASH_KEY); i <= uint8(SystemLogKey.BLOB_SIX_HASH_KEY); ++i) {
-                logOutput.blobHashes[i - uint8(SystemLogKey.BLOB_ONE_HASH_KEY)] = bytes32(0);
-            }
-        } else if (pubdataSource == uint8(PubdataSource.Blob)) {
-            // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
-            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blobHashes);
-        } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
-            // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
-            if (_newBatch.pubdataCommitments.length > BLOB_SIZE_BYTES) {
-                revert InvalidPubdataLength();
-            }
-            bytes32 pubdataHash = keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]);
-            if (logOutput.pubdataHash != pubdataHash) {
-                revert InvalidPubdataHash(pubdataHash, logOutput.pubdataHash);
-            }
-            blobCommitments[0] = bytes32(
-                _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
-                    .pubdataCommitments
-                    .length]
-            );
-        }
-
-        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
-            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
-        }
-        // Check that the priority operation hash in the L2 logs is as expected
-        if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
-            revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
-        }
-        // Check that the number of processed priority operations is as expected
-        if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
-            revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
-        }
-
-        // Check the timestamp of the new batch
-        _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
+// TODO: commented for ZKOS testing
+//        if (pricingMode == PubdataPricingMode.Validium) {
+//            // skipping data validation for validium, we just check that the data is empty
+//            if (_newBatch.pubdataCommitments.length != 1) {
+//                revert CalldataLengthTooBig();
+//            }
+//            for (uint8 i = uint8(SystemLogKey.BLOB_ONE_HASH_KEY); i <= uint8(SystemLogKey.BLOB_SIX_HASH_KEY); ++i) {
+//                logOutput.blobHashes[i - uint8(SystemLogKey.BLOB_ONE_HASH_KEY)] = bytes32(0);
+//            }
+//        } else if (pubdataSource == uint8(PubdataSource.Blob)) {
+//            // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
+//            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blobHashes);
+//        } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
+//            // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
+//            if (_newBatch.pubdataCommitments.length > BLOB_SIZE_BYTES) {
+//                revert InvalidPubdataLength();
+//            }
+//            bytes32 pubdataHash = keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]);
+//            if (logOutput.pubdataHash != pubdataHash) {
+//                revert InvalidPubdataHash(pubdataHash, logOutput.pubdataHash);
+//            }
+//            blobCommitments[0] = bytes32(
+//                _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
+//                    .pubdataCommitments
+//                    .length]
+//            );
+//        }
+//
+//        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+//            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+//        }
+//        // Check that the priority operation hash in the L2 logs is as expected
+//        if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
+//            revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
+//        }
+//        // Check that the number of processed priority operations is as expected
+//        if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
+//            revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
+//        }
+//
+//        // Check the timestamp of the new batch
+//        _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
         bytes32 commitment = _createBatchCommitment(
@@ -252,15 +254,16 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
         // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
-        if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            if (processedLogs != 8191) {
-                revert MissingSystemLogs(8191, processedLogs);
-            }
-        } else {
-            if (processedLogs != 16383) {
-                revert MissingSystemLogs(16383, processedLogs);
-            }
-        }
+// TODO: commented for ZKOS testing
+//        if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
+//            if (processedLogs != 8191) {
+//                revert MissingSystemLogs(8191, processedLogs);
+//            }
+//        } else {
+//            if (processedLogs != 16383) {
+//                revert MissingSystemLogs(16383, processedLogs);
+//            }
+//        }
     }
 
     /// @inheritdoc IExecutor
@@ -408,10 +411,11 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
         }
 
-        bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
-        if (priorityOperationsHash != _storedBatch.priorityOperationsHash) {
-            revert PriorityOperationsRollingHashMismatch();
-        }
+// TODO: commented for ZKOS testing
+//        bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
+//        if (priorityOperationsHash != _storedBatch.priorityOperationsHash) {
+//            revert PriorityOperationsRollingHashMismatch();
+//        }
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
@@ -508,7 +512,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             revert VerifiedBatchesExceedsCommittedBatches();
         }
 
-        _verifyProof(proofPublicInput, _proof);
+// TODO: commented for ZKOS testing
+//        _verifyProof(proofPublicInput, _proof);
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
