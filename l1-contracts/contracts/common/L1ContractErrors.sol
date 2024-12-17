@@ -117,6 +117,7 @@ error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 error FacetExists(bytes4 selector, address);
 // 0x79e12cc3
 error FacetIsFrozen(bytes4 func);
+// 0xd37a223a
 error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
