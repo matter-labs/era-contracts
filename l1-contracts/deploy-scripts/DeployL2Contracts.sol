@@ -222,4 +222,65 @@ contract DeployL2Script is Script {
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
     }
+
+    // Deploy the ConsensusRegistry implementation and save its address into the config.
+    function deployConsensusRegistry() internal {
+        // ConsensusRegistry.sol doesn't have a constructor, just an initializer.
+        bytes memory constructorData = "";
+
+        config.consensusRegistryImplementation = Utils.deployThroughL1({
+            bytecode: contracts.consensusRegistryBytecode,
+            constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    // Deploy a transparent upgradable proxy for the already deployed consensus registry
+    // implementation and save its address into the config.
+    function deployConsensusRegistryProxy() internal {
+        // Admin for the proxy
+        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+
+        // Call ConsensusRegistry::initialize with the initial owner.
+        // solhint-disable-next-line func-named-parameters
+        bytes memory proxyInitializationParams = abi.encodeWithSignature(
+            "initialize(address)",
+            config.consensusRegistryOwner
+        );
+
+        bytes memory consensusRegistryProxyConstructorData = abi.encode(
+            config.consensusRegistryImplementation, // _logic
+            l2GovernorAddress, // admin_
+            proxyInitializationParams // _data
+        );
+
+        config.consensusRegistryProxy = Utils.deployThroughL1({
+            bytecode: contracts.consensusRegistryProxyBytecode,
+            constructorargs: consensusRegistryProxyConstructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function initializeChain() internal {
+        L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
+
+        Utils.executeUpgrade({
+            _governor: bridge.owner(),
+            _salt: bytes32(0),
+            _target: config.l1SharedBridgeProxy,
+            _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
+            _value: 0,
+            _delay: 0
+        });
+    }
 }
