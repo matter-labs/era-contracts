@@ -57,6 +57,20 @@ library DataEncoding {
         );
     }
 
+    /// @notice Encodes the legacy transaction data hash.
+    /// @dev the encoding strats with 0t
+    /// @param _originalCaller The address of the entity that initiated the deposit.
+    /// @param _l1Token The address of the L1 token.
+    /// @param _amount The amount of the L1 token.
+    /// @return txDataHash The resulting encoded transaction data hash.
+    function encodeLegacyTxDataHash(
+        address _originalCaller,
+        address _l1Token,
+        uint256 _amount
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_originalCaller, _l1Token, _amount));
+    }
+
     /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
     /// @param _chainId The id of the chain token is native to.
     /// @param _assetData The asset data that has to be encoded.

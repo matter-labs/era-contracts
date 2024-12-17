@@ -74,8 +74,10 @@ address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 IBaseToken constant REAL_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
+ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
 address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
+address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
 // Note, that on its own this contract does not provide much functionality, but having it on a constant address
 // serves as a convenient storage for its bytecode to be accessible via `extcodehash`.

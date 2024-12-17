@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
 error AccessToFunctionDenied(address target, bytes4 selector, address invoker);
+// 0x8164f842
+error ApprovalFailed();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x52e22c98
@@ -25,21 +27,21 @@ error RemovingPermanentRestriction();
 error UnallowedImplementation(bytes32 implementationHash);
 // 0x1ff9d522
 error AddressAlreadyUsed(address addr);
-//
+// 0x0dfb42bf
 error AddressAlreadySet(address addr);
 // 0x86bb51b8
 error AddressHasNoCode(address);
-//
+// 0x1f73225f
 error AddressMismatch(address expected, address supplied);
 // 0x1eee5481
 error AddressTooLow(address);
-//
+// 0x5e85ae73
 error AmountMustBeGreaterThanZero();
-//
+// 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
-//
+// 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
-//
+// 0xfe919e28
 error AssetIdAlreadyRegistered();
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
@@ -57,7 +59,7 @@ error BatchNotExecuted(uint256 batchNumber);
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
-//
+// 0xdb538614
 error BridgeMintNotImplemented();
 // 0xcf102c5a
 error CalldataLengthTooBig();
@@ -73,7 +75,7 @@ error ChainIdAlreadyExists();
 error ChainIdCantBeCurrentChain();
 // 0xa179f8c9
 error ChainIdMismatch();
-//
+// 0x23f3c357
 error ChainIdNotRegistered(uint256 chainId);
 //
 error ChainNotLegacy();
@@ -85,8 +87,10 @@ error ChainIdTooBig();
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
 error DenominatorIsZero();
-//
+// 0xb4f54111
 error DeployFailed();
+// 0x138ee1a3
+error DeployingBridgedTokenForNativeToken();
 // 0xc7c9660f
 error DepositDoesNotExist();
 // 0xad2fa98e
@@ -95,17 +99,17 @@ error DepositExists();
 error DiamondAlreadyFrozen();
 // 0xa7151b9a
 error DiamondNotFrozen();
-//
+// 0x7138356f
 error EmptyAddress();
 // 0x2d4d012f
 error EmptyAssetId();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
-//
+// 0x1c25715b
 error EmptyBytes32();
 // 0x95b66fe9
 error EmptyDeposit();
-//
+// 0x627e0872
 error ETHDepositNotSupported();
 //
 error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
@@ -136,7 +140,7 @@ error IncorrectBridgeHubAddress(address bridgehub);
 error InsufficientChainBalance();
 // 0x356680b7
 error InsufficientFunds();
-//
+// 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x7a47c9a2
 error InvalidChainId();
@@ -178,7 +182,7 @@ error MerkleIndexOutOfBounds();
 error MerklePathEmpty();
 // 0x1c500385
 error MerklePathOutOfBounds();
-//
+// 0x3312a450
 error MigrationPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
@@ -202,7 +206,7 @@ error NonEmptyMsgValue();
 error NonIncreasingTimestamp();
 // 0x0105f9c0
 error NonSequentialBatch();
-//
+// 0x0ac76f01
 error NonSequentialVersion();
 // 0x4ef79e5a
 error NonZeroAddress(address);
@@ -304,7 +308,7 @@ error UndefinedDiamondCutAction();
 error UnexpectedSystemLog(uint256 logKey);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
-//
+// 0x084a1449
 error UnsupportedEncodingVersion();
 // 0x47b3b145
 error ValidateTxnNotEnoughGas();
@@ -345,6 +349,46 @@ error NotBridgehub(address addr);
 error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
+// 0x64846fe4
+error NotARestriction(address addr);
+// 0xccdd18d2
+error BytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x25d8333c
+error CallerNotTimerAdmin();
+// 0x907f8e51
+error DeadlineNotYetPassed();
+// 0x6eef58d1
+error NewDeadlineNotGreaterThanCurrent();
+// 0x8b7e144a
+error NewDeadlineExceedsMaxDeadline();
+// 0x2a5989a0
+error AlreadyPermanentRollup();
+// 0x92daded2
+error InvalidDAForPermanentRollup();
+// 0x6e3331f5
+error IncorrectPricingMode();
+// 0xd0266e26
+error NotSettlementLayer();
+// 0x7a4902ad
+error TimerAlreadyStarted();
+
+// 0x09aa9830
+error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);
+
+// 0xc33e6128
+error MerkleNothingToProve();
+
+// 0xafbb7a4e
+error MerkleIndexOrHeightMismatch();
+
+// 0x1b582fcf
+error MerkleWrongIndex(uint256 index, uint256 maxNodeNumber);
+
+// 0x485cfcaa
+error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
+
+// 0xce63ce17
+error NoCTMForAssetId(bytes32 assetId);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
