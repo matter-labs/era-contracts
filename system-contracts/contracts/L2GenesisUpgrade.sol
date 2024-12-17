@@ -6,10 +6,7 @@ import {DEPLOYER_SYSTEM_CONTRACT, SYSTEM_CONTEXT_CONTRACT, L2_BRIDGE_HUB, L2_ASS
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
-import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
-
-import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs

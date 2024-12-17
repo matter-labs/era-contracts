@@ -46,11 +46,6 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         {
             bytes memory complexUpgraderCalldata;
             {
-                bytes memory additionalForceDeploymentsData = L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
-                    s,
-                    address(0),
-                    baseTokenAddress
-                );
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
                     (_chainId, _l1CtmDeployerAddress, _forceDeploymentsData)

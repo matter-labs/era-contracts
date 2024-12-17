@@ -11,9 +11,21 @@ import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
+import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+
+// solhint-disable-next-line gas-struct-packing
+struct GatewayUpgradeEncodedInput {
+    IL2ContractDeployer.ForceDeployment[] forceDeployments;
+    uint256 l2GatewayUpgradePosition;
+    bytes fixedForceDeploymentsData;
+    address ctmDeployer;
+    address oldValidatorTimelock;
+    address newValidatorTimelock;
+    address wrappedBaseTokenStore;
+}
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
