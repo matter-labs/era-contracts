@@ -104,7 +104,8 @@ export async function initialTestnetDeploymentProcess(
   deployer.chainId = 9;
 
   const testnetTokens = getTokens();
-  const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
+  const result = await deployTokens(testnetTokens, deployer.deployWallet, null, true, deployer.verbose);
+
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
   // deploy the verifier first

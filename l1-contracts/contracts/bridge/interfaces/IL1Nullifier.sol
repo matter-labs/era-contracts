@@ -78,13 +78,22 @@ interface IL1Nullifier {
 
     function setL1AssetRouter(address _l1AssetRouter) external;
 
-    function __DEPRECATED_chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
-    function __DEPRECATED_l2BridgeAddress(uint256 _chainId) external view returns (address);
+    function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external;
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.

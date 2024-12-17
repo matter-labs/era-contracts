@@ -22,7 +22,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -34,9 +34,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal l2TokenProxyBytecodeHash;
+    bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
+    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
@@ -63,7 +64,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             revert EmptyAddress();
         }
 
-        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
+        L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
 
         if (_contractsDeployedAlready) {
@@ -85,38 +86,42 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
-        tokenAddress[assetId] = _l2TokenAddress;
-        originChainId[assetId] = L1_CHAIN_ID;
+        if (l1TokenAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
+        tokenAddress[newAssetId] = _l2TokenAddress;
+        assetId[_l2TokenAddress] = newAssetId;
+        originChainId[newAssetId] = L1_CHAIN_ID;
     }
 
     /// @notice Ensures that the token is deployed.
-    /// @param _originChainId The chain ID of the origin chain.
     /// @param _assetId The asset ID.
     /// @param _originToken The origin token address.
     /// @param _erc20Data The ERC20 data.
     /// @return expectedToken The token address.
-    function _ensureTokenDeployed(
-        uint256 _originChainId,
+    function _ensureAndSaveTokenDeployed(
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
     ) internal override returns (address expectedToken) {
-        expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
+        uint256 tokenOriginChainId;
+        (expectedToken, tokenOriginChainId) = _calculateExpectedTokenAddress(_originToken, _erc20Data);
         address l1LegacyToken;
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
             l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
         }
 
         if (l1LegacyToken != address(0)) {
-            /// token is a legacy token, no need to deploy
-            if (l1LegacyToken != _originToken) {
-                revert AddressMismatch(_originToken, l1LegacyToken);
-            }
-            tokenAddress[_assetId] = expectedToken;
+            _ensureAndSaveTokenDeployedInnerLegacyToken({
+                _assetId: _assetId,
+                _originToken: _originToken,
+                _expectedToken: expectedToken,
+                _l1LegacyToken: l1LegacyToken
+            });
         } else {
-            super._ensureTokenDeployedInner({
-                _originChainId: _originChainId,
+            super._ensureAndSaveTokenDeployedInner({
+                _tokenOriginChainId: tokenOriginChainId,
                 _assetId: _assetId,
                 _originToken: _originToken,
                 _erc20Data: _erc20Data,
@@ -125,13 +130,35 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    /// @notice Ensures that the token is deployed inner for legacy tokens.
+    function _ensureAndSaveTokenDeployedInnerLegacyToken(
+        bytes32 _assetId,
+        address _originToken,
+        address _expectedToken,
+        address _l1LegacyToken
+    ) internal {
+        _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
+
+        /// token is a legacy token, no need to deploy
+        if (_l1LegacyToken != _originToken) {
+            revert AddressMismatch(_originToken, _l1LegacyToken);
+        }
+
+        tokenAddress[_assetId] = _expectedToken;
+        assetId[_expectedToken] = _assetId;
+    }
+
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
-    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
+    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
+    /// @param _tokenOriginChainId The origin chain id of the token.
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
-    function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
+    function _deployBeaconProxy(
+        bytes32 _salt,
+        uint256 _tokenOriginChainId
+    ) internal virtual override returns (BeaconProxy proxy) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0) || _tokenOriginChainId != L1_CHAIN_ID) {
             // Deploy the beacon proxy for the L2 token
 
             (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
@@ -140,7 +167,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
                 0,
                 abi.encodeCall(
                     IContractDeployer.create2,
-                    (_salt, l2TokenProxyBytecodeHash, abi.encode(address(bridgedTokenBeacon), ""))
+                    (_salt, L2_TOKEN_PROXY_BYTECODE_HASH, abi.encode(address(bridgedTokenBeacon), ""))
                 )
             );
 
@@ -170,32 +197,36 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
-    /// @param _l1Token The address of token on L1.
+    /// @param _originChainId The chain id of the origin token.
+    /// @param _nonNativeToken The address of token on its origin chain..
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
-        address _l1Token
-    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
+        address _nonNativeToken
+    ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
-            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
+            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
+            bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
+            bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
             return
                 L2ContractHelper.computeCreate2Address(
                     address(this),
                     salt,
-                    l2TokenProxyBytecodeHash,
+                    L2_TOKEN_PROXY_BYTECODE_HASH,
                     constructorInputHash
                 );
         }
     }
 
     /// @notice Calculates the salt for the Create2 deployment of the L2 token.
-    function _getCreate2Salt(uint256 _originChainId, address _l1Token) internal view override returns (bytes32 salt) {
-        salt = _originChainId == L1_CHAIN_ID
+    function _getCreate2Salt(
+        uint256 _tokenOriginChainId,
+        address _l1Token
+    ) internal view override returns (bytes32 salt) {
+        salt = _tokenOriginChainId == L1_CHAIN_ID
             ? bytes32(uint256(uint160(_l1Token)))
-            : keccak256(abi.encode(_originChainId, _l1Token));
+            : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
     function _handleChainBalanceIncrease(

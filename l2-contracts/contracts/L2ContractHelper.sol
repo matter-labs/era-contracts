@@ -181,7 +181,7 @@ library L2ContractHelper {
     /// - Bytecode bytes length is not a multiple of 32
     /// - Bytecode bytes length is not less than 2^21 bytes (2^16 words)
     /// - Bytecode words length is not odd
-    function hashL2Bytecode(bytes calldata _bytecode) internal view returns (bytes32 hashedBytecode) {
+    function hashL2BytecodeCalldata(bytes calldata _bytecode) internal view returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
         if (_bytecode.length % 32 != 0) {
             revert MalformedBytecode(BytecodeError.Length);

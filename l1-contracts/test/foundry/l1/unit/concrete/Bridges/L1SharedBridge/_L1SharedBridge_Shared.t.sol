@@ -153,7 +153,6 @@ contract L1AssetRouterTest is Test {
         nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
             _l1AssetRouter: address(sharedBridge),
-            _eraChainId: eraChainId,
             _l1Nullifier: l1Nullifier
         });
         address tokenBeacon = makeAddr("tokenBeacon");
@@ -208,11 +207,6 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
-        // vm.mockCall(
-        //     address(bridgehubAddress),
-        //     abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, address(token)),
-        //     abi.encode(nativeTokenVault.getAssetId(address(token)))
-        // );
 
         token.mint(address(nativeTokenVault), amount);
 
@@ -281,7 +275,7 @@ contract L1AssetRouterTest is Test {
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
             .target(address(l1Nullifier))
-            .sig(l1Nullifier.__DEPRECATED_chainBalance.selector)
+            .sig(l1Nullifier.chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);

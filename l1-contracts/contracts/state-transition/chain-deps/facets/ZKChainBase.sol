@@ -6,7 +6,7 @@ import {ZKChainStorage} from "../ZKChainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, NotSettlementLayer} from "../../../common/L1ContractErrors.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -62,9 +62,9 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyBaseTokenBridge() {
-        if (msg.sender != s.baseTokenBridge) {
-            revert Unauthorized(msg.sender);
+    modifier onlySettlementLayer() {
+        if (s.settlementLayer != address(0)) {
+            revert NotSettlementLayer();
         }
         _;
     }

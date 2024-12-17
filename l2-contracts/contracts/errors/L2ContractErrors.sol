@@ -2,6 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+// 0x1f73225f
+error AddressMismatch(address expected, address supplied);
+// 0x1294e9e1
+error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
 // 0x7138356f
@@ -20,6 +24,7 @@ error Unimplemented();
 error UnsupportedPaymasterFlow();
 // 0x750b219c
 error WithdrawFailed();
+// 0xcea34703
 error MalformedBytecode(BytecodeError);
 
 enum BytecodeError {

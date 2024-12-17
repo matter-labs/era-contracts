@@ -99,10 +99,6 @@ library BatchDecoder {
             uint256[] memory proof
         )
     {
-        if (_proofData.length == 0) {
-            revert EmptyData();
-        }
-
         uint8 encodingVersion = uint8(_proofData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
             (prevBatch, provedBatches, proof) = abi.decode(
