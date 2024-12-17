@@ -77,7 +77,7 @@ error ChainIdCantBeCurrentChain();
 error ChainIdMismatch();
 // 0x23f3c357
 error ChainIdNotRegistered(uint256 chainId);
-//
+// 0x5de72107
 error ChainNotLegacy();
 // 0x78d2ed02
 error ChainAlreadyLive();
@@ -111,7 +111,7 @@ error EmptyBytes32();
 error EmptyDeposit();
 // 0x627e0872
 error ETHDepositNotSupported();
-//
+// 0x1bdfd505
 error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
@@ -371,22 +371,16 @@ error IncorrectPricingMode();
 error NotSettlementLayer();
 // 0x7a4902ad
 error TimerAlreadyStarted();
-
 // 0x09aa9830
 error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);
-
 // 0xc33e6128
 error MerkleNothingToProve();
-
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
-
 // 0x1b582fcf
 error MerkleWrongIndex(uint256 index, uint256 maxNodeNumber);
-
 // 0x485cfcaa
 error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
-
 // 0xce63ce17
 error NoCTMForAssetId(bytes32 assetId);
 
