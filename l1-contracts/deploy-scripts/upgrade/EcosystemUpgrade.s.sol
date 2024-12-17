@@ -182,6 +182,7 @@ contract EcosystemUpgrade is Script {
         // for facilitating partially trusted, but not critical tasks.
         address ecosystemAdminAddress;
         bool testnetVerifier;
+        uint256 governanceUpgradeTimerInitialDelay;
         ContractsConfig contracts;
         TokensConfig tokens;
     }
@@ -724,8 +725,8 @@ contract EcosystemUpgrade is Script {
         config.contracts.oldValidatorTimelock = toml.readAddress("$.contracts.old_validator_timelock");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
+        config.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
-        // TODO: maybe receive the address from the config + cross check
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
     }
 
@@ -838,11 +839,10 @@ contract EcosystemUpgrade is Script {
 
     function publishBytecodes() internal {
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
-        BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(addresses.bytecodesSupplier), allDeps);
-
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
-
         require(factoryDeps.length <= 64, "Too many deps");
+
+        BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(addresses.bytecodesSupplier), allDeps);
 
         for (uint256 i = 0; i < allDeps.length; i++) {
             factoryDeps[i] = uint256(L2ContractHelper.hashL2Bytecode(allDeps[i]));
@@ -1055,9 +1055,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployL1NullifierImplementation() internal {
-        // TODO(EVM-743): allow non-dev nullifier in the local deployment
         bytes memory bytecode = abi.encodePacked(
-            type(L1NullifierDev).creationCode,
+            type(L1Nullifier).creationCode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(config.contracts.bridgehubProxyAddress, config.eraChainId, config.contracts.eraDiamondProxy)
         );
@@ -1133,12 +1132,6 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployBridgedTokenBeacon() internal {
-        // bytes memory bytecode = abi.encodePacked(
-        //     type(UpgradeableBeacon).creationCode,
-        //     // solhint-disable-next-line func-named-parameters
-        //     abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
-        // );
-
         // Note, that the `msg.sender` will be set as the owner.
         // This means that we can not use a naive create2factory. It may be replaced
         // with a more advanced one, but CREATE from a hot wallet is fine too.
@@ -1185,7 +1178,6 @@ contract EcosystemUpgrade is Script {
 
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.sharedBridgeProxy);
         IL1Nullifier l1Nullifier = IL1Nullifier(config.contracts.oldSharedBridgeProxyAddress);
-        // Ownable ownable = Ownable(addresses.bridges.sharedBridgeProxy);
 
         vm.broadcast(msg.sender);
         sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
@@ -1203,8 +1195,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployGovernanceUpgradeTimer() internal {
-        // Needed for easy server testing, in reality it will be different
-        uint256 INITIAL_DELAY = 0;
+        uint256 INITIAL_DELAY = config.governanceUpgradeTimerInitialDelay;
 
         uint256 MAX_ADDITIONAL_DELAY = 2 weeks;
 
@@ -1248,7 +1239,6 @@ contract EcosystemUpgrade is Script {
         _moveGovernanceToOwner(addresses.validatorTimelock);
         _moveGovernanceToOwner(addresses.bridges.sharedBridgeProxy);
         _moveGovernanceToOwner(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        console.log("hi");
         _moveGovernanceToOwner(addresses.daAddresses.rollupDAManager);
 
         vm.stopBroadcast();
