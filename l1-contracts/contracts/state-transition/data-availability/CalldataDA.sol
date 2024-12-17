@@ -107,7 +107,7 @@ abstract contract CalldataDA {
             revert PubdataTooLong(_pubdata.length, BLOB_SIZE_BYTES);
         }
         if (_fullPubdataHash != keccak256(_pubdata)) {
-            revert InvalidPubdataHash();
+            revert InvalidPubdataHash(_fullPubdataHash, keccak256(_pubdata));
         }
         blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - BLOB_COMMITMENT_SIZE:_pubdataInput.length]);
     }

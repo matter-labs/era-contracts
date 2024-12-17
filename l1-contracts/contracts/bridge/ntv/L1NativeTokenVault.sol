@@ -62,7 +62,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Accepts ether only from the contract that was the shared Bridge.
     receive() external payable {
-        if ((address(L1_NULLIFIER) != msg.sender) && (address(ASSET_ROUTER) != msg.sender)) {
+        if (address(L1_NULLIFIER) != msg.sender) {
             revert Unauthorized(msg.sender);
         }
     }
@@ -166,7 +166,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bool _depositChecked,
         uint256 _depositAmount,
         address _receiver,
-        address _tokenAddress
+        address _nativeToken
     ) internal override returns (bytes memory _bridgeMintData) {
         bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
             _assetId,
@@ -180,7 +180,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             _depositChecked: depositChecked,
             _depositAmount: _depositAmount,
             _receiver: _receiver,
-            _tokenAddress: _tokenAddress
+            _nativeToken: _nativeToken
         });
     }
 
@@ -195,6 +195,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _depositSender,
         bytes calldata _data
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
+        // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];
         if (_amount == 0) {
@@ -230,7 +231,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
+    function _registerTokenIfBridgedLegacy(address) internal override returns (bytes32) {
         // There are no legacy tokens present on L1.
         return bytes32(0);
     }
@@ -280,7 +281,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 _amount,
         bool _isNative
     ) internal override {
-        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+        // Note, that we do not update balances for chains where the assetId comes from,
+        // since these chains can mint new instances of the token.
+        if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
             chainBalance[_chainId][_assetId] += _amount;
         }
     }
@@ -291,12 +294,24 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 _amount,
         bool _isNative
     ) internal override {
-        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+        // Note, that we do not update balances for chains where the assetId comes from,
+        // since these chains can mint new instances of the token.
+        if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
             // Check that the chain has sufficient balance
             if (chainBalance[_chainId][_assetId] < _amount) {
                 revert InsufficientChainBalance();
             }
             chainBalance[_chainId][_assetId] -= _amount;
         }
+    }
+
+    /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.
+    /// it can be minted by it.
+    /// @param _isNative Whether the asset is native to the L1 chain.
+    /// @param _assetId The asset id
+    /// @param _chainId An id of a chain which we test against.
+    /// @return Whether The chain `_chainId` has infinite balance of the token
+    function _hasInfiniteBalance(bool _isNative, bytes32 _assetId, uint256 _chainId) private view returns (bool) {
+        return !_isNative && originChainId[_assetId] == _chainId;
     }
 }

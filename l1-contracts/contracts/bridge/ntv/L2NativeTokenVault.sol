@@ -87,13 +87,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
         // In zkEVM immutables are stored in a storage of a system contract,
         // so it makes sense to cache them for efficiency.
-        address legacyBridge = address(L2_LEGACY_SHARED_BRIDGE);
-        if (legacyBridge == address(0)) {
+        IL2SharedBridgeLegacy legacyBridge = L2_LEGACY_SHARED_BRIDGE;
+        if (address(legacyBridge) == address(0)) {
             // No legacy bridge, the token must be native
             return bytes32(0);
         }
 
-        address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_tokenAddress);
+        address l1TokenAddress = legacyBridge.l1TokenAddress(_tokenAddress);
         if (l1TokenAddress == address(0)) {
             // The token is not legacy
             return bytes32(0);
@@ -231,18 +231,18 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
-    /// @param _originChainId The chain id of the origin token.
+    /// @param _tokenOriginChainId The chain id of the origin token.
     /// @param _nonNativeToken The address of token on its origin chain..
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
-        uint256 _originChainId,
+        uint256 _tokenOriginChainId,
         address _nonNativeToken
     ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
             bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-            bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
+            bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _nonNativeToken);
             return
                 L2ContractHelper.computeCreate2Address(
                     address(this),

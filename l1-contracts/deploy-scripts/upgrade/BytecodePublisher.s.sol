@@ -14,10 +14,10 @@ library BytecodePublisher {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
-    // 100 kb
+    /// @notice Maximal size of bytecodes' batch to be published at once
     uint256 constant MAX_BATCH_SIZE = 126_000;
 
-    /// @notice Publishes bytecodes in batches, each not exceeding 100KB
+    /// @notice Publishes bytecodes in batches, each not exceeding `MAX_BATCH_SIZE`
     /// @param bytecodes The array of bytecodes to publish
     function publishBytecodesInBatches(BytecodesSupplier bytecodesSupplier, bytes[] memory bytecodes) internal {
         uint256 totalBytecodes = bytecodes.length;

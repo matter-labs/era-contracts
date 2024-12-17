@@ -14,12 +14,13 @@ import {IChainTypeManager, ChainTypeManagerInitializeData, ChainCreationParams} 
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
+import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -65,12 +66,19 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
     constructor(address _bridgehub) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+
+        _disableInitializers();
     }
 
     /// @notice only the bridgehub can call
@@ -115,6 +123,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @dev initialize
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
@@ -227,6 +240,10 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
+        if (!IBridgehub(BRIDGE_HUB).migrationPaused()) {
+            revert MigrationsNotPaused();
+        }
+
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;

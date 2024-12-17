@@ -278,7 +278,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_bridgeRecoverFailedTransfer_Eth_claimFailedDepositFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
@@ -357,7 +357,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.store(address(l1Nullifier), bytes32(isWithdrawalFinalizedStorageLocation - 5), bytes32(uint256(2)));
 
         uint256 l2BatchNumber = 0;
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");

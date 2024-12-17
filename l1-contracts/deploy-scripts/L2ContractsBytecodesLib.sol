@@ -190,6 +190,12 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL1("L2SharedBridgeLegacy.sol", "L2SharedBridgeLegacy");
     }
 
+    /// @notice Reads the bytecode of the L2SharedBridgeLegacy contract.
+    /// @return The bytecode of the L2SharedBridgeLegacy contract.
+    function readL2LegacySharedBridgeDevBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL1("L2SharedBridgeLegacyDev.sol", "L2SharedBridgeLegacyDev");
+    }
+
     /// @notice Reads the bytecode of the L2GatewayUpgrade contract.
     /// @return The bytecode of the L2GatewayUpgrade contract.
     function readGatewayUpgradeBytecode() internal view returns (bytes memory) {

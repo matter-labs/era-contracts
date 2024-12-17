@@ -145,7 +145,7 @@ abstract contract NativeTokenVault is
     }
 
     function _bridgeMintBridgedToken(
-        uint256 _originChainId,
+        uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) internal virtual returns (address receiver, uint256 amount) {
@@ -159,12 +159,12 @@ abstract contract NativeTokenVault is
         if (token == address(0)) {
             token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
-        _handleChainBalanceDecrease(_originChainId, _assetId, amount, false);
+        _handleChainBalanceDecrease(_chainId, _assetId, amount, false);
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
     }
 
     function _bridgeMintNativeToken(
-        uint256 _originChainId,
+        uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) internal returns (address receiver, uint256 amount) {
@@ -172,7 +172,7 @@ abstract contract NativeTokenVault is
         // slither-disable-next-line unused-return
         (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
 
-        _handleChainBalanceDecrease(_originChainId, _assetId, amount, true);
+        _handleChainBalanceDecrease(_chainId, _assetId, amount, true);
         _withdrawFunds(_assetId, receiver, token, amount);
     }
 
@@ -202,14 +202,14 @@ abstract contract NativeTokenVault is
     {
         (uint256 amount, address receiver, address tokenAddress) = _decodeBurnAndCheckAssetId(_data, _assetId);
         if (originChainId[_assetId] != block.chainid) {
-            _bridgeMintData = _bridgeBurnBridgedToken(
-                _chainId,
-                _assetId,
-                _originalCaller,
-                amount,
-                receiver,
-                tokenAddress
-            );
+            _bridgeMintData = _bridgeBurnBridgedToken({
+                _chainId: _chainId,
+                _assetId: _assetId,
+                _originalCaller: _originalCaller,
+                _amount: amount,
+                _receiver: receiver,
+                _tokenAddress: tokenAddress
+            });
         } else {
             _bridgeMintData = _bridgeBurnNativeToken({
                 _chainId: _chainId,
@@ -218,22 +218,22 @@ abstract contract NativeTokenVault is
                 _depositChecked: false,
                 _depositAmount: amount,
                 _receiver: receiver,
-                _tokenAddress: tokenAddress
+                _nativeToken: tokenAddress
             });
         }
     }
 
     function tryRegisterTokenFromBurnData(bytes calldata _data, bytes32 _expectedAssetId) external {
-        (uint256 amount, address receiver, address tokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
+        // slither-disable-next-line unused-return
+        (, , address tokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (tokenAddress == address(0)) {
-            // todo
-            revert("Nothing to register");
+            revert ZeroAddress();
         }
 
         bytes32 storedAssetId = assetId[tokenAddress];
         if (storedAssetId != bytes32(0)) {
-            revert("asset id already registered");
+            revert AssetIdAlreadyRegistered();
         }
 
         // This token has not been registered within this NTV yet. Usually this means that the
@@ -250,27 +250,30 @@ abstract contract NativeTokenVault is
         }
 
         if (newAssetId != _expectedAssetId) {
-            // todo
-            revert("bad asset id");
+            revert AssetIdMismatch(_expectedAssetId, newAssetId);
         }
     }
 
     function _decodeBurnAndCheckAssetId(
         bytes calldata _data,
-        bytes32 _expectedAssetId
+        bytes32 _suppliedAssetId
     ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
         (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (parsedTokenAddress == address(0)) {
-            // This means that the wants the native token vault to resolve the
+            // This means that the user wants the native token vault to resolve the
             // address. In this case, it is assumed that the assetId is already registered.
-            parsedTokenAddress = tokenAddress[_expectedAssetId];
+            parsedTokenAddress = tokenAddress[_suppliedAssetId];
+        }
+
+        // If it is still zero, it means that the token has not been registered.
+        if (parsedTokenAddress == address(0)) {
+            revert ZeroAddress();
         }
 
         bytes32 storedAssetId = assetId[parsedTokenAddress];
-        if (_expectedAssetId != storedAssetId || parsedTokenAddress == address(0)) {
-            // todo: use custom error;
-            revert("bad asset id");
+        if (_suppliedAssetId != storedAssetId) {
+            revert AssetIdMismatch(storedAssetId, _suppliedAssetId);
         }
     }
 
@@ -333,7 +336,7 @@ abstract contract NativeTokenVault is
         bool _depositChecked,
         uint256 _depositAmount,
         address _receiver,
-        address _tokenAddress
+        address _nativeToken
     ) internal virtual returns (bytes memory _bridgeMintData) {
         address nativeToken = tokenAddress[_assetId];
         if (nativeToken == WETH_TOKEN) {
@@ -349,13 +352,12 @@ abstract contract NativeTokenVault is
 
             _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
         } else {
-            // The Bridgehub also checks this, but we want to be sure
             if (msg.value != 0) {
                 revert NonEmptyMsgValue();
             }
             _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
             if (!_depositChecked) {
-                uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(_tokenAddress), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
+                uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(_nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
                 // The token has non-standard transfer logic
                 if (_depositAmount != expectedDepositAmount) {
                     revert TokensWithFeesNotSupported();
@@ -369,12 +371,12 @@ abstract contract NativeTokenVault is
 
         bytes memory erc20Metadata;
         {
-            erc20Metadata = getERC20Getters(_tokenAddress, originChainId[_assetId]);
+            erc20Metadata = getERC20Getters(_nativeToken, originChainId[_assetId]);
         }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
             _remoteReceiver: _receiver,
-            _originToken: _tokenAddress,
+            _originToken: _nativeToken,
             _amount: _depositAmount,
             _erc20Metadata: erc20Metadata
         });

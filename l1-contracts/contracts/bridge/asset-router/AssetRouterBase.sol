@@ -15,7 +15,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {Unauthorized, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
@@ -51,7 +51,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[47] private __gap;
+    uint256[48] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -147,8 +147,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
         if (l1AssetHandler == address(0)) {
-            // As a UX feature, whenever we asset handler is not present, we always try to register asset within native token vault.
-            // The Native Token Vault is trusted to correctly return whether an asset belongs to it.
+            // As a UX feature, whenever an asset handler is not present, we always try to register asset within native token vault.
+            // The Native Token Vault is trusted to revert in an asset does not belong to it.
             //
             // Note, that it may "pollute" error handling a bit: instead of getting error for asset handler not being
             // present, the user will get whatever error the native token vault will return, however, providing

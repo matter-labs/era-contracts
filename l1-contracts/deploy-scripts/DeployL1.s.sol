@@ -57,6 +57,7 @@ import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -341,9 +342,15 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployL1NullifierImplementation() internal {
-        // TODO(EVM-743): allow non-dev nullifier in the local deployment
+        bytes memory bytecode;
+        if (config.supportL2LegacySharedBridgeTest) {
+            bytecode = type(L1NullifierDev).creationCode;
+        } else {
+            bytecode = type(L1Nullifier).creationCode;
+        }
+
         address contractAddress = deployViaCreate2(
-            type(L1NullifierDev).creationCode,
+            bytecode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.stateTransition.diamondProxy)
         );
@@ -726,6 +733,15 @@ contract DeployL1Script is Script, DeployUtils {
     function prepareForceDeploymentsData() internal view returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
 
+        address dangerousTestOnlyForcedBeacon;
+        if (config.supportL2LegacySharedBridgeTest) {
+            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+                addresses.bridges.erc20BridgeProxy,
+                addresses.bridges.l1NullifierProxy,
+                addresses.governance
+            );
+        }
+
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
@@ -746,7 +762,8 @@ contract DeployL1Script is Script, DeployUtils {
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
-            l2BridgedStandardERC20Impl: address(0)
+            l2BridgedStandardERC20Impl: address(0),
+            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });
 
         return abi.encode(data);

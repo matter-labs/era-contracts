@@ -346,16 +346,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_validateMigrationToL2() public {
-        address expectedAddress = L2ContractHelper.computeCreate2Address(
-            L2_FACTORY_ADDR,
-            bytes32(0),
-            bytes32(0),
-            bytes32(0)
-        );
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, uint256(0));
 
         vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.AllowL2Admin(expectedAddress);
-        permRestriction.allowL2Admin(bytes32(0), bytes32(0), bytes32(0));
+        permRestriction.allowL2Admin(uint256(0));
 
         Call memory call = _encodeMigraationCall(true, true, true, true, true, expectedAddress);
 

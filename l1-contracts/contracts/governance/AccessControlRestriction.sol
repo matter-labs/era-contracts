@@ -65,6 +65,8 @@ contract AccessControlRestriction is Restriction, IAccessControlRestriction, Acc
         // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
         // role for all the functions.
         if (_call.data.length < 4) {
+            // Note, that the following restriction protects only for targets that were compiled after
+            // Solidity v0.4.18, since before a substring of selector could still call the function.
             if (!hasRole(requiredRolesForFallback[_call.target], _invoker)) {
                 revert AccessToFallbackDenied(_call.target, _invoker);
             }

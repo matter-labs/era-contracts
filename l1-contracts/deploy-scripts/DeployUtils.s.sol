@@ -69,6 +69,10 @@ struct FixedForceDeploymentsData {
     bytes32 messageRootBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
+    // The forced beacon address. It is needed only for internal testing.
+    // MUST be equal to 0 in production.
+    // It will be the job of the governance to ensure that this value is set correctly.
+    address dangerousTestOnlyForcedBeacon;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -129,6 +133,7 @@ struct Config {
     uint256 eraChainId;
     address ownerAddress;
     bool testnetVerifier;
+    bool supportL2LegacySharedBridgeTest;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -192,6 +197,7 @@ contract DeployUtils is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
+        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"

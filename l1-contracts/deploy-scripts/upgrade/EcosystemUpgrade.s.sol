@@ -87,6 +87,10 @@ struct FixedForceDeploymentsData {
     bytes32 messageRootBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
+    // The forced beacon address. It is needed only for internal testing.
+    // MUST be equal to 0 in production.
+    // It will be the job of the governance to ensure that this value is set correctly.
+    address dangerousTestOnlyForcedBeacon;
 }
 
 // A subset of the ones used for tests
@@ -1514,7 +1518,8 @@ contract EcosystemUpgrade is Script {
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
             l2SharedBridgeLegacyImpl: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
-            l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl
+            l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
+            dangerousTestOnlyForcedBeacon: address(0)
         });
 
         return abi.encode(data);

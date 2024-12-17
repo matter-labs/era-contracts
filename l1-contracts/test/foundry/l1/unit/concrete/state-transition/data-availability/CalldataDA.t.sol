@@ -155,7 +155,13 @@ contract CalldataDATest is Test {
         bytes memory pubdataInput = abi.encodePacked(pubdataInputWithoutBlobCommitment, blobCommitment);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
-        vm.expectRevert(InvalidPubdataHash.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidPubdataHash.selector,
+                fullPubdataHash,
+                keccak256(pubdataInputWithoutBlobCommitment)
+            )
+        );
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
