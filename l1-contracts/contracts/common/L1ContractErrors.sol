@@ -279,7 +279,7 @@ error SharedBridgeNotSet();
 error SlotOccupied();
 // 0xec273439
 error CTMAlreadyRegistered();
-// 0x09865e10
+// 0xc630ef3c
 error CTMNotRegistered();
 // 0xae43b424
 error SystemLogsSizeTooBig();
