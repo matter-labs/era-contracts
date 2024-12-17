@@ -9,6 +9,7 @@ import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -81,15 +82,25 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
     ) external view returns (bool) {
         if (sender == L1_ASSET_ROUTER) {
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
+
+            if (IL2AssetRouter.setAssetHandlerAddress.selector == l2TxSelector) {
+                (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, address));
+                return _checkCTMAssetId(decodedAssetId);
+            }
+
             if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 
             (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
-            address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(decodedAssetId);
-            return (ctmAddress != address(0));
+            return _checkCTMAssetId(decodedAssetId);
         }
 
         return whitelistedSenders[sender];
+    }
+
+    function _checkCTMAssetId(bytes32 assetId) internal view returns (bool) {
+        address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(assetId);
+        return ctmAddress != address(0);
     }
 }

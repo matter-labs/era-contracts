@@ -92,7 +92,7 @@ library Utils {
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32("")
         );
-        logs[3] = constructL2Log(
+        logs[5] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),

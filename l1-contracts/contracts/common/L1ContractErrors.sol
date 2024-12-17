@@ -133,7 +133,7 @@ error GenesisUpgradeZero();
 error HashedLogIsDefault();
 // 0x0b08d5be
 error HashMismatch(bytes32 expected, bytes32 actual);
-// 0xb615c2b1
+// 0x601b6882
 error ZKChainLimitReached();
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
@@ -277,7 +277,7 @@ error SharedBridgeValueNotSet(SharedBridgeKey);
 error SharedBridgeNotSet();
 // 0xdf3a8fdd
 error SlotOccupied();
-// 0xd0bc70cf
+// 0xec273439
 error CTMAlreadyRegistered();
 // 0x09865e10
 error CTMNotRegistered();
@@ -329,11 +329,11 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x99d8fec9
 error EmptyData();
-// 0xc99a8360
+// 0xf3dd1b9c
 error UnsupportedCommitBatchEncoding(uint8 version);
 // 0xe167e4a6
 error UnsupportedProofBatchEncoding(uint8 version);
-// 0xe8e3f6f4
+// 0x14d2ed8a
 error UnsupportedExecuteBatchEncoding(uint8 version);
 // 0xd7d93e1f
 error IncorrectBatchBounds(
