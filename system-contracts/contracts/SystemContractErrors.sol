@@ -103,9 +103,6 @@ error SloadContractBytecodeUnknown();
 // 0x43197434
 error PreviousBytecodeUnknown();
 
-// 0x7a47c9a2
-error InvalidChainId();
-
 // 0xc84a0422
 error UpgradeTransactionMustBeFirst();
 

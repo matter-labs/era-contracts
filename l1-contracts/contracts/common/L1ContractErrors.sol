@@ -15,12 +15,6 @@ error RestrictionWasNotPresent(address restriction);
 error RestrictionWasAlreadyPresent(address restriction);
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
-// 0x59e1b0d2
-error ChainZeroAddress();
-// 0xff4bbdf1
-error NotAHyperchain(address chainAddress);
-// 0xa3decdf3
-error NotAnAdmin(address expected, address actual);
 // 0xf6fd7071
 error RemovingPermanentRestriction();
 // 0xfcb9b2e1
@@ -33,8 +27,6 @@ error AddressAlreadySet(address addr);
 error AddressHasNoCode(address);
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
-// 0x1eee5481
-error AddressTooLow(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
 // 0xfde974f4
@@ -47,8 +39,6 @@ error AssetIdAlreadyRegistered();
 error AlreadyWhitelisted(address);
 // 0x04a0b7e9
 error AssetIdNotSupported(bytes32 assetId);
-// 0x6afd6c20
-error BadReturnData();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
@@ -61,8 +51,6 @@ error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumb
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
 error BridgeMintNotImplemented();
-// 0xcf102c5a
-error CalldataLengthTooBig();
 // 0xe85392f9
 error CanOnlyProcessOneBatch();
 // 0x00c6ead2
@@ -79,8 +67,6 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x5de72107
 error ChainNotLegacy();
-// 0x78d2ed02
-error ChainAlreadyLive();
 // 0x8f620a06
 error ChainIdTooBig();
 // 0xf7a01e4d
@@ -115,10 +101,6 @@ error ETHDepositNotSupported();
 error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
-// 0x79e12cc3
-error FacetIsFrozen(bytes4 func);
-// 0xd37a223a
-error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x6d4a7df8
@@ -143,8 +125,6 @@ error InsufficientChainBalance();
 error InsufficientFunds();
 // 0xcbd9d2e0
 error InvalidCaller(address);
-// 0x7a47c9a2
-error InvalidChainId();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0xc1780bd6
@@ -209,8 +189,6 @@ error NonIncreasingTimestamp();
 error NonSequentialBatch();
 // 0x0ac76f01
 error NonSequentialVersion();
-// 0x4ef79e5a
-error NonZeroAddress(address);
 // 0xdd629f86
 error NotEnoughGas();
 // 0xdd7e3621
@@ -331,7 +309,7 @@ error ZeroChainId();
 error EmptyData();
 // 0xf3dd1b9c
 error UnsupportedCommitBatchEncoding(uint8 version);
-// 0xe167e4a6
+// 0xf338f830
 error UnsupportedProofBatchEncoding(uint8 version);
 // 0x14d2ed8a
 error UnsupportedExecuteBatchEncoding(uint8 version);
@@ -344,10 +322,6 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
-// 0x10f30e75
-error NotBridgehub(address addr);
-// 0x2554babc
-error InvalidAddress(address expected, address actual);
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -372,12 +346,6 @@ error IncorrectPricingMode();
 error NotSettlementLayer();
 // 0x7a4902ad
 error TimerAlreadyStarted();
-// 0x09aa9830
-error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);
-// 0xc33e6128
-error MerkleNothingToProve();
-// 0xafbb7a4e
-error MerkleIndexOrHeightMismatch();
 // 0x1b582fcf
 error MerkleWrongIndex(uint256 index, uint256 maxNodeNumber);
 // 0x485cfcaa
