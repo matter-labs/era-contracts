@@ -19,7 +19,6 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {L1GatewayHelper} from "./L1GatewayHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,8 +38,6 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         bytes calldata _forceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
-        address baseTokenAddress = IBridgehub(s.bridgehub).baseToken(_chainId);
-
         L2CanonicalTransaction memory l2ProtocolUpgradeTx;
 
         {
