@@ -15,27 +15,27 @@ import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
 library DataEncoding {
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
     /// @param _originalCaller The address which initiated the transfer.
-    /// @param _remoteReceiver The address which to receive tokens on remote chain.
-    /// @param _originToken The transferred token address.
+    /// @param _l2Receiver The address which to receive tokens on remote chain.
+    /// @param _l1Token The transferred token address.
     /// @param _amount The amount of token to be transferred.
     /// @param _erc20Metadata The transferred token metadata.
     /// @return The encoded bridgeMint data
     function encodeBridgeMintData(
         address _originalCaller,
-        address _remoteReceiver,
-        address _originToken,
+        address _l2Receiver,
+        address _l1Token,
         uint256 _amount,
         bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encode(_originalCaller, _remoteReceiver, _originToken, _amount, _erc20Metadata);
+        return abi.encode(_originalCaller, _l2Receiver, _l1Token, _amount, _erc20Metadata);
     }
 
     /// @notice Function decoding transfer data previously encoded with this library.
     /// @param _bridgeMintData The encoded bridgeMint data
     /// @return _originalCaller The address which initiated the transfer.
-    /// @return _remoteReceiver The address which to receive tokens on remote chain.
-    /// @return _parsedOriginToken The transferred token address.
+    /// @return _l2Receiver The address which to receive tokens on remote chain.
+    /// @return _parsedL1Token The transferred token address.
     /// @return _amount The amount of token to be transferred.
     /// @return _erc20Metadata The transferred token metadata.
     function decodeBridgeMintData(
@@ -45,16 +45,30 @@ library DataEncoding {
         pure
         returns (
             address _originalCaller,
-            address _remoteReceiver,
-            address _parsedOriginToken,
+            address _l2Receiver,
+            address _parsedL1Token,
             uint256 _amount,
             bytes memory _erc20Metadata
         )
     {
-        (_originalCaller, _remoteReceiver, _parsedOriginToken, _amount, _erc20Metadata) = abi.decode(
+        (_originalCaller, _l2Receiver, _parsedL1Token, _amount, _erc20Metadata) = abi.decode(
             _bridgeMintData,
             (address, address, address, uint256, bytes)
         );
+    }
+
+    /// @notice Encodes the legacy transaction data hash.
+    /// @dev the encoding strats with 0t
+    /// @param _originalCaller The address of the entity that initiated the deposit.
+    /// @param _l1Token The address of the L1 token.
+    /// @param _amount The amount of the L1 token.
+    /// @return txDataHash The resulting encoded transaction data hash.
+    function encodeLegacyTxDataHash(
+        address _originalCaller,
+        address _l1Token,
+        uint256 _amount
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_originalCaller, _l1Token, _amount));
     }
 
     /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
@@ -108,7 +122,7 @@ library DataEncoding {
         if (_encodingVersion == LEGACY_ENCODING_VERSION) {
             address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = encodeLegacyTxDataHash(_originalCaller, tokenAddress, depositAmount);
+            txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
         } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.
             // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
@@ -120,21 +134,12 @@ library DataEncoding {
         }
     }
 
-    /// @notice Encodes the legacy transaction data hash.
-    /// @dev the encoding strats with 0t
-    /// @param _originalCaller The address of the entity that initiated the deposit.
-    /// @param _l1Token The address of the L1 token.
-    /// @param _amount The amount of the L1 token.
-    /// @return txDataHash The resulting encoded transaction data hash.
-    function encodeLegacyTxDataHash(
-        address _originalCaller,
-        address _l1Token,
-        uint256 _amount
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_originalCaller, _l1Token, _amount));
-    }
-
-    /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @notice Decodes the token data
+    /// @dev Note that all the returned metadata of the token is ABI encoded.
+    /// @return chainId The chainId of the origin of the token
+    /// @return name The name of the token.
+    /// @return symbol The symbol of the token.
+    /// @return decimals The decimals of the token.
     function decodeTokenData(
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {

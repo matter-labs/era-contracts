@@ -65,6 +65,8 @@ error ChainIdCantBeCurrentChain();
 error ChainIdMismatch();
 // 0x23f3c357
 error ChainIdNotRegistered(uint256 chainId);
+// 0x5de72107
+error ChainNotLegacy();
 // 0x8f620a06
 error ChainIdTooBig();
 // 0xf7a01e4d
@@ -87,12 +89,16 @@ error DiamondNotFrozen();
 error EmptyAddress();
 // 0x2d4d012f
 error EmptyAssetId();
+// 0xfc7ab1d3
+error EmptyBlobVersionHash(uint256 index);
 // 0x1c25715b
 error EmptyBytes32();
 // 0x95b66fe9
 error EmptyDeposit();
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0x1bdfd505
+error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0xc91cf3b1
@@ -115,6 +121,8 @@ error ZKChainLimitReached();
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x826fb11e
 error InsufficientChainBalance();
+// 0x356680b7
+error InsufficientFunds();
 // 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x4fbe5dba
@@ -314,10 +322,10 @@ error IncorrectBatchBounds(
 );
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
-// 0x64846fe4
-error NotARestriction(address addr);
 // 0xfa5cd00f
 error NotAllowed(address addr);
+// 0x64846fe4
+error NotARestriction(address addr);
 // 0xccdd18d2
 error BytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x25d8333c
@@ -338,22 +346,10 @@ error IncorrectPricingMode();
 error NotSettlementLayer();
 // 0x7a4902ad
 error TimerAlreadyStarted();
-
-// 0x09aa9830
-error MerklePathLengthMismatch(uint256 pathLength, uint256 expectedLength);
-
-// 0xc33e6128
-error MerkleNothingToProve();
-
-// 0xafbb7a4e
-error MerkleIndexOrHeightMismatch();
-
 // 0x1b582fcf
 error MerkleWrongIndex(uint256 index, uint256 maxNodeNumber);
-
 // 0x485cfcaa
 error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
-
 // 0xce63ce17
 error NoCTMForAssetId(bytes32 assetId);
 

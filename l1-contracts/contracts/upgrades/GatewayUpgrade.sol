@@ -9,11 +9,12 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
-import {GatewayUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {L1GatewayHelper} from "./L1GatewayHelper.sol";
+import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
+
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct GatewayUpgradeEncodedInput {
@@ -45,40 +46,25 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
-        GatewayUpgradeEncodedInput memory encodedInput = abi.decode(
+        (bytes memory l2TxDataStart, bytes memory l2TxDataFinish) = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
-            (GatewayUpgradeEncodedInput)
+            (bytes, bytes)
         );
 
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.__DEPRECATED_baseToken);
-
-        s.baseTokenAssetId = baseTokenAssetId;
+        s.baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.__DEPRECATED_baseToken);
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        s.validators[encodedInput.oldValidatorTimelock] = false;
-        s.validators[encodedInput.newValidatorTimelock] = true;
+        IBridgehub(s.bridgehub).setLegacyBaseTokenAssetId(s.chainId);
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
-
-        bytes memory gatewayUpgradeCalldata = abi.encode(
-            encodedInput.ctmDeployer,
-            encodedInput.fixedForceDeploymentsData,
-            L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
-                s,
-                encodedInput.wrappedBaseTokenStore,
-                s.__DEPRECATED_baseToken
-            )
+        address l2LegacyBridge = IL1SharedBridgeLegacy(s.baseTokenBridge).l2BridgeAddress(s.chainId);
+        proposedUpgrade.l2ProtocolUpgradeTx.data = bytes.concat(
+            l2TxDataStart,
+            bytes32(uint256(uint160(l2LegacyBridge))),
+            l2TxDataFinish
         );
-        encodedInput.forceDeployments[encodedInput.l2GatewayUpgradePosition].input = gatewayUpgradeCalldata;
-
-        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-            IL2ContractDeployer.forceDeployOnAddresses,
-            (encodedInput.forceDeployments)
-        );
-
         // slither-disable-next-line controlled-delegatecall
         (bool success, ) = THIS_ADDRESS.delegatecall(abi.encodeCall(IGatewayUpgrade.upgradeExternal, proposedUpgrade));
-        if (!success) {
-            revert GatewayUpgradeFailed();
-        }
+        // solhint-disable-next-line gas-custom-errors
+        require(success, "GatewayUpgrade: upgrade failed");
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 

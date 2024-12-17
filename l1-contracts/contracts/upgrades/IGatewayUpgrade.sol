@@ -6,7 +6,6 @@ import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 /**
  * @author Matter Labs
- * @custom:security-contact security@matterlabs.dev
  * @notice Gateway upgrade interface. Used for the protocol upgrade that introduces the Gateway.
  */
 interface IGatewayUpgrade {

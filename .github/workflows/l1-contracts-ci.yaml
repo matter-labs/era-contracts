@@ -45,6 +45,9 @@ jobs:
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
+      - name: Build l1 artifacts
+        run: yarn l1 build
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:

@@ -287,7 +287,7 @@ describe("L1Messenger tests", () => {
         l1Messenger
           .connect(knownCodeStorageAccount)
           .requestBytecodeL1Publication(ethers.utils.hexlify(utils.hashBytecode(bytecode)), {
-            gasLimit: 2300000000,
+            gasLimit: 230000000,
           })
       )
         .to.emit(l1Messenger, "BytecodeL1PublicationRequested")

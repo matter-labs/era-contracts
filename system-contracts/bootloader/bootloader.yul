@@ -3900,12 +3900,12 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function chainedPriorityTxnHashLogKey() -> ret {
-                ret := 2
+                ret := 3
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function numberOfLayer1TxsLogKey() -> ret {
-                ret := 3
+                ret := 4
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum

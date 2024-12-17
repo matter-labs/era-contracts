@@ -4,7 +4,9 @@ pragma solidity ^0.8.21;
 
 /**
  * @author Matter Labs
- * @notice System smart contract that is responsible for deploying other smart contracts on a ZK chain.
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for the contract that is used to deploy contracts on L2.
+ * @dev Identical interface is defined in L2ContractHelper library. Duplication is for testing purposes only.
  */
 interface IL2ContractDeployer {
     /// @notice A struct that describes a forced deployment on an address.
