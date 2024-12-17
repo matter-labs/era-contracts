@@ -121,6 +121,7 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -162,6 +163,7 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Install foundry zksync
         run: |
@@ -213,9 +215,6 @@ jobs:
             l2-contracts/cache-zk
             l2-contracts/typechain
             l1-contracts/lib
-
-      - name: Build L2 contracts
-        run: yarn l2 build
 
       - name: Build L2 contracts
         run: yarn l2 build
@@ -283,6 +282,7 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov

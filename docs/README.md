@@ -3,7 +3,6 @@
 The order of the files here only roughly represents the order of reading. A lot of topics are intertwined, so it is recommended to read everything first to have a complete picture and then refer to specific documents for more details.
 
 - [Glossary](./glossary.md)
-- [Overview](./overview.md)
 - Contracts of an individual chain
   - [ZK Chain basics](./settlement_contracts/zkchain_basics.md)
   - Data availability
