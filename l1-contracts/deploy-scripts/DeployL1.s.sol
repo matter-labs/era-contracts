@@ -10,8 +10,10 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {Verifier} from "contracts/state-transition/Verifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -253,15 +255,30 @@ contract DeployL1Script is Script {
     }
 
     function deployVerifier() internal {
+        address verifierFflonk = deployVerifierFflonk();
+        address verifierPlonk = deployVerifierPlonk();
         bytes memory code;
         if (config.testnetVerifier) {
             code = type(TestnetVerifier).creationCode;
         } else {
-            code = type(Verifier).creationCode;
+            code = type(DualVerifier).creationCode;
         }
+        code = abi.encodePacked(code, abi.encode(verifierFflonk, verifierPlonk));
         address contractAddress = deployViaCreate2(code);
-        console.log("Verifier deployed at:", contractAddress);
+        console.log("Dual verifier deployed at:", contractAddress);
         addresses.stateTransition.verifier = contractAddress;
+    }
+
+    function deployVerifierFflonk() internal returns (address contractAddress) {
+        bytes memory code = type(VerifierFflonk).creationCode;
+        contractAddress = deployViaCreate2(code);
+        console.log("FFLONK verifier deployed at:", contractAddress);
+    }
+
+    function deployVerifierPlonk() internal returns (address contractAddress) {
+        bytes memory code = type(VerifierPlonk).creationCode;
+        contractAddress = deployViaCreate2(code);
+        console.log("Plonk verifier deployed at:", contractAddress);
     }
 
     function deployDefaultUpgrade() internal {

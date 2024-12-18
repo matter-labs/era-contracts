@@ -17,8 +17,10 @@ import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -33,7 +35,7 @@ contract StateTransitionManagerTest is Test {
     address internal constant validator = address(0x5050505);
     address internal newChainAdmin;
     uint256 chainId = block.chainid;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     Diamond.FacetCut[] internal facetCuts;
 
