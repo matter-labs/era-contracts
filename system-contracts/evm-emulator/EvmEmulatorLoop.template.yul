@@ -407,7 +407,6 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0x39 { // OP_CODECOPY
-    
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         let dstOffset, sourceOffset, len
@@ -432,14 +431,14 @@ for { } true { } {
 
         sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
 
-        if gt(sourceOffset, MEM_LEN_OFFSET()) {
-            sourceOffset := MEM_LEN_OFFSET()
+        if gt(sourceOffset, bytecodeEndOffset) {
+            sourceOffset := bytecodeEndOffset
         }
 
         // Check bytecode out-of-bounds access
         let truncatedLen := len
-        if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
-            truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+        if gt(add(sourceOffset, len), bytecodeEndOffset) {
+            truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
         }
 
