@@ -122,8 +122,8 @@
     "contractName": "PubdataChunkPublisher",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/PubdataChunkPublisher.sol/PubdataChunkPublisher.json",
     "sourceCodePath": "contracts-preprocessed/PubdataChunkPublisher.sol",
-    "bytecodeHash": "0x01000049c3894918e0427641f1a176f5742177b0bf9778b19cd69d44aa96f6ee",
-    "sourceCodeHash": "0x398b1b9325b39d4c31e672866d4cbdf1cab453fae8d29f438262d921d427f094"
+    "bytecodeHash": "0x01000049db20631b837996e89e6f1d67ed8cb300fbde428a464ee4e1b8953f0f",
+    "sourceCodeHash": "0x2cc940e90be489f34c769147d18d3e607a89a60078ac7aed404670a7700f6e08"
   },
   {
     "contractName": "SloadContract",
