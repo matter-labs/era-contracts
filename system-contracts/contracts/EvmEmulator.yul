@@ -1746,16 +1746,14 @@ object "EvmEmulator" {
             
                     sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
             
-                    let outOfBoundsOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
-            
-                    if gt(sourceOffset, outOfBoundsOffset) {
-                        sourceOffset := outOfBoundsOffset
+                    if gt(sourceOffset, bytecodeEndOffset) {
+                        sourceOffset := bytecodeEndOffset
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), outOfBoundsOffset) {
-                        truncatedLen := sub(outOfBoundsOffset, sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), bytecodeEndOffset) {
+                        truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -4871,16 +4869,14 @@ object "EvmEmulator" {
                 
                         sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
                 
-                        let outOfBoundsOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
-                
-                        if gt(sourceOffset, outOfBoundsOffset) {
-                            sourceOffset := outOfBoundsOffset
+                        if gt(sourceOffset, bytecodeEndOffset) {
+                            sourceOffset := bytecodeEndOffset
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), outOfBoundsOffset) {
-                            truncatedLen := sub(outOfBoundsOffset, sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), bytecodeEndOffset) {
+                            truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
