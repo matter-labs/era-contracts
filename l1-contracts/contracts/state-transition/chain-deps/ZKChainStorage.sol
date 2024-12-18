@@ -150,7 +150,7 @@ struct ZKChainStorage {
     address __DEPRECATED_baseToken;
     /// @dev The address of the baseTokenbridge. Eth also uses the shared bridge
     address baseTokenBridge;
-    /// @notice gasPriceMultiplier for each baseToken, so that each L1->L2 transaction pays for its transaction on the destination
+    /// @notice gasPriceMultiplier for  each baseToken, so that each L1->L2 transaction pays for its transaction on the destination
     /// we multiply by the nominator, and divide by the denominator
     uint128 baseTokenGasPriceMultiplierNominator;
     uint128 baseTokenGasPriceMultiplierDenominator;
@@ -169,4 +169,6 @@ struct ZKChainStorage {
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
+    /// @dev Whether the chain is a permanent rollup
+    bool isPermanentRollup;
 }

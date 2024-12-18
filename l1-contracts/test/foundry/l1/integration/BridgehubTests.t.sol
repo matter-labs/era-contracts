@@ -22,6 +22,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -122,7 +123,9 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
-        require(users.length == 0, "Addresses already generated");
+        if (users.length != 0) {
+            revert AddressesAlreadyGenerated();
+        }
 
         for (uint256 i = 0; i < TEST_USERS_COUNT; i++) {
             address newAddress = makeAddr(string(abi.encode("account", i)));
@@ -270,7 +273,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgeHub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -320,7 +323,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgeHub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
+        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -375,7 +378,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgeHub.requestL2TransactionTwoBridges(requestTx);
+        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -420,7 +423,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: mintValue}(txRequest);
+        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -464,7 +467,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect(txRequest);
+        bytes32 resultantHash = bridgehub.requestL2TransactionDirect(txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -486,7 +489,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         bytes32[] memory merkleProof = new bytes32[](1);
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = l1Nullifier.__DEPRECATED_chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
         uint256 beforeBalance = currentToken.balanceOf(address(sharedBridge));
 
         if (beforeChainBalance < amountToWithdraw) {
@@ -534,7 +537,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         // check if the balance was updated correctly
         if (beforeChainBalance > amountToWithdraw) {
             assertEq(
-                beforeChainBalance - l1Nullifier.__DEPRECATED_chainBalance(currentChainId, currentTokenAddress),
+                beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
             assertEq(beforeBalance - currentToken.balanceOf(address(sharedBridge)), amountToWithdraw);
@@ -548,7 +551,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         bytes32[] memory merkleProof = new bytes32[](1);
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = l1Nullifier.__DEPRECATED_chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
         uint256 beforeBalance = address(sharedBridge).balance;
 
         if (beforeChainBalance < amountToWithdraw) {
@@ -590,7 +593,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         // check if the balance was updated correctly
         if (beforeChainBalance > amountToWithdraw) {
             assertEq(
-                beforeChainBalance - l1Nullifier.__DEPRECATED_chainBalance(currentChainId, currentTokenAddress),
+                beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
             assertEq(beforeBalance - address(sharedBridge).balance, amountToWithdraw);

@@ -11,6 +11,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {OnlyEraSupported, TooManyFactoryDeps, MsgValueTooLow, GasPerPubdataMismatch} from "contracts/common/L1ContractErrors.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
@@ -24,6 +25,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(l1SharedBridge);
+        vm.mockCall(bridgehub, abi.encodeCall(Bridgehub.sharedBridge, ()), abi.encode(baseTokenBridgeAddress));
 
         tempAddress = makeAddr("temp");
         tempBytesArr = new bytes[](0);
@@ -122,7 +124,6 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
     function test_RevertWhen_bridgePaused(uint256 randomValue) public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
-        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
 
         uint256 l2GasLimit = 1000000;
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
@@ -137,7 +138,6 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
     function test_success_requestL2Transaction(uint256 randomValue) public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
-        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
 
         uint256 l2GasLimit = 1000000;
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);

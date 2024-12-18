@@ -19,6 +19,7 @@ import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfac
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
+import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -75,23 +76,22 @@ library Utils {
         );
         logs[2] = constructL2Log(
             true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            bytes32("")
-        );
-        logs[3] = constructL2Log(
-            true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             keccak256("")
         );
-        logs[4] = constructL2Log(
+        logs[3] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
-
+        logs[4] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
+            bytes32("")
+        );
         logs[5] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -108,6 +108,18 @@ library Utils {
         return logs;
     }
 
+    function createSystemLogsWithEmptyDAValidator() public returns (bytes[] memory) {
+        bytes[] memory systemLogs = createSystemLogs(bytes32(0));
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+            true,
+            L2_TO_L1_MESSENGER,
+            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            bytes32(uint256(0))
+        );
+
+        return systemLogs;
+    }
+
     function createSystemLogsWithUpgradeTransaction(
         bytes32 _expectedSystemContractUpgradeTxHash
     ) public returns (bytes[] memory) {
@@ -116,6 +128,30 @@ library Utils {
         for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
             logs[i] = logsWithoutUpgradeTx[i];
         }
+        logs[logsWithoutUpgradeTx.length] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
+            _expectedSystemContractUpgradeTxHash
+        );
+        return logs;
+    }
+
+    function createSystemLogsWithUpgradeTransactionForCTM(
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        bytes32 _outputHash
+    ) public returns (bytes[] memory) {
+        bytes[] memory logsWithoutUpgradeTx = createSystemLogs(_outputHash);
+        bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
+        for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
+            logs[i] = logsWithoutUpgradeTx[i];
+        }
+        logs[uint256(SystemLogKey.PREV_BATCH_HASH_KEY)] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
+            bytes32(uint256(0x01))
+        );
         logs[logsWithoutUpgradeTx.length] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
@@ -198,7 +234,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](12);
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = AdminFacet.setPendingAdmin.selector;
         selectors[1] = AdminFacet.acceptAdmin.selector;
         selectors[2] = AdminFacet.setValidator.selector;
@@ -211,6 +247,7 @@ library Utils {
         selectors[9] = AdminFacet.freezeDiamond.selector;
         selectors[10] = AdminFacet.unfreezeDiamond.selector;
         selectors[11] = AdminFacet.genesisUpgrade.selector;
+        selectors[12] = AdminFacet.setDAValidatorPair.selector;
         return selectors;
     }
 
@@ -272,48 +309,47 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](41);
+        bytes4[] memory selectors = new bytes4[](39);
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
         selectors[3] = UtilsFacet.util_getBridgehub.selector;
         selectors[4] = UtilsFacet.util_setBaseToken.selector;
         selectors[5] = UtilsFacet.util_getBaseTokenAssetId.selector;
-        selectors[6] = UtilsFacet.util_setBaseTokenBridge.selector;
-        selectors[7] = UtilsFacet.util_getBaseTokenBridge.selector;
-        selectors[8] = UtilsFacet.util_setVerifier.selector;
-        selectors[9] = UtilsFacet.util_getVerifier.selector;
-        selectors[10] = UtilsFacet.util_setStoredBatchHashes.selector;
-        selectors[11] = UtilsFacet.util_getStoredBatchHashes.selector;
-        selectors[12] = UtilsFacet.util_setVerifierParams.selector;
-        selectors[13] = UtilsFacet.util_getVerifierParams.selector;
-        selectors[14] = UtilsFacet.util_setL2BootloaderBytecodeHash.selector;
-        selectors[15] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
-        selectors[16] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
-        selectors[17] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
-        selectors[18] = UtilsFacet.util_setPendingAdmin.selector;
-        selectors[19] = UtilsFacet.util_getPendingAdmin.selector;
-        selectors[20] = UtilsFacet.util_setAdmin.selector;
-        selectors[21] = UtilsFacet.util_getAdmin.selector;
-        selectors[22] = UtilsFacet.util_setValidator.selector;
-        selectors[23] = UtilsFacet.util_getValidator.selector;
-        selectors[24] = UtilsFacet.util_setZkPorterAvailability.selector;
-        selectors[25] = UtilsFacet.util_getZkPorterAvailability.selector;
-        selectors[26] = UtilsFacet.util_setChainTypeManager.selector;
-        selectors[27] = UtilsFacet.util_getChainTypeManager.selector;
-        selectors[28] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
-        selectors[29] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
-        selectors[30] = UtilsFacet.util_setFeeParams.selector;
-        selectors[31] = UtilsFacet.util_getFeeParams.selector;
-        selectors[32] = UtilsFacet.util_setProtocolVersion.selector;
-        selectors[33] = UtilsFacet.util_getProtocolVersion.selector;
-        selectors[34] = UtilsFacet.util_setIsFrozen.selector;
-        selectors[35] = UtilsFacet.util_getIsFrozen.selector;
-        selectors[36] = UtilsFacet.util_setTransactionFilterer.selector;
-        selectors[37] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
-        selectors[38] = UtilsFacet.util_setTotalBatchesExecuted.selector;
-        selectors[39] = UtilsFacet.util_setL2LogsRootHash.selector;
-        selectors[40] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
+        selectors[6] = UtilsFacet.util_setVerifier.selector;
+        selectors[7] = UtilsFacet.util_getVerifier.selector;
+        selectors[8] = UtilsFacet.util_setStoredBatchHashes.selector;
+        selectors[9] = UtilsFacet.util_getStoredBatchHashes.selector;
+        selectors[10] = UtilsFacet.util_setVerifierParams.selector;
+        selectors[11] = UtilsFacet.util_getVerifierParams.selector;
+        selectors[12] = UtilsFacet.util_setL2BootloaderBytecodeHash.selector;
+        selectors[13] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
+        selectors[14] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
+        selectors[15] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
+        selectors[16] = UtilsFacet.util_setPendingAdmin.selector;
+        selectors[17] = UtilsFacet.util_getPendingAdmin.selector;
+        selectors[18] = UtilsFacet.util_setAdmin.selector;
+        selectors[19] = UtilsFacet.util_getAdmin.selector;
+        selectors[20] = UtilsFacet.util_setValidator.selector;
+        selectors[21] = UtilsFacet.util_getValidator.selector;
+        selectors[22] = UtilsFacet.util_setZkPorterAvailability.selector;
+        selectors[23] = UtilsFacet.util_getZkPorterAvailability.selector;
+        selectors[24] = UtilsFacet.util_setChainTypeManager.selector;
+        selectors[25] = UtilsFacet.util_getChainTypeManager.selector;
+        selectors[26] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
+        selectors[27] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
+        selectors[28] = UtilsFacet.util_setFeeParams.selector;
+        selectors[29] = UtilsFacet.util_getFeeParams.selector;
+        selectors[30] = UtilsFacet.util_setProtocolVersion.selector;
+        selectors[31] = UtilsFacet.util_getProtocolVersion.selector;
+        selectors[32] = UtilsFacet.util_setIsFrozen.selector;
+        selectors[33] = UtilsFacet.util_getIsFrozen.selector;
+        selectors[34] = UtilsFacet.util_setTransactionFilterer.selector;
+        selectors[35] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
+        selectors[36] = UtilsFacet.util_setTotalBatchesExecuted.selector;
+        selectors[37] = UtilsFacet.util_setL2LogsRootHash.selector;
+        selectors[38] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
+
         return selectors;
     }
 
@@ -350,7 +386,6 @@ library Utils {
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
-                baseTokenBridge: address(0x23746765237749923040872834),
                 storedBatchZero: bytes32(0),
                 verifier: makeVerifier(testnetVerifier),
                 verifierParams: makeVerifierParams(),
@@ -480,8 +515,12 @@ library Utils {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        require(_blobCommitments.length == TOTAL_BLOBS_IN_COMMITMENT, "b10");
-        require(_blobHashes.length == TOTAL_BLOBS_IN_COMMITMENT, "b11");
+        if (_blobCommitments.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidBlobCommitmentsLength();
+        }
+        if (_blobHashes.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidBlobHashesLength();
+        }
 
         // for each blob we have:
         // linear hash (hash of preimage from system logs) and

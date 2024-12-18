@@ -78,6 +78,9 @@ interface IChainTypeManager {
     /// @notice New ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
+    /// @notice Updated ProtocolVersion deadline
+    event UpdateProtocolVersionDeadline(uint256 indexed protocolVersion, uint256 deadline);
+
     function BRIDGE_HUB() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;
@@ -117,7 +120,6 @@ interface IChainTypeManager {
     function createNewChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _assetRouter,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps

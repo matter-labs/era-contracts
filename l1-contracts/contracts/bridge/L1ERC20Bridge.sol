@@ -140,7 +140,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             chainId: ERA_CHAIN_ID,
             l2BatchNumber: _l2BatchNumber,
             l2MessageIndex: _l2MessageIndex,
-            l2Sender: l2Bridge,
+            l2Sender: L1_NULLIFIER.l2BridgeAddress(ERA_CHAIN_ID),
             l2TxNumberInBatch: _l2TxNumberInBatch,
             message: _message,
             merkleProof: _merkleProof
@@ -203,9 +203,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
             _refundRecipient: _refundRecipient
         });
-        // clearing approval
-        // slither-disable-next-line unused-return
-        IERC20(_l1Token).approve(address(L1_ASSET_ROUTER), 0);
+        // Ensuring that all the funds that were locked into this bridge were spent by the asset router / native token vault.
+        if (IERC20(_l1Token).allowance(address(this), address(L1_ASSET_ROUTER)) != 0) {
+            revert AssetRouterAllowanceNotZero();
+        }
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
             l2DepositTxHash: l2TxHash,
@@ -225,8 +226,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.safeTransferFrom(_from, address(this), _amount);
-        // slither-disable-next-line unused-return
-        _token.approve(address(L1_ASSET_ROUTER), _amount);
+        _token.forceApprove(address(L1_ASSET_ROUTER), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;

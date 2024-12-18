@@ -76,11 +76,6 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getBaseTokenBridge() external view returns (address) {
-        return s.baseTokenBridge;
-    }
-
-    /// @inheritdoc IGetters
     function baseTokenGasPriceMultiplierNominator() external view returns (uint128) {
         return s.baseTokenGasPriceMultiplierNominator;
     }
@@ -113,6 +108,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getTotalPriorityTxs() external view returns (uint256) {
         return _getTotalPriorityTxs();
+    }
+
+    /// @inheritdoc IGetters
+    function getPriorityTreeStartIndex() external view returns (uint256) {
+        return s.priorityTree.startIndex;
     }
 
     /// @inheritdoc IGetters

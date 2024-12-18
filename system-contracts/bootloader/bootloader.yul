@@ -193,7 +193,7 @@ object "Bootloader" {
 
             /// @dev The maximum number of new factory deps that are allowed in a transaction
             function MAX_NEW_FACTORY_DEPS() -> ret {
-                ret := 32
+                ret := 64
             }
 
             /// @dev Besides the factory deps themselves, we also need another 4 slots for:

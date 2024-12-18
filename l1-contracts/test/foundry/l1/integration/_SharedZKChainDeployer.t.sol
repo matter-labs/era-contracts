@@ -13,6 +13,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
+import {Config as ChainConfig} from "deploy-scripts/RegisterZKChain.s.sol";
+
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 
@@ -29,6 +31,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint128 baseTokenGasPriceMultiplierDenominator;
     }
 
+    ChainConfig internal eraConfig;
+
     uint256 currentZKChainId = 10;
     uint256 eraZKChainId = 9;
     uint256[] public zkChainIds;
@@ -36,19 +40,31 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployEra() internal {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
+            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
+        );
+        vm.setEnv(
+            "ZK_CHAIN_OUT",
             "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
-
         deployScript = new RegisterZKChainScript();
         saveZKChainConfig(_getDefaultDescription(eraZKChainId, ETH_TOKEN_ADDRESS, eraZKChainId));
         vm.warp(100);
-        deployScript.run();
+        deployScript.runForTest();
         zkChainIds.push(eraZKChainId);
+        eraConfig = deployScript.getConfig();
     }
 
     function _deployZKChain(address _baseToken) internal {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
+            string.concat(
+                "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-",
+                Strings.toString(currentZKChainId),
+                ".toml"
+            )
+        );
+        vm.setEnv(
+            "ZK_CHAIN_OUT",
             string.concat(
                 "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
                 Strings.toString(currentZKChainId),
@@ -58,7 +74,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         zkChainIds.push(currentZKChainId);
         saveZKChainConfig(_getDefaultDescription(currentZKChainId, _baseToken, currentZKChainId));
         currentZKChainId++;
-        deployScript.run();
+        deployScript.runForTest();
     }
 
     function _getDefaultDescription(
@@ -123,15 +139,15 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function getZKChainAddress(uint256 _chainId) public view returns (address) {
-        return bridgeHub.getZKChain(_chainId);
+        return bridgehub.getZKChain(_chainId);
     }
 
     function getZKChainBaseToken(uint256 _chainId) public view returns (address) {
-        return bridgeHub.baseToken(_chainId);
+        return bridgehub.baseToken(_chainId);
     }
 
     function acceptPendingAdmin() public {
-        IZKChain chain = IZKChain(bridgeHub.getZKChain(currentZKChainId - 1));
+        IZKChain chain = IZKChain(bridgehub.getZKChain(currentZKChainId - 1));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();
@@ -145,14 +161,13 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployZkChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _sharedBridge,
         address _admin,
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
-        address _bridgeHub
+        address _bridgehub
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
-            l1Script.getInitialDiamondCutData(),
+            ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
         bytes memory initData;
@@ -161,13 +176,12 @@ contract ZKChainDeployer is L1ContractDeployer {
             initData = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),
-                bytes32(uint256(uint160(address(_bridgeHub)))),
+                bytes32(uint256(uint160(address(_bridgehub)))),
                 bytes32(uint256(uint160(address(this)))),
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(address(0x1337)))),
                 _baseTokenAssetId,
-                bytes32(uint256(uint160(_sharedBridge))),
                 _storedBatchZero,
                 diamondCut.initCalldata
             );

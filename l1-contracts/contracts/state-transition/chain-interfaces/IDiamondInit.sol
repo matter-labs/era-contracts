@@ -30,7 +30,6 @@ struct InitializeData {
     address admin;
     address validatorTimelock;
     bytes32 baseTokenAssetId;
-    address baseTokenBridge;
     bytes32 storedBatchZero;
     IVerifier verifier;
     VerifierParams verifierParams;

@@ -14,14 +14,19 @@ import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
-
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate-called by the chain Admin facet.
+    /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
+    /// @param _chainId the chain id
+    /// @param _protocolVersion the current protocol version
+    /// @param _l1CtmDeployerAddress the address of the l1 ctm deployer
+    /// @param _forceDeploymentsData the force deployments data
+    /// @param _factoryDeps the factory dependencies
     function genesisUpgrade(
         address _l1GenesisUpgrade,
         uint256 _chainId,
@@ -69,7 +74,6 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         }
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            factoryDeps: _factoryDeps,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             verifier: address(0),

@@ -18,4 +18,8 @@ interface IBridgedStandardToken {
     function originToken() external view returns (address);
 
     function l2Bridge() external view returns (address);
+
+    function assetId() external view returns (bytes32);
+
+    function nativeTokenVault() external view returns (address);
 }

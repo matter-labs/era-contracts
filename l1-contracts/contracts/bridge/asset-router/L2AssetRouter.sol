@@ -104,7 +104,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
-    ) external override(AssetRouterBase) {
+    ) external override(AssetRouterBase, IAssetRouterBase) {
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
@@ -120,7 +120,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public override onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
+    ) 
+        public
+        payable
+        override(AssetRouterBase, IAssetRouterBase)
+        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
+        nonReentrant
+    {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
@@ -146,6 +152,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Ensures that token is registered with native token vault.
+    /// @dev Only used when deposit is made with legacy data encoding format.
+    /// @param _token The L2 token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        nativeTokenVault.ensureTokenIsRegistered(_token);
+    }
+
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
     /// @param _assetId The asset id of the withdrawn asset
@@ -157,7 +172,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes memory _assetData,
         address _sender,
         bool _alwaysNewMessageFormat
-    ) internal {
+    ) internal returns (bytes32 txHash) {
         address assetHandler = assetHandlerAddress[_assetId];
         bytes memory _l1bridgeMintData = IAssetHandler(assetHandler).bridgeBurn({
             _chainId: L1_CHAIN_ID,
@@ -171,13 +186,17 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         if (_alwaysNewMessageFormat || L2_LEGACY_SHARED_BRIDGE == address(0)) {
             message = _getAssetRouterWithdrawMessage(_assetId, _l1bridgeMintData);
             // slither-disable-next-line unused-return
-            L2ContractHelper.sendMessageToL1(message);
+            txHash = L2ContractHelper.sendMessageToL1(message);
         } else {
-            address l1Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId);
-            require(l1Token != address(0), "Unsupported asset Id by NTV");
+            address l1Token = IBridgedStandardToken(
+                IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
+            ).originToken();
+            if (l1Token == address(0)) {
+                revert AssetIdNotSupported(_assetId);
+            }
             (uint256 amount, address l1Receiver) = abi.decode(_assetData, (uint256, address));
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
-            IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
+            txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
         }
 
         emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
@@ -222,6 +241,38 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _amount,
         bytes calldata _data
     ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+        _translateLegacyFinalizeDeposit({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
+    }
+
+    function finalizeDepositLegacyBridge(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) external onlyLegacyBridge {
+        _translateLegacyFinalizeDeposit({
+            _l1Sender: _l1Sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _data: _data
+        });
+    }
+
+    function _translateLegacyFinalizeDeposit(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) internal {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
@@ -257,16 +308,29 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
-        bytes memory data = abi.encode(_amount, _l1Receiver);
+        address l1Address = l1TokenAddress(_l2Token);
+        if (l1Address == address(0)) {
+            revert TokenNotLegacy();
+        }
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Address);
+        bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, _l2Token);
         _withdrawSender(assetId, data, _sender, false);
     }
 
     /// @notice Legacy getL1TokenAddress.
     /// @param _l2Token The address of token on L2.
     /// @return The address of token on L1.
-    function getL1TokenAddress(address _l2Token) public view returns (address) {
-        return IBridgedStandardToken(_l2Token).l1Address();
+    function l1TokenAddress(address _l2Token) public view returns (address) {
+        bytes32 assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2Token);
+        if (assetId == bytes32(0)) {
+            return address(0);
+        }
+        uint256 originChainId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(assetId);
+        if (originChainId != L1_CHAIN_ID) {
+            return address(0);
+        }
+
+        return IBridgedStandardToken(_l2Token).originToken();
     }
 
     /// @notice Legacy function used for backward compatibility to return L2 wrapped token

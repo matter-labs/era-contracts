@@ -16,7 +16,7 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
@@ -85,12 +85,28 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
+        if (assetId[_l2TokenAddress] != bytes32(0)) {
+            revert AssetIdAlreadyRegistered();
+        }
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
+            revert NoLegacySharedBridge();
+        }
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         if (l1TokenAddress == address(0)) {
-            revert ZeroAddress();
+            revert TokenIsNotLegacy();
         }
-        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
+
+        _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
+    }
+
+    function _registerLegacyTokenAssetId(
+        address _l2TokenAddress,
+        address _l1TokenAddress
+    ) internal returns (bytes32 newAssetId) {
+        newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
         tokenAddress[newAssetId] = _l2TokenAddress;
+        assetId[_l2TokenAddress] = newAssetId;
         originChainId[newAssetId] = L1_CHAIN_ID;
     }
 
@@ -144,9 +160,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
 
         tokenAddress[_assetId] = _expectedToken;
+        assetId[_expectedToken] = _assetId;
     }
 
-    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract or the legacy shared bridge.
+    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
@@ -161,7 +178,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
             (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
                 uint32(gasleft()),
-                DEPLOYER_SYSTEM_CONTRACT,
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
                 0,
                 abi.encodeCall(
                     IContractDeployer.create2,

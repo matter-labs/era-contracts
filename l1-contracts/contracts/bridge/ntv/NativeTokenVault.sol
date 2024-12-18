@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -21,7 +19,8 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress, DeployingBridgedTokenForNativeToken} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, DeployingBridgedTokenForNativeToken, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyToken} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -52,12 +51,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
+    /// @dev A mapping tokenAddress => assetId
+    mapping(address tokenAddress => bytes32 assetId) public assetId;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
@@ -88,8 +90,20 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (_nativeToken == WETH_TOKEN) {
             revert TokenNotSupported(WETH_TOKEN);
         }
-        require(_nativeToken.code.length > 0, "NTV: empty token");
+        if (_nativeToken.code.length == 0) {
+            revert EmptyToken();
+        }
+        if (assetId[_nativeToken] != bytes32(0)) {
+            revert AssetIdAlreadyRegistered();
+        }
         _unsafeRegisterNativeToken(_nativeToken);
+    }
+
+    /// @inheritdoc INativeTokenVault
+    function ensureTokenIsRegistered(address _nativeToken) public {
+        if (assetId[_nativeToken] == bytes32(0)) {
+            _registerToken(_nativeToken);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -253,7 +267,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             }
             _handleChainBalanceIncrease(_chainId, _assetId, amount, true);
             if (_depositAmount != amount) {
-                revert ValueMismatch(amount, msg.value);
+                revert ValueMismatch(_depositAmount, amount);
             }
         } else {
             // The Bridgehub also checks this, but we want to be sure
@@ -331,10 +345,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
+        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
+        tokenAddress[newAssetId] = _nativeToken;
+        assetId[_nativeToken] = newAssetId;
+        originChainId[newAssetId] = block.chainid;
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
-        tokenAddress[assetId] = _nativeToken;
-        originChainId[assetId] = block.chainid;
     }
 
     function _handleChainBalanceIncrease(
@@ -414,6 +429,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
 
         tokenAddress[_assetId] = _expectedToken;
+        assetId[_expectedToken] = _assetId;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
@@ -442,7 +458,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
-        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
+        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_assetId, _originToken, _erc20Data);
 
         originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);

@@ -24,6 +24,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
+import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -114,8 +115,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "AR: native token v already set");
-        require(address(_nativeTokenVault) != address(0), "AR: native token vault 0");
+        if (address(nativeTokenVault) != address(0)) {
+            revert NativeTokenVaultAlreadySet();
+        }
+        if (address(_nativeTokenVault) == address(0)) {
+            revert ZeroAddress();
+        }
         nativeTokenVault = _nativeTokenVault;
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         assetHandlerAddress[ethAssetId] = address(nativeTokenVault);
@@ -332,6 +337,31 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
     }
+
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetId,
+        bytes calldata _assetData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external {
+        L1_NULLIFIER.bridgeRecoverFailedTransfer({
+            _chainId: _chainId,
+            _depositSender: _depositSender,
+            _assetId: _assetId,
+            _assetData: _assetData,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
+    }
+
     /*//////////////////////////////////////////////////////////////
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
@@ -351,6 +381,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Ensures that token is registered with native token vault.
     /// @dev Only used when deposit is made with legacy data encoding format.
+<<<<<<< HEAD
     /// @param _token The L1 token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
     function _ensureTokenRegisteredWithNTV(address _token) internal returns (bytes32 assetId) {
@@ -358,6 +389,17 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);
         }
+=======
+    /// @param _token The native token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
+        assetId = nativeTokenVault.assetId(_token);
+        if (assetId != bytes32(0)) {
+            return assetId;
+        }
+        nativeTokenVault.ensureTokenIsRegistered(_token);
+        assetId = nativeTokenVault.assetId(_token);
+>>>>>>> origin/oz-audit-sep-base
     }
 
     /// @inheritdoc IL1AssetRouter
@@ -542,6 +584,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
+<<<<<<< HEAD
         /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
         /// by the legacy bridge.
         address legacyL2Bridge = L1_NULLIFIER.__DEPRECATED_l2BridgeAddress(_chainId);
@@ -555,6 +598,16 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             merkleProof: _merkleProof
         });
         L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
+=======
+        L1_NULLIFIER.finalizeWithdrawal({
+            _chainId: _chainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
+>>>>>>> origin/oz-audit-sep-base
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
@@ -589,4 +642,23 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
     }
+<<<<<<< HEAD
+=======
+
+    /// @notice Legacy read method, which forwards the call to L1Nullifier to check if withdrawal was finalized
+    function isWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex
+    ) external view returns (bool) {
+        return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
+    }
+
+    /// @notice Legacy function to get the L2 shared bridge address for a chain.
+    /// @dev In case the chain has been deployed after the gateway release,
+    /// the returned value is 0.
+    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
+        return L1_NULLIFIER.l2BridgeAddress(_chainId);
+    }
+>>>>>>> origin/oz-audit-sep-base
 }

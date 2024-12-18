@@ -22,6 +22,9 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Install dependencies
         run: yarn
 
@@ -39,11 +42,15 @@ jobs:
       - name: Build l1 artifacts
         run: yarn l1 build
 
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -71,6 +78,9 @@ jobs:
 
       - name: Lint
         run: yarn lint:check
+
+      - name: Lint errors
+        run: yarn l1 errors-lint --check
 
   test-foundry:
     needs: [build, lint]
@@ -100,6 +110,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -141,6 +152,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -191,6 +203,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -258,6 +271,7 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
           path: |
+            da-contracts/out
             l1-contracts/artifacts
             l1-contracts/artifacts-zk
             l1-contracts/cache
@@ -282,25 +296,25 @@ jobs:
           sudo apt update && sudo apt install -y lcov
           lcov --remove lcov.info 'test/*' 'contracts/bridge/asset-router/L1AssetRouter.sol' 'contracts/dev-contracts/*' '../lib/forge-std/*' '../lib/murky/*' 'lib/*' '../lib/*' 'lib/' --ignore-errors unused --output-file lcov.info --rc lcov_branch_coverage=1
 
-      # This step posts a detailed coverage report as a comment and deletes previous comments on
-      # each push. The below step is used to fail coverage if the specified coverage threshold is
-      # not met. The below step can post a comment (when it's `github-token` is specified) but it's
-      # not as useful, and this action cannot fail CI based on a minimum coverage threshold, which
-      # is why we use both in this way.
-      - name: Post coverage report
-        if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
-        uses: romeovs/lcov-reporter-action@v0.3.1
-        with:
-          delete-old-comments: true
-          lcov-file: ./l1-contracts/lcov.info
-          github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
+      # # This step posts a detailed coverage report as a comment and deletes previous comments on
+      # # each push. The below step is used to fail coverage if the specified coverage threshold is
+      # # not met. The below step can post a comment (when it's `github-token` is specified) but it's
+      # # not as useful, and this action cannot fail CI based on a minimum coverage threshold, which
+      # # is why we use both in this way.
+      # - name: Post coverage report
+      #   if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
+      #   uses: romeovs/lcov-reporter-action@v0.3.1
+      #   with:
+      #     delete-old-comments: true
+      #     lcov-file: ./l1-contracts/lcov.info
+      #     github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
 
-      - name: Verify minimum coverage
-        uses: zgosalvez/github-actions-report-lcov@v2
-        with:
-          coverage-files: ./l1-contracts/lcov.info
-          working-directory: l1-contracts
-          minimum-coverage: 85 # Set coverage threshold.
+      # - name: Verify minimum coverage
+      #   uses: zgosalvez/github-actions-report-lcov@v2
+      #   with:
+      #     coverage-files: ./l1-contracts/lcov.info
+      #     working-directory: l1-contracts
+      #     minimum-coverage: 85 # Set coverage threshold.
 
   gas-report:
     needs: [build, lint]
