@@ -334,13 +334,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         return BridgeHelper.getERC20Getters(_token, _originChainId);
     }
 
-    /// @notice Returns the parsed assetId.
-    /// @param _nativeToken The address of the token to be parsed.
-    /// @dev Shows the assetId for a given chain and token address
-    function getAssetId(uint256 _chainId, address _nativeToken) external pure override returns (bytes32) {
-        return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
-    }
-
     /// @notice Registers a native token address for the vault.
     /// @dev It does not perform any checks for the correctnesss of the token contract.
     /// @param _nativeToken The address of the token to be registered.

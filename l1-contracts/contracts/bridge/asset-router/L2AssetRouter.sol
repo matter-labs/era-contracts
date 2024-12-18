@@ -18,7 +18,7 @@ import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -68,6 +68,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _;
     }
 
+    modifier onlyNTV() {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Disable the initialization to prevent Parity hack.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
@@ -108,6 +115,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
+    function setLegacyTokenAssetHandler(bytes32 _assetId) external override onlyNTV {
+        // Note, that it is an asset handler, but not asset deployment tracker,
+        // which is located on L1.
+        _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
@@ -120,13 +133,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) 
-        public
-        payable
-        override(AssetRouterBase, IAssetRouterBase)
-        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
-        nonReentrant
-    {
+    ) public override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
@@ -144,7 +151,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @dev do not rely on this function, it will be deprecated in the future
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
+    function withdraw(bytes32 _assetId, bytes calldata _assetData) external returns (bytes32) {
         _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 

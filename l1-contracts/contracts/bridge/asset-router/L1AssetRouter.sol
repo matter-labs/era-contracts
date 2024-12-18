@@ -15,7 +15,7 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-import {IL1Nullifier, FinalizeL1DepositParams} from "../interfaces/IL1Nullifier.sol";
+import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
@@ -381,15 +381,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Ensures that token is registered with native token vault.
     /// @dev Only used when deposit is made with legacy data encoding format.
-<<<<<<< HEAD
-    /// @param _token The L1 token address which should be registered with native token vault.
-    /// @return assetId The asset ID of the token provided.
-    function _ensureTokenRegisteredWithNTV(address _token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(block.chainid, _token);
-        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
-            nativeTokenVault.registerToken(_token);
-        }
-=======
     /// @param _token The native token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
     function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
@@ -399,7 +390,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
         nativeTokenVault.ensureTokenIsRegistered(_token);
         assetId = nativeTokenVault.assetId(_token);
->>>>>>> origin/oz-audit-sep-base
     }
 
     /// @inheritdoc IL1AssetRouter
@@ -584,21 +574,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-<<<<<<< HEAD
-        /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
-        /// by the legacy bridge.
-        address legacyL2Bridge = L1_NULLIFIER.__DEPRECATED_l2BridgeAddress(_chainId);
-        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
-            chainId: _chainId,
-            l2BatchNumber: _l2BatchNumber,
-            l2MessageIndex: _l2MessageIndex,
-            l2Sender: legacyL2Bridge == address(0) ? L2_ASSET_ROUTER_ADDR : legacyL2Bridge,
-            l2TxNumberInBatch: _l2TxNumberInBatch,
-            message: _message,
-            merkleProof: _merkleProof
-        });
-        L1_NULLIFIER.finalizeDeposit(finalizeWithdrawalParams);
-=======
         L1_NULLIFIER.finalizeWithdrawal({
             _chainId: _chainId,
             _l2BatchNumber: _l2BatchNumber,
@@ -607,7 +582,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _message: _message,
             _merkleProof: _merkleProof
         });
->>>>>>> origin/oz-audit-sep-base
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
@@ -642,8 +616,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
     }
-<<<<<<< HEAD
-=======
 
     /// @notice Legacy read method, which forwards the call to L1Nullifier to check if withdrawal was finalized
     function isWithdrawalFinalized(
@@ -660,5 +632,4 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
         return L1_NULLIFIER.l2BridgeAddress(_chainId);
     }
->>>>>>> origin/oz-audit-sep-base
 }

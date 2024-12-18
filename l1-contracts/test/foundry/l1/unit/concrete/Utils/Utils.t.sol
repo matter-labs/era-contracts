@@ -95,8 +95,8 @@ contract UtilsTest is Test {
             logs[4],
             Utils.constructL2Log(
                 true,
-                L2_BOOTLOADER_ADDRESS,
-                uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
                 bytes32("")
             ),
             "log[4] should be correct"

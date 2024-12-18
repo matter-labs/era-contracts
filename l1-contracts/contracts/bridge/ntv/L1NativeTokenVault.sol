@@ -130,7 +130,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bytes32,
         address,
         address _assetHandlerAddressOnCounterpart
-    ) external view override onlyAssetRouter {
+    ) external view onlyAssetRouter {
         if (_assetHandlerAddressOnCounterpart != L2_NATIVE_TOKEN_VAULT_ADDR) {
             revert WrongCounterpart();
         }

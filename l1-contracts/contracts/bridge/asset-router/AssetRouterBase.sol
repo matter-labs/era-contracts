@@ -117,6 +117,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
 
+    function _setAssetHandler(bytes32 _assetId, address _assetHandlerAddress) internal {
+        assetHandlerAddress[_assetId] = _assetHandlerAddress;
+        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
+    }
+
     /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.

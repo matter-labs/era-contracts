@@ -13,22 +13,38 @@ import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
  * @notice Helper library for transfer data encoding and decoding to reduce possibility of errors.
  */
 library DataEncoding {
+    /// @notice Abi.encodes the data required for bridgeBurn for NativeTokenVault.
+    /// @param _amount The amount of token to be transferred.
+    /// @param _remoteReceiver The address which to receive tokens on remote chain.
+    /// @param _maybeTokenAddress The helper field that should be either equal to 0 (in this case
+    /// it is assumed that the token has been registered within NativeTokenVault already) or it
+    /// can be equal to the address of the token on the current chain. Providing non-zero address
+    /// allows it to be automatically registered in case it is not yet a part of NativeTokenVault.
+    /// @return The encoded bridgeBurn data
+    function encodeBridgeBurnData(
+        uint256 _amount,
+        address _remoteReceiver,
+        address _maybeTokenAddress
+    ) internal pure returns (bytes memory) {
+        return abi.encode(_amount, _remoteReceiver, _maybeTokenAddress);
+    }
+
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
     /// @param _originalCaller The address which initiated the transfer.
-    /// @param _l2Receiver The address which to receive tokens on remote chain.
-    /// @param _l1Token The transferred token address.
+    /// @param _remoteReceiver The address which to receive tokens on remote chain.
+    /// @param _originToken The transferred token address.
     /// @param _amount The amount of token to be transferred.
     /// @param _erc20Metadata The transferred token metadata.
     /// @return The encoded bridgeMint data
     function encodeBridgeMintData(
         address _originalCaller,
-        address _l2Receiver,
-        address _l1Token,
+        address _remoteReceiver,
+        address _originToken,
         uint256 _amount,
         bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encode(_originalCaller, _l2Receiver, _l1Token, _amount, _erc20Metadata);
+        return abi.encode(_originalCaller, _remoteReceiver, _originToken, _amount, _erc20Metadata);
     }
 
     /// @notice Function decoding transfer data previously encoded with this library.

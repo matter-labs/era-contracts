@@ -78,9 +78,9 @@ interface IL1Nullifier {
 
     function setL1AssetRouter(address _l1AssetRouter) external;
 
-    function __DEPRECATED_chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
-    function __DEPRECATED_l2BridgeAddress(uint256 _chainId) external view returns (address);
+    function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
     function transferTokenToNTV(address _token) external;
 
@@ -106,6 +106,26 @@ interface IL1Nullifier {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
+
+    /// @notice Legacy function to finalize withdrawal via the same
+    /// interface as the old L1SharedBridge.
+    /// @dev Note, that we need to keep this interface, since the `L2AssetRouter`
+    /// will continue returning the previous address as the `l1SharedBridge`. The value
+    /// returned by it is used in the SDK for finalizing withdrawals.
+    /// @param _chainId The chain ID of the transaction to check
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
+    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
 }
