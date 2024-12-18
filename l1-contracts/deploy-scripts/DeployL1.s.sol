@@ -281,7 +281,6 @@ contract DeployL1Script is Script, DeployUtils {
         bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         console.log("ChainTypeManager registered");
         CTMDeploymentTracker ctmDT = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        // vm.startBroadcast(msg.sender);
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.setAssetDeploymentTracker(
             bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
@@ -294,8 +293,6 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("CTM registered in CTMDeploymentTracker");
 
         bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        // console.log(address(bridgehub.ctmDeployer()), addresses.bridgehub.ctmDeploymentTrackerProxy);
-        // console.log(address(bridgehub.ctmDeployer().BRIDGE_HUB()), addresses.bridgehub.bridgehubProxy);
         console.log(
             "CTM in router 1",
             sharedBridge.assetHandlerAddress(assetId),
@@ -398,7 +395,6 @@ contract DeployL1Script is Script, DeployUtils {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
-        // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
             addresses.bridges.sharedBridgeProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
