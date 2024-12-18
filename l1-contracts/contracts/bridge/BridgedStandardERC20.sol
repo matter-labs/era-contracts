@@ -86,11 +86,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @param _originToken Address of the origin token that can be deposited to mint this bridged token
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
-    function bridgeInitialize(
-        bytes32 _assetId,
-        address _originToken,
-        bytes calldata _data
-    ) external initializer returns (uint256) {
+    function bridgeInitialize(bytes32 _assetId, address _originToken, bytes calldata _data) external initializer {
         if (_originToken == address(0)) {
             revert ZeroAddress();
         }
@@ -99,9 +95,12 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
         nativeTokenVault = msg.sender;
 
+        bytes memory nameBytes;
+        bytes memory symbolBytes;
+        bytes memory decimalsBytes;
         // We parse the data exactly as they were created on the L1 bridge
-        (uint256 chainId, bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = DataEncoding
-            .decodeTokenData(_data);
+        // slither-disable-next-line unused-return
+        (, nameBytes, symbolBytes, decimalsBytes) = DataEncoding.decodeTokenData(_data);
 
         ERC20Getters memory getters;
         string memory decodedName;
@@ -143,7 +142,6 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
         availableGetters = getters;
         emit BridgeInitialize(_originToken, decodedName, decodedSymbol, decimals_);
-        return chainId;
     }
 
     /// @notice A method to be called by the governor to update the token's metadata.

@@ -2,22 +2,25 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
 
-import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "./DAContractsErrors.sol";
+import {InvalidPubdataSource, PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed, BlobCommitmentNotPublished} from "./DAContractsErrors.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
+/// @dev The number of blocks within each we allow blob to be used for DA.
+/// On Ethereum blobs expire within 4096 slots, i.e. 4096 * 32 blocks. We reserve
+/// half of the time in order to ensure reader's ability to read the blob's content.
+uint256 constant BLOB_EXPIRATION_BLOCKS = (4096 * 32) / 2;
+
 contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
-    /// @dev The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash
+    /// @notice The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash
     /// is *not* checked in this contract, but is expected to be checked at the verification stage of the ZK contract.
-    mapping(bytes32 blobCommitment => bool isPublished) public publishedBlobCommitments;
+    mapping(bytes32 blobCommitment => uint256 blockOfPublishing) public publishedBlobCommitments;
 
     /// @notice Publishes certain blobs, marking commitments to them as published.
     /// @param _pubdataCommitments The commitments to the blobs to be published.
@@ -38,9 +41,17 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
                 versionedHashIndex,
                 _pubdataCommitments[i:i + PUBDATA_COMMITMENT_SIZE]
             );
-            publishedBlobCommitments[blobCommitment] = true;
+            publishedBlobCommitments[blobCommitment] = block.number;
             ++versionedHashIndex;
         }
+    }
+
+    function isBlobAvailable(bytes32 _blobCommitment) public view returns (bool) {
+        uint256 blockOfPublishing = publishedBlobCommitments[_blobCommitment];
+
+        // While `block.number` on all used L1 networks is much higher than `BLOB_EXPIRATION_BLOCKS`,
+        // we still check that `blockOfPublishing > 0` just in case.
+        return blockOfPublishing > 0 && block.number - blockOfPublishing <= BLOB_EXPIRATION_BLOCKS;
     }
 
     /// @inheritdoc IL1DAValidator
@@ -67,7 +78,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             (blobCommitments, ) = _processCalldataDA(blobsProvided, fullPubdataHash, _maxBlobsSupported, l1DaInput[1:]);
         } else {
-            revert("l1-da-validator/invalid-pubdata-source");
+            revert InvalidPubdataSource(pubdataSource);
         }
 
         // We verify that for each set of blobHash/blobCommitment are either both empty
@@ -138,15 +149,14 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // we iterate over the `_operatorDAInput`, while advancing the pointer by `BLOB_DA_INPUT_SIZE` each time
         for (uint256 i = 0; i < _blobsProvided; ++i) {
             bytes calldata commitmentData = _operatorDAInput[:PUBDATA_COMMITMENT_SIZE];
-            bytes32 prepublishedCommitment = bytes32(
-                _operatorDAInput[PUBDATA_COMMITMENT_SIZE:PUBDATA_COMMITMENT_SIZE + 32]
-            );
+            bytes32 prepublishedCommitment = bytes32(_operatorDAInput[PUBDATA_COMMITMENT_SIZE:BLOB_DA_INPUT_SIZE]);
 
             if (prepublishedCommitment != bytes32(0)) {
                 // We double check that this commitment has indeed been published.
                 // If that is the case, we do not care about the actual underlying data.
-                require(publishedBlobCommitments[prepublishedCommitment], "not published");
-
+                if (!isBlobAvailable(prepublishedCommitment)) {
+                    revert BlobCommitmentNotPublished();
+                }
                 blobsCommitments[i] = prepublishedCommitment;
             } else {
                 blobsCommitments[i] = _getPublishedBlobCommitment(versionedHashIndex, commitmentData);

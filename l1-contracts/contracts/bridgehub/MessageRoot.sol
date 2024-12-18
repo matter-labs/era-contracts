@@ -2,26 +2,22 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
-
-import {MAX_NUMBER_OF_ZK_CHAINS} from "../common/Config.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-// Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
+// The single shared tree consists of the roots of chain trees as its leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
@@ -29,7 +25,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-contract MessageRoot is IMessageRoot, ReentrancyGuard {
+contract MessageRoot is IMessageRoot, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
@@ -59,32 +55,39 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "MR: only bridgehub");
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+        }
         _;
     }
 
     /// @notice only the bridgehub can call
     /// @param _chainId the chainId of the chain
     modifier onlyChain(uint256 _chainId) {
-        require(msg.sender == BRIDGE_HUB.getZKChain(_chainId), "MR: only chain");
+        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        }
         _;
     }
 
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
         _initialize();
+        _disableInitializers();
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
-    function initialize() external reentrancyGuardInitializer {
+    function initialize() external initializer {
         _initialize();
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
-        require(!chainRegistered(_chainId), "MR: chain exists");
+        if (chainRegistered(_chainId)) {
+            revert ChainExists();
+        }
         _addNewChain(_chainId);
     }
 
@@ -98,7 +101,9 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
     ) external onlyChain(_chainId) {
-        require(chainRegistered(_chainId), "MR: not registered");
+        if (!chainRegistered(_chainId)) {
+            revert MessageRootNotRegistered();
+        }
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
@@ -145,8 +150,9 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @param _chainId the chainId of the chain
     function _addNewChain(uint256 _chainId) internal {
         uint256 cachedChainCount = chainCount;
-        require(cachedChainCount < MAX_NUMBER_OF_ZK_CHAINS, "MR: too many chains");
 
+        // Since only the bridgehub can add new chains to the message root, it is expected that
+        // it will be responsible for ensuring that the number of chains does not exceed the limit.
         ++chainCount;
         chainIndex[_chainId] = cachedChainCount;
         chainIndexToId[cachedChainCount] = _chainId;

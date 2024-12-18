@@ -17,6 +17,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
@@ -43,7 +44,6 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -55,6 +55,9 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -91,6 +94,8 @@ contract DeployL1Script is Script, DeployUtils {
 
         instantiateCreate2Factory();
         deployIfNeededMulticall3();
+
+        deployBytecodesSupplier();
 
         deployVerifier();
 
@@ -143,15 +148,65 @@ contract DeployL1Script is Script, DeployUtils {
             config.contracts.multicall3Addr = MULTICALL3_ADDRESS;
         }
     }
-    function deployDAValidators() internal {
-        address contractAddress = deployViaCreate2(Utils.readRollupDAValidatorBytecode(), "");
-        console.log("L1RollupDAValidator deployed at:", contractAddress);
-        addresses.daAddresses.l1RollupDAValidator = contractAddress;
 
-        contractAddress = deployViaCreate2(type(ValidiumL1DAValidator).creationCode, "");
-        console.log("L1ValidiumDAValidator deployed at:", contractAddress);
-        addresses.daAddresses.l1ValidiumDAValidator = contractAddress;
+    function getRollupL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
+                hex""
+            );
     }
+
+    function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
+                hex""
+            );
+    }
+
+    function getAvailL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode()),
+                hex""
+            );
+    }
+
+    function deployDAValidators() internal {
+        vm.broadcast(msg.sender);
+        address rollupDAManager = address(new RollupDAManager());
+        addresses.daAddresses.rollupDAManager = rollupDAManager;
+
+        address rollupDAValidator = deployViaCreate2(Utils.readRollupDAValidatorBytecode(), "");
+        console.log("L1RollupDAValidator deployed at:", rollupDAValidator);
+        addresses.daAddresses.l1RollupDAValidator = rollupDAValidator;
+
+        addresses.daAddresses.noDAValidiumL1DAValidator = deployViaCreate2(
+            type(ValidiumL1DAValidator).creationCode,
+            ""
+        );
+        console.log("L1NoDAValidiumDAValidator deployed at:", addresses.daAddresses.noDAValidiumL1DAValidator);
+
+        if (config.contracts.availL1DAValidator == address(0)) {
+            address availBridge = deployViaCreate2(Utils.readDummyAvailBridgeBytecode(), "");
+            addresses.daAddresses.availL1DAValidator = deployViaCreate2(
+                Utils.readAvailL1DAValidatorBytecode(),
+                abi.encode(availBridge)
+            );
+            console.log("AvailL1DAValidator deployed at:", addresses.daAddresses.availL1DAValidator);
+        } else {
+            addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
+        }
+
+        vm.startBroadcast(msg.sender);
+        RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), getRollupL2ValidatorAddress(), true);
+        vm.stopBroadcast();
+    }
+
     function deployBridgehubContract() internal {
         address bridgehubImplementation = deployViaCreate2(
             type(Bridgehub).creationCode,
@@ -219,6 +274,7 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
         addresses.blobVersionedHashRetriever = contractAddress;
     }
+
     function registerChainTypeManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
@@ -286,9 +342,15 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployL1NullifierImplementation() internal {
-        // TODO(EVM-743): allow non-dev nullifier in the local deployment
+        bytes memory bytecode;
+        if (config.supportL2LegacySharedBridgeTest) {
+            bytecode = type(L1NullifierDev).creationCode;
+        } else {
+            bytecode = type(L1Nullifier).creationCode;
+        }
+
         address contractAddress = deployViaCreate2(
-            type(L1NullifierDev).creationCode,
+            bytecode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.stateTransition.diamondProxy)
         );
@@ -405,7 +467,6 @@ contract DeployL1Script is Script, DeployUtils {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
-                config.eraChainId,
                 addresses.bridges.l1NullifierProxy
             )
         );
@@ -438,16 +499,6 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.broadcast(msg.sender);
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
-
-        // bytes memory data = abi.encodeCall(sharedBridge.setNativeTokenVault, (IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy)));
-        // Utils.executeUpgrade({
-        //     _governor: ownable.owner(),
-        //     _salt: bytes32(0),
-        //     _target: addresses.bridges.sharedBridgeProxy,
-        //     _data: data,
-        //     _value: 0,
-        //     _delay: 0
-        // });
     }
 
     function updateOwners() internal {
@@ -470,15 +521,17 @@ contract DeployL1Script is Script, DeployUtils {
         CTMDeploymentTracker ctmDeploymentTracker = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
         ctmDeploymentTracker.transferOwnership(addresses.governance);
 
+        RollupDAManager(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
+
         vm.stopBroadcast();
         console.log("Owners updated");
     }
 
     function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1);
+        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
-        ExecutorFacet executorFacet = new ExecutorFacet();
+        ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
         bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
@@ -543,6 +596,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "diamond_proxy_addr",
@@ -637,6 +691,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
 
+        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
         vm.serializeAddress(
             "deployed_addresses",
             "rollup_l1_da_validator_addr",
@@ -644,8 +699,13 @@ contract DeployL1Script is Script, DeployUtils {
         );
         vm.serializeAddress(
             "deployed_addresses",
-            "validium_l1_da_validator_addr",
-            addresses.daAddresses.l1ValidiumDAValidator
+            "no_da_validium_l1_validator_addr",
+            addresses.daAddresses.noDAValidiumL1DAValidator
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "avail_l1_da_validator_addr",
+            addresses.daAddresses.availL1DAValidator
         );
 
         string memory deployedAddresses = vm.serializeAddress(
@@ -662,6 +722,9 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
+        vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
+        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
@@ -669,6 +732,15 @@ contract DeployL1Script is Script, DeployUtils {
 
     function prepareForceDeploymentsData() internal view returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
+
+        address dangerousTestOnlyForcedBeacon;
+        if (config.supportL2LegacySharedBridgeTest) {
+            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+                addresses.bridges.erc20BridgeProxy,
+                addresses.bridges.l1NullifierProxy,
+                addresses.governance
+            );
+        }
 
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
@@ -687,11 +759,11 @@ contract DeployL1Script is Script, DeployUtils {
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
-            // For newly created chains it it is expected that the following bridges are not present
+            // For newly created chains it it is expected that the following bridges are not present at the moment
+            // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
-            l2BridgeProxyOwnerAddress: address(0),
-            l2BridgedStandardERC20ProxyOwnerAddress: address(0)
+            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });
 
         return abi.encode(data);

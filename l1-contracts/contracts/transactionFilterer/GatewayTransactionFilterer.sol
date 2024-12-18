@@ -4,11 +4,9 @@ pragma solidity 0.8.24;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IL2Bridge} from "../bridge/interfaces/IL2Bridge.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
@@ -16,7 +14,7 @@ import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Filters transactions received by the Mailbox
 /// @dev Only allows whitelisted senders to deposit to Gateway
-contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2StepUpgradeable {
+contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgradeable {
     /// @notice Event emitted when sender is whitelisted
     event WhitelistGranted(address indexed sender);
 
@@ -34,7 +32,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgeHub, address _assetRouter) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgeHub, address _assetRouter) {
         BRIDGE_HUB = _bridgeHub;
         L1_ASSET_ROUTER = _assetRouter;
         _disableInitializers();
@@ -42,7 +40,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
     /// @notice Initializes a contract filterer for later use. Expected to be used in the proxy.
     /// @param _owner The address which can upgrade the implementation.
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+    function initialize(address _owner) external initializer {
         if (_owner == address(0)) {
             revert ZeroAddress();
         }
@@ -86,25 +84,22 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
             if (IL2AssetRouter.setAssetHandlerAddress.selector == l2TxSelector) {
                 (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, address));
-                return _checkSTMAssetId(decodedAssetId);
+                return _checkCTMAssetId(decodedAssetId);
             }
 
-            if (
-                IAssetRouterBase.finalizeDeposit.selector != l2TxSelector &&
-                IL2Bridge.finalizeDeposit.selector != l2TxSelector
-            ) {
+            if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 
             (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
-            return _checkSTMAssetId(decodedAssetId);
+            return _checkCTMAssetId(decodedAssetId);
         }
 
         return whitelistedSenders[sender];
     }
 
-    function _checkSTMAssetId(bytes32 assetId) internal view returns (bool) {
-        address stmAddress = BRIDGE_HUB.ctmAssetIdToAddress(assetId);
-        return stmAddress != address(0);
+    function _checkCTMAssetId(bytes32 assetId) internal view returns (bool) {
+        address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(assetId);
+        return ctmAddress != address(0);
     }
 }

@@ -118,6 +118,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function admin() external view returns (address);
 
+    function assetRouter() external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
@@ -223,17 +225,15 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function ctmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 
-    function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external;
+    function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
 
-    function setLegacyBaseTokenAssetId(uint256 _chainId) external;
-
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
-
-    function setLegacyChainAddress(uint256 _chainId) external;
 
     /// @notice return the ZK chain contract for a chainId
     /// @dev It is a legacy method. Do not use!
     function getHyperchain(uint256 _chainId) external view returns (address);
+
+    function registerLegacyChain(uint256 _chainId) external;
 }
