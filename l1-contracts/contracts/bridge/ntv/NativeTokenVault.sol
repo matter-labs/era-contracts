@@ -174,7 +174,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
+    /// @notice Allows bridgehub to acquire mintValue for L1->L2 and L2->L1 transactions.
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _receiver.
     function bridgeBurn(
         uint256 _chainId,
@@ -239,8 +239,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
-            _l2Receiver: _receiver,
-            _l1Token: originToken,
+            _remoteReceiver: _receiver,
+            _originToken: originToken,
             _amount: _amount,
             _erc20Metadata: erc20Metadata
         });
@@ -295,8 +295,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _originalCaller,
-            _l2Receiver: _receiver,
-            _l1Token: nativeToken,
+            _remoteReceiver: _receiver,
+            _originToken: nativeToken,
             _amount: amount,
             _erc20Metadata: erc20Metadata
         });
@@ -399,7 +399,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     }
 
     /// @notice Checks that the assetId is correct for the origin token and chain.
-    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal view {
+    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal pure {
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
         if (_assetId != expectedAssetId) {
             // Make sure that a NativeTokenVault sent the message

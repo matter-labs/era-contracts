@@ -7,7 +7,6 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
@@ -19,7 +18,7 @@ import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -69,6 +68,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _;
     }
 
+    modifier onlyNTV() {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Disable the initialization to prevent Parity hack.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
@@ -109,6 +115,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
+    function setLegacyTokenAssetHandler(bytes32 _assetId) external override onlyNTV {
+        // Note, that it is an asset handler, but not asset deployment tracker,
+        // which is located on L1.
+        _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
@@ -131,7 +143,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LEGACY FUNCTIONS
+                            INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -139,18 +151,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @dev do not rely on this function, it will be deprecated in the future
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override returns (bytes32) {
-        return _withdrawSender(_assetId, _assetData, msg.sender, true);
-    }
-
-    function withdrawToken(address _l2NativeToken, bytes memory _assetData) public returns (bytes32) {
-        bytes32 recordedAssetId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2NativeToken);
-        uint256 recordedOriginChainId = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(recordedAssetId);
-        if (recordedOriginChainId == L1_CHAIN_ID) {
-            revert AssetIdNotSupported(recordedAssetId);
-        }
-        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l2NativeToken);
-        return _withdrawSender(assetId, _assetData, msg.sender, true);
+    function withdraw(bytes32 _assetId, bytes calldata _assetData) external returns (bytes32) {
+        _withdrawSender(_assetId, _assetData, msg.sender, true);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -313,8 +315,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress(_l2Token));
-        bytes memory data = abi.encode(_amount, _l1Receiver);
+        address l1Address = l1TokenAddress(_l2Token);
+        if (l1Address == address(0)) {
+            revert TokenNotLegacy();
+        }
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Address);
+        bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, _l2Token);
         _withdrawSender(assetId, data, _sender, false);
     }
 
@@ -322,7 +328,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _l2Token The address of token on L2.
     /// @return The address of token on L1.
     function l1TokenAddress(address _l2Token) public view returns (address) {
-        return IBridgedStandardToken(_l2Token).l1Address();
+        bytes32 assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2Token);
+        if (assetId == bytes32(0)) {
+            return address(0);
+        }
+        uint256 originChainId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(assetId);
+        if (originChainId != L1_CHAIN_ID) {
+            return address(0);
+        }
+
+        return IBridgedStandardToken(_l2Token).originToken();
     }
 
     /// @notice Legacy function used for backward compatibility to return L2 wrapped token

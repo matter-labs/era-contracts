@@ -5,8 +5,8 @@ pragma solidity ^0.8.21;
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
 error AccessToFunctionDenied(address target, bytes4 selector, address invoker);
-// 0x8164f842
-error ApprovalFailed();
+// 0xfe919e28
+error AssetIdAlreadyRegistered();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x52e22c98
@@ -33,8 +33,6 @@ error AmountMustBeGreaterThanZero();
 error AssetHandlerDoesNotExist(bytes32 assetId);
 // 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
-// 0xfe919e28
-error AssetIdAlreadyRegistered();
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
 // 0x04a0b7e9
@@ -57,6 +55,8 @@ error CanOnlyProcessOneBatch();
 error CantExecuteUnprovenBatches();
 // 0xe18cb383
 error CantRevertExecutedBatch();
+// 0x78d2ed02
+error ChainAlreadyLive();
 // 0x24591d89
 error ChainIdAlreadyExists();
 // 0x717a1656
@@ -185,6 +185,8 @@ error NonEmptyCalldata();
 error NonEmptyMsgValue();
 // 0xd018e08e
 error NonIncreasingTimestamp();
+// 0xb20b58ce
+error NoLegacySharedBridge();
 // 0x0105f9c0
 error NonSequentialBatch();
 // 0x0ac76f01
@@ -346,6 +348,10 @@ error IncorrectPricingMode();
 error NotSettlementLayer();
 // 0x7a4902ad
 error TimerAlreadyStarted();
+// 0x1850b46b
+error TokenNotLegacy();
+// 0x7acd7817
+error TokenIsNotLegacy();
 // 0x1b582fcf
 error MerkleWrongIndex(uint256 index, uint256 maxNodeNumber);
 // 0x485cfcaa

@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2SharedBridgeLegacy {
@@ -13,8 +11,6 @@ interface IL2SharedBridgeLegacy {
         address indexed l2Token,
         uint256 amount
     );
-
-    function l2TokenBeacon() external returns (UpgradeableBeacon);
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
 
