@@ -22,11 +22,9 @@ import {InvalidCaller, ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGrea
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
+/// @dev Note, that this contract should be compatible with its previous version as it will be
+/// the primary bridge to be used during migration.
 contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Disable the initialization to prevent Parity hack.
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
 
@@ -86,7 +84,10 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
         l1SharedBridge = _l1SharedBridge;
 
-        if (block.chainid != ERA_CHAIN_ID) {
+        // The following statement is true only in freshly deployed environments. However,
+        // for those environments we do not need to deploy this contract at all.
+        // This check is primarily for local testing purposes.
+        if (l2TokenProxyBytecodeHash == bytes32(0) && address(l2TokenBeacon) == address(0)) {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
