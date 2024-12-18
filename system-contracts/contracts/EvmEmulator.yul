@@ -1722,7 +1722,6 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0x39 { // OP_CODECOPY
-                
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
                     let dstOffset, sourceOffset, len
@@ -1747,14 +1746,16 @@ object "EvmEmulator" {
             
                     sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
             
-                    if gt(sourceOffset, MEM_LEN_OFFSET()) {
-                        sourceOffset := MEM_LEN_OFFSET()
+                    let outOfBoundsOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
+            
+                    if gt(sourceOffset, outOfBoundsOffset) {
+                        sourceOffset := outOfBoundsOffset
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
-                        truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), outOfBoundsOffset) {
+                        truncatedLen := sub(outOfBoundsOffset, sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -4846,7 +4847,6 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0x39 { // OP_CODECOPY
-                    
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
                         let dstOffset, sourceOffset, len
@@ -4871,14 +4871,16 @@ object "EvmEmulator" {
                 
                         sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
                 
-                        if gt(sourceOffset, MEM_LEN_OFFSET()) {
-                            sourceOffset := MEM_LEN_OFFSET()
+                        let outOfBoundsOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
+                
+                        if gt(sourceOffset, outOfBoundsOffset) {
+                            sourceOffset := outOfBoundsOffset
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
-                            truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), outOfBoundsOffset) {
+                            truncatedLen := sub(outOfBoundsOffset, sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
