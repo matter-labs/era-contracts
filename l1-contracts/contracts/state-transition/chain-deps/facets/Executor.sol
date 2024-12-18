@@ -99,12 +99,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 //        _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(
-            _newBatch,
-            logOutput.stateDiffHash,
-            blobCommitments,
-            logOutput.blobHashes
-        );
+
+// TODO: commented for ZKOS testing
+        bytes32 commitment;
+//        bytes32 commitment = _createBatchCommitment(
+//            _newBatch,
+//            logOutput.stateDiffHash,
+//            blobCommitments,
+//            logOutput.blobHashes
+//        );
 
         return
             StoredBatchInfo({
