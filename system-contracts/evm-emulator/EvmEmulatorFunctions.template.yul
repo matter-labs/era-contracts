@@ -355,8 +355,13 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
     let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
     // it fails if we don't have any code deployed at this address
     if success {
-        // The true length of the bytecode is encoded in bytecode hash
+        // The length of the bytecode is encoded in versioned bytecode hash
         let codeLen := and(shr(224, rawCodeHash), 0xffff)
+
+        if eq(shr(248, rawCodeHash), 1) {
+            // For native zkVM contracts length encoded in words, not bytes
+            codeLen := shl(5, codeLen) // * 32
+        }
 
         if gt(len, codeLen) {
             len := codeLen
