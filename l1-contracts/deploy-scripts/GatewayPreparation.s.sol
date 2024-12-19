@@ -311,7 +311,7 @@ contract GatewayPreparation is Script {
     function deployL2ChainAdmin() public {
         initializeConfig();
 
-        // FIXME: it is deployed without any restrictions.
+        // TODO(EVM-925): it is deployed without any restrictions.
         address l2ChainAdminAddress = Utils.deployThroughL1({
             bytecode: L2ContractsBytecodesLib.readChainAdminBytecode(),
             constructorargs: abi.encode(new address[](0)),

@@ -76,10 +76,38 @@ contract AcceptAdmin is Script {
 
     // This function should be called by the owner to update token multiplier setter role
     function chainSetTokenMultiplierSetter(
+        address chainAdmin,
         address accessControlRestriction,
         address diamondProxyAddress,
         address setter
     ) public {
+        if(accessControlRestriction == address(0)) {
+            _chainSetTokenMultiplierSetterSingleOwner(chainAdmin, setter);
+        } else {
+            _chainSetTokenMultiplierSetterLatestChainAdmin(
+                accessControlRestriction,
+                diamondProxyAddress,
+                setter
+            );
+        }   
+    }
+
+    function _chainSetTokenMultiplierSetterSingleOwner(
+        address chainAdmin,
+        address setter
+    ) internal {
+        IChainAdmin admin = IChainAdmin(chainAdmin);
+
+        vm.startBroadcast();
+        admin.setTokenMultiplierSetter(target);
+        vm.stopBroadcast();
+    }
+
+    function _chainSetTokenMultiplierSetterLatestChainAdmin(
+        address accessControlRestriction,
+        address diamondProxyAddress,
+        address setter
+    ) internal {
         AccessControlRestriction restriction = AccessControlRestriction(accessControlRestriction);
 
         if (
