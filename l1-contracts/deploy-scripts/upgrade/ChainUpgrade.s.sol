@@ -28,7 +28,6 @@ contract ChainUpgrade is Script {
         uint256 chainChainId;
         address chainDiamondProxyAddress;
         bool permanentRollup;
-        // FIXME: From ecosystem, maybe move to a different struct
         address bridgehubProxyAddress;
         address oldSharedBridgeProxyAddress;
     }
