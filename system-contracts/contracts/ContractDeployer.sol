@@ -250,7 +250,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         address _newAddress,
         bytes calldata _initCode
     ) external payable onlySystemCallFromEvmEmulator returns (uint256, address) {
-        uint256 constructorReturnEvmGas = _performDeployOnAddressEVM(msg.sender, _newAddress, AccountAbstractionVersion.None, _initCode);
+        uint256 constructorReturnEvmGas = _performDeployOnAddressEVM(
+            msg.sender,
+            _newAddress,
+            AccountAbstractionVersion.None,
+            _initCode
+        );
         return (constructorReturnEvmGas, _newAddress);
     }
 
@@ -584,25 +589,26 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             _isSystem: false
         });
 
-        // Returned data bytes have structure: bytecode.constructorReturnEvmGas
+        uint256 evmBytecodeLen;
+        // Returned data bytes have structure: paddedBytecode.evmBytecodeLen.constructorReturnEvmGas
         assembly {
             let dataLen := mload(paddedBytecode)
+            evmBytecodeLen := mload(add(paddedBytecode, sub(dataLen, 0x20)))
             constructorReturnEvmGas := mload(add(paddedBytecode, dataLen))
-            mstore(paddedBytecode, sub(dataLen, 0x20)) // shrink paddedBytecode
+            mstore(paddedBytecode, sub(dataLen, 0x40)) // shrink paddedBytecode
         }
 
-        bytes32 versionedCodeHash = KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedBytecode);
-        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, versionedCodeHash);
+        bytes32 versionedBytecodeHash = KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(evmBytecodeLen, paddedBytecode);
+        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, versionedBytecodeHash);
 
         bytes32 evmBytecodeHash;
         assembly {
-            let bytecodeLen := mload(add(paddedBytecode, 0x20))
-            evmBytecodeHash := keccak256(add(paddedBytecode, 0x40), bytecodeLen)
+            evmBytecodeHash := keccak256(add(paddedBytecode, 0x20), evmBytecodeLen)
         }
 
         _setEvmCodeHash(_newAddress, evmBytecodeHash);
 
-        emit ContractDeployed(_sender, versionedCodeHash, _newAddress);
+        emit ContractDeployed(_sender, versionedBytecodeHash, _newAddress);
     }
 
     function _setEvmCodeHash(address _address, bytes32 _hash) internal {

@@ -349,59 +349,39 @@ function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
 
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
 function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-    let codeHash := getRawCodeHash(addr)
-    mstore(0, codeHash)
+    let rawCodeHash := getRawCodeHash(addr)
+    mstore(0, rawCodeHash)
     
     let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
     // it fails if we don't have any code deployed at this address
     if success {
-        returndatacopy(0, 0, 32)
-        // The first word of returndata is the true length of the bytecode
-        let codeLen := mload(0)
+        // The length of the bytecode is encoded in versioned bytecode hash
+        let codeLen := and(shr(224, rawCodeHash), 0xffff)
+
+        if eq(shr(248, rawCodeHash), 1) {
+            // For native zkVM contracts length encoded in words, not bytes
+            codeLen := shl(5, codeLen) // * 32
+        }
 
         if gt(len, codeLen) {
             len := codeLen
         }
     
-        let shiftedSrcOffset := add(32, srcOffset) // first 32 bytes is length
-    
         let _returndatasize := returndatasize()
-        if gt(shiftedSrcOffset, _returndatasize) {
-            shiftedSrcOffset := _returndatasize
+        if gt(srcOffset, _returndatasize) {
+            srcOffset := _returndatasize
         }
     
-        if gt(add(len, shiftedSrcOffset), _returndatasize) {
-            len := sub(_returndatasize, shiftedSrcOffset)
+        if gt(add(len, srcOffset), _returndatasize) {
+            len := sub(_returndatasize, srcOffset)
         }
     
         if len {
-            returndatacopy(dstOffset, shiftedSrcOffset, len)
+            returndatacopy(dstOffset, srcOffset, len)
         }
     
         copiedLen := len
     } 
-}
-
-// Returns the length of the EVM bytecode.
-function fetchDeployedEvmCodeLen(addr) -> codeLen {
-    let codeHash := getRawCodeHash(addr)
-    mstore(0, codeHash)
-
-    let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-
-    switch iszero(success)
-    case 1 {
-        // The code oracle call can only fail in the case where the contract
-        // we are querying is the current one executing and it has not yet been
-        // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-        // inside the constructor. In that case, code length is zero.
-        codeLen := 0
-    }
-    default {
-        // The first word is the true length of the bytecode
-        returndatacopy(0, 0, 32)
-        codeLen := mload(0)
-    }
 }
 
 function getMax(a, b) -> max {

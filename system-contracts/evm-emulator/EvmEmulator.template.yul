@@ -21,16 +21,14 @@ object "EvmEmulator" {
             copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
-        function padBytecode(offset, len) -> blobOffset, blobLen {
-            blobOffset := sub(offset, 32)
+        function padBytecode(offset, len) -> blobLen {
             let trueLastByte := add(offset, len)
 
-            mstore(blobOffset, len)
             // clearing out additional bytes
             mstore(trueLastByte, 0)
             mstore(add(trueLastByte, 32), 0)
 
-            blobLen := add(len, 32)
+            blobLen := len
 
             if iszero(eq(mod(blobLen, 32), 0)) {
                 blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
@@ -98,11 +96,12 @@ object "EvmEmulator" {
 
         gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
 
-        offset, len := padBytecode(offset, len)
+        let blobLen := padBytecode(offset, len)
 
-        mstore(add(offset, len), gasToReturn)
+        mstore(add(offset, blobLen), len)
+        mstore(add(offset, add(32, blobLen)), gasToReturn)
 
-        verbatim_2i_0o("return_deployed", offset, add(len, 32))
+        verbatim_2i_0o("return_deployed", offset, add(blobLen, 64))
     }
     object "EvmEmulator_deployed" {
         code {
