@@ -64,8 +64,8 @@ struct Config {
 }
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-/// @dev IMPORTANT: this script is not intended to be used in production. 
-/// TODO(EVM-925): support secure gateway deployment. 
+/// @dev IMPORTANT: this script is not intended to be used in production.
+/// TODO(EVM-925): support secure gateway deployment.
 contract GatewayPreparation is Script {
     using stdToml for string;
 
