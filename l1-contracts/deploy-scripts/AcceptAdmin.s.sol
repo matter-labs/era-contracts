@@ -9,6 +9,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {IChainAdminSingleOwner} from "contracts/governance/IChainAdminSingleOwner.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -89,10 +90,10 @@ contract AcceptAdmin is Script {
     }
 
     function _chainSetTokenMultiplierSetterSingleOwner(address chainAdmin, address setter) internal {
-        IChainAdmin admin = IChainAdmin(chainAdmin);
+        IChainAdminSingleOwner admin = IChainAdminSingleOwner(chainAdmin);
 
         vm.startBroadcast();
-        admin.setTokenMultiplierSetter(target);
+        admin.setTokenMultiplierSetter(setter);
         vm.stopBroadcast();
     }
 
