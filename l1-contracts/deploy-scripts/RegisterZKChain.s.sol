@@ -32,6 +32,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {CreateAndTransfer} from "./CreateAndTransfer.sol";
+import {ChainAdminSingleOwner} from "contracts/governance/ChainAdminSingleOwner.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -337,7 +338,7 @@ contract RegisterZKChainScript is Script {
         (address chainAdmin, address accessControlRestriction) = deployChainAdminSingleOwner();
 
         output.accessControlRestrictionAddress = accessControlRestriction;
-        output.chainAdmin = chainAdmin
+        output.chainAdmin = chainAdmin;
     }
 
     function deployChainAdminSingleOwner() internal returns (address chainAdmin, address accessControlRestriction) {
@@ -354,7 +355,10 @@ contract RegisterZKChainScript is Script {
     }
 
     // TODO(EVM-924): this function is unused
-    function deployChainAdminWithRestrictions() internal returns (address chainAdmin, address accessControlRestriction) {
+    function deployChainAdminWithRestrictions()
+        internal
+        returns (address chainAdmin, address accessControlRestriction)
+    {
         bytes memory input = abi.encode(0, config.ownerAddress);
         accessControlRestriction = Utils.deployViaCreate2(
             abi.encodePacked(type(AccessControlRestriction).creationCode, input),

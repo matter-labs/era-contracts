@@ -81,21 +81,14 @@ contract AcceptAdmin is Script {
         address diamondProxyAddress,
         address setter
     ) public {
-        if(accessControlRestriction == address(0)) {
+        if (accessControlRestriction == address(0)) {
             _chainSetTokenMultiplierSetterSingleOwner(chainAdmin, setter);
         } else {
-            _chainSetTokenMultiplierSetterLatestChainAdmin(
-                accessControlRestriction,
-                diamondProxyAddress,
-                setter
-            );
-        }   
+            _chainSetTokenMultiplierSetterLatestChainAdmin(accessControlRestriction, diamondProxyAddress, setter);
+        }
     }
 
-    function _chainSetTokenMultiplierSetterSingleOwner(
-        address chainAdmin,
-        address setter
-    ) internal {
+    function _chainSetTokenMultiplierSetterSingleOwner(address chainAdmin, address setter) internal {
         IChainAdmin admin = IChainAdmin(chainAdmin);
 
         vm.startBroadcast();

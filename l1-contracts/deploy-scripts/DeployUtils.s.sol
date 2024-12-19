@@ -337,7 +337,7 @@ contract DeployUtils is Script {
         (address chainAdmin, address accessControlRestriction) = deployChainAdminSingleOwner();
 
         addresses.accessControlRestrictionAddress = accessControlRestriction;
-        addresses.chainAdmin = chainAdmin
+        addresses.chainAdmin = chainAdmin;
     }
 
     function deployChainAdminSingleOwner() internal returns (address chainAdmin, address accessControlRestriction) {
@@ -353,7 +353,10 @@ contract DeployUtils is Script {
     }
 
     // TODO(EVM-924): this function is unused
-    function deployChainAdminWithRestrictions() internal returns (address chainAdmin, address accessControlRestriction) {
+    function deployChainAdminWithRestrictions()
+        internal
+        returns (address chainAdmin, address accessControlRestriction)
+    {
         accessControlRestriction = deployViaCreate2(
             type(AccessControlRestriction).creationCode,
             abi.encode(uint256(0), config.ownerAddress)

@@ -1010,9 +1010,9 @@ library Utils {
         uint256 _value
     ) internal {
         // If `_accessControlRestriction` is not provided, we expect that this ChainAdmin is Ownable
-        address adminOwner = _accessControlRestriction == address(0) ? 
-            Ownable(_admin).owner() :
-            AccessControlRestriction(_accessControlRestriction).defaultAdmin();
+        address adminOwner = _accessControlRestriction == address(0)
+            ? Ownable(_admin).owner()
+            : AccessControlRestriction(_accessControlRestriction).defaultAdmin();
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
