@@ -165,7 +165,7 @@ function cached(cacheIndex, value) -> _value {
 
 function chargeGas(prevGas, toCharge) -> gasRemaining {
     if lt(prevGas, toCharge) {
-        panic()
+        revertWithGas(prevGas)
     }
 
     gasRemaining := sub(prevGas, toCharge)
@@ -179,62 +179,73 @@ function getEvmGasFromContext() -> evmGas {
     }
 }
 
-// This function can overflow, it is the job of the caller to ensure that it does not.
 // The argument to this function is the offset into the memory region IN BYTES.
-function expandMemory(offset, size) -> gasCost {
+function expandMemory(offset, size, evmGasLeft) -> gasCost {
     // memory expansion costs 0 if size is 0
     if size {
-        let oldSizeInWords := mload(MEM_LEN_OFFSET())
+        checkOverflow(offset, size, evmGasLeft)
+        gasCost := _expandMemoryInternal(add(offset, size), evmGasLeft)
+    }
+}
 
-        // div rounding up
-        let newSizeInWords := div(add(add(offset, size), 31), 32)
-    
-        // memory_size_word = (memory_byte_size + 31) / 32
-        // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
-        // memory_expansion_cost = new_memory_cost - last_memory_cost
-        if gt(newSizeInWords, oldSizeInWords) {
-            let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
-            let quadraticPart := sub(
-                div(
-                    mul(newSizeInWords, newSizeInWords),
-                    512
-                ),
-                div(
-                    mul(oldSizeInWords, oldSizeInWords),
-                    512
-                )
+// This function can overflow, it is the job of the caller to ensure that it does not.
+// The argument to this function is the offset into the memory region IN BYTES.
+function _expandMemoryInternal(newMemsize, evmGasLeft) -> gasCost {
+    if gt(newMemsize, MAX_POSSIBLE_MEM_LEN()) {
+        revertWithGas(evmGasLeft) // Not possible to pay for this memsize
+    }
+
+    let oldSizeInWords := mload(MEM_LEN_OFFSET())
+
+    // div rounding up
+    let newSizeInWords := div(add(newMemsize, 31), 32)
+
+    // memory_size_word = (memory_byte_size + 31) / 32
+    // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+    // memory_expansion_cost = new_memory_cost - last_memory_cost
+    if gt(newSizeInWords, oldSizeInWords) {
+        let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+        let quadraticPart := sub(
+            div(
+                mul(newSizeInWords, newSizeInWords),
+                512
+            ),
+            div(
+                mul(oldSizeInWords, oldSizeInWords),
+                512
             )
-    
-            gasCost := add(linearPart, quadraticPart)
-    
-            mstore(MEM_LEN_OFFSET(), newSizeInWords)
-        }
+        )
+
+        gasCost := add(linearPart, quadraticPart)
+
+        mstore(MEM_LEN_OFFSET(), newSizeInWords)
     }
 }
 
-function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-    switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
-    case 0 {
-        maxExpand := expandMemory(retOffset, retSize)
-    }
-    default {
-        maxExpand := expandMemory(argsOffset, argsSize)
-    }
-}
-
-function checkMemIsAccessible(relativeOffset, size) {
+// Returns 0 if size is 0
+function _memsizeRequired(offset, size, evmGasLeft) -> memorySize {
     if size {
-        checkOverflow(relativeOffset, size)
-
-        if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
-            panic()
-        }   
+        checkOverflow(offset, size, evmGasLeft)
+        memorySize := add(offset, size)
     }
 }
 
-function checkOverflow(data1, data2) {
+function expandMemory2(retOffset, retSize, argsOffset, argsSize, evmGasLeft) -> gasCost {
+    let maxNewMemsize := _memsizeRequired(retOffset, retSize, evmGasLeft)
+    let argsMemsize := _memsizeRequired(argsOffset, argsSize, evmGasLeft)
+
+    if lt(maxNewMemsize, argsMemsize) {
+        maxNewMemsize := argsMemsize  
+    }
+
+    if maxNewMemsize { // Memory expansion costs 0 if size is 0
+        gasCost := _expandMemoryInternal(maxNewMemsize, evmGasLeft)
+    }
+}
+
+function checkOverflow(data1, data2, evmGasLeft) {
     if lt(add(data1, data2), data2) {
-        panic()
+        revertWithGas(evmGasLeft)
     }
 }
 
@@ -633,7 +644,7 @@ function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, s
     // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called.
     // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
 
-    let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
+    let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize, evmGasLeft)
 
     if gt(value, 0) {
         if isStatic {
@@ -680,7 +691,7 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
     argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
-    let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
+    let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize, evmGasLeft)
 
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
@@ -712,7 +723,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
     argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     rawRetOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
-    let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize)
+    let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize, evmGasLeft)
 
     newGasLeft := chargeGas(evmGasLeft, gasUsed)
     gasToPass := capGasForCall(newGasLeft, gasToPass)
@@ -768,11 +779,8 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
     stackHead := success
 }
 
-function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
+function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize, evmGasLeft) -> addr, gasUsed {
     addr := and(rawAddr, 0xffffffffffffffffffffffffffffffffffffffff)
-
-    checkMemIsAccessible(argsOffset, argsSize)
-    checkMemIsAccessible(retOffset, retSize)
 
     gasUsed := 100 // warm address access cost
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -780,7 +788,7 @@ function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
     }
 
     // memory_expansion_cost
-    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize, evmGasLeft))
 }
 
 function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
@@ -1026,8 +1034,6 @@ function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, s
 }
 
 function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
-    checkMemIsAccessible(offset, size)
-
     // EIP-3860
     if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
         panic()
@@ -1041,7 +1047,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
     let minimum_word_size := div(add(size, 31), 32) // rounding up
     let dynamicGas := add(
         mul(2, minimum_word_size),
-        expandMemory(offset, size)
+        expandMemory(offset, size, evmGasLeftOld)
     )
     if isCreate2 {
         // hash_cost = 6 * minimum_word_size
@@ -1236,10 +1242,8 @@ function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmG
     rawOffset, newSp, newStackHead := popStackItemWithoutCheck(sp, stackHead)
     size, newSp, newStackHead := popStackItemWithoutCheck(newSp, newStackHead)
 
-    checkMemIsAccessible(rawOffset, size)
-
     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-    let dynamicGas := add(shl(3, size), expandMemory(rawOffset, size))
+    let dynamicGas := add(shl(3, size), expandMemory(rawOffset, size, newEvmGasLeft))
     dynamicGas := add(dynamicGas, mul(375, topicCount))
 
     newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)

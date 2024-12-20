@@ -283,13 +283,11 @@ for { } true { } {
         popStackCheck(sp, 2)
         rawOffset, sp, size := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(rawOffset, size)
-
         // When an offset is first accessed (either read or write), memory may trigger 
         // an expansion, which costs gas.
         // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(rawOffset, size))
+        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(rawOffset, size, evmGasLeft))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         let offset
@@ -367,11 +365,9 @@ for { } true { } {
         sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(dstOffset, len)
-
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
+        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len, evmGasLeft))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         dstOffset := add(dstOffset, MEM_OFFSET())
@@ -412,11 +408,9 @@ for { } true { } {
         sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(dstOffset, len)
-
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
+        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len, evmGasLeft))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         dstOffset := add(dstOffset, MEM_OFFSET())
@@ -489,13 +483,11 @@ for { } true { } {
 
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
     
-        checkMemIsAccessible(dstOffset, len)
-    
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
         // minimum_word_size = (size + 31) / 32
         let dynamicGas := add(
             mul(3, shr(5, add(len, 31))),
-            expandMemory(dstOffset, len)
+            expandMemory(dstOffset, len, evmGasLeft)
         )
         
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -537,14 +529,12 @@ for { } true { } {
         sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(dstOffset, len)
-
         // minimum_word_size = (size + 31) / 32
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
+        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len, evmGasLeft))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        checkOverflow(sourceOffset, len)
+        checkOverflow(sourceOffset, len, evmGasLeft)
 
         // Check returndata out-of-bounds error
         if gt(add(sourceOffset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
@@ -686,9 +676,7 @@ for { } true { } {
 
         let offset := accessStackHead(sp, stackHead)
 
-        checkMemIsAccessible(offset, 32)
-        let expansionGas := expandMemory(offset, 32)
-        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 32, evmGasLeft))
 
         stackHead := mload(add(MEM_OFFSET(), offset))
 
@@ -703,9 +691,7 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(offset, 32)
-        let expansionGas := expandMemory(offset, 32)
-        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 32, evmGasLeft))
 
         mstore(add(MEM_OFFSET(), offset), value)
         ip := add(ip, 1)
@@ -719,9 +705,7 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(offset, 1)
-        let expansionGas := expandMemory(offset, 1)
-        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 1, evmGasLeft))
 
         mstore8(add(MEM_OFFSET(), offset), value)
         ip := add(ip, 1)
@@ -902,11 +886,8 @@ for { } true { } {
         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        checkMemIsAccessible(offset, size)
-        checkMemIsAccessible(destOffset, size)
-
         // dynamic_gas = 3 * words_copied + memory_expansion_cost
-        let dynamicGas := expandMemory2(offset, size, destOffset, size)
+        let dynamicGas := expandMemory2(offset, size, destOffset, size, evmGasLeft)
         let wordsCopied := div(add(size, 31), 32) // div rounding up
         dynamicGas := add(dynamicGas, mul(3, wordsCopied))
 
@@ -1418,9 +1399,7 @@ for { } true { } {
         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
         if size {
-            checkMemIsAccessible(offset, size)
-
-            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size, evmGasLeft))
     
             returnLen := size
             
@@ -1457,8 +1436,7 @@ for { } true { } {
         
         switch iszero(size)
         case 0 {
-            checkMemIsAccessible(offset, size)
-            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size, evmGasLeft))
             
             // Don't check overflow here since previous checks are enough to ensure this is safe
             offset := add(offset, MEM_OFFSET())

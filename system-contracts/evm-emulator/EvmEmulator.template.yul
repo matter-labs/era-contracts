@@ -141,7 +141,7 @@ object "EvmEmulator" {
                 if eq(isCallerEVM, 1) {
                     // Includes gas
                     returnOffset := sub(returnOffset, 32)
-                    checkOverflow(returnLen, 32)
+                    checkOverflow(returnLen, 32, evmGasLeft)
                     returnLen := add(returnLen, 32)
 
                     mstore(returnOffset, evmGasLeft)
