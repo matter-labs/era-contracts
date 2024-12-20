@@ -1309,6 +1309,18 @@ object "EvmEmulator" {
             }
         }
 
+        function $llvm_AlwaysInline_llvm$_calldatasize() -> size {
+            size := 0
+        }
+        
+        function $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen) {
+            $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, truncatedLen)
+        }
+        
+        function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
+            res := 0
+        }
+
         function simulate(
             isCallerEVM,
             evmGasLeft,
@@ -1667,18 +1679,14 @@ object "EvmEmulator" {
             
                     let calldataOffset := accessStackHead(sp, stackHead)
             
-                    stackHead := 0
-                    // EraVM will revert if offset + length overflows uint32
-                    if lt(calldataOffset, UINT32_MAX()) {
-                        stackHead := calldataload(calldataOffset)
-                    }
+                    stackHead := $llvm_AlwaysInline_llvm$_calldataload(calldataOffset)
             
                     ip := add(ip, 1)
                 }
                 case 0x36 { // OP_CALLDATASIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp, stackHead := pushStackItem(sp, calldatasize(), stackHead)
+                    sp, stackHead := pushStackItem(sp, $llvm_AlwaysInline_llvm$_calldatasize(), stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x37 { // OP_CALLDATACOPY
@@ -1713,7 +1721,7 @@ object "EvmEmulator" {
                     }
             
                     if truncatedLen {
-                        calldatacopy(dstOffset, sourceOffset, truncatedLen)
+                        $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen)
                     }
             
                     ip := add(ip, 1)
@@ -4805,18 +4813,14 @@ object "EvmEmulator" {
                 
                         let calldataOffset := accessStackHead(sp, stackHead)
                 
-                        stackHead := 0
-                        // EraVM will revert if offset + length overflows uint32
-                        if lt(calldataOffset, UINT32_MAX()) {
-                            stackHead := calldataload(calldataOffset)
-                        }
+                        stackHead := $llvm_AlwaysInline_llvm$_calldataload(calldataOffset)
                 
                         ip := add(ip, 1)
                     }
                     case 0x36 { // OP_CALLDATASIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp, stackHead := pushStackItem(sp, calldatasize(), stackHead)
+                        sp, stackHead := pushStackItem(sp, $llvm_AlwaysInline_llvm$_calldatasize(), stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x37 { // OP_CALLDATACOPY
@@ -4851,7 +4855,7 @@ object "EvmEmulator" {
                         }
                 
                         if truncatedLen {
-                            calldatacopy(dstOffset, sourceOffset, truncatedLen)
+                            $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen)
                         }
                 
                         ip := add(ip, 1)
@@ -6283,6 +6287,21 @@ object "EvmEmulator" {
                     }
                 }
                 
+
+                function $llvm_AlwaysInline_llvm$_calldatasize() -> size {
+                    size := calldatasize()
+                }
+                
+                function $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen) {
+                    calldatacopy(dstOffset, sourceOffset, truncatedLen)
+                }
+                
+                function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
+                    // EraVM will revert if offset + length overflows uint32
+                    if lt(calldataOffset, UINT32_MAX()) {
+                        res := calldataload(calldataOffset)
+                    }
+                }
 
                 if eq(isCallerEVM, 1) {
                     // Includes gas

@@ -347,18 +347,14 @@ for { } true { } {
 
         let calldataOffset := accessStackHead(sp, stackHead)
 
-        stackHead := 0
-        // EraVM will revert if offset + length overflows uint32
-        if lt(calldataOffset, UINT32_MAX()) {
-            stackHead := calldataload(calldataOffset)
-        }
+        stackHead := $llvm_AlwaysInline_llvm$_calldataload(calldataOffset)
 
         ip := add(ip, 1)
     }
     case 0x36 { // OP_CALLDATASIZE
         evmGasLeft := chargeGas(evmGasLeft, 2)
 
-        sp, stackHead := pushStackItem(sp, calldatasize(), stackHead)
+        sp, stackHead := pushStackItem(sp, $llvm_AlwaysInline_llvm$_calldatasize(), stackHead)
         ip := add(ip, 1)
     }
     case 0x37 { // OP_CALLDATACOPY
@@ -393,7 +389,7 @@ for { } true { } {
         }
 
         if truncatedLen {
-            calldatacopy(dstOffset, sourceOffset, truncatedLen)
+            $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen)
         }
 
         ip := add(ip, 1)
