@@ -262,8 +262,8 @@ jobs:
       # defaults to removing branch info.
       - name: Filter directories
         run: |
-          sudo apt update && sudo apt install -y lcov
-          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' '../lib/forge-std/*' '../lib/murky/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc lcov_branch_coverage=1 --rc lcov_line_coverage=1 --rc derive_function_end_line=0 --ignore-errors unused
+          sudo apt update && sudo apt install -y lcov=2.1-1
+          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' '../lib/forge-std/*' '../lib/murky/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc lcov_branch_coverage=1 --rc derive_function_end_line=0 --ignore-errors unused
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is
