@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {OperatorDAInputTooSmall, InvalidBlobsHashes, InvalidNumberOfBlobs, InvalidL2DAOutputHash, OnlyOneBlobWithCalldata, PubdataTooSmall, PubdataTooLong, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
+import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, InvalidL2DAOutputHash, OnlyOneBlobWithCalldataAllowed, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
 
 /// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
 /// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
@@ -61,7 +61,7 @@ abstract contract CalldataDA {
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
         if (_operatorDAInput.length < BLOB_DATA_OFFSET + 32 * blobsProvided) {
-            revert InvalidBlobsHashes(_operatorDAInput.length, BLOB_DATA_OFFSET + 32 * blobsProvided);
+            revert OperatorDAInputTooSmall(_operatorDAInput.length, BLOB_DATA_OFFSET + 32 * blobsProvided);
         }
 
         _cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
@@ -90,10 +90,10 @@ abstract contract CalldataDA {
         bytes calldata _pubdataInput
     ) internal pure virtual returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
         if (_blobsProvided != 1) {
-            revert OnlyOneBlobWithCalldata();
+            revert OnlyOneBlobWithCalldataAllowed();
         }
         if (_pubdataInput.length < BLOB_COMMITMENT_SIZE) {
-            revert PubdataTooSmall(_pubdataInput.length, BLOB_COMMITMENT_SIZE);
+            revert PubdataInputTooSmall(_pubdataInput.length, BLOB_COMMITMENT_SIZE);
         }
 
         // We typically do not know whether we'll use calldata or blobs at the time when
@@ -104,7 +104,7 @@ abstract contract CalldataDA {
         _pubdata = _pubdataInput[:_pubdataInput.length - BLOB_COMMITMENT_SIZE];
 
         if (_pubdata.length > BLOB_SIZE_BYTES) {
-            revert PubdataTooLong(_pubdata.length, BLOB_SIZE_BYTES);
+            revert PubdataLengthTooBig(_pubdata.length, BLOB_SIZE_BYTES);
         }
         if (_fullPubdataHash != keccak256(_pubdata)) {
             revert InvalidPubdataHash(_fullPubdataHash, keccak256(_pubdata));

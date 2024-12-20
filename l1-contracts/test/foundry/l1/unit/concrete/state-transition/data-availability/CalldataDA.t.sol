@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {TestCalldataDA} from "contracts/dev-contracts/test/TestCalldataDA.sol";
 import {BLOB_SIZE_BYTES, BLOB_DATA_OFFSET, BLOB_COMMITMENT_SIZE} from "contracts/state-transition/data-availability/CalldataDA.sol";
-import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OnlyOneBlobWithCalldata, PubdataTooSmall, PubdataTooLong, InvalidPubdataHash} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, InvalidL2DAOutputHash, OnlyOneBlobWithCalldataAllowed, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract CalldataDATest is Test {
     TestCalldataDA calldataDA;
@@ -62,7 +62,7 @@ contract CalldataDATest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                InvalidBlobsHashes.selector,
+                OperatorDAInputTooSmall.selector,
                 operatorDAInput.length,
                 BLOB_DATA_OFFSET + 32 * uint256(uint8(operatorDAInput[64]))
             )
@@ -117,13 +117,13 @@ contract CalldataDATest is Test {
                             CalldataDA::_processCalldataDA
     //////////////////////////////////////////////////////////////////////////*/
 
-    function test_RevertWhen_OnlyOneBlobWithCalldata(uint256 blobsProvided) public {
+    function test_RevertWhen_OnlyOneBlobWithCalldataAllowed(uint256 blobsProvided) public {
         vm.assume(blobsProvided != 1);
         bytes32 fullPubdataHash = Utils.randomBytes32("fullPubdataHash");
         uint256 maxBlobsSupported = 6;
         bytes memory pubdataInput = "";
 
-        vm.expectRevert(OnlyOneBlobWithCalldata.selector);
+        vm.expectRevert(OnlyOneBlobWithCalldataAllowed.selector);
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
@@ -133,17 +133,19 @@ contract CalldataDATest is Test {
         bytes calldata pubdataInput = makeBytesArrayOfLength(BLOB_SIZE_BYTES + 33);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
-        vm.expectRevert(abi.encodeWithSelector(PubdataTooLong.selector, 126977, blobsProvided * BLOB_SIZE_BYTES));
+        vm.expectRevert(abi.encodeWithSelector(PubdataLengthTooBig.selector, 126977, blobsProvided * BLOB_SIZE_BYTES));
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
-    function test_RevertWhen_PubdataTooSmall() public {
+    function test_RevertWhen_PubdataInputTooSmall() public {
         uint256 blobsProvided = 1;
         uint256 maxBlobsSupported = 6;
         bytes calldata pubdataInput = makeBytesArrayOfLength(31);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
-        vm.expectRevert(abi.encodeWithSelector(PubdataTooSmall.selector, pubdataInput.length, BLOB_COMMITMENT_SIZE));
+        vm.expectRevert(
+            abi.encodeWithSelector(PubdataInputTooSmall.selector, pubdataInput.length, BLOB_COMMITMENT_SIZE)
+        );
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 

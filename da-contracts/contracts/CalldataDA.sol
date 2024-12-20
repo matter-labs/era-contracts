@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {OperatorDAInputLengthTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OneBlobWithCalldata, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "./DAContractsErrors.sol";
+import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, InvalidL2DAOutputHash, OnlyOneBlobWithCalldataAllowed, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "./DAContractsErrors.sol";
 
 /// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
 /// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
@@ -45,7 +45,7 @@ abstract contract CalldataDA {
 
         // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
         if (_operatorDAInput.length < BLOB_DATA_OFFSET) {
-            revert OperatorDAInputLengthTooSmall(_operatorDAInput.length, BLOB_DATA_OFFSET);
+            revert OperatorDAInputTooSmall(_operatorDAInput.length, BLOB_DATA_OFFSET);
         }
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);
@@ -61,7 +61,7 @@ abstract contract CalldataDA {
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
         if (_operatorDAInput.length < BLOB_DATA_OFFSET + 32 * blobsProvided) {
-            revert InvalidBlobsHashes(_operatorDAInput.length, BLOB_DATA_OFFSET + 32 * blobsProvided);
+            revert OperatorDAInputTooSmall(_operatorDAInput.length, BLOB_DATA_OFFSET + 32 * blobsProvided);
         }
 
         _cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
@@ -90,7 +90,7 @@ abstract contract CalldataDA {
         bytes calldata _pubdataInput
     ) internal pure virtual returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
         if (_blobsProvided != 1) {
-            revert OneBlobWithCalldata();
+            revert OnlyOneBlobWithCalldataAllowed();
         }
         if (_pubdataInput.length < BLOB_COMMITMENT_SIZE) {
             revert PubdataInputTooSmall(_pubdataInput.length, BLOB_COMMITMENT_SIZE);

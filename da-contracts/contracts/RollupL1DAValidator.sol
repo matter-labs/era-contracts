@@ -13,7 +13,7 @@ import {InvalidPubdataSource, PubdataCommitmentsEmpty, InvalidPubdataCommitments
 uint256 constant BLOBS_SUPPORTED = 6;
 
 /// @dev The number of blocks within each we allow blob to be used for DA.
-/// On Ethereum blobs expire within 4096 slots, i.e. 4096 * 32 blocks. We reserve
+/// On Ethereum blobs expire within 4096 epochs, i.e. 4096 * 32 blocks. We reserve
 /// half of the time in order to ensure reader's ability to read the blob's content.
 uint256 constant BLOB_EXPIRATION_BLOCKS = (4096 * 32) / 2;
 

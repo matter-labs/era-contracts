@@ -22,7 +22,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
+import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -385,6 +385,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             (address, uint256, address)
         );
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+
+        // We ensure that the legacy data format can not be used for tokens that did not originate from L1.
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
+        if (assetId != expectedAssetId) {
+            revert LegacyEncodingUsedForNonL1Token();
+        }
 
         if (assetId == ETH_TOKEN_ASSET_ID) {
             // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
