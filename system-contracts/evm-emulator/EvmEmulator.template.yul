@@ -60,6 +60,8 @@ object "EvmEmulator" {
 
         <!-- @include EvmEmulatorFunctions.template.yul -->
 
+        <!-- @include calldata-opcodes/ConstructorScope.template.yul -->
+
         function simulate(
             isCallerEVM,
             evmGasLeft,
@@ -133,6 +135,8 @@ object "EvmEmulator" {
                 returnLen := 0
 
                 <!-- @include EvmEmulatorLoop.template.yul -->
+
+                <!-- @include calldata-opcodes/RuntimeScope.template.yul -->
 
                 if eq(isCallerEVM, 1) {
                     // Includes gas
