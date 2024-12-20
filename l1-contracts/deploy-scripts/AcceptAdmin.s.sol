@@ -9,6 +9,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {IChainAdminSingleOwner} from "contracts/governance/IChainAdminSingleOwner.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -76,10 +77,31 @@ contract AcceptAdmin is Script {
 
     // This function should be called by the owner to update token multiplier setter role
     function chainSetTokenMultiplierSetter(
+        address chainAdmin,
         address accessControlRestriction,
         address diamondProxyAddress,
         address setter
     ) public {
+        if (accessControlRestriction == address(0)) {
+            _chainSetTokenMultiplierSetterSingleOwner(chainAdmin, setter);
+        } else {
+            _chainSetTokenMultiplierSetterLatestChainAdmin(accessControlRestriction, diamondProxyAddress, setter);
+        }
+    }
+
+    function _chainSetTokenMultiplierSetterSingleOwner(address chainAdmin, address setter) internal {
+        IChainAdminSingleOwner admin = IChainAdminSingleOwner(chainAdmin);
+
+        vm.startBroadcast();
+        admin.setTokenMultiplierSetter(setter);
+        vm.stopBroadcast();
+    }
+
+    function _chainSetTokenMultiplierSetterLatestChainAdmin(
+        address accessControlRestriction,
+        address diamondProxyAddress,
+        address setter
+    ) internal {
         AccessControlRestriction restriction = AccessControlRestriction(accessControlRestriction);
 
         if (

@@ -223,9 +223,9 @@ abstract contract NativeTokenVault is
         }
     }
 
-    function tryRegisterTokenFromBurnData(bytes calldata _data, bytes32 _expectedAssetId) external {
+    function tryRegisterTokenFromBurnData(bytes calldata _burnData, bytes32 _expectedAssetId) external {
         // slither-disable-next-line unused-return
-        (, , address tokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
+        (, , address tokenAddress) = DataEncoding.decodeBridgeBurnData(_burnData);
 
         if (tokenAddress == address(0)) {
             revert ZeroAddress();
@@ -338,8 +338,7 @@ abstract contract NativeTokenVault is
         address _receiver,
         address _nativeToken
     ) internal virtual returns (bytes memory _bridgeMintData) {
-        address nativeToken = tokenAddress[_assetId];
-        if (nativeToken == WETH_TOKEN) {
+        if (_nativeToken == WETH_TOKEN) {
             // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
             // It can only be withdrawn from the chain where it has already gotten.
             revert BurningNativeWETHNotSupported();

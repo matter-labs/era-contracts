@@ -48,6 +48,8 @@ import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-trans
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
+/// @dev IMPORTANT: this script is not intended to be used in production.
+/// TODO(EVM-925): support secure gateway deployment.
 contract GatewayCTMFromL1 is Script {
     using stdToml for string;
 

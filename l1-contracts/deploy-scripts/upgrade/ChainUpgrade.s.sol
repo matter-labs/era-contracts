@@ -28,7 +28,6 @@ contract ChainUpgrade is Script {
         uint256 chainChainId;
         address chainDiamondProxyAddress;
         bool permanentRollup;
-        // FIXME: From ecosystem, maybe move to a different struct
         address bridgehubProxyAddress;
         address oldSharedBridgeProxyAddress;
     }
@@ -58,9 +57,6 @@ contract ChainUpgrade is Script {
 
         checkCorrectOwnerAddress();
 
-        // Deploying of the new chain admin is not strictly needed
-        // but our existing tooling relies on the new impl of chain admin
-        deployNewChainAdmin();
         governanceMoveToNewChainAdmin();
 
         // This script does nothing, it only checks that the provided inputs are correct.
@@ -123,6 +119,7 @@ contract ChainUpgrade is Script {
         require(currentAdminOwner == config.ownerAddress, "Only the owner of the chain admin can call this function");
     }
 
+    // TODO(EVM-924): this function is not used.
     function deployNewChainAdmin() internal {
         vm.broadcast(config.ownerAddress);
         AccessControlRestriction accessControlRestriction = new AccessControlRestriction(0, config.ownerAddress);

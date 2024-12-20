@@ -32,6 +32,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {CreateAndTransfer} from "./CreateAndTransfer.sol";
+import {ChainAdminSingleOwner} from "contracts/governance/ChainAdminSingleOwner.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -333,24 +334,47 @@ contract RegisterZKChainScript is Script {
     }
 
     function deployChainAdmin() internal {
+        // TODO(EVM-924): provide an option to deploy a non-single owner ChainAdmin.
+        (address chainAdmin, address accessControlRestriction) = deployChainAdminSingleOwner();
+
+        output.accessControlRestrictionAddress = accessControlRestriction;
+        output.chainAdmin = chainAdmin;
+    }
+
+    function deployChainAdminSingleOwner() internal returns (address chainAdmin, address accessControlRestriction) {
+        chainAdmin = Utils.deployViaCreate2(
+            abi.encodePacked(type(ChainAdminSingleOwner).creationCode, abi.encode(config.ownerAddress, address(0))),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
+        // The single owner chainAdmin does not have a separate control restriction contract.
+        // We set to it to zero explicitly so that it is clear to the reader.
+        accessControlRestriction = address(0);
+
+        console.log("ChainAdminSingleOwner deployed at:", accessControlRestriction);
+    }
+
+    // TODO(EVM-924): this function is unused
+    function deployChainAdminWithRestrictions()
+        internal
+        returns (address chainAdmin, address accessControlRestriction)
+    {
         bytes memory input = abi.encode(0, config.ownerAddress);
-        address restriction = Utils.deployViaCreate2(
+        accessControlRestriction = Utils.deployViaCreate2(
             abi.encodePacked(type(AccessControlRestriction).creationCode, input),
             config.create2Salt,
             config.create2FactoryAddress
         );
-        output.accessControlRestrictionAddress = restriction;
 
         address[] memory restrictions = new address[](1);
-        restrictions[0] = restriction;
+        restrictions[0] = accessControlRestriction;
 
         input = abi.encode(restrictions);
-        address chainAdmin = Utils.deployViaCreate2(
+        chainAdmin = Utils.deployViaCreate2(
             abi.encodePacked(type(ChainAdmin).creationCode, input),
             config.create2Salt,
             config.create2FactoryAddress
         );
-        output.chainAdmin = chainAdmin;
     }
 
     function registerZKChain() internal {

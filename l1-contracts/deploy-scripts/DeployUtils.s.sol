@@ -55,6 +55,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
+import {ChainAdminSingleOwner} from "contracts/governance/ChainAdminSingleOwner.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -332,7 +333,31 @@ contract DeployUtils is Script {
     }
 
     function deployChainAdmin() internal {
-        address accessControlRestriction = deployViaCreate2(
+        // TODO(EVM-924): provide an option to deploy a non-single owner ChainAdmin.
+        (address chainAdmin, address accessControlRestriction) = deployChainAdminSingleOwner();
+
+        addresses.accessControlRestrictionAddress = accessControlRestriction;
+        addresses.chainAdmin = chainAdmin;
+    }
+
+    function deployChainAdminSingleOwner() internal returns (address chainAdmin, address accessControlRestriction) {
+        chainAdmin = deployViaCreate2(
+            type(ChainAdminSingleOwner).creationCode,
+            abi.encode(config.ownerAddress, address(0))
+        );
+        // The single owner chainAdmin does not have a separate control restriction contract.
+        // We set to it to zero explicitly so that it is clear to the reader.
+        accessControlRestriction = address(0);
+
+        console.log("ChainAdminSingleOwner deployed at:", accessControlRestriction);
+    }
+
+    // TODO(EVM-924): this function is unused
+    function deployChainAdminWithRestrictions()
+        internal
+        returns (address chainAdmin, address accessControlRestriction)
+    {
+        accessControlRestriction = deployViaCreate2(
             type(AccessControlRestriction).creationCode,
             abi.encode(uint256(0), config.ownerAddress)
         );
@@ -342,9 +367,8 @@ contract DeployUtils is Script {
         restrictions[0] = accessControlRestriction;
         addresses.accessControlRestrictionAddress = accessControlRestriction;
 
-        address contractAddress = deployViaCreate2(type(ChainAdmin).creationCode, abi.encode(restrictions));
-        console.log("ChainAdmin deployed at:", contractAddress);
-        addresses.chainAdmin = contractAddress;
+        chainAdmin = deployViaCreate2(type(ChainAdmin).creationCode, abi.encode(restrictions));
+        console.log("ChainAdmin deployed at:", chainAdmin);
     }
 
     function deployTransparentProxyAdmin() internal {

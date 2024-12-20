@@ -64,6 +64,8 @@ struct Config {
 }
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
+/// @dev IMPORTANT: this script is not intended to be used in production.
+/// TODO(EVM-925): support secure gateway deployment.
 contract GatewayPreparation is Script {
     using stdToml for string;
 
@@ -311,7 +313,7 @@ contract GatewayPreparation is Script {
     function deployL2ChainAdmin() public {
         initializeConfig();
 
-        // FIXME: it is deployed without any restrictions.
+        // TODO(EVM-925): it is deployed without any restrictions.
         address l2ChainAdminAddress = Utils.deployThroughL1({
             bytecode: L2ContractsBytecodesLib.readChainAdminBytecode(),
             constructorargs: abi.encode(new address[](0)),
@@ -436,7 +438,7 @@ contract GatewayPreparation is Script {
 
             l2Calldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
         }
-        // FIXME: this should migrate to use L2 transactions directly
+        // TODO(EVM-925): this should migrate to use L2 transactions directly
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
