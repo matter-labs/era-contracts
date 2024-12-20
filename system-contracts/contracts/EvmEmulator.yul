@@ -2122,6 +2122,11 @@ object "EvmEmulator" {
                     let counter
                     counter, sp, stackHead := popStackItem(sp, stackHead)
             
+                    // Counter certainly can't be bigger than uint64.
+                    if gt(counter, MAX_UINT64()) {
+                        panic()
+                    } 
+            
                     ip := add(BYTECODE_OFFSET(), counter)
             
                     // Check next opcode is JUMPDEST
@@ -2146,6 +2151,11 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                         continue
                     }
+            
+                    // Counter certainly can't be bigger than uint64.
+                    if gt(counter, MAX_UINT64()) {
+                        panic()
+                    } 
             
                     ip := add(BYTECODE_OFFSET(), counter)
             
@@ -5250,6 +5260,11 @@ object "EvmEmulator" {
                         let counter
                         counter, sp, stackHead := popStackItem(sp, stackHead)
                 
+                        // Counter certainly can't be bigger than uint64.
+                        if gt(counter, MAX_UINT64()) {
+                            panic()
+                        } 
+                
                         ip := add(BYTECODE_OFFSET(), counter)
                 
                         // Check next opcode is JUMPDEST
@@ -5274,6 +5289,11 @@ object "EvmEmulator" {
                             ip := add(ip, 1)
                             continue
                         }
+                
+                        // Counter certainly can't be bigger than uint64.
+                        if gt(counter, MAX_UINT64()) {
+                            panic()
+                        } 
                 
                         ip := add(BYTECODE_OFFSET(), counter)
                 
