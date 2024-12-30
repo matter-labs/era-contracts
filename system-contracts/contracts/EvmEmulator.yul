@@ -1058,7 +1058,7 @@ object "EvmEmulator" {
         
                     mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
         
-                    // Skip the returnData
+                    // Skip first 32 bytes of the returnData
                     ptrAddIntoActive(32)
                 }
         }
@@ -4186,7 +4186,7 @@ object "EvmEmulator" {
             
                         mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
             
-                        // Skip the returnData
+                        // Skip first 32 bytes of the returnData
                         ptrAddIntoActive(32)
                     }
             }
