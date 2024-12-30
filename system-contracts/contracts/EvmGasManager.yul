@@ -71,9 +71,9 @@ object "EvmGasManager" {
                 let notSystemCall := iszero(and(callFlags, 2))
 
                 if notSystemCall {
-                    // error CallerMustBeEvmContract()
-                    mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
-                    revert(0, 32)
+                    // error SystemCallFlagRequired()
+                    mstore(0, 0x71C3DA0100000000000000000000000000000000000000000000000000000000)
+                    revert(0, 4)
                 }
 
                 // SELFDESTRUCT is not supported, so it is ok to cache here
@@ -86,7 +86,7 @@ object "EvmGasManager" {
                     if iszero(isEVM) {
                         // error CallerMustBeEvmContract()
                         mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
-                        revert(0, 32)
+                        revert(0, 4)
                     }
 
                     // we will not cache contract if it is being constructed
