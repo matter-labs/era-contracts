@@ -8,7 +8,7 @@ function $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncate
 
 function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
     // EraVM will revert if offset + length overflows uint32
-    if lt(calldataOffset, UINT32_MAX()) {
+    if lt(calldataOffset, MAX_UINT32()) {
         res := calldataload(calldataOffset)
     }
 }

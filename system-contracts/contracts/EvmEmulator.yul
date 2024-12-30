@@ -187,7 +187,7 @@ object "EvmEmulator" {
         
         function OVERHEAD() -> overhead { overhead := 2000 }
         
-        function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+        function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
         
         function EMPTY_KECCAK() -> value {  // keccak("")
             value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -290,7 +290,7 @@ object "EvmEmulator" {
             }
         }
         
-        function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
+        function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> gasCost {
             let maxNewMemsize := _memsizeRequired(retOffset, retSize)
             let argsMemsize := _memsizeRequired(argsOffset, argsSize)
         
@@ -299,7 +299,7 @@ object "EvmEmulator" {
             }
         
             if maxNewMemsize { // Memory expansion costs 0 if size is 0
-                maxExpand := _expandMemoryInternal(maxNewMemsize)
+                gasCost := _expandMemoryInternal(maxNewMemsize)
             }
         }
         
@@ -931,8 +931,8 @@ object "EvmEmulator" {
         
             zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
         
-            if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
-                zkEvmGasToPass := UINT32_MAX()
+            if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
+                zkEvmGasToPass := MAX_UINT32()
             }
         
             let zkEvmGasBefore := gas()
@@ -1710,14 +1710,14 @@ object "EvmEmulator" {
                     dstOffset := add(dstOffset, MEM_OFFSET())
             
                     // EraVM will revert if offset + length overflows uint32
-                    if gt(sourceOffset, UINT32_MAX()) {
-                        sourceOffset := UINT32_MAX()
+                    if gt(sourceOffset, MAX_UINT32()) {
+                        sourceOffset := MAX_UINT32()
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), UINT32_MAX()) {
-                        truncatedLen := sub(UINT32_MAX(), sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), MAX_UINT32()) {
+                        truncatedLen := sub(MAX_UINT32(), sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -3315,7 +3315,7 @@ object "EvmEmulator" {
             
             function OVERHEAD() -> overhead { overhead := 2000 }
             
-            function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+            function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
             
             function EMPTY_KECCAK() -> value {  // keccak("")
                 value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -3418,7 +3418,7 @@ object "EvmEmulator" {
                 }
             }
             
-            function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
+            function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> gasCost {
                 let maxNewMemsize := _memsizeRequired(retOffset, retSize)
                 let argsMemsize := _memsizeRequired(argsOffset, argsSize)
             
@@ -3427,7 +3427,7 @@ object "EvmEmulator" {
                 }
             
                 if maxNewMemsize { // Memory expansion costs 0 if size is 0
-                    maxExpand := _expandMemoryInternal(maxNewMemsize)
+                    gasCost := _expandMemoryInternal(maxNewMemsize)
                 }
             }
             
@@ -4059,8 +4059,8 @@ object "EvmEmulator" {
             
                 zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
             
-                if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
-                    zkEvmGasToPass := UINT32_MAX()
+                if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
+                    zkEvmGasToPass := MAX_UINT32()
                 }
             
                 let zkEvmGasBefore := gas()
@@ -4826,14 +4826,14 @@ object "EvmEmulator" {
                         dstOffset := add(dstOffset, MEM_OFFSET())
                 
                         // EraVM will revert if offset + length overflows uint32
-                        if gt(sourceOffset, UINT32_MAX()) {
-                            sourceOffset := UINT32_MAX()
+                        if gt(sourceOffset, MAX_UINT32()) {
+                            sourceOffset := MAX_UINT32()
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), UINT32_MAX()) {
-                            truncatedLen := sub(UINT32_MAX(), sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), MAX_UINT32()) {
+                            truncatedLen := sub(MAX_UINT32(), sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
@@ -6262,7 +6262,7 @@ object "EvmEmulator" {
                 
                 function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
                     // EraVM will revert if offset + length overflows uint32
-                    if lt(calldataOffset, UINT32_MAX()) {
+                    if lt(calldataOffset, MAX_UINT32()) {
                         res := calldataload(calldataOffset)
                     }
                 }
