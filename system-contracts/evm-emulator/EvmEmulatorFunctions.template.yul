@@ -179,56 +179,67 @@ function getEvmGasFromContext() -> evmGas {
     }
 }
 
-// This function can overflow, it is the job of the caller to ensure that it does not.
 // The argument to this function is the offset into the memory region IN BYTES.
 function expandMemory(offset, size) -> gasCost {
     // memory expansion costs 0 if size is 0
     if size {
-        let oldSizeInWords := mload(MEM_LEN_OFFSET())
+        checkOverflow(offset, size)
+        gasCost := _expandMemoryInternal(add(offset, size))
+    }
+}
 
-        // div rounding up
-        let newSizeInWords := div(add(add(offset, size), 31), 32)
-    
-        // memory_size_word = (memory_byte_size + 31) / 32
-        // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
-        // memory_expansion_cost = new_memory_cost - last_memory_cost
-        if gt(newSizeInWords, oldSizeInWords) {
-            let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
-            let quadraticPart := sub(
-                div(
-                    mul(newSizeInWords, newSizeInWords),
-                    512
-                ),
-                div(
-                    mul(oldSizeInWords, oldSizeInWords),
-                    512
-                )
+// This function can overflow, it is the job of the caller to ensure that it does not.
+// The argument to this function is the new size of memory IN BYTES.
+function _expandMemoryInternal(newMemsize) -> gasCost {
+    if gt(newMemsize, MAX_POSSIBLE_MEM_LEN()) {
+        panic()
+    }   
+
+    let oldSizeInWords := mload(MEM_LEN_OFFSET())
+
+    // div rounding up
+    let newSizeInWords := div(add(newMemsize, 31), 32)
+
+    // memory_size_word = (memory_byte_size + 31) / 32
+    // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+    // memory_expansion_cost = new_memory_cost - last_memory_cost
+    if gt(newSizeInWords, oldSizeInWords) {
+        let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+        let quadraticPart := sub(
+            div(
+                mul(newSizeInWords, newSizeInWords),
+                512
+            ),
+            div(
+                mul(oldSizeInWords, oldSizeInWords),
+                512
             )
-    
-            gasCost := add(linearPart, quadraticPart)
-    
-            mstore(MEM_LEN_OFFSET(), newSizeInWords)
-        }
+        )
+
+        gasCost := add(linearPart, quadraticPart)
+
+        mstore(MEM_LEN_OFFSET(), newSizeInWords)
+    }
+}
+
+// Returns 0 if size is 0
+function _memsizeRequired(offset, size) -> memorySize {
+    if size {
+        checkOverflow(offset, size)
+        memorySize := add(offset, size)
     }
 }
 
 function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-    switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
-    case 0 {
-        maxExpand := expandMemory(retOffset, retSize)
-    }
-    default {
-        maxExpand := expandMemory(argsOffset, argsSize)
-    }
-}
+    let maxNewMemsize := _memsizeRequired(retOffset, retSize)
+    let argsMemsize := _memsizeRequired(argsOffset, argsSize)
 
-function checkMemIsAccessible(relativeOffset, size) {
-    if size {
-        checkOverflow(relativeOffset, size)
+    if lt(maxNewMemsize, argsMemsize) {
+        maxNewMemsize := argsMemsize  
+    }
 
-        if gt(add(relativeOffset, size), MAX_POSSIBLE_MEM_LEN()) {
-            panic()
-        }   
+    if maxNewMemsize { // Memory expansion costs 0 if size is 0
+        maxExpand := _expandMemoryInternal(maxNewMemsize)
     }
 }
 
@@ -771,16 +782,15 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
 function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
     addr := and(rawAddr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-    checkMemIsAccessible(argsOffset, argsSize)
-    checkMemIsAccessible(retOffset, retSize)
+    // memory_expansion_cost
+    gasUsed := expandMemory2(retOffset, retSize, argsOffset, argsSize)
 
-    gasUsed := 100 // warm address access cost
+    let addressAccessCost := 100 // warm address access cost
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        gasUsed := 2600 // cold address access cost
+        addressAccessCost := 2600 // cold address access cost
     }
 
-    // memory_expansion_cost
-    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+    gasUsed := add(gasUsed, addressAccessCost)
 }
 
 function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
@@ -1026,8 +1036,6 @@ function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, s
 }
 
 function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
-    checkMemIsAccessible(offset, size)
-
     // EIP-3860
     if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
         panic()
@@ -1235,8 +1243,6 @@ function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmG
     popStackCheck(sp, add(2, topicCount))
     rawOffset, newSp, newStackHead := popStackItemWithoutCheck(sp, stackHead)
     size, newSp, newStackHead := popStackItemWithoutCheck(newSp, newStackHead)
-
-    checkMemIsAccessible(rawOffset, size)
 
     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
     let dynamicGas := add(shl(3, size), expandMemory(rawOffset, size))
