@@ -31,35 +31,35 @@ function ORIGIN_CACHE_OFFSET() -> offset {
 }
 
 function GASPRICE_CACHE_OFFSET() -> offset {
-    offset := mul(24, 32)
+    offset := add(ORIGIN_CACHE_OFFSET(), 32)
 }
 
 function COINBASE_CACHE_OFFSET() -> offset {
-    offset := mul(25, 32)
+    offset := add(GASPRICE_CACHE_OFFSET(), 32)
 }
 
 function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
-    offset := mul(26, 32)
+    offset := add(COINBASE_CACHE_OFFSET(), 32)
 }
 
 function BLOCKNUMBER_CACHE_OFFSET() -> offset {
-    offset := mul(27, 32)
+    offset := add(BLOCKTIMESTAMP_CACHE_OFFSET(), 32)
 }
 
 function PREVRANDAO_CACHE_OFFSET() -> offset {
-    offset := mul(28, 32)
+    offset := add(BLOCKNUMBER_CACHE_OFFSET(), 32)
 }
 
 function GASLIMIT_CACHE_OFFSET() -> offset {
-    offset := mul(29, 32)
+    offset := add(PREVRANDAO_CACHE_OFFSET(), 32)
 }
 
 function CHAINID_CACHE_OFFSET() -> offset {
-    offset := mul(30, 32)
+    offset := add(GASLIMIT_CACHE_OFFSET(), 32)
 }
 
 function BASEFEE_CACHE_OFFSET() -> offset {
-    offset := mul(31, 32)
+    offset := add(CHAINID_CACHE_OFFSET(), 32)
 }
 
 function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
