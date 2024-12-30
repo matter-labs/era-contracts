@@ -2731,8 +2731,7 @@ object "EvmEmulator" {
                     let offset, size
             
                     popStackCheck(sp, 2)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
                     if size {
                         evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
@@ -2764,11 +2763,10 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0xFD { // OP_REVERT
-                    let offset,size
+                    let offset, size
             
                     popStackCheck(sp, 2)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                     
                     switch iszero(size)
                     case 0 {
@@ -5847,8 +5845,7 @@ object "EvmEmulator" {
                         let offset, size
                 
                         popStackCheck(sp, 2)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                 
                         if size {
                             evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
@@ -5880,11 +5877,10 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0xFD { // OP_REVERT
-                        let offset,size
+                        let offset, size
                 
                         popStackCheck(sp, 2)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                         
                         switch iszero(size)
                         case 0 {
