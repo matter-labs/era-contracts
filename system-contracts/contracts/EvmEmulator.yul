@@ -180,11 +180,6 @@ object "EvmEmulator" {
         // Each evm gas is 5 zkEVM one
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         
-        // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
-        function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                gas_stipend := 35000 // 27000 + a little bit more
-        }
-        
         function OVERHEAD() -> overhead { overhead := 2000 }
         
         function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
@@ -405,13 +400,6 @@ object "EvmEmulator" {
             evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
         }
         
-        function isEvmContract(addr) -> isEVM {
-            // function isAccountEVM(address addr) external view returns (bool);
-            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-            mstore(4, addr)
-            isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
-        }
-        
         function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
             let version := shr(248, rawCodeHash)
             let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
@@ -453,13 +441,6 @@ object "EvmEmulator" {
             
                 copiedLen := len
             } 
-        }
-        
-        function getMax(a, b) -> max {
-            max := b
-            if gt(a, b) {
-                max := a
-            }
         }
         
         function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
@@ -574,12 +555,6 @@ object "EvmEmulator" {
             a := oldStackHead
             newSp := sub(sp, 0x20)
             stackHead := mload(newSp)
-        }
-        
-        function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
-            mstore(sp, oldStackHead)
-            stackHead := item
-            newSp := add(sp, 0x20)
         }
         
         function popStackCheck(sp, numInputs) {
@@ -3306,11 +3281,6 @@ object "EvmEmulator" {
             // Each evm gas is 5 zkEVM one
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             
-            // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
-            function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                    gas_stipend := 35000 // 27000 + a little bit more
-            }
-            
             function OVERHEAD() -> overhead { overhead := 2000 }
             
             function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
@@ -3531,13 +3501,6 @@ object "EvmEmulator" {
                 evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
             }
             
-            function isEvmContract(addr) -> isEVM {
-                // function isAccountEVM(address addr) external view returns (bool);
-                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-                mstore(4, addr)
-                isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
-            }
-            
             function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
                 let version := shr(248, rawCodeHash)
                 let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
@@ -3579,13 +3542,6 @@ object "EvmEmulator" {
                 
                     copiedLen := len
                 } 
-            }
-            
-            function getMax(a, b) -> max {
-                max := b
-                if gt(a, b) {
-                    max := a
-                }
             }
             
             function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
@@ -3700,12 +3656,6 @@ object "EvmEmulator" {
                 a := oldStackHead
                 newSp := sub(sp, 0x20)
                 stackHead := mload(newSp)
-            }
-            
-            function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
-                mstore(sp, oldStackHead)
-                stackHead := item
-                newSp := add(sp, 0x20)
             }
             
             function popStackCheck(sp, numInputs) {
