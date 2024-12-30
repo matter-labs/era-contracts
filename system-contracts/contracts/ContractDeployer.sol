@@ -567,7 +567,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
 
         // 2. Set the constructed code hash on the account
-        _storeConstructingByteCodeHashOnAddress(
+        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructingCodeHash(
             _newAddress,
             // Dummy EVM bytecode hash just to call emulator.
             // The second byte is `0x01` to indicate that it is being constructed.
