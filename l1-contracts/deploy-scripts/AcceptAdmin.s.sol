@@ -9,7 +9,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
-import {IChainAdminSingleOwner} from "contracts/governance/IChainAdminSingleOwner.sol";
+import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -83,14 +83,14 @@ contract AcceptAdmin is Script {
         address setter
     ) public {
         if (accessControlRestriction == address(0)) {
-            _chainSetTokenMultiplierSetterSingleOwner(chainAdmin, setter);
+            _chainSetTokenMultiplierSetterOwnable(chainAdmin, setter);
         } else {
             _chainSetTokenMultiplierSetterLatestChainAdmin(accessControlRestriction, diamondProxyAddress, setter);
         }
     }
 
-    function _chainSetTokenMultiplierSetterSingleOwner(address chainAdmin, address setter) internal {
-        IChainAdminSingleOwner admin = IChainAdminSingleOwner(chainAdmin);
+    function _chainSetTokenMultiplierSetterOwnable(address chainAdmin, address setter) internal {
+        IChainAdminOwnable admin = IChainAdminOwnable(chainAdmin);
 
         vm.startBroadcast();
         admin.setTokenMultiplierSetter(setter);

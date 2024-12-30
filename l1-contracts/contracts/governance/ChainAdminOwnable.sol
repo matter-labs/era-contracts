@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {IChainAdminSingleOwner} from "./IChainAdminSingleOwner.sol";
+import {IChainAdminOwnable} from "./IChainAdminOwnable.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
@@ -13,7 +13,7 @@ import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractEr
 /// The owner of the contract can perform any external calls and also save the information needed for
 /// the blockchain node to accept the protocol upgrade. Another role - `tokenMultiplierSetter` can be used in the contract
 /// to change the base token gas price in the Chain contract.
-contract ChainAdminSingleOwner is IChainAdminSingleOwner, Ownable2Step {
+contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
     /// @notice Mapping of protocol versions to their expected upgrade timestamps.
     /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
     mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;

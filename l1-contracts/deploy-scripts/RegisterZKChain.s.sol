@@ -32,7 +32,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {CreateAndTransfer} from "./CreateAndTransfer.sol";
-import {ChainAdminSingleOwner} from "contracts/governance/ChainAdminSingleOwner.sol";
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -335,15 +335,15 @@ contract RegisterZKChainScript is Script {
 
     function deployChainAdmin() internal {
         // TODO(EVM-924): provide an option to deploy a non-single owner ChainAdmin.
-        (address chainAdmin, address accessControlRestriction) = deployChainAdminSingleOwner();
+        (address chainAdmin, address accessControlRestriction) = deployChainAdminOwnable();
 
         output.accessControlRestrictionAddress = accessControlRestriction;
         output.chainAdmin = chainAdmin;
     }
 
-    function deployChainAdminSingleOwner() internal returns (address chainAdmin, address accessControlRestriction) {
+    function deployChainAdminOwnable() internal returns (address chainAdmin, address accessControlRestriction) {
         chainAdmin = Utils.deployViaCreate2(
-            abi.encodePacked(type(ChainAdminSingleOwner).creationCode, abi.encode(config.ownerAddress, address(0))),
+            abi.encodePacked(type(ChainAdminOwnable).creationCode, abi.encode(config.ownerAddress, address(0))),
             config.create2Salt,
             config.create2FactoryAddress
         );
@@ -351,7 +351,7 @@ contract RegisterZKChainScript is Script {
         // We set to it to zero explicitly so that it is clear to the reader.
         accessControlRestriction = address(0);
 
-        console.log("ChainAdminSingleOwner deployed at:", accessControlRestriction);
+        console.log("ChainAdminOwnable deployed at:", accessControlRestriction);
     }
 
     // TODO(EVM-924): this function is unused

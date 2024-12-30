@@ -7,7 +7,7 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 /// @title ChainAdmin contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IChainAdminSingleOwner {
+interface IChainAdminOwnable {
     /// @dev Represents a call to be made during multicall.
     /// @param target The address to which the call will be made.
     /// @param value The amount of Ether (in wei) to be sent along with the call.
