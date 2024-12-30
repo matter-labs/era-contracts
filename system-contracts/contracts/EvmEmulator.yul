@@ -617,8 +617,7 @@ object "EvmEmulator" {
             // non-standard selector 0x01
             mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
             mstore(1, key)
-            // should be call since we use TSTORE in gas manager
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
+            let success := staticcall(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 33, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
@@ -3746,8 +3745,7 @@ object "EvmEmulator" {
                 // non-standard selector 0x01
                 mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
                 mstore(1, key)
-                // should be call since we use TSTORE in gas manager
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
+                let success := staticcall(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 33, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
