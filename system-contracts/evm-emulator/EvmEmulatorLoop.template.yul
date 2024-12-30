@@ -887,7 +887,7 @@ for { } true { } {
 
         // dynamic_gas = 3 * words_copied + memory_expansion_cost
         let dynamicGas := expandMemory2(offset, size, destOffset, size)
-        let wordsCopied := div(add(size, 31), 32) // div rounding up
+        let wordsCopied := shr(5, add(size, 31)) // div rounding up
         dynamicGas := add(dynamicGas, mul(3, wordsCopied))
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
@@ -1394,8 +1394,7 @@ for { } true { } {
         let offset, size
 
         popStackCheck(sp, 2)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
 
         if size {
             evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
@@ -1427,11 +1426,10 @@ for { } true { } {
         ip := add(ip, 1)
     }
     case 0xFD { // OP_REVERT
-        let offset,size
+        let offset, size
 
         popStackCheck(sp, 2)
-        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
         
         switch iszero(size)
         case 0 {

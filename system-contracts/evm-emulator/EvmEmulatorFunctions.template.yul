@@ -198,7 +198,7 @@ function _expandMemoryInternal(newMemsize) -> gasCost {
     let oldSizeInWords := mload(MEM_LEN_OFFSET())
 
     // div rounding up
-    let newSizeInWords := div(add(newMemsize, 31), 32)
+    let newSizeInWords := shr(5, add(newMemsize, 31))
 
     // memory_size_word = (memory_byte_size + 31) / 32
     // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
@@ -206,13 +206,13 @@ function _expandMemoryInternal(newMemsize) -> gasCost {
     if gt(newSizeInWords, oldSizeInWords) {
         let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
         let quadraticPart := sub(
-            div(
+            shr(
+                9,
                 mul(newSizeInWords, newSizeInWords),
-                512
             ),
-            div(
+            shr(
+                9,
                 mul(oldSizeInWords, oldSizeInWords),
-                512
             )
         )
 
@@ -1045,7 +1045,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
     // minimum_word_size = (size + 31) / 32
     // init_code_cost = 2 * minimum_word_size, EIP-3860
     // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-    let minimum_word_size := div(add(size, 31), 32) // rounding up
+    let minimum_word_size := shr(5, add(size, 31)) // rounding up
     let dynamicGas := add(
         mul(2, minimum_word_size),
         expandMemory(offset, size)
