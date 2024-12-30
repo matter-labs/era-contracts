@@ -67,7 +67,7 @@ library L2LegacySharedBridgeTestHelper {
         address l1Erc20BridgeProxy,
         address l1NullifierProxy,
         address ecosystemL1Governance
-    ) internal view returns (address tokenBeaconAddress, bytes32 tokenBeaconBytecodeHash) {
+    ) internal view returns (address tokenBeaconAddress, bytes32 tokenBeaconProxyBytecodeHash) {
         address l2SharedBridgeAddress = calculateL2LegacySharedBridgeProxyAddr(
             l1Erc20BridgeProxy,
             l1NullifierProxy,
@@ -84,8 +84,11 @@ library L2LegacySharedBridgeTestHelper {
             keccak256(hex"")
         );
 
-        tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(
+        bytes32 tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(
             L2ContractsBytecodesLib.readUpgradeableBeaconBytecode()
+        );
+        tokenBeaconProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(
+            L2ContractsBytecodesLib.readBeaconProxyBytecode()
         );
         tokenBeaconAddress = L2ContractHelper.computeCreate2Address(
             l2SharedBridgeAddress,
