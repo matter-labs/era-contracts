@@ -258,7 +258,7 @@ object "EvmEmulator" {
             let oldSizeInWords := mload(MEM_LEN_OFFSET())
         
             // div rounding up
-            let newSizeInWords := div(add(newMemsize, 31), 32)
+            let newSizeInWords := shr(5, add(newMemsize, 31))
         
             // memory_size_word = (memory_byte_size + 31) / 32
             // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
@@ -266,13 +266,13 @@ object "EvmEmulator" {
             if gt(newSizeInWords, oldSizeInWords) {
                 let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
                 let quadraticPart := sub(
-                    div(
+                    shr(
+                        9,
                         mul(newSizeInWords, newSizeInWords),
-                        512
                     ),
-                    div(
+                    shr(
+                        9,
                         mul(oldSizeInWords, oldSizeInWords),
-                        512
                     )
                 )
         
@@ -1105,7 +1105,7 @@ object "EvmEmulator" {
             // minimum_word_size = (size + 31) / 32
             // init_code_cost = 2 * minimum_word_size, EIP-3860
             // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-            let minimum_word_size := div(add(size, 31), 32) // rounding up
+            let minimum_word_size := shr(5, add(size, 31)) // rounding up
             let dynamicGas := add(
                 mul(2, minimum_word_size),
                 expandMemory(offset, size)
@@ -2224,7 +2224,7 @@ object "EvmEmulator" {
             
                     // dynamic_gas = 3 * words_copied + memory_expansion_cost
                     let dynamicGas := expandMemory2(offset, size, destOffset, size)
-                    let wordsCopied := div(add(size, 31), 32) // div rounding up
+                    let wordsCopied := shr(5, add(size, 31)) // div rounding up
                     dynamicGas := add(dynamicGas, mul(3, wordsCopied))
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
@@ -3386,7 +3386,7 @@ object "EvmEmulator" {
                 let oldSizeInWords := mload(MEM_LEN_OFFSET())
             
                 // div rounding up
-                let newSizeInWords := div(add(newMemsize, 31), 32)
+                let newSizeInWords := shr(5, add(newMemsize, 31))
             
                 // memory_size_word = (memory_byte_size + 31) / 32
                 // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
@@ -3394,13 +3394,13 @@ object "EvmEmulator" {
                 if gt(newSizeInWords, oldSizeInWords) {
                     let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
                     let quadraticPart := sub(
-                        div(
+                        shr(
+                            9,
                             mul(newSizeInWords, newSizeInWords),
-                            512
                         ),
-                        div(
+                        shr(
+                            9,
                             mul(oldSizeInWords, oldSizeInWords),
-                            512
                         )
                     )
             
@@ -4233,7 +4233,7 @@ object "EvmEmulator" {
                 // minimum_word_size = (size + 31) / 32
                 // init_code_cost = 2 * minimum_word_size, EIP-3860
                 // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-                let minimum_word_size := div(add(size, 31), 32) // rounding up
+                let minimum_word_size := shr(5, add(size, 31)) // rounding up
                 let dynamicGas := add(
                     mul(2, minimum_word_size),
                     expandMemory(offset, size)
@@ -5340,7 +5340,7 @@ object "EvmEmulator" {
                 
                         // dynamic_gas = 3 * words_copied + memory_expansion_cost
                         let dynamicGas := expandMemory2(offset, size, destOffset, size)
-                        let wordsCopied := div(add(size, 31), 32) // div rounding up
+                        let wordsCopied := shr(5, add(size, 31)) // div rounding up
                         dynamicGas := add(dynamicGas, mul(3, wordsCopied))
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)

@@ -887,7 +887,7 @@ for { } true { } {
 
         // dynamic_gas = 3 * words_copied + memory_expansion_cost
         let dynamicGas := expandMemory2(offset, size, destOffset, size)
-        let wordsCopied := div(add(size, 31), 32) // div rounding up
+        let wordsCopied := shr(5, add(size, 31)) // div rounding up
         dynamicGas := add(dynamicGas, mul(3, wordsCopied))
 
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)

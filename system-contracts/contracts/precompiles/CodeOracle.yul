@@ -163,7 +163,7 @@ object "CodeOracle" {
                 let lengthInBytes := and(shr(224, versionedCodeHash), 0xffff)
                 let paddedLengthInBytes := paddedBytecodeLen(lengthInBytes)
 
-                decommit(versionedCodeHash, div(paddedLengthInBytes, 32))
+                decommit(versionedCodeHash, shr(5, paddedLengthInBytes))
             }
             default {
                 // Unsupported
