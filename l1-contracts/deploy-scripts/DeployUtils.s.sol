@@ -55,7 +55,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {ChainAdminSingleOwner} from "contracts/governance/ChainAdminSingleOwner.sol";
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -334,22 +334,22 @@ contract DeployUtils is Script {
 
     function deployChainAdmin() internal {
         // TODO(EVM-924): provide an option to deploy a non-single owner ChainAdmin.
-        (address chainAdmin, address accessControlRestriction) = deployChainAdminSingleOwner();
+        (address chainAdmin, address accessControlRestriction) = deployChainAdminOwnable();
 
         addresses.accessControlRestrictionAddress = accessControlRestriction;
         addresses.chainAdmin = chainAdmin;
     }
 
-    function deployChainAdminSingleOwner() internal returns (address chainAdmin, address accessControlRestriction) {
+    function deployChainAdminOwnable() internal returns (address chainAdmin, address accessControlRestriction) {
         chainAdmin = deployViaCreate2(
-            type(ChainAdminSingleOwner).creationCode,
+            type(ChainAdminOwnable).creationCode,
             abi.encode(config.ownerAddress, address(0))
         );
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         accessControlRestriction = address(0);
 
-        console.log("ChainAdminSingleOwner deployed at:", accessControlRestriction);
+        console.log("ChainAdminOwnable deployed at:", accessControlRestriction);
     }
 
     // TODO(EVM-924): this function is unused
