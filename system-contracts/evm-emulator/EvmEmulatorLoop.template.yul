@@ -897,299 +897,104 @@ for { } true { } {
     }
     case 0x5F { // OP_PUSH0
         evmGasLeft := chargeGas(evmGasLeft, 2)
-
-        let value := 0
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
+        sp, stackHead := pushStackItem(sp, 0, stackHead)
         ip := add(ip, 1)
     }
     case 0x60 { // OP_PUSH1
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 1)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 1)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(1, ip, sp, evmGasLeft, stackHead)
     }
     case 0x61 { // OP_PUSH2
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 2)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 2)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(2, ip, sp, evmGasLeft, stackHead)
     }     
     case 0x62 { // OP_PUSH3
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 3)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 3)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(3, ip, sp, evmGasLeft, stackHead)
     }
     case 0x63 { // OP_PUSH4
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 4)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 4)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(4, ip, sp, evmGasLeft, stackHead)
     }
     case 0x64 { // OP_PUSH5
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 5)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 5)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(5, ip, sp, evmGasLeft, stackHead)
     }
     case 0x65 { // OP_PUSH6
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 6)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 6)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(6, ip, sp, evmGasLeft, stackHead)
     }
     case 0x66 { // OP_PUSH7
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 7)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 7)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(7, ip, sp, evmGasLeft, stackHead)
     }
     case 0x67 { // OP_PUSH8
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 8)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 8)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(8, ip, sp, evmGasLeft, stackHead)
     }
     case 0x68 { // OP_PUSH9
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 9)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 9)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(9, ip, sp, evmGasLeft, stackHead)
     }
     case 0x69 { // OP_PUSH10
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 10)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 10)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(10, ip, sp, evmGasLeft, stackHead)
     }
     case 0x6A { // OP_PUSH11
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 11)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 11)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(11, ip, sp, evmGasLeft, stackHead)
     }
     case 0x6B { // OP_PUSH12
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 12)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 12)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(12, ip, sp, evmGasLeft, stackHead)
     }
     case 0x6C { // OP_PUSH13
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 13)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 13)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(13, ip, sp, evmGasLeft, stackHead)
     }
     case 0x6D { // OP_PUSH14
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 14)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 14)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(14, ip, sp, evmGasLeft, stackHead)
     }
     case 0x6E { // OP_PUSH15
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 15)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 15)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(15, ip, sp, evmGasLeft, stackHead)
     }
     case 0x6F { // OP_PUSH16
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 16)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 16)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(16, ip, sp, evmGasLeft, stackHead)
     }
     case 0x70 { // OP_PUSH17
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 17)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 17)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(17, ip, sp, evmGasLeft, stackHead)
     }
     case 0x71 { // OP_PUSH18
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 18)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 18)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(18, ip, sp, evmGasLeft, stackHead)
     }
     case 0x72 { // OP_PUSH19
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 19)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 19)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(19, ip, sp, evmGasLeft, stackHead)
     }
     case 0x73 { // OP_PUSH20
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 20)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 20)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(20, ip, sp, evmGasLeft, stackHead)
     }
     case 0x74 { // OP_PUSH21
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 21)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 21)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(21, ip, sp, evmGasLeft, stackHead)
     }
     case 0x75 { // OP_PUSH22
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 22)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 22)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(22, ip, sp, evmGasLeft, stackHead)
     }
     case 0x76 { // OP_PUSH23
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 23)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 23)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(23, ip, sp, evmGasLeft, stackHead)
     }
     case 0x77 { // OP_PUSH24
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 24)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 24)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(24, ip, sp, evmGasLeft, stackHead)
     }
     case 0x78 { // OP_PUSH25
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 25)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 25)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(25, ip, sp, evmGasLeft, stackHead)
     }
     case 0x79 { // OP_PUSH26
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 26)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 26)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(26, ip, sp, evmGasLeft, stackHead)
     }
     case 0x7A { // OP_PUSH27
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 27)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 27)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(27, ip, sp, evmGasLeft, stackHead)
     }
     case 0x7B { // OP_PUSH28
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 28)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 28)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(28, ip, sp, evmGasLeft, stackHead)
     }
     case 0x7C { // OP_PUSH29
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 29)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 29)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(29, ip, sp, evmGasLeft, stackHead)
     }
     case 0x7D { // OP_PUSH30
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 30)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 30)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(30, ip, sp, evmGasLeft, stackHead)
     }
     case 0x7E { // OP_PUSH31
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 31)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 31)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(31, ip, sp, evmGasLeft, stackHead)
     }
     case 0x7F { // OP_PUSH32
-        evmGasLeft := chargeGas(evmGasLeft, 3)
-
-        ip := add(ip, 1)
-        let value := readBytes(ip, 32)
-
-        sp, stackHead := pushStackItem(sp, value, stackHead)
-        ip := add(ip, 32)
+        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(32, ip, sp, evmGasLeft, stackHead)
     }
     case 0x80 { // OP_DUP1 
         evmGasLeft := chargeGas(evmGasLeft, 3)

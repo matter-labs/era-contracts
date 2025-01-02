@@ -440,6 +440,16 @@ function rawStaticcall(gas, to, dataStart, dataLength, outputOffset, outputLen) 
 //                     STACK OPERATIONS
 ////////////////////////////////////////////////////////////////
 
+function pushOpcodeInner(size, ip, sp, evmGas, oldStackHead) -> newIp, newSp, evmGasLeft, stackHead {
+    evmGasLeft := chargeGas(evmGas, 3)
+
+    newIp := add(ip, 1)
+    let value := readBytes(newIp, size)
+
+    newSp, stackHead := pushStackItem(sp, value, oldStackHead)
+    newIp := add(newIp, size)
+}
+
 function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
     evmGasLeft := chargeGas(evmGas, 3)
 
