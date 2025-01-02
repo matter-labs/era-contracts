@@ -27,7 +27,7 @@ function MSG_VALUE_SYSTEM_CONTRACT() -> addr {
 }
 
 function ORIGIN_CACHE_OFFSET() -> offset {
-    offset := mul(23, 32)
+    offset := mul(24, 32)
 }
 
 function GASPRICE_CACHE_OFFSET() -> offset {
@@ -46,12 +46,8 @@ function BLOCKNUMBER_CACHE_OFFSET() -> offset {
     offset := add(BLOCKTIMESTAMP_CACHE_OFFSET(), 32)
 }
 
-function PREVRANDAO_CACHE_OFFSET() -> offset {
-    offset := add(BLOCKNUMBER_CACHE_OFFSET(), 32)
-}
-
 function GASLIMIT_CACHE_OFFSET() -> offset {
-    offset := add(PREVRANDAO_CACHE_OFFSET(), 32)
+    offset := add(BLOCKNUMBER_CACHE_OFFSET(), 32)
 }
 
 function CHAINID_CACHE_OFFSET() -> offset {
@@ -132,6 +128,10 @@ function EMPTY_KECCAK() -> value {  // keccak("")
 
 function ADDRESS_MASK() -> value { // mask for lower 160 bits
     value := 0xffffffffffffffffffffffffffffffffffffffff
+}
+
+function PREVRANDAO_VALUE() -> value {
+    value := 2500000000000000 // This value is fixed in EraVM
 }
 
 ////////////////////////////////////////////////////////////////
