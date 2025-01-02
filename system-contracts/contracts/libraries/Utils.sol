@@ -103,6 +103,8 @@ library Utils {
         return _bytecodeHash & ~IS_CONSTRUCTOR_BYTECODE_HASH_BIT_MASK;
     }
 
+    uint256 internal constant MAX_BYTECODE_LENGTH = (2 ** 16) - 1;
+
     /// @notice Validate the bytecode format and calculate its hash.
     /// @param _bytecode The bytecode to hash.
     /// @return hashedBytecode The 32-byte hash of the bytecode.
@@ -118,7 +120,7 @@ library Utils {
 
         uint256 lengthInWords = _bytecode.length / 32;
         // bytecode length must be less than 2^16 words
-        if (lengthInWords >= 2 ** 16) {
+        if (lengthInWords > MAX_BYTECODE_LENGTH) {
             revert MalformedBytecode(BytecodeError.NumberOfWords);
         }
         // bytecode length in words must be odd
@@ -133,9 +135,6 @@ library Utils {
         // Setting the length
         hashedBytecode = hashedBytecode | bytes32(lengthInWords << 224);
     }
-
-    // the real max supported number is 2^16, but we'll stick to evm convention
-    uint256 internal constant MAX_EVM_BYTECODE_LENGTH = (2 ** 16) - 1;
 
     /// @notice Validate the bytecode format and calculate its hash.
     /// @param _evmBytecodeLen The length of original EVM bytecode in bytes
@@ -158,7 +157,8 @@ library Utils {
             revert MalformedBytecode(BytecodeError.EvmBytecodeLength);
         }
 
-        if (_evmBytecodeLen > MAX_EVM_BYTECODE_LENGTH) {
+        // bytecode length must be less than 2^16 bytes
+        if (_evmBytecodeLen > MAX_BYTECODE_LENGTH) {
             revert MalformedBytecode(BytecodeError.EvmBytecodeLengthTooBig);
         }
 
