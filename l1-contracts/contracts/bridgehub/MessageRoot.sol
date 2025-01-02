@@ -37,6 +37,8 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     event Preimage(bytes32 one, bytes32 two);
 
+    event NewGlobalMessageRoot(bytes32 root);
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -115,6 +117,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+        emit NewGlobalMessageRoot(sharedTree.root());
     }
 
     /// @dev Gets the aggregated root of all chains.
@@ -139,6 +142,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         }
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
+        emit NewGlobalMessageRoot(sharedTree.root());
     }
 
     function _initialize() internal {

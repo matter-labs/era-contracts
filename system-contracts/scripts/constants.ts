@@ -254,6 +254,11 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "InteropAccount",
     lang: Language.Solidity,
   },
+  L2MessageRootStorage: {
+    address: "0x000000000000000000000000000000000001000b",
+    codeName: "L2MessageRootStorage",
+    lang: Language.Solidity,
+  },
 } as const;
 
 export const EIP712_TX_ID = 113;

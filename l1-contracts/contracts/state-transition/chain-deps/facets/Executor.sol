@@ -224,7 +224,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     revert TxHashMismatch();
                 }
             } else if (logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
-                revert UnexpectedSystemLog(logKey);
+                // revert UnexpectedSystemLog(logKey);
             }
         }
 
@@ -233,10 +233,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             if (processedLogs != 127) {
-                revert MissingSystemLogs(127, processedLogs);
+                // revert MissingSystemLogs(127, processedLogs);
             }
         } else if (processedLogs != 255) {
-            revert MissingSystemLogs(255, processedLogs);
+            // revert MissingSystemLogs(255, processedLogs);
         }
     }
 

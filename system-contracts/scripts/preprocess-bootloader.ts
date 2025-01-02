@@ -113,6 +113,7 @@ const params = {
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
+  RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR: getPaddedSelector("L2MessageRootStorage", "addMessageRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
@@ -120,7 +121,7 @@ const params = {
   PADDED_FORCE_DEPLOY_ON_ADDRESSES_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployOnAddresses"),
   // One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent
   // on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have
-  // accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
+  // accommodate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
   // roughly 43212000 bytes needed for calldata.
   // 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
   //
