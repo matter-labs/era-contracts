@@ -188,6 +188,9 @@ object "EvmEmulator" {
             value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
         }
         
+        function ADDRESS_MASK() -> value { // mask for lower 160 bits
+            value := 0xffffffffffffffffffffffffffffffffffffffff
+        }
         
         ////////////////////////////////////////////////////////////////
         //                  GENERAL FUNCTIONS
@@ -575,11 +578,12 @@ object "EvmEmulator" {
         //               EVM GAS MANAGER FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
         
+        // Address higher bytes must be cleaned before
         function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
             // function warmAccount(address account)
             // non-standard selector 0x00
             // addr is packed in the same word with selector
-            mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+            mstore(0, addr)
         
             performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
         
@@ -814,10 +818,10 @@ object "EvmEmulator" {
         }
         
         function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
-            addr := and(rawAddr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
             // memory_expansion_cost
             gasUsed := expandMemory2(retOffset, retSize, argsOffset, argsSize)
+        
+            addr := and(rawAddr, ADDRESS_MASK())
         
             let addressAccessCost := 100 // warm address access cost
             if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1126,8 +1130,7 @@ object "EvmEmulator" {
         
             if canBeDeployed {
                 returndatacopy(0, 0, 32)
-                addr := mload(0)
-            
+                addr := and(mload(0), ADDRESS_MASK())
                 pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
                 // so even if constructor reverts, nonce stays incremented and addr stays warm
         
@@ -1621,7 +1624,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     let addr := accessStackHead(sp, stackHead)
-                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                    addr := and(addr, ADDRESS_MASK())
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -1764,7 +1767,7 @@ object "EvmEmulator" {
             
                     let addr := accessStackHead(sp, stackHead)
             
-                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                    addr := and(addr, ADDRESS_MASK())
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
@@ -1793,8 +1796,6 @@ object "EvmEmulator" {
                     srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
                     // minimum_word_size = (size + 31) / 32
                     let dynamicGas := add(
@@ -1802,6 +1803,7 @@ object "EvmEmulator" {
                         expandMemory(dstOffset, len)
                     )
                     
+                    addr := and(addr, ADDRESS_MASK())
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         dynamicGas := add(dynamicGas, 2500)
                     }
@@ -1860,7 +1862,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     let addr := accessStackHead(sp, stackHead)
-                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                    addr := and(addr, ADDRESS_MASK())
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
@@ -3289,6 +3291,9 @@ object "EvmEmulator" {
                 value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
             }
             
+            function ADDRESS_MASK() -> value { // mask for lower 160 bits
+                value := 0xffffffffffffffffffffffffffffffffffffffff
+            }
             
             ////////////////////////////////////////////////////////////////
             //                  GENERAL FUNCTIONS
@@ -3676,11 +3681,12 @@ object "EvmEmulator" {
             //               EVM GAS MANAGER FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
             
+            // Address higher bytes must be cleaned before
             function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
                 // function warmAccount(address account)
                 // non-standard selector 0x00
                 // addr is packed in the same word with selector
-                mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+                mstore(0, addr)
             
                 performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
             
@@ -3915,10 +3921,10 @@ object "EvmEmulator" {
             }
             
             function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
-                addr := and(rawAddr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
                 // memory_expansion_cost
                 gasUsed := expandMemory2(retOffset, retSize, argsOffset, argsSize)
+            
+                addr := and(rawAddr, ADDRESS_MASK())
             
                 let addressAccessCost := 100 // warm address access cost
                 if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -4227,8 +4233,7 @@ object "EvmEmulator" {
             
                 if canBeDeployed {
                     returndatacopy(0, 0, 32)
-                    addr := mload(0)
-                
+                    addr := and(mload(0), ADDRESS_MASK())
                     pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
                     // so even if constructor reverts, nonce stays incremented and addr stays warm
             
@@ -4710,7 +4715,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         let addr := accessStackHead(sp, stackHead)
-                        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                        addr := and(addr, ADDRESS_MASK())
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -4853,7 +4858,7 @@ object "EvmEmulator" {
                 
                         let addr := accessStackHead(sp, stackHead)
                 
-                        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                        addr := and(addr, ADDRESS_MASK())
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
@@ -4882,8 +4887,6 @@ object "EvmEmulator" {
                         srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-                
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
                         // minimum_word_size = (size + 31) / 32
                         let dynamicGas := add(
@@ -4891,6 +4894,7 @@ object "EvmEmulator" {
                             expandMemory(dstOffset, len)
                         )
                         
+                        addr := and(addr, ADDRESS_MASK())
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             dynamicGas := add(dynamicGas, 2500)
                         }
@@ -4949,7 +4953,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         let addr := accessStackHead(sp, stackHead)
-                        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                        addr := and(addr, ADDRESS_MASK())
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500) 

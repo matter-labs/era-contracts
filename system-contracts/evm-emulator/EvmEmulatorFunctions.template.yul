@@ -128,6 +128,9 @@ function EMPTY_KECCAK() -> value {  // keccak("")
     value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
 }
 
+function ADDRESS_MASK() -> value { // mask for lower 160 bits
+    value := 0xffffffffffffffffffffffffffffffffffffffff
+}
 
 ////////////////////////////////////////////////////////////////
 //                  GENERAL FUNCTIONS
@@ -515,11 +518,12 @@ function accessStackHead(sp, stackHead) -> value {
 //               EVM GAS MANAGER FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
+// Address higher bytes must be cleaned before
 function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
     // function warmAccount(address account)
     // non-standard selector 0x00
     // addr is packed in the same word with selector
-    mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+    mstore(0, addr)
 
     performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
 
@@ -754,10 +758,10 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
 }
 
 function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
-    addr := and(rawAddr, 0xffffffffffffffffffffffffffffffffffffffff)
-
     // memory_expansion_cost
     gasUsed := expandMemory2(retOffset, retSize, argsOffset, argsSize)
+
+    addr := and(rawAddr, ADDRESS_MASK())
 
     let addressAccessCost := 100 // warm address access cost
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1066,8 +1070,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
 
     if canBeDeployed {
         returndatacopy(0, 0, 32)
-        addr := mload(0)
-    
+        addr := and(mload(0), ADDRESS_MASK())
         pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
         // so even if constructor reverts, nonce stays incremented and addr stays warm
 
