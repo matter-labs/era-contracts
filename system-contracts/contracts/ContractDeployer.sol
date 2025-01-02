@@ -318,15 +318,16 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _deployment Information about the forced deployment.
     /// @param _sender The `msg.sender` inside the constructor call.
     function forceDeployOnAddress(ForceDeployment calldata _deployment, address _sender) external payable onlySelf {
+        // Since the `forceDeployOnAddress` function is called only during upgrades, the Governance is trusted to correctly select
+        // the addresses to deploy the new bytecodes to and to assess whether overriding the AccountInfo for the "force-deployed"
+        // contract is acceptable.
+
         if (Utils.isCodeHashEVM(_deployment.bytecodeHash)) {
-            // It is not allowed to change the AccountInfo for EVM contracts.
+            // It is not possible to change the AccountInfo for EVM contracts.
             _constructEVMContract(_sender, _deployment.newAddress, _deployment.input);
         } else {
             _ensureBytecodeIsKnown(_deployment.bytecodeHash);
 
-            // Since the `forceDeployOnAddress` function is called only during upgrades, the Governance is trusted to correctly select
-            // the addresses to deploy the new bytecodes to and to assess whether overriding the AccountInfo for the "force-deployed"
-            // contract is acceptable.
             AccountInfo memory newAccountInfo;
             newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
             // Accounts have sequential nonces by default.
