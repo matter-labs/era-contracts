@@ -51,6 +51,7 @@ object "EvmGasManager" {
             }
 
             function $llvm_AlwaysInline_llvm$__getRawSenderCodeHash() -> hash {
+                // function getRawCodeHash(address _address)
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, caller())
             

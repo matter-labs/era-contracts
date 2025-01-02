@@ -331,12 +331,14 @@ function getRawNonce(addr) -> nonce {
 }
 
 function getRawCodeHash(addr) -> hash {
+    // function getRawCodeHash(address _address)
     mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
     hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 
 function getEvmExtcodehash(addr) -> evmCodeHash {
+    // function evmCodeHash(address _address)
     mstore(0, 0x54A3314700000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
     evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
