@@ -1174,45 +1174,52 @@ function _saveConstructorReturnGas() -> gasLeft, addr {
 }
 
 ////////////////////////////////////////////////////////////////
-//               EXTCODECOPY FUNCTIONALITY
+//               MEMORY REGIONS FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
-function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
-    let rest_bits := shl(3, len)
-    let upper_bits := sub(256, rest_bits)
-    let val_mask := shl(upper_bits, MAX_UINT())
-    let val_masked := and(val, val_mask)
-    let dst_val := mload(dest)
-    let dst_mask := shr(rest_bits, MAX_UINT())
-    let dst_masked := and(dst_val, dst_mask)
-    mstore(dest, or(val_masked, dst_masked))
-}
-
+// Copy the region of memory
 function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
-    let dest_addr := dest
-    let src_addr := src
-    let dest_end := add(dest, and(len, sub(0, 32)))
-    for { } lt(dest_addr, dest_end) {} {
-        mstore(dest_addr, mload(src_addr))
-        dest_addr := add(dest_addr, 32)
-        src_addr := add(src_addr, 32)
+    // Copy all the whole memory words in a cycle
+    let destIndex := dest
+    let srcIndex := src
+    let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+    for { } lt(destIndex, destEndIndex) {} {
+        mstore(destIndex, mload(srcIndex))
+        destIndex := add(destIndex, 32)
+        srcIndex := add(srcIndex, 32)
     }
 
-    let rest_len := and(len, 31)
-    if rest_len {
-        $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+    // Copy the remainder (if any)
+    let remainderLen := and(len, 31)
+    if remainderLen {
+        $llvm_AlwaysInline_llvm$_memWriteRemainder(destIndex, mload(srcIndex), remainderLen)
     }
 }
 
-function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
-    let dest_end := add(dest, and(len, sub(0, 32)))
-    for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+// Write the last part of the copied/cleaned memory region (smaller than the memory word)
+function $llvm_AlwaysInline_llvm$_memWriteRemainder(dest, remainder, len) {
+    let remainderBitLength := shl(3, len) // bytes to bits
+
+    let existingValue := mload(dest)
+    let existingValueMask := shr(remainderBitLength, MAX_UINT())
+    let existingValueMasked := and(existingValue, existingValueMask) // clean up place for remainder
+
+    let remainderMasked := and(remainder, not(existingValueMask)) // using only `len` higher bytes of remainder word
+    mstore(dest, or(remainderMasked, existingValueMasked))
+}
+
+// Clean the region of memory
+function $llvm_AlwaysInline_llvm$_memsetToZero(dest, len) {
+    // Clean all the whole memory words in a cycle
+    let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+    for {let i := dest} lt(i, destEndIndex) { i := add(i, 32) } {
         mstore(i, 0)
     }
 
-    let rest_len := and(len, 31)
-    if rest_len {
-        $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+    // Clean the remainder (if any)
+    let remainderLen := and(len, 31)
+    if remainderLen {
+        $llvm_AlwaysInline_llvm$_memWriteRemainder(destEndIndex, 0, remainderLen)
     }
 }
 
