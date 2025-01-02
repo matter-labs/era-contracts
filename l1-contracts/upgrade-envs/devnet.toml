@@ -4,7 +4,7 @@ governance_upgrade_timer_initial_delay = 120
 
 [contracts]
 max_number_of_chains = 100
-create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000001"
 validator_timelock_execution_delay = 0
 genesis_root = "0xf9030b78c5bf5ac997a76962aa32c90a6d8e8ebce9838c8eeb388d73e1f7659a"
 genesis_rollup_leaf_index = 64

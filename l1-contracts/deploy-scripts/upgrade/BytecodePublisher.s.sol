@@ -61,7 +61,7 @@ library BytecodePublisher {
         }
 
         // Publish the last batch if any
-        if (batchStartIndex < totalBytecodes) {
+        if (batchStartIndex < totalBytecodes && currentBatchSize != 0) {
             bytes[] memory lastBatch = slice(bytecodes, batchStartIndex, totalBytecodes);
             _publishBatch(bytecodesSupplier, lastBatch);
         }

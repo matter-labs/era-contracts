@@ -25,7 +25,6 @@ async function main() {
 
       console.log(`bridgehub_proxy_address = "${bridgehubAddr}"`);
       console.log(`transparent_proxy_admin = "0x${proxyAdmin.substring(26)}"`);
-
     });
 
   await program.parseAsync(process.argv);
