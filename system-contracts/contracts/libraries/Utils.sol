@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {EfficientCall} from "./EfficientCall.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
-import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG} from "../Constants.sol";
+import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG, CREATE2_EVM_PREFIX} from "../Constants.sol";
 
 /**
  * @author Matter Labs
@@ -187,7 +187,7 @@ library Utils {
         bytes32 _salt,
         bytes32 _bytecodeHash
     ) internal pure returns (address newAddress) {
-        bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), _sender, _salt, _bytecodeHash));
+        bytes32 hash = keccak256(abi.encodePacked(bytes1(CREATE2_EVM_PREFIX), _sender, _salt, _bytecodeHash));
 
         newAddress = address(uint160(uint256(hash)));
     }
