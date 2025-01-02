@@ -309,7 +309,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         let addr := accessStackHead(sp, stackHead)
-        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+        addr := and(addr, ADDRESS_MASK())
 
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -452,7 +452,7 @@ for { } true { } {
 
         let addr := accessStackHead(sp, stackHead)
 
-        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+        addr := and(addr, ADDRESS_MASK())
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
@@ -481,8 +481,6 @@ for { } true { } {
         srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
 
-        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
         // minimum_word_size = (size + 31) / 32
         let dynamicGas := add(
@@ -490,6 +488,7 @@ for { } true { } {
             expandMemory(dstOffset, len)
         )
         
+        addr := and(addr, ADDRESS_MASK())
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
             dynamicGas := add(dynamicGas, 2500)
         }
@@ -548,7 +547,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         let addr := accessStackHead(sp, stackHead)
-        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+        addr := and(addr, ADDRESS_MASK())
 
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500) 
