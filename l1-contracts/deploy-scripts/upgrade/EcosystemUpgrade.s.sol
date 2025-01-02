@@ -73,6 +73,8 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {Create2AndTransfer} from "contracts/governance/Create2AndTransfer.sol";
+
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -888,9 +890,16 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployDAValidators() internal {
-        vm.broadcast(msg.sender);
-        address rollupDAManager = address(new RollupDAManager());
+        // Note, that here we use the `msg.sender` address, while the final owner should be the decentralized governance.
+        // The ownership will be transferred later during the `updateOwners` step.
+        address rollupDAManager = address(create2WithDeterministicOwner(type(RollupDAManager).creationCode, msg.sender));
         addresses.daAddresses.rollupDAManager = rollupDAManager;
+
+        if(RollupDAManager(rollupDAManager).owner() != address(msg.sender)) {
+            require(RollupDAManager(rollupDAManager).pendingOwner() == address(msg.sender), "Ownership was not set correctly");
+            vm.broadcast(msg.sender);
+            RollupDAManager(rollupDAManager).acceptOwnership();
+        }
 
         address rollupDAValidator = deployViaCreate2(Utils.readRollupDAValidatorBytecode());
         console.log("L1RollupDAValidator deployed at:", rollupDAValidator);
@@ -1114,16 +1123,14 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployBridgedTokenBeacon() internal {
-        // Note, that the `msg.sender` will be set as the owner.
-        // This means that we can not use a naive create2factory. It may be replaced
-        // with a more advanced one, but CREATE from a hot wallet is fine too.
-        vm.startBroadcast(msg.sender);
-        UpgradeableBeacon beacon = new UpgradeableBeacon(addresses.bridges.bridgedStandardERC20Implementation);
-        beacon.transferOwnership(config.ownerAddress);
-        vm.stopBroadcast();
-        address contractAddress = address(beacon);
-        console.log("BridgedTokenBeacon deployed at:", contractAddress);
-        addresses.bridges.bridgedTokenBeacon = contractAddress;
+        bytes memory initCode = abi.encodePacked(
+            type(UpgradeableBeacon).creationCode,
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        );
+        
+        address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
+        console.log("BridgedTokenBeacon deployed at:", beacon);
+        addresses.bridges.bridgedTokenBeacon = beacon;
     }
 
     function deployL1NativeTokenVaultImplementation() internal {
@@ -1204,6 +1211,17 @@ contract EcosystemUpgrade is Script {
         );
 
         addresses.l2WrappedBaseTokenStore = deployViaCreate2(bytecode);
+    }
+
+    function create2WithDeterministicOwner(bytes memory initCode, address owner) internal returns (address) {
+        bytes memory creatorInitCode = abi.encodePacked(
+            type(Create2AndTransfer).creationCode,
+            abi.encode(initCode, config.contracts.create2FactorySalt, owner)
+        );
+
+        address deployerAddr = deployViaCreate2(creatorInitCode);
+
+        return Create2AndTransfer(deployerAddr).deployedAddress();
     }
 
     function _moveGovernanceToOwner(address target) internal {

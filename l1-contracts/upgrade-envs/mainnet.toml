@@ -1,7 +1,6 @@
 era_chain_id = 324
 owner_address = "8f7a9912416e8adc4d9c21fae1415d3318a11897"
 testnet_verifier = false
-support_l2_legacy_shared_bridge_test = false
 governance_upgrade_timer_initial_delay = 1058400
 
 [contracts]
