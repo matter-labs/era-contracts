@@ -302,11 +302,11 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
     /// @notice A struct that describes a forced deployment on an address
     struct ForceDeployment {
-        // The bytecode hash to put on an address
+        // The bytecode hash to put on an address. Hash and length parts are ignored in case of EVM bytecode.
         bytes32 bytecodeHash;
         // The address on which to deploy the bytecodehash to
         address newAddress;
-        // Whether to run the constructor on the force deployment
+        // Whether to run the constructor on the force deployment. Ignored in case of EVM deployment.
         bool callConstructor;
         // The value with which to initialize a contract
         uint256 value;
@@ -318,25 +318,30 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _deployment Information about the forced deployment.
     /// @param _sender The `msg.sender` inside the constructor call.
     function forceDeployOnAddress(ForceDeployment calldata _deployment, address _sender) external payable onlySelf {
-        _ensureBytecodeIsKnown(_deployment.bytecodeHash);
+        if (Utils.isCodeHashEVM(_deployment.bytecodeHash)) {
+            // It is not allowed to change the AccountInfo for EVM contracts.
+            _constructEVMContract(_sender, _deployment.newAddress, _deployment.input);
+        } else {
+            _ensureBytecodeIsKnown(_deployment.bytecodeHash);
 
-        // Since the `forceDeployOnAddress` function is called only during upgrades, the Governance is trusted to correctly select
-        // the addresses to deploy the new bytecodes to and to assess whether overriding the AccountInfo for the "force-deployed"
-        // contract is acceptable.
-        AccountInfo memory newAccountInfo;
-        newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
-        // Accounts have sequential nonces by default.
-        newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
-        _storeAccountInfo(_deployment.newAddress, newAccountInfo);
+            // Since the `forceDeployOnAddress` function is called only during upgrades, the Governance is trusted to correctly select
+            // the addresses to deploy the new bytecodes to and to assess whether overriding the AccountInfo for the "force-deployed"
+            // contract is acceptable.
+            AccountInfo memory newAccountInfo;
+            newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
+            // Accounts have sequential nonces by default.
+            newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+            _storeAccountInfo(_deployment.newAddress, newAccountInfo);
 
-        _constructContract({
-            _sender: _sender,
-            _newAddress: _deployment.newAddress,
-            _bytecodeHash: _deployment.bytecodeHash,
-            _input: _deployment.input,
-            _isSystem: false,
-            _callConstructor: _deployment.callConstructor
-        });
+            _constructContract({
+                _sender: _sender,
+                _newAddress: _deployment.newAddress,
+                _bytecodeHash: _deployment.bytecodeHash,
+                _input: _deployment.input,
+                _isSystem: false,
+                _callConstructor: _deployment.callConstructor
+            });
+        }
     }
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
