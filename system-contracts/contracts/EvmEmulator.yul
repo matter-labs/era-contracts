@@ -86,8 +86,12 @@ object "EvmEmulator" {
             addr :=  0x0000000000000000000000000000000000008009
         }
         
+        function IS_CALLER_EVM_OFFSET() -> offset {
+            offset := mul(23, 32)
+        }
+        
         function ORIGIN_CACHE_OFFSET() -> offset {
-            offset := mul(24, 32)
+            offset := add(IS_CALLER_EVM_OFFSET(), 32)
         }
         
         function GASPRICE_CACHE_OFFSET() -> offset {
@@ -203,19 +207,17 @@ object "EvmEmulator" {
             revert(0, 0)
         }
         
-        function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
-            mstore(0, 0)
-            revert(0, 32)
-        }
-        
-        function revertWithGas(evmGasLeft) {
-            mstore(0, evmGasLeft)
-            revert(0, 32)
+        function $llvm_NoInline_llvm$_invalid() { // revert consuming all EVM gas
+            panic()
         }
         
         function panic() { // revert consuming all EVM gas
-            mstore(0, 0)
-            revert(0, 32)
+            if mload(IS_CALLER_EVM_OFFSET()) {
+                mstore(0, 0)
+                revert(0, 32)
+            }
+        
+            revert(0, 0)
         }
         
         function cached(cacheIndex, value) -> _value {
@@ -648,16 +650,16 @@ object "EvmEmulator" {
         }
         
         function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-            // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
+            // function consumeEvmFrame(_caller) external returns (uint256 passGas, uint256 auxDataRes)
             // non-standard selector 0x04
-            mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
-            mstore(1, caller())
+            mstore(0, or(0x0400000000000000000000000000000000000000000000000000000000000000, caller()))
         
-            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
         
             let _returndatasize := returndatasize()
             if _returndatasize {
                 callerEVM := true
+                mstore(IS_CALLER_EVM_OFFSET(), true)
         
                 returndatacopy(0, 0, 32)
                 passGas := mload(0)
@@ -2579,7 +2581,7 @@ object "EvmEmulator" {
                     }
                     
             
-                    if eq(isCallerEVM, 1) {
+                    if isCallerEVM {
                         offset := sub(offset, 32)
                         size := add(size, 32)
                 
@@ -2590,345 +2592,344 @@ object "EvmEmulator" {
                     revert(offset, size)
                 }
                 case 0xFE { // OP_INVALID
-                    evmGasLeft := 0
-                    revertWithGas(evmGasLeft)
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 // We explicitly add unused opcodes to optimize the jump table by compiler.
                 case 0x0C { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x0D { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x0E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x0F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x1E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x1F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x21 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x22 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x23 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x24 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x25 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x26 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x27 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x28 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x29 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2A { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2B { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2C { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2D { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x49 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4A { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4B { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4C { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4D { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xED { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xFB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xFC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xFF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 default {
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
             }
             
@@ -3009,8 +3010,12 @@ object "EvmEmulator" {
                 addr :=  0x0000000000000000000000000000000000008009
             }
             
+            function IS_CALLER_EVM_OFFSET() -> offset {
+                offset := mul(23, 32)
+            }
+            
             function ORIGIN_CACHE_OFFSET() -> offset {
-                offset := mul(24, 32)
+                offset := add(IS_CALLER_EVM_OFFSET(), 32)
             }
             
             function GASPRICE_CACHE_OFFSET() -> offset {
@@ -3126,19 +3131,17 @@ object "EvmEmulator" {
                 revert(0, 0)
             }
             
-            function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
-                mstore(0, 0)
-                revert(0, 32)
-            }
-            
-            function revertWithGas(evmGasLeft) {
-                mstore(0, evmGasLeft)
-                revert(0, 32)
+            function $llvm_NoInline_llvm$_invalid() { // revert consuming all EVM gas
+                panic()
             }
             
             function panic() { // revert consuming all EVM gas
-                mstore(0, 0)
-                revert(0, 32)
+                if mload(IS_CALLER_EVM_OFFSET()) {
+                    mstore(0, 0)
+                    revert(0, 32)
+                }
+            
+                revert(0, 0)
             }
             
             function cached(cacheIndex, value) -> _value {
@@ -3571,16 +3574,16 @@ object "EvmEmulator" {
             }
             
             function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-                // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
+                // function consumeEvmFrame(_caller) external returns (uint256 passGas, uint256 auxDataRes)
                 // non-standard selector 0x04
-                mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
-                mstore(1, caller())
+                mstore(0, or(0x0400000000000000000000000000000000000000000000000000000000000000, caller()))
             
-                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
             
                 let _returndatasize := returndatasize()
                 if _returndatasize {
                     callerEVM := true
+                    mstore(IS_CALLER_EVM_OFFSET(), true)
             
                     returndatacopy(0, 0, 32)
                     passGas := mload(0)
@@ -4236,7 +4239,7 @@ object "EvmEmulator" {
                 }
             }
 
-            function $llvm_NoInline_llvm$_simulate(
+            function simulate(
                 isCallerEVM,
                 evmGasLeft,
                 isStatic,
@@ -5490,7 +5493,7 @@ object "EvmEmulator" {
                         }
                         
                 
-                        if eq(isCallerEVM, 1) {
+                        if isCallerEVM {
                             offset := sub(offset, 32)
                             size := add(size, 32)
                     
@@ -5501,345 +5504,344 @@ object "EvmEmulator" {
                         revert(offset, size)
                     }
                     case 0xFE { // OP_INVALID
-                        evmGasLeft := 0
-                        revertWithGas(evmGasLeft)
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     // We explicitly add unused opcodes to optimize the jump table by compiler.
                     case 0x0C { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x0D { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x0E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x0F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x1E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x1F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x21 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x22 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x23 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x24 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x25 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x26 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x27 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x28 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x29 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2A { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2B { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2C { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2D { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x49 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4A { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4B { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4C { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4D { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xED { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xFB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xFC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xFF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     default {
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                 }
                 
@@ -5859,7 +5861,7 @@ object "EvmEmulator" {
                     }
                 }
 
-                if eq(isCallerEVM, 1) {
+                if isCallerEVM {
                     // Includes gas
                     returnOffset := sub(returnOffset, 32)
                     checkOverflow(returnLen, 32)
@@ -5884,7 +5886,7 @@ object "EvmEmulator" {
             // segment of memory.
             getDeployedBytecode()
 
-            let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
+            let returnOffset, returnLen := simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
         }
     }

@@ -221,7 +221,7 @@ object "EvmGasManager" {
 
                 // We do not have active frame. This means that the EVM contract was called from the EraVM contract.
                 // mark caller and txorigin as warm
-                let _msgsender := calldataload(1)
+                let _msgsender := and(ADDRESS_MASK(), _calldata0Slot)
                 let _origin := origin()
                 warmAccount(_msgsender)
                 if iszero(eq(_msgsender, _origin)) {

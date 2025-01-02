@@ -1243,7 +1243,7 @@ for { } true { } {
         }
         
 
-        if eq(isCallerEVM, 1) {
+        if isCallerEVM {
             offset := sub(offset, 32)
             size := add(size, 32)
     
@@ -1254,12 +1254,11 @@ for { } true { } {
         revert(offset, size)
     }
     case 0xFE { // OP_INVALID
-        evmGasLeft := 0
-        revertWithGas(evmGasLeft)
+        $llvm_NoInline_llvm$_invalid()
     }
     // We explicitly add unused opcodes to optimize the jump table by compiler.
     <!-- @include EvmEmulatorLoopUnusedOpcodes.template.yul -->
     default {
-        $llvm_NoInline_llvm$_panic()
+        $llvm_NoInline_llvm$_invalid()
     }
 }
