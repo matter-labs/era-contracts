@@ -1176,6 +1176,10 @@ contract EcosystemUpgrade is Script {
         addresses.transitionaryOwner = deployViaCreate2(bytecode);
     }
 
+    function getInitialDelay() external view returns (uint256) {
+        return config.governanceUpgradeTimerInitialDelay;
+    }
+
     function deployGovernanceUpgradeTimer() internal {
         uint256 INITIAL_DELAY = config.governanceUpgradeTimerInitialDelay;
 

@@ -13,33 +13,22 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-
-interface LegacyChainAdmin {
-    function owner() external view returns (address);
-}
 
 contract ChainUpgrade is Script {
     using stdToml for string;
 
     struct ChainConfig {
         address deployerAddress;
-        address ownerAddress;
         uint256 chainChainId;
         address chainDiamondProxyAddress;
-        bool permanentRollup;
         address bridgehubProxyAddress;
-        address oldSharedBridgeProxyAddress;
-    }
-
-    struct Output {
-        address accessControlRestriction;
-        address chainAdmin;
     }
 
     address currentChainAdmin;
     ChainConfig config;
-    Output output;
 
     function prepareChain(
         string memory ecosystemInputPath,
@@ -55,14 +44,8 @@ contract ChainUpgrade is Script {
 
         initializeConfig(configPath, ecosystemInputPath, ecosystemOutputPath);
 
-        checkCorrectOwnerAddress();
-
-        governanceMoveToNewChainAdmin();
-
         // This script does nothing, it only checks that the provided inputs are correct.
         // It is just a wrapper to easily call `upgradeChain`
-
-        saveOutput(outputPath);
     }
 
     function run() public {
@@ -79,8 +62,8 @@ contract ChainUpgrade is Script {
 
     function upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory upgradeCutData) public {
         Utils.adminExecute(
-            output.chainAdmin,
-            output.accessControlRestriction,
+            IZKChain(config.chainDiamondProxyAddress).getAdmin(),
+            address(0),
             config.chainDiamondProxyAddress,
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             0
@@ -101,70 +84,11 @@ contract ChainUpgrade is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        config.ownerAddress = toml.readAddress("$.owner_address");
         config.chainChainId = toml.readUint("$.chain.chain_id");
-        config.chainDiamondProxyAddress = toml.readAddress("$.chain.diamond_proxy_address");
-        config.permanentRollup = toml.readBool("$.chain.permanent_rollup");
 
         toml = vm.readFile(ecosystemInputPath);
-
         config.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
-        config.oldSharedBridgeProxyAddress = toml.readAddress("$.contracts.old_shared_bridge_proxy_address");
-    }
 
-    function checkCorrectOwnerAddress() internal {
-        currentChainAdmin = address(IZKChain(config.chainDiamondProxyAddress).getAdmin());
-        address currentAdminOwner = LegacyChainAdmin(currentChainAdmin).owner();
-
-        require(currentAdminOwner == config.ownerAddress, "Only the owner of the chain admin can call this function");
-    }
-
-    // TODO(EVM-924): this function is not used.
-    function deployNewChainAdmin() internal {
-        vm.broadcast(config.ownerAddress);
-        AccessControlRestriction accessControlRestriction = new AccessControlRestriction(0, config.ownerAddress);
-
-        address[] memory restrictions;
-        restrictions = new address[](1);
-        restrictions[0] = address(accessControlRestriction);
-
-        vm.broadcast(config.ownerAddress);
-        ChainAdmin newChainAdmin = new ChainAdmin(restrictions);
-        output.chainAdmin = address(newChainAdmin);
-        output.accessControlRestriction = address(accessControlRestriction);
-    }
-
-    /// @dev The caller of this function needs to be the owner of the chain admin
-    /// of the
-    function governanceMoveToNewChainAdmin() internal {
-        // Firstly, we need to call the legacy chain admin to transfer the ownership to the new chain admin
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: config.chainDiamondProxyAddress,
-            value: 0,
-            data: abi.encodeCall(IAdmin.setPendingAdmin, (output.chainAdmin))
-        });
-
-        vm.startBroadcast(config.ownerAddress);
-        ChainAdmin(payable(currentChainAdmin)).multicall(calls, true);
-        vm.stopBroadcast();
-
-        // Now we need to accept the adminship
-        Utils.adminExecute({
-            _admin: output.chainAdmin,
-            _accessControlRestriction: output.accessControlRestriction,
-            _target: config.chainDiamondProxyAddress,
-            _data: abi.encodeCall(IAdmin.acceptAdmin, ()),
-            _value: 0
-        });
-    }
-
-    function saveOutput(string memory outputPath) internal {
-        vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-
-        string memory toml = vm.serializeAddress("root", "access_control_restriction", output.accessControlRestriction);
-        string memory root = vm.projectRoot();
-        vm.writeToml(toml, outputPath);
-        console.log("Output saved at:", outputPath);
+        config.chainDiamondProxyAddress = Bridgehub(config.bridgehubProxyAddress).getHyperchain(config.chainChainId);
     }
 }
