@@ -66,6 +66,8 @@ function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
     offset := add(BASEFEE_CACHE_OFFSET(), 32)
 }
 
+// Note: we have an empty memory slot after LAST_RETURNDATA_SIZE_OFFSET(), it is used to simplify stack logic
+
 function STACK_OFFSET() -> offset {
     offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
 }
