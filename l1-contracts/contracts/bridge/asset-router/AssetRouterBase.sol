@@ -136,7 +136,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             _msgValue: 0,
             _assetId: _assetId,
             _originalCaller: _originalCaller,
-            _data: abi.encode(_amount, address(0))
+            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
         });
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
@@ -200,6 +200,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
         // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
         if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
+            if (msg.value != 0 || _value != 0) {
+                revert NonEmptyMsgValue();
+            }
             (bytes32 _assetId, address _assetHandlerAddressOnCounterpart) = abi.decode(_data[1:], (bytes32, address));
             return
                 _setAssetHandlerAddressOnCounterpart(
@@ -226,11 +229,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             _assetId: assetId,
             _originalCaller: _originalCaller,
             _transferData: transferData,
-            _passValue: true
+            _passValue: true,
+            _nativeTokenVault: _nativeTokenVault
         });
 
         bytes32 txDataHash = DataEncoding.encodeTxDataHash({
-            _nativeTokenVault: address(_nativeTokenVault),
+            _nativeTokenVault: _nativeTokenVault,
             _encodingVersion: encodingVersion,
             _originalCaller: _originalCaller,
             _assetId: assetId,

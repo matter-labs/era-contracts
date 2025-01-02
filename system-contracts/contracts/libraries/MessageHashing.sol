@@ -39,7 +39,7 @@ library MessageHashing {
 
     function parseProofMetadata(
         bytes32[] memory _proof
-    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen, bool finalProofNode) {
         bytes32 proofMetadata = _proof[0];
 
         // We support two formats of the proofs:
@@ -49,25 +49,26 @@ library MessageHashing {
         // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
         // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
         // - the rest of the bytes are zeroes.
+        // - fourth byte: whether the current proof is the last in the links of recursive proofs for settlement layers.
         //
         // In the future the old version will be disabled, and only the new version will be supported.
-        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 29 bytes are zeroes.
-        // It is safe, since the elements of the proof are hashes and are unlikely to have 29 zero bytes in them.
+        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 28 bytes are zeroes.
+        // It is safe, since the elements of the proof are hashes and are unlikely to have 28 zero bytes in them.
 
-        // We shift left by 3 bytes = 24 bits to remove the top 24 bits of the metadata.
-        uint256 metadataAsUint256 = (uint256(proofMetadata) << 24);
+        // We shift left by 4 bytes = 32 bits to remove the top 32 bits of the metadata.
+        uint256 metadataAsUint256 = (uint256(proofMetadata) << 32);
 
         if (metadataAsUint256 == 0) {
             // It is the new version
             bytes1 metadataVersion = bytes1(proofMetadata);
-            require(
-                uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION,
-                "Mailbox: unsupported proof metadata version"
-            );
+            if (uint256(uint8(metadataVersion)) != SUPPORTED_PROOF_METADATA_VERSION) {
+                revert UnsupportedProofMetadataVersion(uint256(uint8(metadataVersion)));
+            }
 
             proofStartIndex = 1;
             logLeafProofLen = uint256(uint8(proofMetadata[1]));
             batchLeafProofLen = uint256(uint8(proofMetadata[2]));
+            finalProofNode = uint256(uint8(proofMetadata[3])) != 0;
         } else {
             // It is the old version
 
@@ -75,6 +76,11 @@ library MessageHashing {
             proofStartIndex = 0;
             logLeafProofLen = _proof.length;
             batchLeafProofLen = 0;
+            finalProofNode = true;
+        }
+
+        if (finalProofNode && batchLeafProofLen != 0) {
+            revert InvalidProofLengthForFinalNode();
         }
     }
 
@@ -89,7 +95,7 @@ library MessageHashing {
             revert MerklePathEmpty();
         }
 
-        (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = MessageHashing
+        (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen, bool finalProofNode) = MessageHashing
             .parseProofMetadata(_proof);
         result.ptr = proofStartIndex;
 
@@ -147,7 +153,7 @@ library MessageHashing {
     }
 
     function extractSlice(
-        bytes32[] memory _proof,
+        bytes32[] calldata _proof,
         uint256 _left,
         uint256 _right
     ) internal pure returns (bytes32[] memory slice) {
@@ -160,7 +166,7 @@ library MessageHashing {
     /// @notice Extracts slice until the end of the array.
     /// @dev It is used in one place in order to circumvent the stack too deep error.
     function extractSliceUntilEnd(
-        bytes32[] memory _proof,
+        bytes32[] calldata _proof,
         uint256 _start
     ) internal pure returns (bytes32[] memory slice) {
         slice = extractSlice(_proof, _start, _proof.length);
