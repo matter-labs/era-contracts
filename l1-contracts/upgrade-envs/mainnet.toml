@@ -1,5 +1,4 @@
 era_chain_id = 324
-owner_address = "8f7a9912416e8adc4d9c21fae1415d3318a11897"
 testnet_verifier = false
 governance_upgrade_timer_initial_delay = 1058400
 
@@ -23,13 +22,7 @@ diamond_init_minimal_l2_gas_price = 250000000
 bootloader_hash = "0x010008e5b883de8897598e83d383e332b87d09164363816c15f22353c3cd910d"
 default_aa_hash = "0x0100052307b3b66ef67935255483d39b3c8dcdb47fdf94dddca11ebe8271afe6"
 bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
-old_shared_bridge_proxy_address = "0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB"
-state_transition_manager_address = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
 transparent_proxy_admin = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"
-era_diamond_proxy = "0x32400084c286cf3e17e7b677ea9583e60a000324"
-blob_versioned_hash_retriever = "0x0000000000000000000000000000000000000001"
-legacy_erc20_bridge_address = "0x57891966931eb4bb6fb81430e6ce0a03aabde063"
-old_validator_timelock = "0x5D8ba173Dc6C3c90C8f7C04C9288BeF5FDbAd06E"
 
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"

@@ -75,6 +75,10 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "contracts/governance/Create2AndTransfer.sol";
 
+interface IBridgehubLegacy {
+    function stateTransitionManager(uint256 chainId) external returns (address); 
+}
+
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -681,7 +685,6 @@ contract EcosystemUpgrade is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
-        config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
@@ -716,15 +719,16 @@ contract EcosystemUpgrade is Script {
         config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
 
-        config.contracts.stateTransitionManagerAddress = toml.readAddress(
-            "$.contracts.state_transition_manager_address"
-        );
         config.contracts.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
-        config.contracts.oldSharedBridgeProxyAddress = toml.readAddress("$.contracts.old_shared_bridge_proxy_address");
+
+        config.ownerAddress = Bridgehub(config.contracts.bridgehubProxyAddress).owner();
+        config.contracts.stateTransitionManagerAddress = IBridgehubLegacy(config.contracts.bridgehubProxyAddress).stateTransitionManager(config.eraChainId);
+        config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
+        config.contracts.eraDiamondProxy = ChainTypeManager(config.contracts.stateTransitionManagerAddress).getHyperchain(config.eraChainId);
+        config.contracts.legacyErc20BridgeAddress = address(L1AssetRouter(config.contracts.oldSharedBridgeProxyAddress).legacyBridge());
+        config.contracts.oldValidatorTimelock = ChainTypeManager(config.contracts.stateTransitionManagerAddress).validatorTimelock();
+
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
-        config.contracts.eraDiamondProxy = toml.readAddress("$.contracts.era_diamond_proxy");
-        config.contracts.legacyErc20BridgeAddress = toml.readAddress("$.contracts.legacy_erc20_bridge_address");
-        config.contracts.oldValidatorTimelock = toml.readAddress("$.contracts.old_validator_timelock");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         config.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
