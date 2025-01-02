@@ -2943,8 +2943,6 @@ object "EvmEmulator" {
         ////////////////////////////////////////////////////////////////
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
-
-        pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
         
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
