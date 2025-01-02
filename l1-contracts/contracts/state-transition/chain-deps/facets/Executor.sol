@@ -15,8 +15,8 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
-import {ChainWasMigrated, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -35,14 +35,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
-
-    /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
-    modifier chainOnCurrentBridgehub() {
-        if (s.settlementLayer != address(0)) {
-            revert ChainWasMigrated();
-        }
-        _;
-    }
 
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
@@ -163,6 +155,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // linear traversal of the logs
         uint256 logsLength = emittedL2Logs.length;
+
+        if (logsLength % L2_TO_L1_LOG_SERIALIZE_SIZE != 0) {
+            revert InvalidSystemLogsLength();
+        }
+
         for (uint256 i = 0; i < logsLength; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
             // Extract the values to be compared to/used such as the log sender, key, and value
             // slither-disable-next-line unused-return
@@ -228,9 +225,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
         }
 
-        // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
-        // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
+        // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
+        // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
+        // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             if (processedLogs != 127) {
                 // revert MissingSystemLogs(127, processedLogs);
@@ -246,7 +243,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
-    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -360,6 +357,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             PriorityOperation memory priorityOp = s.priorityQueue.popFront();
             concatHash = keccak256(abi.encode(concatHash, priorityOp.canonicalTxHash));
         }
+
+        s.priorityTree.skipUntil(s.priorityQueue.getFirstUnprocessedPriorityTx());
     }
 
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
@@ -450,7 +449,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
-    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
             .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
@@ -459,9 +458,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
-                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
-            } else {
+            if (_isPriorityQueueActive()) {
                 if (priorityOpsData[i].leftPath.length != 0) {
                     revert PriorityOpsDataLeftPathLengthIsNotZero();
                 }
@@ -471,7 +468,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (priorityOpsData[i].itemHashes.length != 0) {
                     revert PriorityOpsDataItemHashesLengthIsNotZero();
                 }
+
                 _executeOneBatch(batchesData[i], i);
+            } else {
+                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
             }
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
@@ -495,7 +495,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
-    ) external nonReentrant onlyValidator chainOnCurrentBridgehub {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
@@ -561,11 +561,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external nonReentrant onlyValidator {
+    function revertBatchesSharedBridge(
+        uint256,
+        uint256 _newLastBatch
+    ) external nonReentrant onlyValidatorOrChainTypeManager {
         _revertBatches(_newLastBatch);
     }
 
-    function _revertBatches(uint256 _newLastBatch) internal chainOnCurrentBridgehub {
+    function _revertBatches(uint256 _newLastBatch) internal onlySettlementLayer {
         if (s.totalBatchesCommitted <= _newLastBatch) {
             revert RevertedBatchNotAfterNewLastBatch();
         }

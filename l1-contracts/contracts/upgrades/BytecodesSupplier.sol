@@ -34,7 +34,7 @@ contract BytecodesSupplier {
 
     /// @notice Publishes multiple bytecodes.
     /// @param _bytecodes Array of bytecodes to be published.
-    function publishBytecodes(bytes[] calldata _bytecodes) public {
+    function publishBytecodes(bytes[] calldata _bytecodes) external {
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _bytecodes.length; ++i) {
             publishBytecode(_bytecodes[i]);

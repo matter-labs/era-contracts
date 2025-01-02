@@ -85,9 +85,15 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL2("RollupL2DAValidator.sol", "RollupL2DAValidator");
     }
 
-    /// @notice Reads the bytecode of the ValidiumL2DAValidator contract.
+    /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for Avail.
     /// @return The bytecode of the ValidiumL2DAValidator contract.
-    function readValidiumL2DAValidatorBytecode() internal view returns (bytes memory) {
+    function readAvailL2DAValidatorBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL2("AvailL2DAValidator.sol", "AvailL2DAValidator");
+    }
+
+    /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for NoDA validium.
+    /// @return The bytecode of the ValidiumL2DAValidator contract.
+    function readNoDAL2DAValidatorBytecode() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
     }
 
@@ -187,14 +193,16 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL1("RelayedSLDAValidator.sol", "RelayedSLDAValidator");
     }
 
-    function readValidiumL1DAValidatorBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
-    }
-
     /// @notice Reads the bytecode of the L2SharedBridgeLegacy contract.
     /// @return The bytecode of the L2SharedBridgeLegacy contract.
     function readL2LegacySharedBridgeBytecode() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL1("L2SharedBridgeLegacy.sol", "L2SharedBridgeLegacy");
+    }
+
+    /// @notice Reads the bytecode of the L2SharedBridgeLegacy contract.
+    /// @return The bytecode of the L2SharedBridgeLegacy contract.
+    function readL2LegacySharedBridgeDevBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL1("L2SharedBridgeLegacyDev.sol", "L2SharedBridgeLegacyDev");
     }
 
     /// @notice Reads the bytecode of the L2GatewayUpgrade contract.
@@ -235,5 +243,11 @@ library L2ContractsBytecodesLib {
     /// @return The bytecode of the TimestampAsserter contract.
     function readTimestampAsserterBytecode() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL2("TimestampAsserter.sol", "TimestampAsserter");
+    }
+
+    /// @notice Reads the bytecode of the ChainAdmin contract.
+    /// @return The bytecode of the ChainAdmin contract.
+    function readChainAdminBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
     }
 }

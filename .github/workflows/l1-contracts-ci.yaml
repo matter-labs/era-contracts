@@ -21,7 +21,7 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: 18.18.0
           cache: yarn
+
+      - name: Install dependencies
+        run: yarn
 
       - name: Build da contracts
         working-directory: da-contracts
@@ -107,10 +110,11 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
       - name: Install dependencies
         run: yarn
 
@@ -151,15 +155,16 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
       - name: Install dependencies
         run: yarn
 
       - name: Build system contract artifacts
-        run: yarn sc build
+        run: yarn sc build:foundry
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -170,69 +175,14 @@ jobs:
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/zkout
+            # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
             l2-contracts/cache-forge
             l2-contracts/zkout
             system-contracts/zkout
-
-      - name: Install foundry zksync
-        run: |
-          wget https://github.com/matter-labs/foundry-zksync/releases/download/nightly-f908ce43834bc1ffb4de6576ea5600eaab49dddb/foundry_nightly_linux_amd64.tar.gz -O foundry-zksync.tar.gz
-          tar -xzf foundry-zksync.tar.gz
-          sudo mv forge /usr/local/bin/forge
-          sudo mv cast /usr/local/bin/cast
-          sudo chmod +x /usr/local/bin/forge
-          sudo chmod +x /usr/local/bin/cast
-          forge --version
 
       - name: Run tests
         working-directory: ./l1-contracts
         run: FOUNDRY_PROFILE=default yarn test:zkfoundry
-
-  test-hardhat:
-    needs: [build, lint]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Install l1 deps
-        working-directory: ./l1-contracts
-        run: yarn
-
-      - name: Build contracts with hardhat
-        working-directory: ./l1-contracts
-        run: yarn build
-
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
-          path: |
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
-
-      - name: Build L2 contracts
-        run: yarn l2 build
-
-      - name: Run tests
-        run: yarn l1 test
 
   check-verifier-generator-l1:
     runs-on: ubuntu-latest
@@ -277,7 +227,7 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH

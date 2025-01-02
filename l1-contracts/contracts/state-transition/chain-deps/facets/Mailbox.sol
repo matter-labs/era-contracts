@@ -27,7 +27,7 @@ import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
-import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
+import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow, InvalidProofLengthForFinalNode} from "../../../common/L1ContractErrors.sol";
 import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -120,16 +120,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
 
-    // /// @inheritdoc IMailbox
-    function proveL1ToL2TransactionStatusViaGateway(
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) public view returns (bool) {}
-
     /// @inheritdoc IMailbox
     function proveL2LeafInclusion(
         uint256 _batchNumber,
@@ -154,12 +144,13 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             _proof
         );
 
-        // If the `batchLeafProofLen` is 0, then we assume that this is L1 contract of the top-level
+        // If the `finalProofNode` is true, then we assume that this is L1 contract of the top-level
         // in the aggregation, i.e. the batch root is stored here on L1.
-        if (proofVerificationResult.batchLeafProofLen == 0) {
+        if (proofVerificationResult.finalProofNode) {
             // Double checking that the batch has been executed.
             if (_batchNumber > s.totalBatchesExecuted) {
                 revert BatchNotExecuted(_batchNumber);
+            }
             }
 
             bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
@@ -307,7 +298,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub(s.bridgehub).forwardTransactionOnGateway,
+            IBridgehub.forwardTransactionOnGateway,
             (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return
@@ -403,10 +394,10 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     function _nextPriorityTxId() internal view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getTotalPriorityTxs();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getTotalPriorityTxs();
+        } else {
+            return s.priorityTree.getTotalPriorityTxs();
         }
     }
 
@@ -479,7 +470,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     }
 
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
-        if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+        if (_isPriorityQueueActive()) {
             s.priorityQueue.pushBack(
                 PriorityOperation({
                     canonicalTxHash: _canonicalTxHash,

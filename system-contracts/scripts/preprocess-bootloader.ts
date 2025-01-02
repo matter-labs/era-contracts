@@ -68,7 +68,7 @@ function getSystemContextCodeHash() {
 // Maybe in the future some of these params will be passed
 // in a JSON file. For now, a simple object is ok here.
 const params = {
-  MARK_BATCH_AS_REPUBLISHED_SELECTOR: getSelector("KnownCodesStorage", "markFactoryDeps"),
+  MARK_FACTORY_DEPS_SELECTOR: getSelector("KnownCodesStorage", "markFactoryDeps"),
   VALIDATE_TX_SELECTOR: getSelector("IAccount", "validateTransaction"),
   EXECUTE_TX_SELECTOR: getSelector("DefaultAccount", "executeTransaction"),
   RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector("ContractDeployer", "extendedAccountVersion"),

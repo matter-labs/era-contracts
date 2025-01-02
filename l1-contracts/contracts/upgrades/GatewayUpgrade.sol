@@ -13,7 +13,7 @@ import {GatewayUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {L1GatewayHelper} from "./L1GatewayHelper.sol";
+import {L1GatewayBase} from "./L1GatewayBase.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct GatewayUpgradeEncodedInput {
@@ -30,7 +30,7 @@ struct GatewayUpgradeEncodedInput {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade {
+contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase, IGatewayUpgrade {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
@@ -64,11 +64,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         bytes memory gatewayUpgradeCalldata = abi.encode(
             encodedInput.ctmDeployer,
             encodedInput.fixedForceDeploymentsData,
-            L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
-                s,
-                encodedInput.wrappedBaseTokenStore,
-                s.__DEPRECATED_baseToken
-            )
+            getZKChainSpecificForceDeploymentsData(s, encodedInput.wrappedBaseTokenStore, s.__DEPRECATED_baseToken)
         );
         encodedInput.forceDeployments[encodedInput.l2GatewayUpgradePosition].input = gatewayUpgradeCalldata;
 
@@ -87,7 +83,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
-    function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
+    function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external override {
         super.upgrade(_proposedUpgrade);
     }
 }

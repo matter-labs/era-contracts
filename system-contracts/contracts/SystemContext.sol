@@ -485,9 +485,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         batchHashes[previousBatchNumber] = _prevBatchHash;
 
         // Setting new block number and timestamp
-        BlockInfo memory newBlockInfo = BlockInfo({number: previousBatchNumber + 1, timestamp: _newTimestamp});
-
-        currentBatchInfo = newBlockInfo;
+        currentBatchInfo = BlockInfo({number: previousBatchNumber + 1, timestamp: _newTimestamp});
 
         baseFee = _baseFee;
 
@@ -502,8 +500,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         uint256 _number,
         uint256 _baseFee
     ) external onlyCallFromBootloader {
-        BlockInfo memory newBlockInfo = BlockInfo({number: uint128(_number), timestamp: uint128(_newTimestamp)});
-        currentBatchInfo = newBlockInfo;
+        currentBatchInfo = BlockInfo({number: uint128(_number), timestamp: uint128(_newTimestamp)});
 
         baseFee = _baseFee;
     }

@@ -172,9 +172,16 @@ library L2GenesisUpgradeHelper {
         address deployedTokenBeacon;
         bool contractsDeployedAlready;
         if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
-            deployedTokenBeacon = address(
-                IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon()
-            );
+            // In production, the `fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
+            // be equal to 0. It is only for simplifying testing.
+            if (fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
+                deployedTokenBeacon = address(
+                    IL2SharedBridgeLegacy(additionalForceDeploymentsData.l2LegacySharedBridge).l2TokenBeacon()
+                );
+            } else {
+                deployedTokenBeacon = fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
+            }
+
             contractsDeployedAlready = true;
         }
 

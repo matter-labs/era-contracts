@@ -27,6 +27,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -109,8 +110,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             keccak256(abi.encode(randomChainId, 204)),
             bytes32(uint256(uint160(address(chainTypeManager))))
         );
-        bridgehub.setLegacyBaseTokenAssetId(randomChainId);
-        bridgehub.setLegacyChainAddress(randomChainId);
+        bridgehub.registerLegacyChain(randomChainId);
+
+        assertEq(bridgehub.settlementLayer(randomChainId), block.chainid);
+
+        address messageRoot = address(bridgehub.messageRoot());
+        assertTrue(MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
@@ -140,12 +145,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
             address bridgehubStmForChain = bridgehub.chainTypeManager(chainId);
             bytes32 bridgehubBaseAssetIdForChain = bridgehub.baseTokenAssetId(chainId);
-            address bridgehubChainAddressdForChain = bridgehub.getZKChain(chainId);
+            address bridgehubChainAddressForChain = bridgehub.getZKChain(chainId);
             address bhAddr = IZKChain(chain).getBridgehub();
 
             assertEq(bridgehubStmForChain, stmAddr);
             assertEq(bridgehubBaseAssetIdForChain, baseTokenAssetId);
-            assertEq(bridgehubChainAddressdForChain, chain);
+            assertEq(bridgehubChainAddressForChain, chain);
             assertEq(bhAddr, address(bridgehub));
         }
 

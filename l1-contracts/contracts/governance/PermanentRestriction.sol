@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed} from "../common/L1ContractErrors.sol";
+import {TooHighDeploymentNonce, CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed} from "../common/L1ContractErrors.sol";
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -19,6 +19,11 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
+
+/// @dev The value up to which the nonces of the L2AdminDeployer could be used. This is needed
+/// to limit the impact of the birthday paradox attack, where an attack could craft a malicious
+/// address on L1.
+uint256 constant MAX_ALLOWED_NONCE = (1 << 48);
 
 /// @title PermanentRestriction contract
 /// @author Matter Labs
@@ -94,18 +99,15 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Whitelists a certain L2 admin.
-    /// @param deploymentSalt The salt for the deployment.
-    /// @param l2BytecodeHash The hash of the L2 bytecode.
-    /// @param constructorInputHash The hash of the constructor data for the deployment.
-    function allowL2Admin(bytes32 deploymentSalt, bytes32 l2BytecodeHash, bytes32 constructorInputHash) external {
+    /// @param deploymentNonce The deployment nonce of the `L2_ADMIN_FACTORY` used for the deployment.
+    function allowL2Admin(uint256 deploymentNonce) external {
+        if (deploymentNonce > MAX_ALLOWED_NONCE) {
+            revert TooHighDeploymentNonce();
+        }
+
         // We do not do any additional validations for constructor data or the bytecode,
         // we expect that only admins of the allowed format are to be deployed.
-        address expectedAddress = L2ContractHelper.computeCreate2Address(
-            L2_ADMIN_FACTORY,
-            deploymentSalt,
-            l2BytecodeHash,
-            constructorInputHash
-        );
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_ADMIN_FACTORY, deploymentNonce);
 
         if (allowedL2Admins[expectedAddress]) {
             revert AlreadyWhitelisted(expectedAddress);
@@ -193,6 +195,10 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev Ensures that this restriction is not removed.
     function _validateRemoveRestriction(Call calldata _call) private view {
         if (_call.target != msg.sender) {
+            return;
+        }
+
+        if (_call.data.length < 4) {
             return;
         }
 

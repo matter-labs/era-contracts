@@ -61,7 +61,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         sharedBridge.bridgehubDeposit{value: amount}({
             _chainId: chainId,
             _originalCaller: alice,
-            _value: amount,
+            _value: 0,
             _data: abi.encode(ETH_TOKEN_ADDRESS, amount, bob)
         });
     }
@@ -226,7 +226,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
@@ -268,7 +268,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
@@ -351,7 +351,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(bytes32(uint256(2))); //alt base token
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 

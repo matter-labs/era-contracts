@@ -25,8 +25,8 @@ error InvalidNumberOfBlobs(uint256 blobsProvided, uint256 maxBlobsSupported);
 // 0xcd384e46
 error InvalidBlobsHashes(uint256 operatorDAInputLength, uint256 blobsProvided);
 
-// 0xe9e79528
-error InvalidL2DAOutputHash();
+// 0xd2531c15
+error InvalidL2DAOutputHash(bytes32 l2DAValidatorOutputHash);
 
 // 0x3db6e664
 error OneBlobWithCalldata();

@@ -417,7 +417,7 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 59000000 / 32 VM words.
+            /// @dev The memory page consists of 63800000 / 32 VM words.
             /// Each execution result is a single boolean, but
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
@@ -1112,12 +1112,12 @@ object "Bootloader" {
                 gasPerPubdata,
                 basePubdataSpent
             ) -> canonicalL1TxHash, gasUsedOnPreparation {
+                let gasBeforePreparation := gas()
+                debugLog("gasBeforePreparation", gasBeforePreparation)
+
                 let innerTxDataOffset := add(txDataOffset, 32)
 
                 setPubdataInfo(gasPerPubdata, basePubdataSpent)
-
-                let gasBeforePreparation := gas()
-                debugLog("gasBeforePreparation", gasBeforePreparation)
 
                 // Even though the smart contracts on L1 should make sure that the L1->L2 provide enough gas to generate the hash
                 // we should still be able to do it even if this protection layer fails.
@@ -2492,7 +2492,7 @@ object "Bootloader" {
 
                 let ptr := NEW_FACTORY_DEPS_BEGIN_BYTE()
                 // Selector
-                mstore(ptr, {{MARK_BATCH_AS_REPUBLISHED_SELECTOR}})
+                mstore(ptr, {{MARK_FACTORY_DEPS_SELECTOR}})
                 ptr := add(ptr, 32)
 
                 // Saving whether the dependencies should be sent on L1

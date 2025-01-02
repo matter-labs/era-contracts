@@ -13,7 +13,7 @@ import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported, ETHDepositNotSupported, ApprovalFailed} from "../common/L1ContractErrors.sol";
+import {AssetRouterAllowanceNotZero, EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported, ETHDepositNotSupported} from "../common/L1ContractErrors.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
@@ -203,10 +203,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
             _refundRecipient: _refundRecipient
         });
-        // clearing approval
-        bool success = IERC20(_l1Token).approve(address(L1_ASSET_ROUTER), 0);
-        if (!success) {
-            revert ApprovalFailed();
+        // Ensuring that all the funds that were locked into this bridge were spent by the asset router / native token vault.
+        if (IERC20(_l1Token).allowance(address(this), address(L1_ASSET_ROUTER)) != 0) {
+            revert AssetRouterAllowanceNotZero();
         }
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
@@ -227,10 +226,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.safeTransferFrom(_from, address(this), _amount);
-        bool success = _token.approve(address(L1_ASSET_ROUTER), _amount);
-        if (!success) {
-            revert ApprovalFailed();
-        }
+        _token.forceApprove(address(L1_ASSET_ROUTER), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;

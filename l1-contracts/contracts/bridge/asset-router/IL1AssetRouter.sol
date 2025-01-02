@@ -33,7 +33,7 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         bytes32 indexed l2DepositTxHash,
         address indexed from,
         address to,
-        address l1Asset,
+        address l1Token,
         uint256 amount
     );
 

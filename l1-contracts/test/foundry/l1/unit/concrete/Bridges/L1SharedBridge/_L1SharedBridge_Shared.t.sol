@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -14,6 +15,7 @@ import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
@@ -92,6 +94,7 @@ contract L1AssetRouterTest is Test {
     uint256 randomChainId;
     address eraDiamondProxy;
     address eraErc20BridgeAddress;
+    address l2LegacySharedBridgeAddr;
 
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
@@ -111,7 +114,7 @@ contract L1AssetRouterTest is Test {
         interopCenterAddress = makeAddr("interopCenter");
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
-        l1WethAddress = makeAddr("weth");
+        l1WethAddress = address(new ERC20("Wrapped ETH", "WETH"));
         l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
         l2SharedBridge = makeAddr("l2SharedBridge");
 
@@ -119,6 +122,7 @@ contract L1AssetRouterTest is Test {
         l2BatchNumber = 3; //uint256(uint160(makeAddr("l2BatchNumber")));
         l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
         l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
+        l2LegacySharedBridgeAddr = makeAddr("l2LegacySharedBridge");
         merkleProof = new bytes32[](1);
         eraPostUpgradeFirstBatch = 1;
 
@@ -129,7 +133,7 @@ contract L1AssetRouterTest is Test {
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        l1NullifierImpl = new L1Nullifier({
+        l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IBridgehub(bridgehubAddress),
             _interopCenter: IInteropCenter(interopCenterAddress),
             _eraChainId: eraChainId,
@@ -140,6 +144,9 @@ contract L1AssetRouterTest is Test {
             proxyAdmin,
             abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
         );
+        L1NullifierDev(address(l1NullifierProxy)).setL2LegacySharedBridge(chainId, l2LegacySharedBridgeAddr);
+        L1NullifierDev(address(l1NullifierProxy)).setL2LegacySharedBridge(eraChainId, l2LegacySharedBridgeAddr);
+
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
         sharedBridgeImpl = new L1AssetRouter({
             _l1WethAddress: l1WethAddress,

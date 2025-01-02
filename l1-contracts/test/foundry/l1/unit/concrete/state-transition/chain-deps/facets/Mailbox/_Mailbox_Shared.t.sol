@@ -24,7 +24,7 @@ contract MailboxTest is Test {
     address bridgehub;
     address interopCenter;
 
-    function setupDiamondProxy() public virtual {
+    function deployDiamondProxy() internal returns (address proxy) {
         sender = makeAddr("sender");
         bridgehub = makeAddr("bridgehub");
         interopCenter = makeAddr("interopCenter");
@@ -50,13 +50,20 @@ contract MailboxTest is Test {
             selectors: Utils.getGettersSelectors()
         });
 
-        diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        utilsFacet = UtilsFacet(proxy);
+        utilsFacet.util_setBridgehub(bridgehub);
+    }
+
+    function setupDiamondProxy() public {
+        address diamondProxy = deployDiamondProxy();
+
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
         gettersFacet = IGetters(diamondProxy);
 
-        utilsFacet.util_setBridgehub(bridgehub);
-        utilsFacet.util_setInteropCenter(interopCenter);
+        // utilsFacet.util_setBridgehub(bridgehub);
+        // utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     // add this to be excluded from coverage report

@@ -13,7 +13,12 @@ import {MurkyBase} from "murky/common/MurkyBase.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
+import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 contract MailboxL2LogsProve is MailboxTest {
     bytes32[] elements;
@@ -285,6 +290,89 @@ contract MailboxL2LogsProve is MailboxTest {
         assertEq(ret, true);
     }
 
+    function checkRecursiveLeafProof(RecursiveProofInfo memory proofInfo) internal returns (bool) {
+        address secondDiamondProxy = deployDiamondProxy();
+
+        IMailbox secondMailbox = IMailbox(secondDiamondProxy);
+        UtilsFacet secondUtils = UtilsFacet(secondDiamondProxy);
+        IGetters secondGetters = IGetters(secondDiamondProxy);
+
+        uint256 secondBatchNumber = secondGetters.getTotalBatchesExecuted();
+
+        (bytes32[] memory proof, bytes32 requiredRoot) = _composeRecursiveProof(
+            RecursiveProofInfo({
+                leaf: proofInfo.leaf,
+                logProof: proofInfo.logProof,
+                leafProofMask: proofInfo.leafProofMask,
+                // We override it since it is only known here
+                batchNumber: batchNumber,
+                batchProof: proofInfo.batchProof,
+                batchLeafProofMask: proofInfo.batchLeafProofMask,
+                // We override it since it is only known here
+                settlementLayerBatchNumber: secondBatchNumber,
+                settlementLayerBatchRootMask: proofInfo.settlementLayerBatchRootMask,
+                settlementLayerChainId: proofInfo.settlementLayerChainId,
+                chainIdProof: proofInfo.chainIdProof
+            })
+        );
+        utilsFacet.util_setL2LogsRootHash(secondBatchNumber, requiredRoot);
+
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeCall(IBridgehub.whitelistedSettlementLayers, (proofInfo.settlementLayerChainId)),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeCall(IBridgehub.getZKChain, (proofInfo.settlementLayerChainId)),
+            abi.encode(secondDiamondProxy)
+        );
+
+        return mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
+    }
+
+    function test_successRecursiveProof() external {
+        assertTrue(
+            checkRecursiveLeafProof(
+                RecursiveProofInfo({
+                    leaf: bytes32(0),
+                    logProof: bytes32Arr(2, bytes32(0), bytes32(uint256(1))),
+                    leafProofMask: 2,
+                    // We override it since it is only known here
+                    batchNumber: 0,
+                    batchProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(1))),
+                    batchLeafProofMask: 1,
+                    // We override it since it is only known here
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 3,
+                    settlementLayerChainId: 255,
+                    chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
+                })
+            )
+        );
+    }
+
+    function test_successRecursiveProofZeroLength() external {
+        assertTrue(
+            checkRecursiveLeafProof(
+                RecursiveProofInfo({
+                    leaf: bytes32(0),
+                    logProof: bytes32Arr(2, bytes32(0), bytes32(uint256(1))),
+                    leafProofMask: 2,
+                    // We override it since it is only known here
+                    batchNumber: 0,
+                    batchProof: bytes32Arr(0, bytes32(0), bytes32(0)),
+                    batchLeafProofMask: 0,
+                    // We override it since it is only known here
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 3,
+                    settlementLayerChainId: 255,
+                    chainIdProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(0)))
+                })
+            )
+        );
+    }
+
     /// @notice Proves L1 to L2 transaction status and cross-checks new and old encoding
     function _proveL1ToL2TransactionStatus(
         bytes32 _l2TxHash,
@@ -379,13 +467,92 @@ contract MailboxL2LogsProve is MailboxTest {
         return retOldEncoding;
     }
 
+    function _composeMetadata(uint256 proofLen, uint256 batchProofLen, bool finalNode) internal pure returns (bytes32) {
+        return
+            bytes32(
+                bytes.concat(
+                    bytes1(0x01),
+                    bytes1(uint8(proofLen)),
+                    bytes1(uint8(batchProofLen)),
+                    bytes1(uint8(finalNode ? 1 : 0)),
+                    bytes28(0)
+                )
+            );
+    }
+
     /// @notice Appends the proof metadata to the log proof as if the proof is for a batch that settled on L1.
     function _appendProofMetadata(bytes32[] memory logProof) internal returns (bytes32[] memory result) {
         result = new bytes32[](logProof.length + 1);
 
-        result[0] = bytes32(bytes.concat(bytes1(0x01), bytes1(uint8(logProof.length)), bytes30(0x00)));
+        result[0] = _composeMetadata(logProof.length, 0, true);
         for (uint256 i = 0; i < logProof.length; i++) {
             result[i + 1] = logProof[i];
+        }
+    }
+
+    // Just quicker to type than creating new bytes32[] each time,
+    function bytes32Arr(uint256 length, bytes32 elem1, bytes32 elem2) internal pure returns (bytes32[] memory result) {
+        result = new bytes32[](length);
+        if (length > 0) {
+            result[0] = elem1;
+        }
+        if (length > 1) {
+            result[1] = elem2;
+        }
+    }
+
+    struct RecursiveProofInfo {
+        bytes32 leaf;
+        bytes32[] logProof;
+        uint256 leafProofMask;
+        uint256 batchNumber;
+        bytes32[] batchProof;
+        uint256 batchLeafProofMask;
+        uint256 settlementLayerBatchNumber;
+        uint256 settlementLayerBatchRootMask;
+        uint256 settlementLayerChainId;
+        bytes32[] chainIdProof;
+    }
+
+    function _composeRecursiveProof(
+        RecursiveProofInfo memory info
+    ) internal returns (bytes32[] memory proof, bytes32 chainBRoot) {
+        uint256 ptr;
+        proof = new bytes32[](1 + info.logProof.length + 1 + info.batchProof.length + 2 + 1 + info.chainIdProof.length);
+        proof[ptr++] = _composeMetadata(info.logProof.length, info.batchProof.length, false);
+        copyBytes32(proof, info.logProof, ptr);
+        ptr += info.logProof.length;
+
+        bytes32 batchSettlementRoot = Merkle.calculateRootMemory(info.logProof, info.leafProofMask, info.leaf);
+
+        bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, info.batchNumber);
+
+        proof[ptr++] = bytes32(uint256(info.batchLeafProofMask));
+        copyBytes32(proof, info.batchProof, ptr);
+        ptr += info.batchProof.length;
+
+        bytes32 chainIdRoot = Merkle.calculateRootMemory(info.batchProof, info.batchLeafProofMask, batchLeafHash);
+
+        bytes32 chainIdLeaf = MessageHashing.chainIdLeafHash(chainIdRoot, gettersFacet.getChainId());
+
+        uint256 settlementLayerPackedBatchInfo = (info.settlementLayerBatchNumber << 128) +
+            (info.settlementLayerBatchRootMask);
+        proof[ptr++] = bytes32(settlementLayerPackedBatchInfo);
+        proof[ptr++] = bytes32(info.settlementLayerChainId);
+
+        proof[ptr++] = _composeMetadata(info.chainIdProof.length, 0, true);
+        copyBytes32(proof, info.chainIdProof, ptr);
+        ptr += info.chainIdProof.length;
+
+        // Just in case
+        require(proof.length == ptr, "Incorrect ptr");
+
+        chainBRoot = Merkle.calculateRootMemory(info.chainIdProof, info.settlementLayerBatchRootMask, chainIdLeaf);
+    }
+
+    function copyBytes32(bytes32[] memory to, bytes32[] memory from, uint256 pos) internal pure {
+        for (uint256 i = 0; i < from.length; i++) {
+            to[pos + i] = from[i];
         }
     }
 }

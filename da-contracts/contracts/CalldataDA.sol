@@ -70,7 +70,7 @@ abstract contract CalldataDA {
 
         // Now, we need to double check that the provided input was indeed returned by the L2 DA validator.
         if (keccak256(_operatorDAInput[:ptr]) != _l2DAValidatorOutputHash) {
-            revert InvalidL2DAOutputHash();
+            revert InvalidL2DAOutputHash(_l2DAValidatorOutputHash);
         }
 
         // The rest of the output was provided specifically by the operator

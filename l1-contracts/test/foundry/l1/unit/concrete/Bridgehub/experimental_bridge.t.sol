@@ -32,8 +32,8 @@ import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehu
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {AssetIdNotSupported, ZeroChainId, AssetIdAlreadyRegistered, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered} from "contracts/common/L1ContractErrors.sol";
 import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {AssetIdNotSupported, ZeroChainId, AssetIdAlreadyRegistered, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ExperimentalBridgeTest is Test {
@@ -1436,7 +1436,6 @@ contract ExperimentalBridgeTest is Test {
         uint256 chainId,
         uint256 mintValue,
         uint256 msgValue,
-        uint256 l2Value,
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
@@ -1456,7 +1455,7 @@ contract ExperimentalBridgeTest is Test {
         L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
             mintValue: mintValue,
-            l2Value: l2Value,
+            l2Value: 0,
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
             refundRecipient: refundRecipient,

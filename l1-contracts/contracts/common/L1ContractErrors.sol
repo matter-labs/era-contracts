@@ -5,10 +5,6 @@ pragma solidity ^0.8.21;
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
 error AccessToFunctionDenied(address target, bytes4 selector, address invoker);
-//
-error AlreadyCurrentSettlementLayer();
-// 0x8164f842
-error ApprovalFailed();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x52e22c98
@@ -360,8 +356,6 @@ error NewDeadlineExceedsMaxDeadline();
 error AlreadyPermanentRollup();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0x6e3331f5
-error IncorrectPricingMode();
 // 0xd0266e26
 error NotSettlementLayer();
 // 0x7a4902ad
@@ -384,6 +378,41 @@ error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
 
 // 0xce63ce17
 error NoCTMForAssetId(bytes32 assetId);
+// 0x02181a13
+error SettlementLayersMustSettleOnL1();
+// 0x1850b46b
+error TokenNotLegacy();
+// 0x1929b7de
+error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
+// 0x48c5fa28
+error InvalidProofLengthForFinalNode();
+// 0x7acd7817
+error TokenIsNotLegacy();
+// 0xa51fa558
+error TokenIsLegacy();
+// 0x29963361
+error LegacyBridgeUsesNonNativeToken();
+// 0x11832de8
+error AssetRouterAllowanceNotZero();
+// 0xaa5f6180
+error BurningNativeWETHNotSupported();
+// 0xb20b58ce
+error NoLegacySharedBridge();
+// 0x8e3ce3cb
+error TooHighDeploymentNonce();
+// 0x78d2ed02
+error ChainAlreadyLive();
+// 0x4e98b356
+error MigrationsNotPaused();
+// 0xf20c5c2a
+error WrappedBaseTokenAlreadyRegistered();
+
+// 0xde4c0b96
+error InvalidNTVBurnData();
+// 0xbe7193d4
+error InvalidSystemLogsLength();
+// 0x8efef97a
+error LegacyBridgeNotSet();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

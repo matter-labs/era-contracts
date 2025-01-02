@@ -129,6 +129,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            address(1),
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
@@ -139,6 +140,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            address(1),
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
@@ -150,6 +152,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            address(1),
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
@@ -171,6 +174,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            address(1),
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );
@@ -250,6 +254,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(
             migratingChain.getAdmin(),
+            address(1),
             _extractAccessControlRestriction(migratingChain.getAdmin()),
             migratingChainId
         );

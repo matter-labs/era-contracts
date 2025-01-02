@@ -169,7 +169,8 @@ struct ZKChainStorage {
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
-    /// @dev Whether the chain is a permanent rollup
+    /// @dev Whether the chain is a permanent rollup. Note, that it only enforces the DA validator pair, but
+    /// it does not enforce any other parameters, e.g. `pubdataPricingMode`
     bool isPermanentRollup;
     /// @dev Interop Center, responsible for starting L1->L2 messages
     address interopCenter;

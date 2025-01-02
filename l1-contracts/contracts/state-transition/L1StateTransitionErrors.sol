@@ -83,8 +83,8 @@ error PubdataTooSmall(uint256 pubdataInputLength, uint256 blobCommitmentSize);
 // 0xcba35a08
 error PubdataTooLong(uint256 pubdataLength, uint256 blobSizeBytes);
 
-// 0x1b0f562e
-error InvalidPubdataHash();
+// 0x5513177c
+error InvalidPubdataHash(bytes32 fullPubdataHash, bytes32 pubdata);
 
 // 0x5717f940
 error InvalidPubdataSource(uint8 pubdataSource);
@@ -109,9 +109,6 @@ error AdminZero();
 
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
-
-// 0x8e7df0b6
-error ChainWasMigrated();
 
 // 0x87470e36
 error NotL1(uint256 blockChainId);

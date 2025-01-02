@@ -70,6 +70,10 @@ struct FixedForceDeploymentsData {
     bytes32 interopCenterBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
+    // The forced beacon address. It is needed only for internal testing.
+    // MUST be equal to 0 in production.
+    // It will be the job of the governance to ensure that this value is set correctly.
+    address dangerousTestOnlyForcedBeacon;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -97,7 +101,8 @@ struct L1NativeTokenVaultAddresses {
 struct DataAvailabilityDeployedAddresses {
     address rollupDAManager;
     address l1RollupDAValidator;
-    address l1ValidiumDAValidator;
+    address noDAValidiumL1DAValidator;
+    address availL1DAValidator;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -131,6 +136,7 @@ struct Config {
     uint256 eraChainId;
     address ownerAddress;
     bool testnetVerifier;
+    bool supportL2LegacySharedBridgeTest;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -161,6 +167,7 @@ struct ContractsConfig {
     bytes diamondCutData;
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
+    address availL1DAValidator;
 }
 
 struct TokensConfig {
@@ -193,6 +200,7 @@ contract DeployUtils is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
+        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -230,6 +238,10 @@ contract DeployUtils is Script {
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
         config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+
+        if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
+            config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
+        }
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
@@ -347,20 +359,20 @@ contract DeployUtils is Script {
         addresses.transparentProxyAdmin = address(proxyAdmin);
     }
 
-    function deployChainTypeManagerContract(address _rollupDAManager) internal {
-        deployStateTransitionDiamondFacets(_rollupDAManager);
+    function deployChainTypeManagerContract() internal {
+        deployStateTransitionDiamondFacets();
         deployChainTypeManagerImplementation();
         deployChainTypeManagerProxy();
     }
 
-    function deployStateTransitionDiamondFacets(address _rollupDAManager) internal {
+    function deployStateTransitionDiamondFacets() internal {
         address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId));
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
         address adminFacet = deployViaCreate2(
             type(AdminFacet).creationCode,
-            abi.encode(config.l1ChainId, _rollupDAManager)
+            abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager)
         );
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;

@@ -258,24 +258,26 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat(
+            "/../system-contracts/zkout/",
+            filename,
+            ".yul/contracts-preprocessed/precompiles/",
+            filename,
+            ".yul.json"
+        );
+
         // It is the only exceptional case
         if (keccak256(abi.encodePacked(filename)) == keccak256(abi.encodePacked("EventWriter"))) {
-            return
-                vm.readFileBinary(
-                    // solhint-disable-next-line func-named-parameters
-                    string.concat("../system-contracts/contracts-preprocessed/artifacts/", filename, ".yul.zbin")
-                );
+            path = string.concat(
+                "/../system-contracts/zkout/",
+                filename,
+                ".yul/contracts-preprocessed/",
+                filename,
+                ".yul.json"
+            );
         }
 
-        return
-            vm.readFileBinary(
-                // solhint-disable-next-line func-named-parameters
-                string.concat(
-                    "../system-contracts/contracts-preprocessed/precompiles/artifacts/",
-                    filename,
-                    ".yul.zbin"
-                )
-            );
+        return readFoundryBytecode(path);
     }
 
     /**
@@ -1105,6 +1107,14 @@ library Utils {
 
     function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
+    }
+
+    function readAvailL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json");
+    }
+
+    function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
     }
 
     // add this to be excluded from coverage report

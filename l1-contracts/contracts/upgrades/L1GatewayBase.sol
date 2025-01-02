@@ -12,10 +12,10 @@ import {ZKChainStorage} from "../state-transition/chain-deps/ZKChainStorage.sol"
 import {L2WrappedBaseTokenStore} from "../bridge/L2WrappedBaseTokenStore.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
-/// @title L1GatewayHelper
+/// @title L1GatewayBase
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-library L1GatewayHelper {
+abstract contract L1GatewayBase {
     /// @notice The function to retrieve the chain-specific upgrade data.
     /// @param s The pointer to the storage of the chain.
     /// @param _wrappedBaseTokenStore The address of the `L2WrappedBaseTokenStore` contract.
@@ -43,8 +43,18 @@ library L1GatewayHelper {
             baseTokenName = string("Ether");
             baseTokenSymbol = string("ETH");
         } else {
-            baseTokenName = IERC20Metadata(_baseTokenAddress).name();
-            baseTokenSymbol = IERC20Metadata(_baseTokenAddress).symbol();
+            try this.getTokenName(_baseTokenAddress) returns (string memory name) {
+                baseTokenName = name;
+            } catch {
+                baseTokenName = string("Base Token");
+            }
+
+            try this.getTokenSymbol(_baseTokenAddress) returns (string memory symbol) {
+                baseTokenSymbol = symbol;
+            } catch {
+                // "BT" is an acronym for "Base Token"
+                baseTokenSymbol = string("BT");
+            }
         }
 
         ZKChainSpecificForceDeploymentsData
@@ -57,5 +67,13 @@ library L1GatewayHelper {
                 baseTokenSymbol: baseTokenSymbol
             });
         return abi.encode(additionalForceDeploymentsData);
+    }
+
+    function getTokenName(address _token) external view returns (string memory) {
+        return IERC20Metadata(_token).name();
+    }
+
+    function getTokenSymbol(address _token) external view returns (string memory) {
+        return IERC20Metadata(_token).symbol();
     }
 }

@@ -16,7 +16,7 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
@@ -41,7 +41,7 @@ jobs:
           yarn build:foundry
 
       - name: Build system contract artifacts
-        run: yarn sc build
+        run: yarn sc build:foundry
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -123,15 +123,13 @@ jobs:
             l2-contracts/cache-forge
             l2-contracts/zkout
 
-      - name: Install foundry zksync
+      - name: Install foundry-zksync
         run: |
-          wget https://github.com/matter-labs/foundry-zksync/releases/download/nightly-f908ce43834bc1ffb4de6576ea5600eaab49dddb/foundry_nightly_linux_amd64.tar.gz -O foundry-zksync.tar.gz
-          tar -xzf foundry-zksync.tar.gz
-          sudo mv forge /usr/local/bin/forge
-          sudo mv cast /usr/local/bin/cast
-          sudo chmod +x /usr/local/bin/forge
-          sudo chmod +x /usr/local/bin/cast
-          forge --version
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Run tests
         run: yarn l2 test:foundry

@@ -42,7 +42,7 @@ contract L2AdminFactoryTest is Test {
         additionalRestrictions[0] = invalidRestriction;
 
         vm.expectRevert(abi.encodeWithSelector(NotARestriction.selector, address(invalidRestriction)));
-        factory.deployAdmin(additionalRestrictions, bytes32(0));
+        factory.deployAdmin(additionalRestrictions);
     }
 
     function testL2AdminFactory() public {
@@ -58,9 +58,7 @@ contract L2AdminFactoryTest is Test {
         allRestrictions[0] = requiredRestrictions[0];
         allRestrictions[1] = additionalRestrictions[0];
 
-        bytes32 salt = keccak256("salt");
-
-        address admin = factory.deployAdmin(additionalRestrictions, salt);
+        address admin = factory.deployAdmin(additionalRestrictions);
 
         // Now, we need to check whether it would be able to accept such an admin
         PermanentRestriction restriction = new PermanentRestriction(IBridgehub(address(0)), address(factory));
@@ -72,6 +70,6 @@ contract L2AdminFactoryTest is Test {
 
         vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.AllowL2Admin(admin);
-        restriction.allowL2Admin(salt, codeHash, keccak256(abi.encode(allRestrictions)));
+        restriction.allowL2Admin(uint256(0));
     }
 }

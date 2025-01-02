@@ -41,12 +41,7 @@ contract FinalizeUpgrade is Script {
 
             if (bh.baseTokenAssetId(chains[i]) == bytes32(0)) {
                 vm.broadcast();
-                Bridgehub(bridgehub).setLegacyBaseTokenAssetId(chains[i]);
-            }
-
-            if (bh.getZKChain(chains[i]) == address(0)) {
-                vm.broadcast();
-                Bridgehub(bridgehub).setLegacyChainAddress(chains[i]);
+                Bridgehub(bridgehub).registerLegacyChain(chains[i]);
             }
         }
     }
@@ -63,18 +58,26 @@ contract FinalizeUpgrade is Script {
 
         for (uint256 i = 0; i < tokens.length; i++) {
             uint256 tokenBalance;
-            if (tokens[i] != ETH_TOKEN_ADDRESS) {
-                uint256 balance = IERC20(tokens[i]).balanceOf(nullifier);
-                if (balance != 0) {
+            if (vault.assetId(tokens[i]) == bytes32(0)) {
+                if (tokens[i] != ETH_TOKEN_ADDRESS) {
+                    uint256 balance = IERC20(tokens[i]).balanceOf(nullifier);
+                    if (balance != 0) {
+                        vm.broadcast();
+                        vault.transferFundsFromSharedBridge(tokens[i]);
+                    } else {
+                        vm.broadcast();
+                        vault.registerToken(tokens[i]);
+                    }
+                } else {
                     vm.broadcast();
-                    vault.transferFundsFromSharedBridge(tokens[i]);
-                }
+                    vault.registerEthToken();
 
-                vm.broadcast();
-                vault.registerToken(tokens[i]);
-            } else {
-                vm.broadcast();
-                vault.registerEthToken();
+                    uint256 balance = address(nullifier).balance;
+                    if (balance != 0) {
+                        vm.broadcast();
+                        vault.transferFundsFromSharedBridge(tokens[i]);
+                    }
+                }
             }
 
             // TODO: we need to reduce complexity of this one

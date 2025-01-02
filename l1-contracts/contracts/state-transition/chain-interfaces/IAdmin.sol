@@ -53,7 +53,7 @@ interface IAdmin is IZKChainBase {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
-    /// @dev Only the current admin can execute the upgrade
+    /// @dev Only the ChainTypeManager contract can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
@@ -62,7 +62,7 @@ interface IAdmin is IZKChainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the CTM can unfreeze Diamond Proxy
+    /// @dev Only the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
     function genesisUpgrade(
@@ -107,7 +107,7 @@ interface IAdmin is IZKChainBase {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
     /// @notice Validium mode status changed
-    event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
+    event PubdataPricingModeUpdate(PubdataPricingMode validiumMode);
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);

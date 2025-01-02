@@ -11,7 +11,7 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, IncorrectPricingMode, InvalidDAForPermanentRollup, AlreadyPermanentRollup} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, InvalidDAForPermanentRollup, AlreadyPermanentRollup} from "../../../common/L1ContractErrors.sol";
 import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 
@@ -86,7 +86,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager {
+    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager onlyL1 {
         if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
             revert TooMuchGas();
         }
@@ -117,7 +117,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager {
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager onlyL1 {
         if (_denominator == 0) {
             revert DenominatorIsZero();
         }
@@ -132,12 +132,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
-        if (s.isPermanentRollup && _pricingMode != PubdataPricingMode.Rollup) {
-            revert IncorrectPricingMode();
-        }
-
         s.feeParams.pubdataPricingMode = _pricingMode;
-        emit ValidiumModeStatusUpdate(_pricingMode);
+        emit PubdataPricingModeUpdate(_pricingMode);
     }
 
     /// @inheritdoc IAdmin
@@ -183,11 +179,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
             // The correct data availability pair should be set beforehand.
             revert InvalidDAForPermanentRollup();
-        }
-
-        if (s.feeParams.pubdataPricingMode != PubdataPricingMode.Rollup) {
-            // The correct pubdata pricing mode should be set beforehand.
-            revert IncorrectPricingMode();
         }
 
         s.isPermanentRollup = true;
@@ -242,6 +233,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         });
 
         Diamond.diamondCut(cutData);
+        emit ExecuteUpgrade(cutData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -381,6 +373,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }
+        _forceDeactivateQueue();
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
@@ -397,7 +390,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function forwardedBridgeRecoverFailedTransfer(
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
-        address _depositSender,
+        address /* _depositSender */,
         bytes calldata _chainData
     ) external payable override onlyBridgehub {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
@@ -406,11 +399,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.settlementLayer == address(0)) {
             revert NotMigrated();
         }
-        // Sanity check that the _depositSender is the chain admin.
-        if (_depositSender != s.admin) {
-            revert NotChainAdmin(_depositSender, s.admin);
-        }
-
         uint256 currentProtocolVersion = s.protocolVersion;
         if (currentProtocolVersion != protocolVersion) {
             revert OutdatedProtocolVersion(protocolVersion, currentProtocolVersion);
@@ -423,7 +411,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
     /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex) {
+        if (_isPriorityQueueActive()) {
             revert PriorityQueueNotReady();
         }
 

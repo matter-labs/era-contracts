@@ -8,9 +8,6 @@ error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xf306a770
 error NotAssetRouter(address msgSender, address sharedBridge);
 
-// 0x4b62f013
-error TokenNotSet();
-
 // 0xff514c10
 error ChainIdAlreadyPresent();
 
@@ -55,9 +52,6 @@ error ChainExists();
 
 // 0x913183d8
 error MessageRootNotRegistered();
-
-// 0x8b7d939c
-error TooManyChains(uint256 cachedChainCount, uint256 maxNumberOfChains);
 
 // 0x7f4316f3
 error NoEthAllowed();
