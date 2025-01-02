@@ -623,11 +623,7 @@ for { } true { } {
     }
     case 0x44 { // OP_PREVRANDAO
         evmGasLeft := chargeGas(evmGasLeft, 2)
-        let _prevrandao := mload(PREVRANDAO_CACHE_OFFSET())
-        if iszero(_prevrandao) {
-            _prevrandao := cached(PREVRANDAO_CACHE_OFFSET(), prevrandao())
-        }
-        sp, stackHead := pushStackItem(sp, _prevrandao, stackHead)
+        sp, stackHead := pushStackItem(sp, PREVRANDAO_VALUE(), stackHead)
         ip := add(ip, 1)
     }
     case 0x45 { // OP_GASLIMIT
