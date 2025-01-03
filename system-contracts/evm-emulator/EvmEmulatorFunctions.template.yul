@@ -277,6 +277,14 @@ function loadReturndataIntoActivePtr() {
     verbatim_0i_0o("return_data_ptr_to_active")
 }
 
+function swapActivePointer(index0, index1) {
+    verbatim_2i_0o("active_ptr_swap", index0, index1)
+}
+
+function activePointerLoad(pos) -> res {
+    res := verbatim_1i_1o("active_ptr_data_load", pos)
+}
+
 function loadCalldataIntoActivePtr() {
     verbatim_0i_0o("calldata_ptr_to_active")
 }
@@ -302,6 +310,13 @@ function getIsStaticFromCallFlags() -> isStatic {
     isStatic := iszero(iszero(and(isStatic, 0x04)))
 }
 
+function loadFromReturnDataPointer(pos) -> res {
+    swapActivePointer(0, 1)
+    loadReturndataIntoActivePtr()
+    res := activePointerLoad(pos)
+    swapActivePointer(0, 1)
+}
+
 function fetchFromSystemContract(to, argSize) -> res {
     let success := staticcall(gas(), to, 0, argSize, 0, 0)
 
@@ -310,8 +325,7 @@ function fetchFromSystemContract(to, argSize) -> res {
         abortEvmEnvironment()
     }
 
-    returndatacopy(0, 0, 32)
-    res := mload(0) 
+    res := loadFromReturnDataPointer(0)
 }
 
 function isAddrEmpty(addr) -> isEmpty {
@@ -573,8 +587,7 @@ function warmSlot(key, currentValue) -> isWarm, originalValue {
     originalValue := currentValue
     if returndatasize() {
         isWarm := true
-        returndatacopy(0, 0, 32)
-        originalValue := mload(0)
+        originalValue := loadFromReturnDataPointer(0)
     }
 }
 
@@ -599,8 +612,7 @@ function consumeEvmFrame() -> passGas, isStatic, callerEVM {
         callerEVM := true
         mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
 
-        returndatacopy(0, 0, 32)
-        passGas := mload(0)
+        passGas := loadFromReturnDataPointer(0)
         
         isStatic := gt(_returndatasize, 32)
     }
@@ -980,8 +992,7 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             abortEvmEnvironment()
         }
         default {
-            returndatacopy(0, 0, 32)
-            _gasLeft := mload(0)
+            _gasLeft := activePointerLoad(0)
 
             // We copy as much returndata as possible without going over the 
             // returndata size.
@@ -1083,8 +1094,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
     let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
 
     if canBeDeployed {
-        returndatacopy(0, 0, 32)
-        addr := and(mload(0), ADDRESS_MASK())
+        addr := and(loadFromReturnDataPointer(0), ADDRESS_MASK())
         pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
         // so even if constructor reverts, nonce stays incremented and addr stays warm
 
@@ -1169,9 +1179,8 @@ function _saveConstructorReturnGas() -> gasLeft, addr {
     }
 
     // ContractDeployer returns (uint256 gasLeft, address createdContract)
-    returndatacopy(0, 0, 64)
-    gasLeft := mload(0)
-    addr := mload(32)
+    gasLeft := activePointerLoad(0)
+    addr := activePointerLoad(32)
 
     _eraseReturndataPointer()
 }
