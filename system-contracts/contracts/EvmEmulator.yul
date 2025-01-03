@@ -17,8 +17,8 @@ object "EvmEmulator" {
             }
 
             mstore(BYTECODE_LEN_OFFSET(), size)
-            mstore(EMPTY_CODE_OFFSET(), 0)
-            copyActivePtrData(BYTECODE_OFFSET(), 0, size)
+
+            swapActivePointerWithBytecodePointer()
         }
 
         function padBytecode(offset, len) -> blobLen {
@@ -144,15 +144,6 @@ object "EvmEmulator" {
             offset := add(MAX_STACK_SLOT_OFFSET(), 32)
         }
         
-        function BYTECODE_OFFSET() -> offset {
-            offset := add(BYTECODE_LEN_OFFSET(), 32)
-        }
-        
-        // reserved empty slot to simplify PUSH N opcodes
-        function EMPTY_CODE_OFFSET() -> offset {
-            offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
-        }
-        
         function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
             max := 24576 // EIP-170
         }
@@ -162,7 +153,7 @@ object "EvmEmulator" {
         }
         
         function MEM_LEN_OFFSET() -> offset {
-            offset := add(EMPTY_CODE_OFFSET(), 32)
+            offset := add(BYTECODE_LEN_OFFSET(), 32)
         }
         
         function MEM_OFFSET() -> offset {
@@ -322,17 +313,21 @@ object "EvmEmulator" {
         }
         
         // It is the responsibility of the caller to ensure that ip is correct
-        function readIP(ip, bytecodeEndOffset) -> opcode {
-            if lt(ip, bytecodeEndOffset) {
-                opcode := and(mload(sub(ip, 31)), 0xff)
-            }
+        function $llvm_AlwaysInline_llvm$_readIP(ip) -> opcode {
+            swapActivePointerWithBytecodePointer()
+            opcode := shr(248, activePointerLoad(ip))
+            swapActivePointerWithBytecodePointer()
             // STOP else
         }
         
         // It is the responsibility of the caller to ensure that start and length is correct
         function readBytes(start, length) -> value {
-            value := shr(mul(8, sub(32, length)), mload(start))
-            // will be padded by zeroes if out of bounds (we have reserved EMPTY_CODE_OFFSET() slot)
+            swapActivePointerWithBytecodePointer()
+            let rawValue := activePointerLoad(start)
+            swapActivePointerWithBytecodePointer()
+        
+            value := shr(mul(8, sub(32, length)), rawValue)
+            // will be padded by zeroes if out of bounds
         }
         
         function getCodeAddress() -> addr {
@@ -345,6 +340,10 @@ object "EvmEmulator" {
         
         function swapActivePointer(index0, index1) {
             verbatim_2i_0o("active_ptr_swap", index0, index1)
+        }
+        
+        function swapActivePointerWithBytecodePointer() {
+            verbatim_2i_0o("active_ptr_swap", 0, 4)
         }
         
         function activePointerLoad(pos) -> res {
@@ -435,10 +434,7 @@ object "EvmEmulator" {
         
         // Basically performs an extcodecopy, while returning the length of the copied bytecode.
         function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-            let rawCodeHash := getRawCodeHash(addr)
-            mstore(0, rawCodeHash)
-            
-            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+            let success, rawCodeHash := fetchBytecode(addr)
             // it fails if we don't have any code deployed at this address
             if success {
                 // The length of the bytecode is encoded in versioned bytecode hash
@@ -468,6 +464,13 @@ object "EvmEmulator" {
             
                 copiedLen := len
             } 
+        }
+        
+        function fetchBytecode(addr) -> success, rawCodeHash {
+            rawCodeHash := getRawCodeHash(addr)
+            mstore(0, rawCodeHash)
+            
+            success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
         }
         
         function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
@@ -1349,13 +1352,13 @@ object "EvmEmulator" {
             let sp := sub(STACK_OFFSET(), 32)
             // instruction pointer - index to next instruction. Not called pc because it's an
             // actual yul/evm instruction.
-            let ip := BYTECODE_OFFSET()
+            let ip := 0
             let stackHead
             
-            let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
+            let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
             
             for { } true { } {
-                let opcode := readIP(ip, bytecodeEndOffset)
+                let opcode := $llvm_AlwaysInline_llvm$_readIP(ip)
             
                 switch opcode
                 case 0x00 { // OP_STOP
@@ -1740,8 +1743,6 @@ object "EvmEmulator" {
                 }
                 case 0x38 { // OP_CODESIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-            
-                    let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                     sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
                     ip := add(ip, 1)
                 }
@@ -1766,21 +1767,21 @@ object "EvmEmulator" {
                         sourceOffset := MAX_UINT64()
                     } 
             
-                    sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
-            
-                    if gt(sourceOffset, bytecodeEndOffset) {
-                        sourceOffset := bytecodeEndOffset
+                    if gt(sourceOffset, bytecodeLen) {
+                        sourceOffset := bytecodeLen
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), bytecodeEndOffset) {
-                        truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), bytecodeLen) {
+                        truncatedLen := sub(bytecodeLen, sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
                     if truncatedLen {
-                        $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+                        swapActivePointerWithBytecodePointer()
+                        copyActivePtrData(dstOffset, sourceOffset, truncatedLen)
+                        swapActivePointerWithBytecodePointer()
                     }
                     
                     ip := add(ip, 1)
@@ -2124,14 +2125,14 @@ object "EvmEmulator" {
                     counter, sp, stackHead := popStackItem(sp, stackHead)
             
                     // Counter certainly can't be bigger than uint64.
-                    if gt(counter, MAX_UINT64()) {
+                    if gt(counter, MAX_UINT32()) {
                         panic()
                     } 
             
-                    ip := add(BYTECODE_OFFSET(), counter)
+                    ip := counter
             
                     // Check next opcode is JUMPDEST
-                    let nextOpcode := readIP(ip, bytecodeEndOffset)
+                    let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                     if iszero(eq(nextOpcode, 0x5B)) {
                         panic()
                     }
@@ -2154,14 +2155,14 @@ object "EvmEmulator" {
                     }
             
                     // Counter certainly can't be bigger than uint64.
-                    if gt(counter, MAX_UINT64()) {
+                    if gt(counter, MAX_UINT32()) {
                         panic()
                     } 
             
-                    ip := add(BYTECODE_OFFSET(), counter)
+                    ip := counter
             
                     // Check next opcode is JUMPDEST
-                    let nextOpcode := readIP(ip, bytecodeEndOffset)
+                    let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                     if iszero(eq(nextOpcode, 0x5B)) {
                         panic()
                     }
@@ -2173,7 +2174,7 @@ object "EvmEmulator" {
                 case 0x58 { // OP_PC
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+                    sp, stackHead := pushStackItem(sp, ip, stackHead)
             
                     ip := add(ip, 1)
                 }
@@ -2982,19 +2983,14 @@ object "EvmEmulator" {
             }
 
             function getDeployedBytecode() {
-                let codeLen := fetchDeployedCode(
-                    getCodeAddress(), 
-                    BYTECODE_OFFSET(), // destination offset
-                    0, // source offset
-                    add(MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN(), 1) // so we can check that bytecode isn't too big
-                )
-
-                if gt(codeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
-                    panic()
-                }
+                let success, rawCodeHash := fetchBytecode(getCodeAddress())
+                let codeLen := and(shr(224, rawCodeHash), 0xffff)
+                
+                loadReturndataIntoActivePtr()
             
-                mstore(EMPTY_CODE_OFFSET(), 0)
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
+
+                swapActivePointerWithBytecodePointer()
             }
 
             ////////////////////////////////////////////////////////////////
@@ -3083,15 +3079,6 @@ object "EvmEmulator" {
                 offset := add(MAX_STACK_SLOT_OFFSET(), 32)
             }
             
-            function BYTECODE_OFFSET() -> offset {
-                offset := add(BYTECODE_LEN_OFFSET(), 32)
-            }
-            
-            // reserved empty slot to simplify PUSH N opcodes
-            function EMPTY_CODE_OFFSET() -> offset {
-                offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
-            }
-            
             function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
                 max := 24576 // EIP-170
             }
@@ -3101,7 +3088,7 @@ object "EvmEmulator" {
             }
             
             function MEM_LEN_OFFSET() -> offset {
-                offset := add(EMPTY_CODE_OFFSET(), 32)
+                offset := add(BYTECODE_LEN_OFFSET(), 32)
             }
             
             function MEM_OFFSET() -> offset {
@@ -3261,17 +3248,21 @@ object "EvmEmulator" {
             }
             
             // It is the responsibility of the caller to ensure that ip is correct
-            function readIP(ip, bytecodeEndOffset) -> opcode {
-                if lt(ip, bytecodeEndOffset) {
-                    opcode := and(mload(sub(ip, 31)), 0xff)
-                }
+            function $llvm_AlwaysInline_llvm$_readIP(ip) -> opcode {
+                swapActivePointerWithBytecodePointer()
+                opcode := shr(248, activePointerLoad(ip))
+                swapActivePointerWithBytecodePointer()
                 // STOP else
             }
             
             // It is the responsibility of the caller to ensure that start and length is correct
             function readBytes(start, length) -> value {
-                value := shr(mul(8, sub(32, length)), mload(start))
-                // will be padded by zeroes if out of bounds (we have reserved EMPTY_CODE_OFFSET() slot)
+                swapActivePointerWithBytecodePointer()
+                let rawValue := activePointerLoad(start)
+                swapActivePointerWithBytecodePointer()
+            
+                value := shr(mul(8, sub(32, length)), rawValue)
+                // will be padded by zeroes if out of bounds
             }
             
             function getCodeAddress() -> addr {
@@ -3284,6 +3275,10 @@ object "EvmEmulator" {
             
             function swapActivePointer(index0, index1) {
                 verbatim_2i_0o("active_ptr_swap", index0, index1)
+            }
+            
+            function swapActivePointerWithBytecodePointer() {
+                verbatim_2i_0o("active_ptr_swap", 0, 4)
             }
             
             function activePointerLoad(pos) -> res {
@@ -3374,10 +3369,7 @@ object "EvmEmulator" {
             
             // Basically performs an extcodecopy, while returning the length of the copied bytecode.
             function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-                let rawCodeHash := getRawCodeHash(addr)
-                mstore(0, rawCodeHash)
-                
-                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+                let success, rawCodeHash := fetchBytecode(addr)
                 // it fails if we don't have any code deployed at this address
                 if success {
                     // The length of the bytecode is encoded in versioned bytecode hash
@@ -3407,6 +3399,13 @@ object "EvmEmulator" {
                 
                     copiedLen := len
                 } 
+            }
+            
+            function fetchBytecode(addr) -> success, rawCodeHash {
+                rawCodeHash := getRawCodeHash(addr)
+                mstore(0, rawCodeHash)
+                
+                success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
             }
             
             function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
@@ -4276,13 +4275,13 @@ object "EvmEmulator" {
                 let sp := sub(STACK_OFFSET(), 32)
                 // instruction pointer - index to next instruction. Not called pc because it's an
                 // actual yul/evm instruction.
-                let ip := BYTECODE_OFFSET()
+                let ip := 0
                 let stackHead
                 
-                let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
+                let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                 
                 for { } true { } {
-                    let opcode := readIP(ip, bytecodeEndOffset)
+                    let opcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                 
                     switch opcode
                     case 0x00 { // OP_STOP
@@ -4667,8 +4666,6 @@ object "EvmEmulator" {
                     }
                     case 0x38 { // OP_CODESIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                
-                        let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                         sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
                         ip := add(ip, 1)
                     }
@@ -4693,21 +4690,21 @@ object "EvmEmulator" {
                             sourceOffset := MAX_UINT64()
                         } 
                 
-                        sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
-                
-                        if gt(sourceOffset, bytecodeEndOffset) {
-                            sourceOffset := bytecodeEndOffset
+                        if gt(sourceOffset, bytecodeLen) {
+                            sourceOffset := bytecodeLen
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), bytecodeEndOffset) {
-                            truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), bytecodeLen) {
+                            truncatedLen := sub(bytecodeLen, sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
                         if truncatedLen {
-                            $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+                            swapActivePointerWithBytecodePointer()
+                            copyActivePtrData(dstOffset, sourceOffset, truncatedLen)
+                            swapActivePointerWithBytecodePointer()
                         }
                         
                         ip := add(ip, 1)
@@ -5051,14 +5048,14 @@ object "EvmEmulator" {
                         counter, sp, stackHead := popStackItem(sp, stackHead)
                 
                         // Counter certainly can't be bigger than uint64.
-                        if gt(counter, MAX_UINT64()) {
+                        if gt(counter, MAX_UINT32()) {
                             panic()
                         } 
                 
-                        ip := add(BYTECODE_OFFSET(), counter)
+                        ip := counter
                 
                         // Check next opcode is JUMPDEST
-                        let nextOpcode := readIP(ip, bytecodeEndOffset)
+                        let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                         if iszero(eq(nextOpcode, 0x5B)) {
                             panic()
                         }
@@ -5081,14 +5078,14 @@ object "EvmEmulator" {
                         }
                 
                         // Counter certainly can't be bigger than uint64.
-                        if gt(counter, MAX_UINT64()) {
+                        if gt(counter, MAX_UINT32()) {
                             panic()
                         } 
                 
-                        ip := add(BYTECODE_OFFSET(), counter)
+                        ip := counter
                 
                         // Check next opcode is JUMPDEST
-                        let nextOpcode := readIP(ip, bytecodeEndOffset)
+                        let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                         if iszero(eq(nextOpcode, 0x5B)) {
                             panic()
                         }
@@ -5100,7 +5097,7 @@ object "EvmEmulator" {
                     case 0x58 { // OP_PC
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+                        sp, stackHead := pushStackItem(sp, ip, stackHead)
                 
                         ip := add(ip, 1)
                     }

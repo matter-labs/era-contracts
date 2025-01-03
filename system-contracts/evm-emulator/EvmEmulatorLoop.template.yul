@@ -2,13 +2,13 @@
 let sp := sub(STACK_OFFSET(), 32)
 // instruction pointer - index to next instruction. Not called pc because it's an
 // actual yul/evm instruction.
-let ip := BYTECODE_OFFSET()
+let ip := 0
 let stackHead
 
-let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
+let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
 
 for { } true { } {
-    let opcode := readIP(ip, bytecodeEndOffset)
+    let opcode := $llvm_AlwaysInline_llvm$_readIP(ip)
 
     switch opcode
     case 0x00 { // OP_STOP
@@ -393,8 +393,6 @@ for { } true { } {
     }
     case 0x38 { // OP_CODESIZE
         evmGasLeft := chargeGas(evmGasLeft, 2)
-
-        let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
         sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
         ip := add(ip, 1)
     }
@@ -419,21 +417,21 @@ for { } true { } {
             sourceOffset := MAX_UINT64()
         } 
 
-        sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
-
-        if gt(sourceOffset, bytecodeEndOffset) {
-            sourceOffset := bytecodeEndOffset
+        if gt(sourceOffset, bytecodeLen) {
+            sourceOffset := bytecodeLen
         }
 
         // Check bytecode out-of-bounds access
         let truncatedLen := len
-        if gt(add(sourceOffset, len), bytecodeEndOffset) {
-            truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
+        if gt(add(sourceOffset, len), bytecodeLen) {
+            truncatedLen := sub(bytecodeLen, sourceOffset) // truncate
             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
         }
 
         if truncatedLen {
-            $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+            swapActivePointerWithBytecodePointer()
+            copyActivePtrData(dstOffset, sourceOffset, truncatedLen)
+            swapActivePointerWithBytecodePointer()
         }
         
         ip := add(ip, 1)
@@ -777,14 +775,14 @@ for { } true { } {
         counter, sp, stackHead := popStackItem(sp, stackHead)
 
         // Counter certainly can't be bigger than uint64.
-        if gt(counter, MAX_UINT64()) {
+        if gt(counter, MAX_UINT32()) {
             panic()
         } 
 
-        ip := add(BYTECODE_OFFSET(), counter)
+        ip := counter
 
         // Check next opcode is JUMPDEST
-        let nextOpcode := readIP(ip, bytecodeEndOffset)
+        let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
         if iszero(eq(nextOpcode, 0x5B)) {
             panic()
         }
@@ -807,14 +805,14 @@ for { } true { } {
         }
 
         // Counter certainly can't be bigger than uint64.
-        if gt(counter, MAX_UINT64()) {
+        if gt(counter, MAX_UINT32()) {
             panic()
         } 
 
-        ip := add(BYTECODE_OFFSET(), counter)
+        ip := counter
 
         // Check next opcode is JUMPDEST
-        let nextOpcode := readIP(ip, bytecodeEndOffset)
+        let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
         if iszero(eq(nextOpcode, 0x5B)) {
             panic()
         }
@@ -826,7 +824,7 @@ for { } true { } {
     case 0x58 { // OP_PC
         evmGasLeft := chargeGas(evmGasLeft, 2)
 
-        sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+        sp, stackHead := pushStackItem(sp, ip, stackHead)
 
         ip := add(ip, 1)
     }
