@@ -2973,8 +2973,12 @@ object "EvmEmulator" {
                     getCodeAddress(), 
                     BYTECODE_OFFSET(), // destination offset
                     0, // source offset
-                    MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
+                    add(MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN(), 1) // so we can check that bytecode isn't too big
                 )
+
+                if gt(codeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
+                    panic()
+                }
             
                 mstore(EMPTY_CODE_OFFSET(), 0)
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
