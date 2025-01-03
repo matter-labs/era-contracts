@@ -317,7 +317,6 @@ object "EvmEmulator" {
             swapActivePointerWithBytecodePointer()
             opcode := shr(248, activePointerLoad(ip))
             swapActivePointerWithBytecodePointer()
-            // STOP else
         }
         
         // It is the responsibility of the caller to ensure that start and length is correct
@@ -343,7 +342,7 @@ object "EvmEmulator" {
         }
         
         function swapActivePointerWithBytecodePointer() {
-            verbatim_2i_0o("active_ptr_swap", 0, 4)
+            verbatim_2i_0o("active_ptr_swap", 0, 2)
         }
         
         function activePointerLoad(pos) -> res {
@@ -2124,7 +2123,7 @@ object "EvmEmulator" {
                     let counter
                     counter, sp, stackHead := popStackItem(sp, stackHead)
             
-                    // Counter certainly can't be bigger than uint64.
+                    // Counter certainly can't be bigger than uint32.
                     if gt(counter, MAX_UINT32()) {
                         panic()
                     } 
@@ -2154,7 +2153,7 @@ object "EvmEmulator" {
                         continue
                     }
             
-                    // Counter certainly can't be bigger than uint64.
+                    // Counter certainly can't be bigger than uint32.
                     if gt(counter, MAX_UINT32()) {
                         panic()
                     } 
@@ -3252,7 +3251,6 @@ object "EvmEmulator" {
                 swapActivePointerWithBytecodePointer()
                 opcode := shr(248, activePointerLoad(ip))
                 swapActivePointerWithBytecodePointer()
-                // STOP else
             }
             
             // It is the responsibility of the caller to ensure that start and length is correct
@@ -3278,7 +3276,7 @@ object "EvmEmulator" {
             }
             
             function swapActivePointerWithBytecodePointer() {
-                verbatim_2i_0o("active_ptr_swap", 0, 4)
+                verbatim_2i_0o("active_ptr_swap", 0, 2)
             }
             
             function activePointerLoad(pos) -> res {
@@ -5047,7 +5045,7 @@ object "EvmEmulator" {
                         let counter
                         counter, sp, stackHead := popStackItem(sp, stackHead)
                 
-                        // Counter certainly can't be bigger than uint64.
+                        // Counter certainly can't be bigger than uint32.
                         if gt(counter, MAX_UINT32()) {
                             panic()
                         } 
@@ -5077,7 +5075,7 @@ object "EvmEmulator" {
                             continue
                         }
                 
-                        // Counter certainly can't be bigger than uint64.
+                        // Counter certainly can't be bigger than uint32.
                         if gt(counter, MAX_UINT32()) {
                             panic()
                         } 
