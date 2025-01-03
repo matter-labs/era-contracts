@@ -10,7 +10,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMBytecodeHash, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -397,6 +397,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     ) internal {
         if (_bytecodeHash == bytes32(0x0)) {
             revert EmptyBytes32();
+        }
+        if (Utils.isCodeHashEVM(_bytecodeHash)) {
+            revert EVMBytecodeHash();
         }
         if (uint160(_newAddress) <= MAX_SYSTEM_CONTRACT_ADDRESS) {
             revert NotAllowedToDeployInKernelSpace();
