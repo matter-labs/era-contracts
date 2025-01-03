@@ -34,6 +34,8 @@ error EmptyVirtualBlocks();
 error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
 // 0x2bfbfc11
 error EncodedLengthNotFourTimesSmallerThanOriginal();
+// 0x39bae0e6
+error EVMBytecodeHash();
 // 0xb9e6e31f
 error EVMEmulationNotSupported();
 // 0xe95a1fbe
