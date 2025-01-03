@@ -86,12 +86,12 @@ object "EvmEmulator" {
             addr :=  0x0000000000000000000000000000000000008009
         }
         
-        function IS_CALLER_EVM_OFFSET() -> offset {
+        function PANIC_RETURNDATASIZE_OFFSET() -> offset {
             offset := mul(23, 32)
         }
         
         function ORIGIN_CACHE_OFFSET() -> offset {
-            offset := add(IS_CALLER_EVM_OFFSET(), 32)
+            offset := add(PANIC_RETURNDATASIZE_OFFSET(), 32)
         }
         
         function GASPRICE_CACHE_OFFSET() -> offset {
@@ -212,12 +212,10 @@ object "EvmEmulator" {
         }
         
         function panic() { // revert consuming all EVM gas
-            if mload(IS_CALLER_EVM_OFFSET()) {
-                mstore(0, 0)
-                revert(0, 32)
-            }
-        
-            revert(0, 0)
+            // we return empty 32 bytes encoding 0 gas left if caller is EVM, and 0 bytes if caller isn't EVM
+            // it is done without if-else block so this function will be inlined
+            mstore(0, 0)
+            revert(0, mload(PANIC_RETURNDATASIZE_OFFSET()))
         }
         
         function cached(cacheIndex, value) -> _value {
@@ -659,7 +657,7 @@ object "EvmEmulator" {
             let _returndatasize := returndatasize()
             if _returndatasize {
                 callerEVM := true
-                mstore(IS_CALLER_EVM_OFFSET(), true)
+                mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
         
                 returndatacopy(0, 0, 32)
                 passGas := mload(0)
@@ -3010,12 +3008,12 @@ object "EvmEmulator" {
                 addr :=  0x0000000000000000000000000000000000008009
             }
             
-            function IS_CALLER_EVM_OFFSET() -> offset {
+            function PANIC_RETURNDATASIZE_OFFSET() -> offset {
                 offset := mul(23, 32)
             }
             
             function ORIGIN_CACHE_OFFSET() -> offset {
-                offset := add(IS_CALLER_EVM_OFFSET(), 32)
+                offset := add(PANIC_RETURNDATASIZE_OFFSET(), 32)
             }
             
             function GASPRICE_CACHE_OFFSET() -> offset {
@@ -3136,12 +3134,10 @@ object "EvmEmulator" {
             }
             
             function panic() { // revert consuming all EVM gas
-                if mload(IS_CALLER_EVM_OFFSET()) {
-                    mstore(0, 0)
-                    revert(0, 32)
-                }
-            
-                revert(0, 0)
+                // we return empty 32 bytes encoding 0 gas left if caller is EVM, and 0 bytes if caller isn't EVM
+                // it is done without if-else block so this function will be inlined
+                mstore(0, 0)
+                revert(0, mload(PANIC_RETURNDATASIZE_OFFSET()))
             }
             
             function cached(cacheIndex, value) -> _value {
@@ -3583,7 +3579,7 @@ object "EvmEmulator" {
                 let _returndatasize := returndatasize()
                 if _returndatasize {
                     callerEVM := true
-                    mstore(IS_CALLER_EVM_OFFSET(), true)
+                    mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
             
                     returndatacopy(0, 0, 32)
                     passGas := mload(0)
