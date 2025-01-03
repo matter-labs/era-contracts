@@ -123,7 +123,7 @@ object "EvmEmulator" {
 
             <!-- @include EvmEmulatorFunctions.template.yul -->
 
-            function $llvm_NoInline_llvm$_simulate(
+            function simulate(
                 isCallerEVM,
                 evmGasLeft,
                 isStatic,
@@ -136,7 +136,7 @@ object "EvmEmulator" {
 
                 <!-- @include calldata-opcodes/RuntimeScope.template.yul -->
 
-                if eq(isCallerEVM, 1) {
+                if isCallerEVM {
                     // Includes gas
                     returnOffset := sub(returnOffset, 32)
                     checkOverflow(returnLen, 32)
@@ -161,7 +161,7 @@ object "EvmEmulator" {
             // segment of memory.
             getDeployedBytecode()
 
-            let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
+            let returnOffset, returnLen := simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
         }
     }

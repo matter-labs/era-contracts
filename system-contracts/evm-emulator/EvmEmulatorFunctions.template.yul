@@ -26,8 +26,12 @@ function MSG_VALUE_SYSTEM_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008009
 }
 
+function PANIC_RETURNDATASIZE_OFFSET() -> offset {
+    offset := mul(23, 32)
+}
+
 function ORIGIN_CACHE_OFFSET() -> offset {
-    offset := mul(24, 32)
+    offset := add(PANIC_RETURNDATASIZE_OFFSET(), 32)
 }
 
 function GASPRICE_CACHE_OFFSET() -> offset {
@@ -143,19 +147,15 @@ function abortEvmEnvironment() {
     revert(0, 0)
 }
 
-function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
-    mstore(0, 0)
-    revert(0, 32)
-}
-
-function revertWithGas(evmGasLeft) {
-    mstore(0, evmGasLeft)
-    revert(0, 32)
+function $llvm_NoInline_llvm$_invalid() { // revert consuming all EVM gas
+    panic()
 }
 
 function panic() { // revert consuming all EVM gas
+    // we return empty 32 bytes encoding 0 gas left if caller is EVM, and 0 bytes if caller isn't EVM
+    // it is done without if-else block so this function will be inlined
     mstore(0, 0)
-    revert(0, 32)
+    revert(0, mload(PANIC_RETURNDATASIZE_OFFSET()))
 }
 
 function cached(cacheIndex, value) -> _value {
@@ -588,16 +588,16 @@ function pushEvmFrame(passGas, isStatic) {
 }
 
 function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-    // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
+    // function consumeEvmFrame(_caller) external returns (uint256 passGas, uint256 auxDataRes)
     // non-standard selector 0x04
-    mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
-    mstore(1, caller())
+    mstore(0, or(0x0400000000000000000000000000000000000000000000000000000000000000, caller()))
 
-    performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
+    performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
 
     let _returndatasize := returndatasize()
     if _returndatasize {
         callerEVM := true
+        mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
 
         returndatacopy(0, 0, 32)
         passGas := mload(0)
