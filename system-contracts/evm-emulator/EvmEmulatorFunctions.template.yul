@@ -1112,10 +1112,10 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
         pushEvmFrame(gasForTheCall, false)
 
         // move needed memory slots to the scratch space
-        mstore(mul(10, 32), mload(sub(offset, 0x80))
-        mstore(mul(11, 32), mload(sub(offset, 0x60))
-        mstore(mul(12, 32), mload(sub(offset, 0x40))
-        mstore(mul(13, 32), mload(sub(offset, 0x20))
+        mstore(mul(10, 32), mload(sub(offset, 0x80)))
+        mstore(mul(11, 32), mload(sub(offset, 0x60)))
+        mstore(mul(12, 32), mload(sub(offset, 0x40)))
+        mstore(mul(13, 32), mload(sub(offset, 0x20)))
     
         // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
         mstore(sub(offset, 0x80), 0xe43cec64)
@@ -1126,10 +1126,10 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
         let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
 
         // move memory slots back
-        mstore(sub(offset, 0x80), mload(mul(10, 32))
-        mstore(sub(offset, 0x60), mload(mul(11, 32))
-        mstore(sub(offset, 0x40), mload(mul(12, 32))
-        mstore(sub(offset, 0x20), mload(mul(13, 32))
+        mstore(sub(offset, 0x80), mload(mul(10, 32)))
+        mstore(sub(offset, 0x60), mload(mul(11, 32)))
+        mstore(sub(offset, 0x40), mload(mul(12, 32)))
+        mstore(sub(offset, 0x20), mload(mul(13, 32)))
     
         let gasLeft
         switch result
