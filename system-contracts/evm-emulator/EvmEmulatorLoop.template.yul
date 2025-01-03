@@ -774,7 +774,7 @@ for { } true { } {
         let counter
         counter, sp, stackHead := popStackItem(sp, stackHead)
 
-        // Counter certainly can't be bigger than uint64.
+        // Counter certainly can't be bigger than uint32.
         if gt(counter, MAX_UINT32()) {
             panic()
         } 
@@ -804,7 +804,7 @@ for { } true { } {
             continue
         }
 
-        // Counter certainly can't be bigger than uint64.
+        // Counter certainly can't be bigger than uint32.
         if gt(counter, MAX_UINT32()) {
             panic()
         } 
