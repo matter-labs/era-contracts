@@ -84,15 +84,6 @@ function BYTECODE_LEN_OFFSET() -> offset {
     offset := add(MAX_STACK_SLOT_OFFSET(), 32)
 }
 
-function BYTECODE_OFFSET() -> offset {
-    offset := add(BYTECODE_LEN_OFFSET(), 32)
-}
-
-// reserved empty slot to simplify PUSH N opcodes
-function EMPTY_CODE_OFFSET() -> offset {
-    offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
-}
-
 function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
     max := 24576 // EIP-170
 }
@@ -102,7 +93,7 @@ function MAX_POSSIBLE_INIT_BYTECODE_LEN() -> max {
 }
 
 function MEM_LEN_OFFSET() -> offset {
-    offset := add(EMPTY_CODE_OFFSET(), 32)
+    offset := add(BYTECODE_LEN_OFFSET(), 32)
 }
 
 function MEM_OFFSET() -> offset {
@@ -262,17 +253,20 @@ function insufficientBalance(value) -> res {
 }
 
 // It is the responsibility of the caller to ensure that ip is correct
-function readIP(ip, bytecodeEndOffset) -> opcode {
-    if lt(ip, bytecodeEndOffset) {
-        opcode := and(mload(sub(ip, 31)), 0xff)
-    }
-    // STOP else
+function $llvm_AlwaysInline_llvm$_readIP(ip) -> opcode {
+    swapActivePointerWithBytecodePointer()
+    opcode := shr(248, activePointerLoad(ip))
+    swapActivePointerWithBytecodePointer()
 }
 
 // It is the responsibility of the caller to ensure that start and length is correct
 function readBytes(start, length) -> value {
-    value := shr(mul(8, sub(32, length)), mload(start))
-    // will be padded by zeroes if out of bounds (we have reserved EMPTY_CODE_OFFSET() slot)
+    swapActivePointerWithBytecodePointer()
+    let rawValue := activePointerLoad(start)
+    swapActivePointerWithBytecodePointer()
+
+    value := shr(mul(8, sub(32, length)), rawValue)
+    // will be padded by zeroes if out of bounds
 }
 
 function getCodeAddress() -> addr {
@@ -285,6 +279,10 @@ function loadReturndataIntoActivePtr() {
 
 function swapActivePointer(index0, index1) {
     verbatim_2i_0o("active_ptr_swap", index0, index1)
+}
+
+function swapActivePointerWithBytecodePointer() {
+    verbatim_2i_0o("active_ptr_swap", 0, 2)
 }
 
 function activePointerLoad(pos) -> res {
@@ -375,10 +373,7 @@ function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
 
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
 function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-    let rawCodeHash := getRawCodeHash(addr)
-    mstore(0, rawCodeHash)
-    
-    let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+    let success, rawCodeHash := fetchBytecode(addr)
     // it fails if we don't have any code deployed at this address
     if success {
         // The length of the bytecode is encoded in versioned bytecode hash
@@ -408,6 +403,13 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
     
         copiedLen := len
     } 
+}
+
+function fetchBytecode(addr) -> success, rawCodeHash {
+    rawCodeHash := getRawCodeHash(addr)
+    mstore(0, rawCodeHash)
+    
+    success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
 }
 
 function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
