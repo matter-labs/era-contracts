@@ -7,18 +7,6 @@ import { join } from "path";
 import { json } from "stream/consumers";
 import { hashBytecode } from "zksync-ethers/build/utils";
 
-type ContractDetails = {
-  contractName: string;
-  bytecodePath: string;
-  sourceCodePath: string;
-};
-
-type Hashes = {
-  bytecodeHash: string;
-  sourceCodeHash: string;
-};
-
-type SystemContractHashes = ContractDetails & Hashes;
 
 
 type SourceContractDetails = {
@@ -50,8 +38,6 @@ const findDirsEndingWith = (path: string, endingWith: string): fs.Dirent[] => {
     const dirsEndingWithSol = dirs.filter((dirent) => dirent.name.endsWith(endingWith));
     return dirsEndingWithSol;
   } catch (err) {
-    //const msg = err instanceof Error ? err.message : "Unknown error";
-    //throw new Error(`Failed to read directory: ${absolutePath} Error: ${msg}`);
     return [];
   }
 };
@@ -71,15 +57,6 @@ const findFilesEndingWith = (path: string, endingWith: string): string[] => {
 const SOLIDITY_ARTIFACTS_ZK_DIR = "artifacts-zk";
 const SOLIDITY_ARTIFACTS_DIR = "artifacts";
 
-const getSolidityContractDetails = (baseDir: string, subDir: string, contractName: string): ContractDetails => {
-  const bytecodePath = join(baseDir, SOLIDITY_ARTIFACTS_DIR, subDir, contractName + ".sol", contractName + ".json");
-  const sourceCodePath = join(baseDir, subDir, contractName + ".sol");
-  return {
-    contractName,
-    bytecodePath,
-    sourceCodePath,
-  };
-};
 
 const getSolidityContractsDetailsWithArtifactsDir = (dir: string, zkBytecode: boolean): SourceAndCompilationDetails[] => {
   const [workDir, subDir] = dir.split('/');
@@ -99,10 +76,8 @@ const getSolidityContractsDetailsWithArtifactsDir = (dir: string, zkBytecode: bo
   }).flat();
 
   return compiledFiles.map((jsonFile) => {
-    console.log("parsing ", jsonFile);
     const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
     const bytecode = ethers.utils.hexlify(jsonFileContents.deployedBytecode);
-    console.log("bytecode length", bytecode.length);
     const bytecodeHash = (bytecode == "0x") ?
       "0x"
       : zkBytecode ?
@@ -120,6 +95,7 @@ const getSolidityContractsDetailsWithArtifactsDir = (dir: string, zkBytecode: bo
       bytecodePath,
       bytecodeHash,
     });
+    // Filter out the interfaces (that don't have any bytecode).
   }).filter((c) => c.bytecodeHash != "0x");
 
 };
@@ -177,19 +153,24 @@ const getSolidityContractsDetails = (dir: string): ContractsInfo[] => {
 
 const YUL_ARTIFACTS_DIR = "artifacts";
 
-const getYulContractDetails = (dir: string, contractName: string): ContractDetails => {
+const getYulContractDetails = (dir: string, contractName: string): ContractsInfo => {
   const bytecodePath = join(dir, YUL_ARTIFACTS_DIR, contractName + ".yul.zbin");
   const sourceCodePath = join(dir, contractName + ".yul");
   return {
     contractName,
-    bytecodePath,
     sourceCodePath,
+    sourceCodeHash: ethers.utils.sha256(ethers.utils.hexlify(fs.readFileSync(sourceCodePath))),
+    zk: {
+      bytecodePath,
+      bytecodeHash: ethers.utils.hexlify(hashBytecode(fs.readFileSync(bytecodePath))),
+    },
+    evm: undefined
   };
 };
 
-const getYulContractsDetails = (dir: string): ContractDetails[] => {
-  const dirsEndingWithYul = findFilesEndingWith(dir, ".yul");
-  const contractNames = dirsEndingWithYul.map((d) => d.replace(".yul", ""));
+const getYulContractsDetails = (dir: string): ContractsInfo[] => {
+  const filesEndingWithYul = findFilesEndingWith(dir, ".yul");
+  const contractNames = filesEndingWithYul.map((d) => d.replace(".yul", ""));
   const yulContractsDetails = contractNames.map((c) => getYulContractDetails(dir, c));
   return yulContractsDetails;
 };
@@ -197,47 +178,6 @@ const getYulContractsDetails = (dir: string): ContractDetails[] => {
 const makePathAbsolute = (path: string): string => {
   return join(__dirname, "..", path);
 };
-
-const readSourceCode = (details: ContractDetails): string => {
-  const absolutePath = makePathAbsolute(details.sourceCodePath);
-  try {
-    return ethers.utils.hexlify(fs.readFileSync(absolutePath));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    throw new Error(`Failed to read source code for ${details.contractName}: ${absolutePath} Error: ${msg}`);
-  }
-};
-
-const readBytecode = (details: ContractDetails): string => {
-  const absolutePath = makePathAbsolute(details.bytecodePath);
-  try {
-    if (details.bytecodePath.endsWith(".json")) {
-      const jsonFile = fs.readFileSync(absolutePath, "utf8");
-      return ethers.utils.hexlify(JSON.parse(jsonFile).bytecode);
-    } else {
-      return ethers.utils.hexlify(fs.readFileSync(absolutePath));
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    throw new Error(`Failed to read bytecode for ${details.contractName}: ${details.bytecodePath} Error: ${msg}`);
-  }
-};
-
-const getHashes = (contractName: string, sourceCode: string, bytecode: string): Hashes => {
-  try {
-    return {
-      bytecodeHash: ethers.utils.hexlify(hashBytecode(bytecode)),
-      // The extra checks performed by the hashBytecode function are not needed for the source code, therefore
-      // sha256 is used for simplicity
-      sourceCodeHash: ethers.utils.sha256(sourceCode),
-    };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    throw new Error(`Failed to calculate hashes for ${contractName} Error: ${msg}`);
-  }
-};
-
-
 
 const readSystemContractsHashesFile = (path: string): ContractsInfo[] => {
   const absolutePath = makePathAbsolute(path);
@@ -292,7 +232,7 @@ const findDifferences = (newHashes: ContractsInfo[], oldHashes: ContractsInfo[])
 
 const SOLIDITY_SOURCE_CODE_PATHS = [
   "system-contracts/contracts-preprocessed",
-  //"l2-contracts/contracts",
+  "l2-contracts/contracts",
   "l1-contracts/contracts"
 ];
 const YUL_SOURCE_CODE_PATHS = ["system-contracts/contracts-preprocessed", "system-contracts/contracts-preprocessed/precompiles", "system-contracts/bootloader/build"];
@@ -309,9 +249,8 @@ const main = async () => {
   const checkOnly = args.includes("--check-only");
 
   const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
-  //const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
-  //const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
-  const systemContractsDetails = [...solidityContractsDetails];
+  const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
+  const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
 
   const newSystemContractsHashes = systemContractsDetails;
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
