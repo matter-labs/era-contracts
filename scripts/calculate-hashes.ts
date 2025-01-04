@@ -23,8 +23,8 @@ type CompilationDetails = {
 type SourceAndCompilationDetails = SourceContractDetails & CompilationDetails;
 
 type AllCompilations = {
-  evm: CompilationDetails | undefined;
-  zk: CompilationDetails | undefined;
+  evm: CompilationDetails | null;
+  zk: CompilationDetails | null;
 }
 
 
@@ -132,7 +132,7 @@ const getSolidityContractsDetails = (dir: string): ContractsInfo[] => {
         sourceCodePath: contract.sourceCodePath,
         sourceCodeHash: contract.sourceCodeHash,
         evm: contract.bytecodePath.includes(SOLIDITY_ARTIFACTS_ZK_DIR)
-          ? undefined
+          ? null
           : {
             bytecodePath: contract.bytecodePath,
             bytecodeHash: contract.bytecodeHash,
@@ -142,7 +142,7 @@ const getSolidityContractsDetails = (dir: string): ContractsInfo[] => {
             bytecodePath: contract.bytecodePath,
             bytecodeHash: contract.bytecodeHash,
           }
-          : undefined,
+          : null,
       };
       mergedContracts.push(newContract);
     }
@@ -164,7 +164,7 @@ const getYulContractDetails = (dir: string, contractName: string): ContractsInfo
       bytecodePath,
       bytecodeHash: ethers.utils.hexlify(hashBytecode(fs.readFileSync(bytecodePath))),
     },
-    evm: undefined
+    evm: null
   };
 };
 
