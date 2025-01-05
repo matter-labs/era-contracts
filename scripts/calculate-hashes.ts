@@ -54,15 +54,38 @@ const findFilesEndingWith = (path: string, endingWith: string): string[] => {
   }
 };
 
-const SOLIDITY_ARTIFACTS_ZK_DIR = "artifacts-zk";
-const SOLIDITY_ARTIFACTS_DIR = "artifacts";
+const SOLIDITY_ARTIFACTS_ZK_DIR = "zkout";
+const SOLIDITY_ARTIFACTS_DIR = "out";
 
 
-const getSolidityContractsDetailsWithArtifactsDir = (dir: string, zkBytecode: boolean): SourceAndCompilationDetails[] => {
-  const [workDir, subDir] = dir.split('/');
+const getBytecodeHashFromZkJson = (jsonFileContents: any) => {
+  try {
+    return ethers.utils.hexlify(hashBytecode("0x" + jsonFileContents.bytecode.object));
+
+  } catch (err) {
+    return "0x";
+  }
+};
+
+const getBytecodeHashFromJson = (jsonFileContents: any) => {
+  try {
+    if (jsonFileContents.deployedBytecode.object == "0x") {
+      return "0x";
+
+    }
+    return ethers.utils.hexlify(ethers.utils.sha256(ethers.utils.arrayify(ethers.utils.hexlify(jsonFileContents.deployedBytecode.object))));
+
+  } catch (err) {
+    return "0x";
+  }
+};
+
+
+const getSolidityContractsDetailsWithArtifactsDir = (workDir: string, zkBytecode: boolean): SourceAndCompilationDetails[] => {
   const artifactsDir = zkBytecode ? SOLIDITY_ARTIFACTS_ZK_DIR : SOLIDITY_ARTIFACTS_DIR;
-  const bytecodesDir = join(workDir, artifactsDir, subDir);
-  const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol");
+  const bytecodesDir = join(workDir, artifactsDir);
+  const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol").filter((dirent) => !dirent.name.endsWith("t.sol") && !dirent.name.endsWith("s.sol"));
+
 
   const compiledFiles = dirsEndingWithSol.map((d) => {
     const contractFiles = fs.readdirSync(join(d.path, d.name), { withFileTypes: true })
@@ -77,21 +100,29 @@ const getSolidityContractsDetailsWithArtifactsDir = (dir: string, zkBytecode: bo
 
   return compiledFiles.map((jsonFile) => {
     const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
-    const bytecode = ethers.utils.hexlify(jsonFileContents.deployedBytecode);
-    const bytecodeHash = (bytecode == "0x") ?
-      "0x"
-      : zkBytecode ?
-        ethers.utils.hexlify(hashBytecode(bytecode)) : ethers.utils.hexlify(ethers.utils.sha256(ethers.utils.arrayify(bytecode)))
-      ;
+    const bytecodeHash = zkBytecode ?
+      getBytecodeHashFromZkJson(jsonFileContents) : getBytecodeHashFromJson(jsonFileContents);
 
     const bytecodePath = jsonFile.startsWith(join(__dirname, '..'))
       ? jsonFile.replace(join(__dirname, '..'), "")
       : jsonFile;
 
+
+    const contractName = (jsonFile.split('/').pop() || "").replace(".json", "");
+
+    if (contractName == "AccessControlRestriction.json") {
+      console.log("access control hash", zkBytecode, bytecodeHash);
+      //const bb = jsonFileContents.bytecode.object;
+      //console.log(bb.length);
+      //const aa = ethers.utils.hexlify(hashBytecode("0x" + jsonFileContents.bytecode.object));
+      //console.log(aa);
+
+    }
+
     return ({
-      contractName: jsonFileContents.contractName,
-      sourceCodePath: jsonFileContents.sourceName,
-      sourceCodeHash: ethers.utils.sha256(ethers.utils.hexlify(fs.readFileSync(join(workDir, jsonFileContents.sourceName)))),
+      contractName,
+      sourceCodePath: "??", //jsonFileContents.sourceName,
+      sourceCodeHash: "??", //ethers.utils.sha256(ethers.utils.hexlify(fs.readFileSync(join(workDir, jsonFileContents.sourceName)))),
       bytecodePath,
       bytecodeHash,
     });
@@ -231,9 +262,9 @@ const findDifferences = (newHashes: ContractsInfo[], oldHashes: ContractsInfo[])
 };
 
 const SOLIDITY_SOURCE_CODE_PATHS = [
-  "system-contracts/contracts-preprocessed",
-  "l2-contracts/contracts",
-  "l1-contracts/contracts"
+  "system-contracts/",
+  "l2-contracts/",
+  "l1-contracts/"
 ];
 const YUL_SOURCE_CODE_PATHS = ["system-contracts/contracts-preprocessed", "system-contracts/contracts-preprocessed/precompiles", "system-contracts/bootloader/build"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
