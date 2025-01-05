@@ -84,7 +84,8 @@ const getBytecodeHashFromJson = (jsonFileContents: any) => {
 const getSolidityContractsDetailsWithArtifactsDir = (workDir: string, zkBytecode: boolean): SourceAndCompilationDetails[] => {
   const artifactsDir = zkBytecode ? SOLIDITY_ARTIFACTS_ZK_DIR : SOLIDITY_ARTIFACTS_DIR;
   const bytecodesDir = join(workDir, artifactsDir);
-  const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol").filter((dirent) => !dirent.name.endsWith("t.sol") && !dirent.name.endsWith("s.sol"));
+  const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol").filter((dirent) => !dirent.name.endsWith(".t.sol") && !dirent.name.endsWith(".s.sol") && !dirent.name.endsWith("Test.sol"));
+
 
 
   const compiledFiles = dirsEndingWithSol.map((d) => {
@@ -110,14 +111,6 @@ const getSolidityContractsDetailsWithArtifactsDir = (workDir: string, zkBytecode
 
     const contractName = (jsonFile.split('/').pop() || "").replace(".json", "");
 
-    if (contractName == "AccessControlRestriction.json") {
-      console.log("access control hash", zkBytecode, bytecodeHash);
-      //const bb = jsonFileContents.bytecode.object;
-      //console.log(bb.length);
-      //const aa = ethers.utils.hexlify(hashBytecode("0x" + jsonFileContents.bytecode.object));
-      //console.log(aa);
-
-    }
 
     return ({
       contractName,
