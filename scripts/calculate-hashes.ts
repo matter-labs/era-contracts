@@ -73,7 +73,7 @@ const getBytecodeHashFromJson = (jsonFileContents: any) => {
       return "0x";
 
     }
-    return ethers.utils.hexlify(ethers.utils.sha256(ethers.utils.arrayify(ethers.utils.hexlify(jsonFileContents.deployedBytecode.object))));
+    return ethers.utils.hexlify(ethers.utils.keccak256(ethers.utils.arrayify(ethers.utils.hexlify(jsonFileContents.deployedBytecode.object))));
 
   } catch (err) {
     return "0x";
@@ -110,7 +110,6 @@ const getSolidityContractsDetailsWithArtifactsDir = (workDir: string, zkBytecode
 
 
     const contractName = (jsonFile.split('/').pop() || "").replace(".json", "");
-
 
     return ({
       contractName,
