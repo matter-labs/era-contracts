@@ -235,6 +235,15 @@ contract DeployL1Script is Script, DeployUtils {
             );
     }
 
+     function getEigenDAL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readEigenDAL2ValidatorBytecode()),
+                hex""
+            );
+    }
+
     function deployVerifiers() internal {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
@@ -263,6 +272,14 @@ contract DeployL1Script is Script, DeployUtils {
         } else {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
+
+        if (config.contracts.eigenDAL1Validator == address(0)) {
+            addresses.daAddresses.eigenDAL1Validator = deployViaCreate2(Utils.readEigenDAL1ValidatorBytecode(), "");
+            console.log("EigenDAL1Validator deployed at:", addresses.daAddresses.eigenDAL1Validator);
+        } else {
+            addresses.daAddresses.eigenDAL1Validator = config.contracts.eigenDAL1Validator;
+        }
+
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2ValidatorAddress(), true);
@@ -564,6 +581,11 @@ contract DeployL1Script is Script, DeployUtils {
             "avail_l1_da_validator_addr",
             addresses.daAddresses.availL1DAValidator
         );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "eigenda_l1_validator_addr",
+            addresses.daAddresses.eigenDAL1Validator
+        );
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
@@ -582,6 +604,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
         vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
         vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
+        vm.serializeAddress("root", "expected_eigenda_l2_validator_addr", getEigenDAL2ValidatorAddress());
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
