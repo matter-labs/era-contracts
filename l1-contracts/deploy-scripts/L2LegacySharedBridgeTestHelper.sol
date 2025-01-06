@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {Utils} from "./Utils.sol";
 import {L2SharedBridgeLegacyDev} from "contracts/dev-contracts/L2SharedBridgeLegacyDev.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";

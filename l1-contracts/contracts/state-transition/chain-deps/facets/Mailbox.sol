@@ -151,7 +151,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             if (_batchNumber > s.totalBatchesExecuted) {
                 revert BatchNotExecuted(_batchNumber);
             }
-            }
 
             bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
             if (correctBatchRoot == bytes32(0)) {

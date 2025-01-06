@@ -20,6 +20,7 @@ struct ProofVerificationResult {
     bytes32 batchSettlementRoot;
     bytes32 chainIdLeaf;
     uint256 ptr;
+    bool finalProofNode;
 }
 
 library MessageHashing {
@@ -143,7 +144,8 @@ library MessageHashing {
             batchLeafProofLen: batchLeafProofLen,
             batchSettlementRoot: result.batchSettlementRoot,
             chainIdLeaf: result.chainIdLeaf,
-            ptr: result.ptr
+            ptr: result.ptr,
+            finalProofNode: true // kl todo?
         });
     }
 
