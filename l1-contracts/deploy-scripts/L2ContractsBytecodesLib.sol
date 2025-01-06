@@ -15,10 +15,7 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the InteropCenter contract.
     /// @return The bytecode of the InteropCenter contract.
     function readInteropCenterBytecode() internal view returns (bytes memory) {
-        return
-            Utils.readHardhatBytecode(
-                "/../l1-contracts/artifacts-zk/contracts/bridgehub/InteropCenter.sol/InteropCenter.json"
-            );
+        return Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter");
     }
 
     /// @notice Reads the bytecode of the L2NativeTokenVault contract.
