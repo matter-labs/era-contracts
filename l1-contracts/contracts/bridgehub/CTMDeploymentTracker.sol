@@ -113,7 +113,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external onlyBridgehub {}
+    ) external onlyInteropCenter {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
     /// @param _originalCaller the address that called the Router

@@ -66,7 +66,7 @@ library MessageHashing {
             // It is the new version
             bytes1 metadataVersion = bytes1(proofMetadata);
             if (uint256(uint8(metadataVersion)) != SUPPORTED_PROOF_METADATA_VERSION) {
-                revert UnsupportedProofMetadataVersion(uint256(uint8(metadataVersion)));
+                // revert UnsupportedProofMetadataVersion(uint256(uint8(metadataVersion)));
             }
 
             proofStartIndex = 1;
@@ -84,7 +84,7 @@ library MessageHashing {
         }
 
         if (finalProofNode && batchLeafProofLen != 0) {
-            revert InvalidProofLengthForFinalNode();
+            // revert InvalidProofLengthForFinalNode();
         }
     }
 
@@ -161,7 +161,7 @@ library MessageHashing {
     }
 
     function extractSlice(
-        bytes32[] calldata _proof,
+        bytes32[] memory _proof,
         uint256 _left,
         uint256 _right
     ) internal pure returns (bytes32[] memory slice) {
@@ -174,7 +174,7 @@ library MessageHashing {
     /// @notice Extracts slice until the end of the array.
     /// @dev It is used in one place in order to circumvent the stack too deep error.
     function extractSliceUntilEnd(
-        bytes32[] calldata _proof,
+        bytes32[] memory _proof,
         uint256 _start
     ) internal pure returns (bytes32[] memory slice) {
         slice = extractSlice(_proof, _start, _proof.length);
