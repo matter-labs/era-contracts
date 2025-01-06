@@ -39,7 +39,11 @@ library MessageHashing {
 
     function parseProofMetadata(
         bytes32[] memory _proof
-    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen, bool finalProofNode) {
+    )
+        internal
+        pure
+        returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen, bool finalProofNode)
+    {
         bytes32 proofMetadata = _proof[0];
 
         // We support two formats of the proofs:
@@ -95,8 +99,12 @@ library MessageHashing {
             revert MerklePathEmpty();
         }
 
-        (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen, bool finalProofNode) = MessageHashing
-            .parseProofMetadata(_proof);
+        (
+            uint256 proofStartIndex,
+            uint256 logLeafProofLen,
+            uint256 batchLeafProofLen,
+            bool finalProofNode
+        ) = MessageHashing.parseProofMetadata(_proof);
         result.ptr = proofStartIndex;
 
         {

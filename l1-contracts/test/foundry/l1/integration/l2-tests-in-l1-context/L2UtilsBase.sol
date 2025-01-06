@@ -90,7 +90,7 @@ library L2UtilsBase {
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
-        
+
         // Initializing reentrancy guard
         // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
         vm.store(

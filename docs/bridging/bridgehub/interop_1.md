@@ -49,6 +49,7 @@ While this looks very similar to ‘regular’ call, there are some caveats, esp
 - Who executes it on the destination chain?
   - This call will be ‘auto executed’ on the destination chain. You as a user don’t have to do anything.
 - What if it fails out of gas? Or what if I set too low gasPrice?
+
   - In either of these scenarios, you can ‘retry’ it, by using `retryInteropTransaction` (not implemented yet).
 
     ```solidity
@@ -60,7 +61,9 @@ While this looks very similar to ‘regular’ call, there are some caveats, esp
     ```
 
   - IMPORTANT: depending on your use case, it might be very important to retry rather than to create a new `sendInteropWithSingleCall` - for example if your call includes some larger asset transfer, creating the new `sendInteropWithSingleCall` would attempt to freeze/burn these assets again.
+
 - If some of my assets were burned when I did the transaction, but it failed on destination chain, how do I get them back?
+
   - If your transaction failed on destination chain, you can either try to retry it with more gas, higher gas limits (see above) or cancel it (not implemented yet):
 
     ```solidity

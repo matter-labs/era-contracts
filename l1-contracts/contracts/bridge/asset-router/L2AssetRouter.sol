@@ -90,7 +90,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), IInteropCenter(L2_INTEROP_CENTER_ADDR)) reentrancyGuardInitializer {
+    )
+        AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), IInteropCenter(L2_INTEROP_CENTER_ADDR))
+        reentrancyGuardInitializer
+    {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
@@ -137,7 +140,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _originChainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override(AssetRouterBase, IAssetRouterBase) onlyAssetRouterCounterpartOrSelf(_originChainId) nonReentrant {
+    )
+        public
+        payable
+        override(AssetRouterBase, IAssetRouterBase)
+        onlyAssetRouterCounterpartOrSelf(_originChainId)
+        nonReentrant
+    {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }

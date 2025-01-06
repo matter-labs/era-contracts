@@ -17,8 +17,6 @@ contract L2MessageRootStorage {
 
     mapping(uint256 chainId => mapping(uint256 blockNumber => bytes32 msgRoot)) public msgRoots;
 
-
-
     function markAsExecuted(bytes32 _txHash) external {
         if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
             revert Unauthorized(msg.sender);

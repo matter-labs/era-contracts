@@ -48,11 +48,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        IBridgehub _bridgehub,
-        IInteropCenter _interopCenter,
-        IAssetRouterBase _l1AssetRouter
-    ) {
+    constructor(IBridgehub _bridgehub, IInteropCenter _interopCenter, IAssetRouterBase _l1AssetRouter) {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         INTEROP_CENTER = _interopCenter;
