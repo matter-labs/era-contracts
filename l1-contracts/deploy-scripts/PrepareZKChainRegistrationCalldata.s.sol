@@ -12,9 +12,7 @@ import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol"
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
-import {AllowedBytecodeTypes} from "contracts/state-transition/l2-deps/AllowedBytecodeTypes.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Utils} from "./Utils.sol";
 
@@ -276,12 +274,6 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     function prepareRegisterHyperchainCall() internal view returns (Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
-        AllowedBytecodeTypes allowedBytecodeTypesMode = config.allowEvmEmulator
-            ? AllowedBytecodeTypes.EraVmAndEVM
-            : AllowedBytecodeTypes.EraVm;
-
-        bytes memory diamondCutEncoded = abi.encode(config.diamondCutData);
-
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
             (
@@ -290,7 +282,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
                 config.baseToken,
                 config.bridgehubCreateNewChainSalt,
                 config.chainAdmin,
-                abi.encode(diamondCutEncoded, allowedBytecodeTypesMode)
+                config.diamondCutData
             )
         );
 

@@ -734,8 +734,7 @@ export class Deployer {
     compareDiamondCutHash: boolean = false,
     nonce?,
     predefinedChainId?: string,
-    useGovernance: boolean = false,
-    isEvmEmulatorSupported: boolean = false
+    useGovernance: boolean = false
   ) {
     const gasLimit = 10_000_000;
 
@@ -749,12 +748,6 @@ export class Deployer {
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
     const diamondCutDataEncoded = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    const allowedBytecodeTypesMode = isEvmEmulatorSupported ? 1 : 0;
-    const initData = new ethers.utils.AbiCoder().encode(
-      ["bytes", "uint256"],
-      [diamondCutDataEncoded, allowedBytecodeTypesMode]
-    );
-
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
       bridgehub,
@@ -765,7 +758,7 @@ export class Deployer {
         baseTokenAddress,
         Date.now(),
         admin,
-        initData,
+        diamondCutDataEncoded,
       ],
       0,
       {
@@ -868,6 +861,17 @@ export class Deployer {
       console.log(
         `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
       );
+    }
+  }
+
+  public async enableEvmEmulation() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.allowEvmEmulation()).wait();
+    if (this.verbose) {
+      console.log(`EVM emulation allowed, gas used: ${receipt.gasUsed.toString()}`);
     }
   }
 

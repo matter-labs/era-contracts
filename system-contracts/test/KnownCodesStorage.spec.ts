@@ -96,7 +96,7 @@ describe("KnownCodesStorage tests", function () {
     });
 
     it("non-deployer failed to call", async () => {
-      await expect(knownCodesStorage.publishEVMBytecode("0x00")).to.be.revertedWithCustomError(
+      await expect(knownCodesStorage.publishEVMBytecode(1, "0x00")).to.be.revertedWithCustomError(
         knownCodesStorage,
         "Unauthorized"
       );
@@ -104,15 +104,14 @@ describe("KnownCodesStorage tests", function () {
 
     it("bytecode with even length failed to publish", async () => {
       await expect(
-        knownCodesStorage.connect(deployerAccount).publishEVMBytecode(InvalidBytecode)
+        knownCodesStorage.connect(deployerAccount).publishEVMBytecode(64, InvalidBytecode)
       ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
 
     it("invalid length bytecode failed to call", async () => {
-      await expect(knownCodesStorage.connect(deployerAccount).publishEVMBytecode("0x00")).to.be.revertedWithCustomError(
-        knownCodesStorage,
-        "MalformedBytecode"
-      );
+      await expect(
+        knownCodesStorage.connect(deployerAccount).publishEVMBytecode(1, "0x00")
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
   });
 

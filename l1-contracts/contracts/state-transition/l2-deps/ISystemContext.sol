@@ -3,8 +3,5 @@
 pragma solidity ^0.8.21;
 
 interface ISystemContext {
-    /// @notice Set the chain configuration.
-    /// @param _newChainId The chainId
-    /// @param _newAllowedBytecodeTypes The new allowed bytecode types mode.
-    function setChainConfiguration(uint256 _newChainId, uint256 _newAllowedBytecodeTypes) external;
+    function setChainId(uint256 _newChainId) external;
 }
