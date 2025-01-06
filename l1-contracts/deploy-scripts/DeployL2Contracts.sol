@@ -90,21 +90,6 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-    function runDeployLegacySharedBridge() public {
-        deploySharedBridge(true);
-    }
-
-    function runDeploySharedBridge() public {
-        deploySharedBridge(false);
-    }
-
-    // TODO(EVM-745): port legacy contract tests to new contracts
-    function deploySharedBridge(bool legacyBridge) internal {
-        initializeConfig();
-
-        saveOutput();
-    }
-
     function runDefaultUpgrader() public {
         initializeConfig();
 

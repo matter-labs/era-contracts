@@ -388,6 +388,8 @@ error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 error InvalidProofLengthForFinalNode();
 // 0x7acd7817
 error TokenIsNotLegacy();
+// 0xfade089a
+error LegacyEncodingUsedForNonL1Token();
 // 0xa51fa558
 error TokenIsLegacy();
 // 0x29963361
@@ -413,6 +415,8 @@ error InvalidNTVBurnData();
 error InvalidSystemLogsLength();
 // 0x8efef97a
 error LegacyBridgeNotSet();
+// 0x767eed08
+error LegacyMethodForNonL1Token();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

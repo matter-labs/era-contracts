@@ -23,7 +23,6 @@ contract SetupLegacyBridge is Script {
 
     struct Config {
         uint256 chainId;
-        address l2SharedBridgeAddress;
         bytes32 create2FactorySalt;
     }
 
@@ -68,7 +67,6 @@ contract SetupLegacyBridge is Script {
         addresses.tokenWethAddress = toml.readAddress("$.token_weth_address");
         addresses.create2FactoryAddr = toml.readAddress("$.create2factory_addr");
         config.chainId = toml.readUint("$.chain_id");
-        config.l2SharedBridgeAddress = toml.readAddress("$.l2shared_bridge_address");
         config.create2FactorySalt = toml.readBytes32("$.create2factory_salt");
     }
 
@@ -129,16 +127,22 @@ contract SetupLegacyBridge is Script {
     }
 
     function setParamsForDummyBridge() internal {
-        (address l2TokenBeacon, bytes32 l2TokenBeaconHash) = L2LegacySharedBridgeTestHelper
+        (address l2TokenBeacon, bytes32 l2TokenBeaconProxyHash) = L2LegacySharedBridgeTestHelper
             .calculateTestL2TokenBeaconAddress(
                 addresses.erc20BridgeProxy,
                 addresses.l1Nullifier,
                 Ownable2StepUpgradeable(addresses.l1Nullifier).owner()
             );
 
+        address l2LegacySharedBridgeAddress = L2LegacySharedBridgeTestHelper.calculateL2LegacySharedBridgeProxyAddr(
+            addresses.erc20BridgeProxy,
+            addresses.l1Nullifier,
+            Ownable2StepUpgradeable(addresses.l1Nullifier).owner()
+        );
+
         DummyL1ERC20Bridge bridge = DummyL1ERC20Bridge(addresses.erc20BridgeProxy);
         vm.broadcast();
-        bridge.setValues(config.l2SharedBridgeAddress, l2TokenBeacon, l2TokenBeaconHash);
+        bridge.setValues(l2LegacySharedBridgeAddress, l2TokenBeacon, l2TokenBeaconProxyHash);
     }
 
     function calculateL2Create2Address(

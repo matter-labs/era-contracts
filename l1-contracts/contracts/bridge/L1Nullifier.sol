@@ -29,7 +29,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../bridgehub/IInteropCenter.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {LegacyBridgeNotSet, Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadySet, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {LegacyMethodForNonL1Token, LegacyBridgeNotSet, Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadySet, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {WrongL2Sender, NativeTokenVaultAlreadySet, EthTransferFailed, WrongMsgLength} from "./L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
@@ -580,11 +580,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // slither-disable-next-line unused-return
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
-            address baseToken = BRIDGE_HUB.baseToken(_chainId);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
                 _remoteReceiver: l1Receiver,
-                _originToken: baseToken,
+                // Note, that `assetId` could belong to a token native to an L2, and so
+                // the logic for determining the correct origin token address will be complex.
+                // It is expected that this value won't be used in the NativeTokenVault and so providing
+                // any value is acceptable here.
+                _originToken: address(0),
                 _amount: amount,
                 _erc20Metadata: new bytes(0)
             });
@@ -652,9 +655,13 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) external {
         bytes32 assetId = l1NativeTokenVault.assetId(_l1Token);
+        bytes32 ntvAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
         if (assetId == bytes32(0)) {
-            assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
+            assetId = ntvAssetId;
+        } else if (assetId != ntvAssetId) {
+            revert LegacyMethodForNonL1Token();
         }
+
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // The token address does not have to be provided for this functionality either.
         bytes memory assetData = DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0));

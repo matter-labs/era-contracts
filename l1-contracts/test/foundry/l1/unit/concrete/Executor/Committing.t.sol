@@ -12,7 +12,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {BLS_MODULUS} from "../../../da-contracts-imports/DAUtils.sol";
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
-import {PubdataCommitmentsEmpty, BlobHashCommitmentError, OperatorDAInputLengthTooSmall, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, NonEmptyBlobVersionHash} from "../../../da-contracts-imports/DAContractsErrors.sol";
+import {PubdataCommitmentsEmpty, BlobHashCommitmentError, OperatorDAInputTooSmall, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, NonEmptyBlobVersionHash} from "../../../da-contracts-imports/DAContractsErrors.sol";
 import {TimeNotReached, BatchNumberMismatch, L2TimestampTooBig, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs} from "contracts/common/L1ContractErrors.sol";
 
 contract CommittingTest is ExecutorTest {
@@ -661,7 +661,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(
-            abi.encodeWithSelector(OperatorDAInputLengthTooSmall.selector, operatorDAInput.length, BLOB_DATA_OFFSET)
+            abi.encodeWithSelector(OperatorDAInputTooSmall.selector, operatorDAInput.length, BLOB_DATA_OFFSET)
         );
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,

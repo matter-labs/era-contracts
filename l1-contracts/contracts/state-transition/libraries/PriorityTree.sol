@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {PriorityTreeCommitment} from "../../common/Config.sol";
-import {RootMismatch, InvalidCommitment, InvalidStartIndex, InvalidUnprocessedIndex, InvalidNextLeafIndex} from "../L1StateTransitionErrors.sol";
+import {NotHistoricalRoot, InvalidCommitment, InvalidStartIndex, InvalidUnprocessedIndex, InvalidNextLeafIndex} from "../L1StateTransitionErrors.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;
@@ -82,7 +82,7 @@ library PriorityTree {
                 _priorityOpsData.itemHashes
             );
             if (!_tree.historicalRoots[expectedRoot]) {
-                revert RootMismatch();
+                revert NotHistoricalRoot();
             }
             _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
         }
