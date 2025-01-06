@@ -42,6 +42,7 @@ contract RegisterHyperchainScript is Script {
         address newDiamondProxy;
         address governance;
         address chainAdmin;
+        bool allowEvmEmulator;
     }
 
     Config internal config;
@@ -98,6 +99,7 @@ contract RegisterHyperchainScript is Script {
         );
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function checkTokenAddress() internal view {
@@ -148,7 +150,6 @@ contract RegisterHyperchainScript is Script {
     function deployChainAdmin() internal {
         vm.broadcast();
         ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress, address(0));
-        console.log("ChainAdmin deployed at:", address(chainAdmin));
         config.chainAdmin = address(chainAdmin);
     }
 

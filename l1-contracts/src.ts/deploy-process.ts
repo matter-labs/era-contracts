@@ -16,6 +16,7 @@ import { ADDRESS_ONE } from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+export const L2_EVM_EMULATOR_BYTECODE_HASH = "0x1010000000000000000000000000000000000000000000000000000000000000";
 
 export async function initialBridgehubDeployment(
   deployer: Deployer,
@@ -58,9 +59,8 @@ export async function initialBridgehubDeployment(
   nonce++;
 
   await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
-  nonce++;
 
-  await deployer.deployChainAdmin(create2Salt, { gasPrice, nonce });
+  await deployer.deployChainAdmin(create2Salt, { gasPrice });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });

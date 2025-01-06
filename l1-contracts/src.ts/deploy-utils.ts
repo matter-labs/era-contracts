@@ -72,7 +72,9 @@ export async function deployBytecodeViaCreate2(
 
   const gasUsed = receipt.gasUsed;
   log(
-    `${contractName} deployed, gasUsed: ${gasUsed.toString()}, tx hash: ${tx.hash}, expected address: ${expectedAddress}`
+    `${contractName} deployed, gasUsed: ${gasUsed.toString()}, tx hash: ${
+      tx.hash
+    }, expected address: ${expectedAddress}`
   );
 
   const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);

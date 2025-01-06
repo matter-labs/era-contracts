@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
+// 0xbe4bf9e4
+error CallerMustBeEvmContract();
 // 0xb7549616
 error CallerMustBeForceDeployer();
 // 0x9eedbd2b
@@ -32,6 +34,10 @@ error EmptyVirtualBlocks();
 error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
 // 0x2bfbfc11
 error EncodedLengthNotFourTimesSmallerThanOriginal();
+// 0x39bae0e6
+error EVMBytecodeHash();
+// 0xb9e6e31f
+error EVMEmulationNotSupported();
 // 0xe95a1fbe
 error FailedToChargeGas();
 // 0x1f70c58f
@@ -138,5 +144,7 @@ enum BytecodeError {
     NumberOfWords,
     Length,
     WordsMustBeOdd,
-    DictionaryLength
+    DictionaryLength,
+    EvmBytecodeLength,
+    EvmBytecodeLengthTooBig
 }

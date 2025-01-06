@@ -53,6 +53,11 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getChainId() external view returns (uint256) {
+        return s.chainId;
+    }
+
+    /// @inheritdoc IGetters
     function getStateTransitionManager() external view returns (address) {
         return s.stateTransitionManager;
     }
@@ -135,6 +140,11 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32) {
         return s.l2DefaultAccountBytecodeHash;
+    }
+
+    /// @inheritdoc IGetters
+    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
+        return s.l2EvmEmulatorBytecodeHash;
     }
 
     /// @inheritdoc IGetters

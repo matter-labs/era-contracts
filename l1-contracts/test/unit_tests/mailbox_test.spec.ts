@@ -105,7 +105,7 @@ describe("Mailbox tests", function () {
       )
     );
 
-    expect(revertReason).contains("MalformedBytecode");
+    expect(revertReason).contains("LengthIsNotDivisibleBy32");
   });
 
   it("Should not accept bytecode of even length in words", async () => {

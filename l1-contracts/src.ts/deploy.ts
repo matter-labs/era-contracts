@@ -10,6 +10,7 @@ import {
   packSemver,
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
+  readEvmEmulatorbytecode,
   unpackStringSemVer,
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
@@ -43,6 +44,7 @@ import type { Contract, Overrides } from "@ethersproject/contracts";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
+let L2_EVM_EMULATOR_BYTECODE_HASH: string;
 
 export interface DeployerConfig {
   deployWallet: Wallet;
@@ -51,6 +53,7 @@ export interface DeployerConfig {
   verbose?: boolean;
   bootloaderBytecodeHash?: string;
   defaultAccountBytecodeHash?: string;
+  evmEmulatorBytecodeHash?: string;
 }
 
 export interface Operation {
@@ -78,6 +81,9 @@ export class Deployer {
     L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash
       ? config.defaultAccountBytecodeHash
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
+    L2_EVM_EMULATOR_BYTECODE_HASH = config.evmEmulatorBytecodeHash
+      ? config.evmEmulatorBytecodeHash
+      : hexlify(hashL2Bytecode(readEvmEmulatorbytecode()));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
   }
@@ -105,6 +111,7 @@ export class Deployer {
       verifierParams,
       L2_BOOTLOADER_BYTECODE_HASH,
       L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+      L2_EVM_EMULATOR_BYTECODE_HASH,
       this.addresses.StateTransition.Verifier,
       this.addresses.BlobVersionedHashRetriever,
       +priorityTxMaxGasLimit,
@@ -212,6 +219,8 @@ export class Deployer {
 
   public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
+
+    // We deploy the ChainAdmin contract itself
     const contractAddress = await this.deployViaCreate2(
       "ChainAdmin",
       [this.ownerAddress, ethers.constants.AddressZero],
@@ -737,7 +746,7 @@ export class Deployer {
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
-    const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
+    const diamondCutDataEncoded = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
@@ -749,7 +758,7 @@ export class Deployer {
         baseTokenAddress,
         Date.now(),
         admin,
-        initialDiamondCut,
+        diamondCutDataEncoded,
       ],
       0,
       {
@@ -852,6 +861,17 @@ export class Deployer {
       console.log(
         `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
       );
+    }
+  }
+
+  public async enableEvmEmulation() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.allowEvmEmulation()).wait();
+    if (this.verbose) {
+      console.log(`EVM emulation allowed, gas used: ${receipt.gasUsed.toString()}`);
     }
   }
 

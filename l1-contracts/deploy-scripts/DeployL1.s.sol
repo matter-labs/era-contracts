@@ -120,6 +120,7 @@ contract DeployL1Script is Script {
         bytes diamondCutData;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
+        bytes32 evmEmulatorHash;
     }
 
     struct TokensConfig {
@@ -214,6 +215,7 @@ contract DeployL1Script is Script {
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
         config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        config.contracts.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
@@ -435,6 +437,7 @@ contract DeployL1Script is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+            l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever

@@ -5,6 +5,10 @@ import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract setUpgradeDiamondCutTest is StateTransitionManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_SettingUpgradeDiamondCut() public {
         assertEq(chainContractAddress.protocolVersion(), 0, "Initial protocol version is not correct");
 
