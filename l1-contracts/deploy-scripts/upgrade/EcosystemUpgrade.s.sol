@@ -227,6 +227,12 @@ contract EcosystemUpgrade is Script {
         address stateTransitionManagerAddress;
         address transparentProxyAdmin;
         address eraDiamondProxy;
+
+        uint256 newProtocolVersion;
+        uint256 oldProtocolVersion;
+
+        address oldValidatorTimelock;
+        address l1LegacySharedBridge;
     }
 
     struct TokensConfig {
@@ -255,6 +261,8 @@ contract EcosystemUpgrade is Script {
         outputPath = string.concat(root, outputPath);
 
         initializeConfig(configPath);
+        
+        initializeOldData();
 
         instantiateCreate2Factory();
 
@@ -304,6 +312,19 @@ contract EcosystemUpgrade is Script {
             vm.envString("GATEWAY_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("GATEWAY_UPGRADE_ECOSYSTEM_OUTPUT")
         );
+    }
+
+    function initializeOldData() internal {
+        config.contracts.newProtocolVersion = getNewProtocolVersion();
+        config.contracts.oldProtocolVersion = getOldProtocolVersion();
+
+        uint256 ctmProtocolVersion = ChainTypeManager(config.contracts.stateTransitionManagerAddress).protocolVersion();
+        require(ctmProtocolVersion != getNewProtocolVersion(), "Can not initialize old data");
+
+        config.contracts.oldValidatorTimelock = ChainTypeManager(config.contracts.stateTransitionManagerAddress).validatorTimelock();
+
+        // In the future this value will be populated with the new shared bridge, but since the version on the CTM is the old one, the old bridge is stored here as well.
+        config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
     }
 
     function provideAcceptOwnershipCalls() public returns (Call[] memory calls) {
@@ -415,6 +436,11 @@ contract EcosystemUpgrade is Script {
             ),
             value: 0
         });
+        Call memory setTimelockCall = Call({
+            target: config.contracts.stateTransitionManagerAddress,
+            data: abi.encodeCall(ChainTypeManager.setValidatorTimelock, (addresses.validatorTimelock)),
+            value: 0
+        });
 
         // The call that will start the timer till the end of the upgrade.
         Call memory timerCall = Call({
@@ -423,9 +449,10 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
 
-        calls = new Call[](2);
+        calls = new Call[](3);
         calls[0] = ctmCall;
-        calls[1] = timerCall;
+        calls[1] = setTimelockCall;
+        calls[2] = timerCall;
     }
 
     function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData) {
@@ -627,14 +654,9 @@ contract EcosystemUpgrade is Script {
             data: abi.encodeCall(ChainTypeManager.setChainCreationParams, (prepareNewChainCreationParams())),
             value: 0
         });
-        calls[5] = Call({
-            target: config.contracts.stateTransitionManagerAddress,
-            data: abi.encodeCall(ChainTypeManager.setValidatorTimelock, (addresses.validatorTimelock)),
-            value: 0
-        });
 
         // Now, we need to update the bridgehub
-        calls[6] = Call({
+        calls[5] = Call({
             target: config.contracts.bridgehubProxyAddress,
             data: abi.encodeCall(
                 Bridgehub.setAddresses,
@@ -648,7 +670,7 @@ contract EcosystemUpgrade is Script {
         });
 
         // Setting the necessary params for the L1Nullifier contract
-        calls[7] = Call({
+        calls[6] = Call({
             target: config.contracts.oldSharedBridgeProxyAddress,
             data: abi.encodeCall(
                 L1Nullifier.setL1NativeTokenVault,
@@ -656,18 +678,18 @@ contract EcosystemUpgrade is Script {
             ),
             value: 0
         });
-        calls[8] = Call({
+        calls[7] = Call({
             target: config.contracts.oldSharedBridgeProxyAddress,
             data: abi.encodeCall(L1Nullifier.setL1AssetRouter, (addresses.bridges.sharedBridgeProxy)),
             value: 0
         });
-        calls[9] = Call({
+        calls[8] = Call({
             target: config.contracts.stateTransitionManagerAddress,
             // Making the old protocol version no longer invalid
             data: abi.encodeCall(ChainTypeManager.setProtocolVersionDeadline, (getOldProtocolVersion(), 0)),
             value: 0
         });
-        calls[10] = Call({
+        calls[9] = Call({
             target: addresses.upgradeTimer,
             // Double checking that the deadline has passed.
             data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
@@ -1516,10 +1538,34 @@ contract EcosystemUpgrade is Script {
         );
         vm.serializeBytes("contracts_config", "diamond_cut_data", generatedData.diamondCutData);
 
-        string memory contractsConfig = vm.serializeBytes(
+        vm.serializeBytes(
             "contracts_config",
             "force_deployments_data",
             generatedData.forceDeploymentsData
+        );
+
+        vm.serializeUint(
+            "contracts_config",
+            "new_protocol_version",
+            config.contracts.newProtocolVersion
+        );
+
+        vm.serializeUint(
+            "contracts_config",
+            "old_protocol_version",
+            config.contracts.oldProtocolVersion
+        );
+
+        vm.serializeAddress(
+            "contracts_config",
+            "old_validator_timelock",
+            config.contracts.oldValidatorTimelock
+        );
+
+        string memory contractsConfig = vm.serializeAddress(
+            "contracts_config",
+            "l1_legacy_shared_bridge",
+            config.contracts.l1_legacy_shared_bridge
         );
 
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
@@ -1617,24 +1663,4 @@ contract EcosystemUpgrade is Script {
 
     // add this to be excluded from coverage report
     function test() internal {}
-
-    function addL2WethToStore(
-        address storeAddress,
-        ChainAdmin chainAdmin,
-        uint256 chainId,
-        address l2WBaseToken
-    ) public {
-        L2WrappedBaseTokenStore l2WrappedBaseTokenStore = L2WrappedBaseTokenStore(storeAddress);
-
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: storeAddress,
-            value: 0,
-            data: abi.encodeCall(l2WrappedBaseTokenStore.initializeChain, (chainId, l2WBaseToken))
-        });
-
-        vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();
-    }
 }

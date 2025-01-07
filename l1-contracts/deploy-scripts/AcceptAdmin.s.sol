@@ -16,6 +16,7 @@ import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -225,5 +226,25 @@ contract AcceptAdmin is Script {
         }
 
         Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
+    }
+
+    function addL2WethToStore(
+        address storeAddress,
+        ChainAdmin chainAdmin,
+        uint256 chainId,
+        address l2WBaseToken
+    ) public {
+        L2WrappedBaseTokenStore l2WrappedBaseTokenStore = L2WrappedBaseTokenStore(storeAddress);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: storeAddress,
+            value: 0,
+            data: abi.encodeCall(l2WrappedBaseTokenStore.initializeChain, (chainId, l2WBaseToken))
+        });
+
+        vm.startBroadcast();
+        chainAdmin.multicall(calls, true);
+        vm.stopBroadcast();
     }
 }
