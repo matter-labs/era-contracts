@@ -77,7 +77,8 @@
     "upgrade-system": "ts-node upgrade-system/index.ts",
     "token-migration": "ts-node scripts/token-migration.ts",
     "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
-    "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts"
+    "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
+    "deploy-l2-wrapped-base-token": "forge script deploy-scripts/DeployL2WrappedBaseToken.s.sol"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
