@@ -10,7 +10,7 @@ pragma solidity 0.8.24;
 /// @dev Allows to deterministically create a contract with a fixed owner.
 contract Create2AndTransfer {
     /// @notice The address of the contract deployed during inside the constructor.
-    address immutable public deployedAddress; 
+    address public immutable deployedAddress;
 
     constructor(bytes memory bytecode, bytes32 salt, address owner) {
         address addr;
