@@ -82,7 +82,9 @@ contract DeployL2WrappedBaseToken is Script {
             config.wrappedBaseTokenSymbol = string.concat("w", ERC20(config.baseToken).symbol());
         }
         config.l1SharedBridgeProxy = address(Bridgehub(config.bridgehubProxy).sharedBridge());
-        config.l2SharedBridgeProxy = address(L1SharedBridge(config.l1SharedBridgeProxy).l2BridgeAddress(config.chainId));
+        config.l2SharedBridgeProxy = address(
+            L1SharedBridge(config.l1SharedBridgeProxy).l2BridgeAddress(config.chainId)
+        );
 
         // Who should be the owner of the L2WrappedBaseTokenProxy?
         // Probably should be the same as L2SharedBridgeProxy owner - but it's pretty random from chain to chain
@@ -102,9 +104,7 @@ contract DeployL2WrappedBaseToken is Script {
         bytecodes.transparentUpgradeableProxy = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
-        bytecodes.proxyAdmin = Utils.readFoundryBytecode(
-            "/../l2-contracts/zkout/ProxyAdmin.sol/ProxyAdmin.json"
-        );
+        bytecodes.proxyAdmin = Utils.readFoundryBytecode("/../l2-contracts/zkout/ProxyAdmin.sol/ProxyAdmin.json");
     }
 
     function deployL2WrappedBaseTokenImplementation() internal {
@@ -165,10 +165,7 @@ contract DeployL2WrappedBaseToken is Script {
         });
 
         // Transfer ownership of ProxyAdmin to l2ProxyAdminOwner
-        bytes memory transferCalldata = abi.encodeWithSignature(
-            "transferOwnership(address)",
-            config.l2ProxyAdminOwner
-        );
+        bytes memory transferCalldata = abi.encodeWithSignature("transferOwnership(address)", config.l2ProxyAdminOwner);
         Utils.runL1L2Transaction({
             l2Calldata: transferCalldata,
             l2GasLimit: MAX_PRIORITY_TX_GAS,
