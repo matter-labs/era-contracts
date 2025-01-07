@@ -228,7 +228,6 @@ contract EcosystemUpgrade is Script {
         address eraDiamondProxy;
         uint256 newProtocolVersion;
         uint256 oldProtocolVersion;
-        address oldValidatorTimelock;
         address l1LegacySharedBridge;
     }
 
@@ -1628,7 +1627,7 @@ contract EcosystemUpgrade is Script {
         string memory contractsConfig = vm.serializeAddress(
             "contracts_config",
             "l1_legacy_shared_bridge",
-            config.contracts.l1_legacy_shared_bridge
+            config.contracts.l1LegacySharedBridge
         );
 
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
