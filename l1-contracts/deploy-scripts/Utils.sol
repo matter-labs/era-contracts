@@ -35,6 +35,12 @@ bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
     "ExecuteEmergencyUpgradeZKFoundation(bytes32 id)"
 );
 
+/// @dev The offset from which the built-in, but user space contracts are located.
+uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
+
+// address constant
+address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
+
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -187,6 +193,71 @@ library Utils {
             revert("Failed to deploy contract via create2");
         }
 
+        return contractAddress;
+    }
+
+    function getL2AddressViaCreate2Factory(
+        bytes32 create2Salt,
+        bytes32 bytecodeHash,
+        bytes memory constructorArgs
+    ) internal view returns (address) {
+        return
+            L2ContractHelper.computeCreate2Address(
+                L2_CREATE2_FACTORY_ADDRESS,
+                create2Salt,
+                bytecodeHash,
+                keccak256(constructorArgs)
+            );
+    }
+
+    function getDeploymentCalldata(
+        bytes32 create2Salt,
+        bytes memory bytecode,
+        bytes memory constructorArgs
+    ) internal view returns (bytes32 bytecodeHash, bytes memory data) {
+        bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
+
+        data = abi.encodeWithSignature("create2(bytes32,bytes32,bytes)", create2Salt, bytecodeHash, constructorArgs);
+    }
+
+    function appendArray(bytes[] memory array, bytes memory element) internal pure returns (bytes[] memory) {
+        uint256 arrayLength = array.length;
+        bytes[] memory newArray = new bytes[](arrayLength + 1);
+        for (uint256 i = 0; i < arrayLength; ++i) {
+            newArray[i] = array[i];
+        }
+        newArray[arrayLength] = element;
+        return newArray;
+    }
+
+    /**
+     * @dev Deploy l2 contracts through l1, while using built-in L2 Create2Factory contract.
+     */
+    function deployThroughL1Deterministic(
+        bytes memory bytecode,
+        bytes memory constructorargs,
+        bytes32 create2salt,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (address) {
+        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
+
+        address contractAddress = getL2AddressViaCreate2Factory(create2salt, bytecodeHash, constructorargs);
+
+        bytes[] memory _factoryDeps = appendArray(factoryDeps, bytecode);
+
+        runL1L2Transaction({
+            l2Calldata: deployData,
+            l2GasLimit: l2GasLimit,
+            factoryDeps: factoryDeps,
+            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy
+        });
         return contractAddress;
     }
 

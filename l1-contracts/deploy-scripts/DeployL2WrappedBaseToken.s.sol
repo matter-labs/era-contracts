@@ -68,7 +68,8 @@ contract DeployL2WrappedBaseToken is Script {
 
         config.chainId = toml.readUint("$.chain_id");
         config.bridgehubProxy = toml.readAddress("$.bridgehub_proxy");
-
+        console.log("Chain ID:", config.chainId);
+        console.log("Bridgehub proxy:", config.bridgehubProxy);
         // Derived:
         config.baseToken = address(Bridgehub(config.bridgehubProxy).baseToken(config.chainId));
         if (config.baseToken == address(0)) {
@@ -84,9 +85,6 @@ contract DeployL2WrappedBaseToken is Script {
         config.l1SharedBridgeProxy = address(Bridgehub(config.bridgehubProxy).sharedBridge());
         config.l2SharedBridgeProxy = address(L1SharedBridge(config.l1SharedBridgeProxy).l2BridgeAddress(config.chainId));
 
-        // Who should be the owner of the L2WrappedBaseTokenProxy?
-        // Probably should be the same as L2SharedBridgeProxy owner - but it's pretty random from chain to chain
-        // Is it supposed to be ProxyAdmin on L2 owned by aliased L1SharedBridgeProxy owner (a.k.a ProtocolUpgradeHandler)?
         address owner = address(L1SharedBridge(config.l1SharedBridgeProxy).owner());
         if (Utils.isEOA(owner)) {
             config.l2ProxyAdminOwner = owner;
@@ -108,7 +106,7 @@ contract DeployL2WrappedBaseToken is Script {
     }
 
     function deployL2WrappedBaseTokenImplementation() internal {
-        output.l2WrappedBaseTokenImplementation = Utils.deployThroughL1({
+        output.l2WrappedBaseTokenImplementation = Utils.deployThroughL1Deterministic({
             bytecode: bytecodes.l2WrappedBaseToken,
             constructorargs: "",
             create2salt: "",
@@ -137,7 +135,7 @@ contract DeployL2WrappedBaseToken is Script {
             proxyInitializationData // data
         );
 
-        output.l2WrappedBaseTokenProxy = Utils.deployThroughL1({
+        output.l2WrappedBaseTokenProxy = Utils.deployThroughL1Deterministic({
             bytecode: bytecodes.transparentUpgradeableProxy,
             constructorargs: l2WrappedBaseTokenProxyConstructorData,
             create2salt: "",
