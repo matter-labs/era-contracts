@@ -91,7 +91,6 @@ jobs:
       - name: Lint errors
         run: yarn l1 errors-lint --check
 
-
   check-hashes:
     needs: [build]
     runs-on: ubuntu-latest
