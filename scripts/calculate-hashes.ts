@@ -28,9 +28,7 @@ type ContractsInfo = SourceContractDetails & EvmCompilations & ZKCompilation;
 const findDirsEndingWith = (path: string, endingWith: string): fs.Dirent[] => {
   const absolutePath = makePathAbsolute(path);
   try {
-    const dirs = fs
-      .readdirSync(absolutePath, { withFileTypes: true })
-      .filter((dirent) => dirent.isDirectory());
+    const dirs = fs.readdirSync(absolutePath, { withFileTypes: true }).filter((dirent) => dirent.isDirectory());
     console.log("Dirs for ", absolutePath, " are ", dirs);
     const dirsEndingWithSol = dirs.filter((dirent) => dirent.name.endsWith(endingWith));
     return dirsEndingWithSol;
