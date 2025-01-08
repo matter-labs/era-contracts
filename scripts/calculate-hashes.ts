@@ -227,7 +227,6 @@ const getYulContractDetails = (dir: string, contractName: string): ContractsInfo
 
 const getYulContractsDetails = (dir: string): ContractsInfo[] => {
     const bytecodesDir = join(dir, SOLIDITY_ARTIFACTS_ZK_DIR);
-    console.log(bytecodesDir);
     const dirsEndingWithYul = findDirsEndingWith(bytecodesDir, ".yul").filter((dirent) => !dirent.name.endsWith(".t.sol"));
 
     const compiledFiles = dirsEndingWithYul.map((d) => {
@@ -264,10 +263,6 @@ const getYulContractsDetails = (dir: string): ContractsInfo[] => {
         // Filter out the interfaces (that don't have any bytecode).
     }).filter((c) => c.zkBytecodeHash != "0x");
 
-    /*const filesEndingWithYul = findFilesEndingWith(dir, ".yul");
-    const contractNames = filesEndingWithYul.map((d) => d.replace(".yul", ""));
-    const yulContractsDetails = contractNames.map((c) => getYulContractDetails(dir, c));
-    return yulContractsDetails;*/
 };
 
 const makePathAbsolute = (path: string): string => {
