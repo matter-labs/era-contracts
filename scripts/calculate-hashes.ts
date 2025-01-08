@@ -31,6 +31,7 @@ const findDirsEndingWith = (path: string, endingWith: string): fs.Dirent[] => {
     const dirs = fs
       .readdirSync(absolutePath, { withFileTypes: true, recursive: true })
       .filter((dirent) => dirent.isDirectory());
+    console.log("Dirs for ", path, " are ", dirs);
     const dirsEndingWithSol = dirs.filter((dirent) => dirent.name.endsWith(endingWith));
     return dirsEndingWithSol;
   } catch (err) {
