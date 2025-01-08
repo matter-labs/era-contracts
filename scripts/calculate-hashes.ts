@@ -111,7 +111,7 @@ const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceA
       console.log("contractName", contractName, "zkBytecodeHash", zkBytecodeHash);
 
       return {
-        contractName,
+        contractName: join(workDir, contractName),
         zkBytecodePath,
         zkBytecodeHash,
       };
@@ -152,7 +152,7 @@ const getEVMSolidityContractsDetailsWithArtifactsDir = (workDir: string): Source
       const contractName = (jsonFile.split("/").pop() || "").replace(".json", "");
 
       return {
-        contractName,
+        contractName: join(workDir, contractName),
         evmBytecodePath,
         evmBytecodeHash: hashes[0],
         evmDeployedBytecodeHash: hashes[1],
