@@ -29,7 +29,6 @@ const findDirsEndingWith = (path: string, endingWith: string): fs.Dirent[] => {
   const absolutePath = makePathAbsolute(path);
   try {
     const dirs = fs.readdirSync(absolutePath, { withFileTypes: true }).filter((dirent) => dirent.isDirectory());
-    console.log("Dirs for ", absolutePath, " are ", dirs);
     const dirsEndingWithSol = dirs.filter((dirent) => dirent.name.endsWith(endingWith));
     return dirsEndingWithSol;
   } catch (err) {
@@ -74,11 +73,9 @@ const getBytecodeHashFromEvmJson = (jsonFileContents: EvmJsonFileContents) => {
 const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceAndZKCompilationDetails[] => {
   const artifactsDir = SOLIDITY_ARTIFACTS_ZK_DIR;
   const bytecodesDir = join(workDir, artifactsDir);
-  console.log("bytecodesDir", bytecodesDir);
   const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol").filter(
     (dirent) => !dirent.name.endsWith(".t.sol") && !dirent.name.endsWith(".s.sol") && !dirent.name.endsWith("Test.sol")
   );
-  console.log("dirsEndingWithSol", dirsEndingWithSol);
 
   const compiledFiles = dirsEndingWithSol
     .map((d) => {
@@ -93,8 +90,6 @@ const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceA
     })
     .flat();
 
-  console.log("compiledFiles", compiledFiles);
-
   return compiledFiles
     .map((jsonFile) => {
       const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
@@ -105,8 +100,6 @@ const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceA
         : jsonFile;
 
       const contractName = (jsonFile.split("/").pop() || "").replace(".json", "");
-
-      console.log("contractName", contractName, "zkBytecodeHash", zkBytecodeHash);
 
       return {
         contractName: join(workDir, contractName),
@@ -330,7 +323,7 @@ const main = async () => {
   console.log(differences);
   if (checkOnly) {
     console.log(
-      "You can use the `yarn sc calculate-hashes:fix` command to update the SystemContractsHashes.json file."
+      "You can use the `yarn calculate-hashes:fix` command to update the AllContractHashes.json file."
     );
     console.log("Exiting...");
     process.exit(1);
