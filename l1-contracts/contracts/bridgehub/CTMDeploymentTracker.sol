@@ -104,7 +104,11 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
 
     /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
     /// @dev Not used in this contract. In case the transaction fails, we can just re-try it.
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
+    function bridgehubConfirmL2Transaction(
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _txHash
+    ) external onlyBridgehub {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
     /// @param _originalCaller the address that called the Router

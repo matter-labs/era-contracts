@@ -1009,12 +1009,15 @@ library Utils {
         bytes memory _data,
         uint256 _value
     ) internal {
-        address defaultAdmin = AccessControlRestriction(_accessControlRestriction).defaultAdmin();
+        // If `_accessControlRestriction` is not provided, we expect that this ChainAdmin is Ownable
+        address adminOwner = _accessControlRestriction == address(0)
+            ? Ownable(_admin).owner()
+            : AccessControlRestriction(_accessControlRestriction).defaultAdmin();
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
 
-        vm.startBroadcast(defaultAdmin);
+        vm.startBroadcast(adminOwner);
         IChainAdmin(_admin).multicall{value: _value}(calls, true);
         vm.stopBroadcast();
     }

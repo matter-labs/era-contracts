@@ -105,6 +105,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     // This is a method to simplify porting the tests for now.
     // Here we rely that the first restriction is the AccessControlRestriction
+    // TODO(EVM-924): this function is not used.
     function _extractAccessControlRestriction(address admin) internal returns (address) {
         return ChainAdmin(payable(admin)).getRestrictions()[0];
     }
@@ -126,35 +127,20 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            address(1),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         require(bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            address(1),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
         gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
     }
 
     function test_startMessageToL3() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            address(1),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         IBridgehub bridgehub = IBridgehub(bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
@@ -171,12 +157,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            address(1),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
 
         // Setup
         IBridgehub bridgehub = IBridgehub(bridgehub);
@@ -251,12 +232,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            address(1),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         migrateBackChain();
     }
 

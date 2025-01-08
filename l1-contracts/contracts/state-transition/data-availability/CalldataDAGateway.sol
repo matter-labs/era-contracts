@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {CalldataDA, BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES} from "./CalldataDA.sol";
-import {PubdataTooSmall, PubdataTooLong, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
+import {PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
 
 /// @notice Contract that contains the functionality for processing the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
@@ -16,7 +16,7 @@ abstract contract CalldataDAGateway is CalldataDA {
         bytes calldata _pubdataInput
     ) internal pure override returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
         if (_pubdataInput.length < _blobsProvided * BLOB_COMMITMENT_SIZE) {
-            revert PubdataTooSmall(_pubdataInput.length, _blobsProvided * BLOB_COMMITMENT_SIZE);
+            revert PubdataInputTooSmall(_pubdataInput.length, _blobsProvided * BLOB_COMMITMENT_SIZE);
         }
 
         // We typically do not know whether we'll use calldata or blobs at the time when
@@ -26,7 +26,7 @@ abstract contract CalldataDAGateway is CalldataDA {
         _pubdata = _pubdataInput[:_pubdataInput.length - _blobsProvided * BLOB_COMMITMENT_SIZE];
 
         if (_pubdata.length > _blobsProvided * BLOB_SIZE_BYTES) {
-            revert PubdataTooLong(_pubdata.length, _blobsProvided * BLOB_SIZE_BYTES);
+            revert PubdataLengthTooBig(_pubdata.length, _blobsProvided * BLOB_SIZE_BYTES);
         }
         if (_fullPubdataHash != keccak256(_pubdata)) {
             revert InvalidPubdataHash(_fullPubdataHash, keccak256(_pubdata));

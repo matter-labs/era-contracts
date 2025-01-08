@@ -19,6 +19,8 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @dev Note, that it does not implement any form of access control by default, but instead utilizes
 /// so called "restrictions": contracts that implement the `IRestriction` interface and ensure that
 /// particular restrictions are ensured for the contract, including access control, security invariants, etc.
+/// @dev This is a new EXPERIMENTAL version of the `ChainAdmin` implementation. While chains may opt into using it,
+/// using the old `ChainAdminOwnable` is recommended.
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
