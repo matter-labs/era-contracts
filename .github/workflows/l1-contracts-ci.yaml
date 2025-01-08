@@ -91,6 +91,40 @@ jobs:
       - name: Lint errors
         run: yarn l1 errors-lint --check
 
+
+  check-hashes:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Check hashes
+        run: yarn calculate-hashes:check
+
   test-foundry:
     needs: [build, lint]
     runs-on: ubuntu-latest
