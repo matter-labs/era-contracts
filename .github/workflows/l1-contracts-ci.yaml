@@ -122,6 +122,11 @@ jobs:
             l2-contracts/zkout
             system-contracts/zkout
 
+      - name: Check contents
+        run: |
+          ls l1-contracts/out
+          ls l1-contracts/zkout
+
       - name: Check hashes
         run: yarn calculate-hashes:check
 
