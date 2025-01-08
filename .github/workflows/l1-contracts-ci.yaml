@@ -123,8 +123,8 @@ jobs:
 
       - name: Check contents
         run: |
-          ls l1-contracts/out
-          ls l1-contracts/zkout
+          ls l2-contracts/zkout
+          ls system-contracts/zkout
 
       - name: Check hashes
         run: yarn calculate-hashes:check
