@@ -1958,5 +1958,141 @@
     "evmDeployedBytecodeHash": "0xbcf2d0de342544f95c33cddbc122cd29455067219c60555a59ee680745879fa7",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
+  },
+  {
+    "contractName": "CodeOracle.yul",
+    "zkBytecodePath": "/system-contracts/zkout/CodeOracle.yul/contracts-preprocessed/precompiles/CodeOracle.yul.json",
+    "zkBytecodeHash": "0x010000230498c3128f0f86bd5cebbce502948ae06b526559d7ed432312ea5673",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "EcAdd.yul",
+    "zkBytecodePath": "/system-contracts/zkout/EcAdd.yul/contracts-preprocessed/precompiles/EcAdd.yul.json",
+    "zkBytecodeHash": "0x010000859ed3467fe4da584e9d993f04d8df6c1d1e078db908cbaac1b6b9d84a",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "EcMul.yul",
+    "zkBytecodePath": "/system-contracts/zkout/EcMul.yul/contracts-preprocessed/precompiles/EcMul.yul.json",
+    "zkBytecodeHash": "0x010000bb45be5491bfa96eac012e6edbcd393863c753de44e1ddf364e490d2e5",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "EcPairing.yul",
+    "zkBytecodePath": "/system-contracts/zkout/EcPairing.yul/contracts-preprocessed/precompiles/EcPairing.yul.json",
+    "zkBytecodeHash": "0x01000f1df321417e6094bb72944163e3e3f6073c4a08723bcd75851a4af87cd7",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "Ecrecover.yul",
+    "zkBytecodePath": "/system-contracts/zkout/Ecrecover.yul/contracts-preprocessed/precompiles/Ecrecover.yul.json",
+    "zkBytecodeHash": "0x01000013344fb47b40c38eddb93142d381a1716cdb99a76aca64b31a3f83c7e5",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "EventWriter.yul",
+    "zkBytecodePath": "/system-contracts/zkout/EventWriter.yul/contracts-preprocessed/EventWriter.yul.json",
+    "zkBytecodeHash": "0x010000175f50060e9307a151fac7759407acd83eff7b387dce4e24814a09cb9f",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "Keccak256.yul",
+    "zkBytecodePath": "/system-contracts/zkout/Keccak256.yul/contracts-preprocessed/precompiles/Keccak256.yul.json",
+    "zkBytecodeHash": "0x0100000f9c77ddf3e1baef9df0c1a497858d24b0ea1cf76f04c9fe3f8b323098",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "Keccak256Mock.yul",
+    "zkBytecodePath": "/system-contracts/zkout/Keccak256Mock.yul/contracts-preprocessed/precompiles/test-contracts/Keccak256Mock.yul.json",
+    "zkBytecodeHash": "0x0100000b42fb03a0a603be54b1e742a9ebbe755c886cf193e5d98d35982f420c",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "P256Verify.yul",
+    "zkBytecodePath": "/system-contracts/zkout/P256Verify.yul/contracts-preprocessed/precompiles/P256Verify.yul.json",
+    "zkBytecodeHash": "0x0100000f40b6e168450d59aaf4283e70c5a26deb4b396a49e3a014b3f7433267",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "SHA256.yul",
+    "zkBytecodePath": "/system-contracts/zkout/SHA256.yul/contracts-preprocessed/precompiles/SHA256.yul.json",
+    "zkBytecodeHash": "0x010000172dd8b6099b59bc284647851340b609bcb9514fa1fad85aa64dedbbc1",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "bootloader_test.yul",
+    "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/contracts-preprocessed/bootloader/bootloader_test.yul.json",
+    "zkBytecodeHash": "0x010003d38aadb86b0c0838a921dbc600728dfe529279491a3d316797482326e2",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "dummy.yul",
+    "zkBytecodePath": "/system-contracts/zkout/dummy.yul/contracts-preprocessed/bootloader/dummy.yul.json",
+    "zkBytecodeHash": "0x01000007c0dc61224c33c91f692c670202b257d4549c1b7801ecf5b1fc7a1c7d",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "fee_estimate.yul",
+    "zkBytecodePath": "/system-contracts/zkout/fee_estimate.yul/contracts-preprocessed/bootloader/fee_estimate.yul.json",
+    "zkBytecodeHash": "0x01000965ea0451253feaf6dafe12c6e12fba7cf279afa46e335e74fb45a7f063",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "gas_test.yul",
+    "zkBytecodePath": "/system-contracts/zkout/gas_test.yul/contracts-preprocessed/bootloader/gas_test.yul.json",
+    "zkBytecodeHash": "0x010008d5e797ddae2bc4f5780cf02ea88ae6c2eec8424c65e0113c317fc86e3e",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "playground_batch.yul",
+    "zkBytecodePath": "/system-contracts/zkout/playground_batch.yul/contracts-preprocessed/bootloader/playground_batch.yul.json",
+    "zkBytecodeHash": "0x0100096b2595be6c8c50405093d1e3bcf4a362b9345dfe2eee3ed7fa49209ae6",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "proved_batch.yul",
+    "zkBytecodePath": "/system-contracts/zkout/proved_batch.yul/contracts-preprocessed/bootloader/proved_batch.yul.json",
+    "zkBytecodeHash": "0x010008e5b883de8897598e83d383e332b87d09164363816c15f22353c3cd910d",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
+    "contractName": "transfer_test.yul",
+    "zkBytecodePath": "/system-contracts/zkout/transfer_test.yul/contracts-preprocessed/bootloader/transfer_test.yul.json",
+    "zkBytecodeHash": "0x010000152e84d6f348a177d29d0f11e03c8058ee3198e587051b59db424a75af",
+    "evmBytecodePath": null,
+    "evmBytecodeHash": null,
+    "evmDeployedBytecodeHash": null
   }
 ]

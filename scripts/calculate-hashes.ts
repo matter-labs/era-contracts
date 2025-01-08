@@ -226,10 +226,48 @@ const getYulContractDetails = (dir: string, contractName: string): ContractsInfo
 };
 
 const getYulContractsDetails = (dir: string): ContractsInfo[] => {
-    const filesEndingWithYul = findFilesEndingWith(dir, ".yul");
+    const bytecodesDir = join(dir, SOLIDITY_ARTIFACTS_ZK_DIR);
+    console.log(bytecodesDir);
+    const dirsEndingWithYul = findDirsEndingWith(bytecodesDir, ".yul").filter((dirent) => !dirent.name.endsWith(".t.sol"));
+
+    const compiledFiles = dirsEndingWithYul.map((d) => {
+        const contractFiles = fs.readdirSync(join(d.path, d.name), { withFileTypes: true, recursive: true })
+            .filter((dirent) => dirent.isFile() && dirent.name.endsWith(".json") && !dirent.name.includes("dbg"));
+
+
+
+        return contractFiles.map((c) => {
+            return join(c.path, c.name)
+        });
+    }).flat();
+
+    return compiledFiles.map((jsonFile) => {
+        const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+        const zkBytecodeHash =
+            getBytecodeHashFromZkJson(jsonFileContents);
+
+        const zkBytecodePath = jsonFile.startsWith(join(__dirname, '..'))
+            ? jsonFile.replace(join(__dirname, '..'), "")
+            : jsonFile;
+
+
+        const contractName = (jsonFile.split('/').pop() || "").replace(".json", "");
+
+        return ({
+            contractName,
+            zkBytecodePath,
+            zkBytecodeHash,
+            evmBytecodePath: null,
+            evmBytecodeHash: null,
+            evmDeployedBytecodeHash: null,
+        });
+        // Filter out the interfaces (that don't have any bytecode).
+    }).filter((c) => c.zkBytecodeHash != "0x");
+
+    /*const filesEndingWithYul = findFilesEndingWith(dir, ".yul");
     const contractNames = filesEndingWithYul.map((d) => d.replace(".yul", ""));
     const yulContractsDetails = contractNames.map((c) => getYulContractDetails(dir, c));
-    return yulContractsDetails;
+    return yulContractsDetails;*/
 };
 
 const makePathAbsolute = (path: string): string => {
@@ -292,7 +330,7 @@ const SOLIDITY_SOURCE_CODE_PATHS = [
     "l2-contracts/",
     "l1-contracts/"
 ];
-const YUL_SOURCE_CODE_PATHS = ["system-contracts/contracts-preprocessed", "system-contracts/contracts-preprocessed/precompiles", "system-contracts/bootloader/build"];
+const YUL_SOURCE_CODE_PATHS = ["system-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
 const main = async () => {
@@ -306,8 +344,8 @@ const main = async () => {
     const checkOnly = args.includes("--check-only");
 
     const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
-    //const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
-    const systemContractsDetails = [...solidityContractsDetails];//, ...yulContractsDetails];
+    const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
+    const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
 
     const newSystemContractsHashes = systemContractsDetails;
     const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
