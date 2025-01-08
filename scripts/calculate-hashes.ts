@@ -75,9 +75,11 @@ const getBytecodeHashFromEvmJson = (jsonFileContents: EvmJsonFileContents) => {
 const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceAndZKCompilationDetails[] => {
   const artifactsDir = SOLIDITY_ARTIFACTS_ZK_DIR;
   const bytecodesDir = join(workDir, artifactsDir);
+  console.log("bytecodesDir", bytecodesDir);
   const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol").filter(
     (dirent) => !dirent.name.endsWith(".t.sol") && !dirent.name.endsWith(".s.sol") && !dirent.name.endsWith("Test.sol")
   );
+  console.log("dirsEndingWithSol", dirsEndingWithSol);
 
   const compiledFiles = dirsEndingWithSol
     .map((d) => {
@@ -92,6 +94,8 @@ const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceA
     })
     .flat();
 
+  console.log("compiledFiles", compiledFiles);
+
   return compiledFiles
     .map((jsonFile) => {
       const jsonFileContents = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
@@ -102,6 +106,8 @@ const getZkSolidityContractsDetailsWithArtifactsDir = (workDir: string): SourceA
         : jsonFile;
 
       const contractName = (jsonFile.split("/").pop() || "").replace(".json", "");
+
+      console.log("contractName", contractName, "zkBytecodeHash", zkBytecodeHash);
 
       return {
         contractName,
@@ -310,6 +316,8 @@ const main = async () => {
   const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
   const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
   const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
+
+  console.log("New hashes: ", systemContractsDetails.length);
 
   const newSystemContractsHashes = systemContractsDetails;
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
