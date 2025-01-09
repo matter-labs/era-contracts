@@ -1,4 +1,6 @@
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -11,9 +13,10 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 contract DeployL2Script is Script {
     using stdToml for string;
 
-    Config config;
-    ContractsBytecodes contracts;
+    Config internal config;
+    ContractsBytecodes internal contracts;
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address bridgehubAddress;
         address l1SharedBridgeProxy;
@@ -30,6 +33,7 @@ contract DeployL2Script is Script {
         address consensusRegistryProxy;
         address multicall3;
         address forceDeployUpgraderAddress;
+        address timestampAsserter;
     }
 
     struct ContractsBytecodes {
@@ -42,6 +46,7 @@ contract DeployL2Script is Script {
         bytes consensusRegistryProxyBytecode;
         bytes multicall3Bytecode;
         bytes forceDeployUpgrader;
+        bytes timestampAsserterBytecode;
     }
 
     function run() public {
@@ -64,6 +69,7 @@ contract DeployL2Script is Script {
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
         deployMulticall3();
+        deployTimestampAsserter();
 
         saveOutput();
     }
@@ -116,45 +122,56 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployTimestampAsserter() public {
+        initializeConfig();
+        loadContracts(false);
+
+        deployTimestampAsserter();
+
+        saveOutput();
+    }
+
     function loadContracts(bool legacyBridge) internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
-        contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+        contracts.l2StandardErc20FactoryBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
-        contracts.beaconProxy = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-        );
-        contracts.l2StandardErc20Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+        contracts.beaconProxy = Utils.readFoundryBytecode("/../l2-contracts/zkout/BeaconProxy.sol/BeaconProxy.json");
+        contracts.l2StandardErc20Bytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/L2StandardERC20.sol/L2StandardERC20.json"
         );
 
         if (legacyBridge) {
-            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/DevL2SharedBridge.sol/DevL2SharedBridge.json"
+            contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
+                "/../l2-contracts/zkout/DevL2SharedBridge.sol/DevL2SharedBridge.json"
             );
         } else {
-            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
+            contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
+                "/../l2-contracts/zkout/L2SharedBridge.sol/L2SharedBridge.json"
             );
         }
 
-        contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+        contracts.l2SharedBridgeProxyBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
 
-        contracts.consensusRegistryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ConsensusRegistry.sol/ConsensusRegistry.json"
+        contracts.consensusRegistryBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/ConsensusRegistry.sol/ConsensusRegistry.json"
         );
-        contracts.consensusRegistryProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
-        );
-
-        contracts.multicall3Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/dev-contracts/Multicall3.sol/Multicall3.json"
+        contracts.consensusRegistryProxyBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
 
-        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+        contracts.multicall3Bytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/Multicall3.sol/Multicall3.json"
+        );
+
+        contracts.forceDeployUpgrader = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+        );
+
+        contracts.timestampAsserterBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/TimestampAsserter.sol/TimestampAsserter.json"
         );
     }
 
@@ -177,6 +194,7 @@ contract DeployL2Script is Script {
         vm.serializeAddress("root", "consensus_registry_implementation", config.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", config.consensusRegistryProxy);
         vm.serializeAddress("root", "multicall3", config.multicall3);
+        vm.serializeAddress("root", "timestamp_asserter", config.timestampAsserter);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
@@ -285,6 +303,19 @@ contract DeployL2Script is Script {
         config.multicall3 = Utils.deployThroughL1({
             bytecode: contracts.multicall3Bytecode,
             constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deployTimestampAsserter() internal {
+        config.timestampAsserter = Utils.deployThroughL1({
+            bytecode: contracts.timestampAsserterBytecode,
+            constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: new bytes[](0),
