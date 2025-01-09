@@ -322,9 +322,7 @@ const main = async () => {
   console.log("Calculated hashes differ from the hashes in the SystemContractsHashes.json file. Differences:");
   console.log(differences);
   if (checkOnly) {
-    console.log(
-      "You can use the `yarn calculate-hashes:fix` command to update the AllContractHashes.json file."
-    );
+    console.log("You can use the `yarn calculate-hashes:fix` command to update the AllContractHashes.json file.");
     console.log("Exiting...");
     process.exit(1);
   } else {
