@@ -3,11 +3,12 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
+import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
@@ -41,6 +42,19 @@ uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 // address constant
 address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
+/// @dev We need to use a struct instead of list of params to prevent stack too deep error
+struct PrepareL1L2TransactionParams {
+    uint256 l1GasPrice;
+    bytes l2Calldata;
+    uint256 l2GasLimit;
+    uint256 l2Value;
+    bytes[] factoryDeps;
+    address dstAddress;
+    uint256 chainId;
+    address bridgehubAddress;
+    address l1SharedBridgeProxy;
+}
+
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -51,7 +65,7 @@ library Utils {
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
+    uint256 internal constant MAX_PRIORITY_TX_GAS = 3600000;
 
     /**
      * @dev Get all selectors from the bytecode.
@@ -168,8 +182,8 @@ library Utils {
             child := create(0, add(bytecode, 0x20), mload(bytecode))
         }
         vm.stopBroadcast();
-        require(child != address(0), "Failed to deploy Create2Factory");
-        require(child.code.length > 0, "Failed to deploy Create2Factory");
+        require(child != address(0), "Failed to deploy create2factory");
+        require(child.code.length > 0, "Failed to deploy create2factory");
         return child;
     }
 
@@ -193,6 +207,50 @@ library Utils {
             revert("Failed to deploy contract via create2");
         }
 
+        return contractAddress;
+    }
+
+    /**
+     * @dev Deploy l2 contracts through l1
+     */
+    function deployThroughL1(
+        bytes memory bytecode,
+        bytes memory constructorargs,
+        bytes32 create2salt,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (address) {
+        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
+
+        address aliasedSender;
+        if (isEOA(msg.sender)) {
+            aliasedSender = msg.sender;
+        } else {
+            aliasedSender = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+        }
+
+        address contractAddress = L2ContractHelper.computeCreate2Address(
+            aliasedSender,
+            create2salt,
+            bytecodeHash,
+            keccak256(constructorargs)
+        );
+
+        bytes[] memory _factoryDeps = appendArray(factoryDeps, bytecode);
+
+        runL1L2Transaction({
+            l2Calldata: deployData,
+            l2GasLimit: l2GasLimit,
+            l2Value: 0,
+            factoryDeps: _factoryDeps,
+            dstAddress: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy
+        });
         return contractAddress;
     }
 
@@ -252,7 +310,8 @@ library Utils {
         runL1L2Transaction({
             l2Calldata: deployData,
             l2GasLimit: l2GasLimit,
-            factoryDeps: factoryDeps,
+            l2Value: 0,
+            factoryDeps: _factoryDeps,
             dstAddress: L2_CREATE2_FACTORY_ADDRESS,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
@@ -261,61 +320,68 @@ library Utils {
         return contractAddress;
     }
 
-    /**
-     * @dev Deploy l2 contracts through l1
-     */
-    function deployThroughL1(
-        bytes memory bytecode,
-        bytes memory constructorargs,
-        bytes32 create2salt,
+    function prepareL1L2Transaction(
+        PrepareL1L2TransactionParams memory params
+    ) internal returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
+        Bridgehub bridgehub = Bridgehub(params.bridgehubAddress);
+
+        requiredValueToDeploy =
+            bridgehub.l2TransactionBaseCost(
+                params.chainId,
+                params.l1GasPrice,
+                params.l2GasLimit,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+            ) *
+            2 +
+            params.l2Value;
+
+        console.log("l1GasPrice", params.l1GasPrice);
+        console.log("l2GasLimit", params.l2GasLimit);
+        console.log("l2Value", params.l2Value);
+        console.log("requiredValueToDeploy", requiredValueToDeploy);
+
+        l2TransactionRequestDirect = L2TransactionRequestDirect({
+            chainId: params.chainId,
+            mintValue: requiredValueToDeploy,
+            l2Contract: params.dstAddress,
+            l2Value: params.l2Value,
+            l2Calldata: params.l2Calldata,
+            l2GasLimit: params.l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: params.factoryDeps,
+            refundRecipient: msg.sender
+        });
+    }    
+
+    function prepareL1L2TransactionTwoBridges(
+        uint256 l1GasPrice,
         uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy
-    ) internal returns (address) {
-        bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    )
+        internal
+        returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
+    {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
 
-        bytes memory deployData = abi.encodeWithSignature(
-            "create2(bytes32,bytes32,bytes)",
-            create2salt,
-            bytecodeHash,
-            constructorargs
-        );
+        requiredValueToDeploy =
+            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            2;
 
-        address aliasedSender;
-        if (isEOA(msg.sender)) {
-            aliasedSender = msg.sender;
-        } else {
-            aliasedSender = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
-        }
-
-        address contractAddress = L2ContractHelper.computeCreate2Address(
-            aliasedSender,
-            create2salt,
-            bytecodeHash,
-            keccak256(constructorargs)
-        );
-
-        uint256 factoryDepsLength = factoryDeps.length;
-
-        bytes[] memory _factoryDeps = new bytes[](factoryDepsLength + 1);
-
-        for (uint256 i = 0; i < factoryDepsLength; ++i) {
-            _factoryDeps[i] = factoryDeps[i];
-        }
-        _factoryDeps[factoryDepsLength] = bytecode;
-
-        runL1L2Transaction({
-            l2Calldata: deployData,
-            l2GasLimit: l2GasLimit,
-            factoryDeps: _factoryDeps,
-            dstAddress: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+        l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
-            bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy
+            mintValue: requiredValueToDeploy,
+            l2Value: 0,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            refundRecipient: msg.sender,
+            secondBridgeAddress: secondBridgeAddress,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata
         });
-        return contractAddress;
     }
 
     /**
@@ -324,6 +390,7 @@ library Utils {
     function runL1L2Transaction(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
+        uint256 l2Value,
         bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
@@ -331,26 +398,24 @@ library Utils {
         address l1SharedBridgeProxy
     ) internal {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
-        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
-
-        uint256 requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
-            chainId,
-            gasPrice,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        ) * 2;
-
-        L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
-            chainId: chainId,
-            mintValue: requiredValueToDeploy,
-            l2Contract: dstAddress,
-            l2Value: 0,
-            l2Calldata: l2Calldata,
-            l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps: factoryDeps,
-            refundRecipient: msg.sender
-        });
+        uint256 l1GasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
+        // uint256 l1GasPrice = 60000000000;
+        (
+            L2TransactionRequestDirect memory l2TransactionRequestDirect,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2Transaction(
+                PrepareL1L2TransactionParams({
+                    l1GasPrice: l1GasPrice,
+                    l2Calldata: l2Calldata,
+                    l2GasLimit: l2GasLimit,
+                    l2Value: l2Value,
+                    factoryDeps: factoryDeps,
+                    dstAddress: dstAddress,
+                    chainId: chainId,
+                    bridgehubAddress: bridgehubAddress,
+                    l1SharedBridgeProxy: l1SharedBridgeProxy
+                })
+            );
 
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
@@ -376,6 +441,7 @@ library Utils {
         runL1L2Transaction({
             l2Calldata: "",
             l2GasLimit: MAX_PRIORITY_TX_GAS,
+            l2Value: 0,
             factoryDeps: factoryDeps,
             dstAddress: 0x0000000000000000000000000000000000000000,
             chainId: chainId,
@@ -555,7 +621,7 @@ library Utils {
         }
     }
 
-    function isEOA(address _addr) public view returns (bool) {
+    function isEOA(address _addr) internal view returns (bool) {
         uint32 size;
         assembly {
             size := extcodesize(_addr)

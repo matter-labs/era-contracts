@@ -20,7 +20,7 @@ contract DeployL2WrappedBaseToken is Script {
     using stdToml for string;
 
     address constant ETH_BASE_TOKEN = 0x0000000000000000000000000000000000000001;
-    uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
+    uint256 internal constant MAX_PRIORITY_TX_GAS = 3600000;
 
     Config public config;
     ContractBytecodes internal bytecodes;
@@ -48,6 +48,7 @@ contract DeployL2WrappedBaseToken is Script {
         address proxyAdmin;
         address l2WrappedBaseTokenImplementation;
         address l2WrappedBaseTokenProxy;
+        bytes l2WrappedBaseTokenProxyConstructorData;
     }
 
     function run() public {
@@ -70,8 +71,14 @@ contract DeployL2WrappedBaseToken is Script {
         config.bridgehubProxy = toml.readAddress("$.bridgehub_proxy");
         console.log("Chain ID:", config.chainId);
         console.log("Bridgehub proxy:", config.bridgehubProxy);
+
         // Derived:
-        config.baseToken = address(Bridgehub(config.bridgehubProxy).baseToken(config.chainId));
+        Bridgehub bridgehub = Bridgehub(config.bridgehubProxy);
+        config.l1SharedBridgeProxy = address(bridgehub.sharedBridge());
+        L1SharedBridge l1SharedBridge = L1SharedBridge(address(bridgehub.sharedBridge()));
+        config.l2SharedBridgeProxy = address(l1SharedBridge.l2BridgeAddress(config.chainId));
+
+        config.baseToken = address(bridgehub.baseToken(config.chainId));
         if (config.baseToken == address(0)) {
             revert("Base token not found");
         }
@@ -79,13 +86,12 @@ contract DeployL2WrappedBaseToken is Script {
             config.wrappedBaseTokenName = "Wrapped Ether";
             config.wrappedBaseTokenSymbol = "WETH";
         } else {
-            config.wrappedBaseTokenName = string.concat("Wrapped ", ERC20(config.baseToken).name());
-            config.wrappedBaseTokenSymbol = string.concat("w", ERC20(config.baseToken).symbol());
+            ERC20 erc20 = ERC20(config.baseToken);
+            config.wrappedBaseTokenName = string.concat("Wrapped ", erc20.name());
+            config.wrappedBaseTokenSymbol = string.concat("w", erc20.symbol());
         }
-        config.l1SharedBridgeProxy = address(Bridgehub(config.bridgehubProxy).sharedBridge());
-        config.l2SharedBridgeProxy = address(L1SharedBridge(config.l1SharedBridgeProxy).l2BridgeAddress(config.chainId));
 
-        address owner = address(L1SharedBridge(config.l1SharedBridgeProxy).owner());
+        address owner = address(l1SharedBridge.owner());
         if (Utils.isEOA(owner)) {
             config.l2ProxyAdminOwner = owner;
         } else {
@@ -145,6 +151,7 @@ contract DeployL2WrappedBaseToken is Script {
             bridgehubAddress: config.bridgehubProxy,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
+        output.l2WrappedBaseTokenProxyConstructorData = l2WrappedBaseTokenProxyConstructorData;
         console.log("L2WrappedBaseTokenProxy deployed at:", output.l2WrappedBaseTokenProxy);
         console.log("L2WrappedBaseTokenProxy constructor args:");
         console.logBytes(l2WrappedBaseTokenProxyConstructorData);
@@ -170,6 +177,7 @@ contract DeployL2WrappedBaseToken is Script {
         Utils.runL1L2Transaction({
             l2Calldata: transferCalldata,
             l2GasLimit: MAX_PRIORITY_TX_GAS,
+            l2Value: 0,
             factoryDeps: new bytes[](0),
             dstAddress: output.proxyAdmin,
             chainId: config.chainId,
@@ -182,7 +190,8 @@ contract DeployL2WrappedBaseToken is Script {
     function saveOutput() internal {
         vm.serializeAddress("root", "proxy_admin", output.proxyAdmin);
         vm.serializeAddress("root", "l2_wrapped_base_token_implementation", output.l2WrappedBaseTokenImplementation);
-        string memory toml = vm.serializeAddress("root", "l2_wrapped_base_token_proxy", output.l2WrappedBaseTokenProxy);
+        vm.serializeAddress("root", "l2_wrapped_base_token_proxy", output.l2WrappedBaseTokenProxy);
+        string memory toml = vm.serializeBytes("root", "l2_wrapped_base_token_proxy_constructor_data", output.l2WrappedBaseTokenProxyConstructorData);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-wrapped-base-token.toml");
         vm.writeToml(toml, path);
