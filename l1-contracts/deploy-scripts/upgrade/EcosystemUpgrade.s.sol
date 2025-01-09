@@ -73,7 +73,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {Create2AndTransfer} from "contracts/governance/Create2AndTransfer.sol";
+import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 interface IBridgehubLegacy {
     function stateTransitionManager(uint256 chainId) external returns (address);

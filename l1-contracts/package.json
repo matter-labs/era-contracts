@@ -63,8 +63,6 @@
     "test:zkfoundry": "forge script --sig 0x2dd0ebe3 DeployL1Script --ffi && forge test --zksync --match-path 'test/foundry/l2/*'",
     "test:mainnet-upgrade-fork": "forge test --match-test test_MainnetFork --ffi --rpc-url $INFURA_MAINNET --gas-limit 20000000000",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
-    "prepare-ecosystem-upgrade": "GATEWAY_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/devnet.toml forge script --sig 0xc0406226 EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --private-key $TEST_PK --slow",
-    "simulate-prepare-ecosystem-upgrade": "GATEWAY_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/devnet.toml forge script --sig 0xc0406226 EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000",
     "coverage:foundry": "forge coverage --ffi --match-path 'test/foundry/l1/*' --no-match-coverage 'contracts/(bridge/.*L2.*\\.sol|governance/L2AdminFactory\\.sol)' --no-match-test test_MainnetFork",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "register-zk-chain": "ts-node scripts/register-zk-chain.ts",
