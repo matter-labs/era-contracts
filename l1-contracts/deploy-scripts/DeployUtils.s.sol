@@ -9,50 +9,50 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {Verifier} from "contracts/state-transition/Verifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {Governance} from "contracts/governance/Governance.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {Multicall3} from "../contracts/dev-contracts/Multicall3.sol";
+import {Verifier} from "../contracts/state-transition/Verifier.sol";
+import {TestnetVerifier} from "../contracts/state-transition/TestnetVerifier.sol";
+import {VerifierParams, IVerifier} from "../contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {DefaultUpgrade} from "../contracts/upgrades/DefaultUpgrade.sol";
+import {Governance} from "../contracts/governance/Governance.sol";
+import {L1GenesisUpgrade} from "../contracts/upgrades/L1GenesisUpgrade.sol";
+import {ChainAdmin} from "../contracts/governance/ChainAdmin.sol";
+import {ValidatorTimelock} from "../contracts/state-transition/ValidatorTimelock.sol";
+import {Bridgehub} from "../contracts/bridgehub/Bridgehub.sol";
+import {MessageRoot} from "../contracts/bridgehub/MessageRoot.sol";
+import {CTMDeploymentTracker} from "../contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1NativeTokenVault} from "../contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {ExecutorFacet} from "../contracts/state-transition/chain-deps/facets/Executor.sol";
+import {AdminFacet} from "../contracts/state-transition/chain-deps/facets/Admin.sol";
+import {MailboxFacet} from "../contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {GettersFacet} from "../contracts/state-transition/chain-deps/facets/Getters.sol";
+import {DiamondInit} from "../contracts/state-transition/chain-deps/DiamondInit.sol";
+import {ChainTypeManager} from "../contracts/state-transition/ChainTypeManager.sol";
+import {ChainTypeManagerInitializeData, ChainCreationParams} from "../contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager} from "../contracts/state-transition/IChainTypeManager.sol";
+import {Diamond} from "../contracts/state-transition/libraries/Diamond.sol";
+import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {FeeParams, PubdataPricingMode} from "../contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {L1AssetRouter} from "../contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1ERC20Bridge} from "../contracts/bridge/L1ERC20Bridge.sol";
+import {L1Nullifier} from "../contracts/bridge/L1Nullifier.sol";
+import {DiamondProxy} from "../contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {IL1AssetRouter} from "../contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {INativeTokenVault} from "../contracts/bridge/ntv/INativeTokenVault.sol";
+import {BridgedStandardERC20} from "../contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {ICTMDeploymentTracker} from "../contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "../contracts/bridgehub/IMessageRoot.sol";
+import {IL2ContractDeployer} from "../contracts/common/interfaces/IL2ContractDeployer.sol";
+import {L2ContractHelper} from "../contracts/common/l2-helpers/L2ContractHelper.sol";
+import {AddressAliasHelper} from "../contracts/vendor/AddressAliasHelper.sol";
+import {IL1Nullifier} from "../contracts/bridge/L1Nullifier.sol";
+import {IL1NativeTokenVault} from "../contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {L1NullifierDev} from "../contracts/dev-contracts/L1NullifierDev.sol";
+import {AccessControlRestriction} from "../contracts/governance/AccessControlRestriction.sol";
+import {ICTMDeploymentTracker} from "../contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "../contracts/bridgehub/IMessageRoot.sol";
+import {IAssetRouterBase} from "../contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -68,6 +68,7 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 interopCenterBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
@@ -113,6 +114,8 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
+    address interopCenterImplementation;
+    address interopCenterProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -416,7 +419,10 @@ contract DeployUtils is Script {
 
     function deployChainTypeManagerImplementation() internal {
         bytes memory bytecode = type(ChainTypeManager).creationCode;
-        bytes memory constructorArgs = abi.encode(addresses.bridgehub.bridgehubProxy);
+        bytes memory constructorArgs = abi.encode(
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridgehub.interopCenterProxy
+        );
         address contractAddress = deployViaCreate2(bytecode, constructorArgs);
         console.log("ChainTypeManagerImplementation deployed at:", contractAddress);
         addresses.stateTransition.chainTypeManagerImplementation = contractAddress;
@@ -424,7 +430,14 @@ contract DeployUtils is Script {
 
     function deployChainTypeManagerProxy() internal {
         string memory root = vm.projectRoot();
-        string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");
+        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
+        string memory inputPath = string.concat(
+            root,
+            "/",
+            CONTRACTS_PATH,
+            "/l1-contracts",
+            "/script-out/diamond-selectors.toml"
+        );
         string memory toml = vm.readFile(inputPath);
 
         bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");

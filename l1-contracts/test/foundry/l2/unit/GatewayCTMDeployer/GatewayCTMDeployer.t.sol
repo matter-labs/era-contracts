@@ -27,7 +27,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -67,7 +67,7 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ChainTypeManager(address(0));
+        new ChainTypeManager(address(0), address(0));
         new ProxyAdmin();
 
         new TestnetVerifier();

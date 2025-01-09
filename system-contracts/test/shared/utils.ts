@@ -1,3 +1,5 @@
+import * as fs from "fs";
+
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import { BigNumber } from "ethers";
@@ -83,6 +85,12 @@ export function loadZasmBytecode(codeName: string, path: string): string {
   });
 }
 
+// Read contract artifacts
+export function readContract(path: string, fileName: string, contractName?: string) {
+  contractName = contractName || fileName;
+  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${contractName}.json`, { encoding: "utf-8" }));
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function deployContract(name: string, constructorArguments?: any[] | undefined): Promise<Contract> {
   const artifact = await loadArtifact(name);
@@ -117,9 +125,14 @@ async function deployBytecode(bytecode: string): Promise<Contract> {
   );
 }
 
-export async function deployContractOnAddress(address: string, name: string) {
-  const artifact = await loadArtifact(name);
-  await setCode(address, artifact.bytecode, true);
+export async function deployContractOnAddress(
+  address: string,
+  name: string,
+  constructorData?: string,
+  artifact?: ZkSyncArtifact
+) {
+  artifact = artifact || (await loadArtifact(name));
+  await setCode(address, artifact.bytecode, true, constructorData);
 }
 
 export async function publishBytecode(bytecode: BytesLike) {
@@ -139,7 +152,12 @@ export async function getCode(address: string): Promise<string> {
 }
 
 // Force deploy bytecode on the address
-export async function setCode(address: string, bytecode: BytesLike, callConstructor: boolean = false) {
+export async function setCode(
+  address: string,
+  bytecode: BytesLike,
+  callConstructor: boolean = false,
+  constructorData?: string
+) {
   // TODO: think about factoryDeps with eth_sendTransaction
   try {
     // publish bytecode in a separate tx
@@ -156,7 +174,7 @@ export async function setCode(address: string, bytecode: BytesLike, callConstruc
     newAddress: address,
     callConstructor,
     value: 0,
-    input: "0x",
+    input: constructorData || "0x",
   };
   await deployerContract.forceDeployOnAddress(deployment, ethers.constants.AddressZero);
 }

@@ -47,6 +47,7 @@ export default {
     compilerSource: "binary",
     version: "1.5.7",
     settings: {
+      // compilerPath: getZksolcUrl(),
       isSystem: true,
     },
   },

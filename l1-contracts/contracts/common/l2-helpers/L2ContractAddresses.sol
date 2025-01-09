@@ -2,8 +2,15 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {IBaseToken} from "./IBaseToken.sol";
+import {IL2Messenger} from "./IL2Messenger.sol";
+import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
+
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(0x8001);
+
+/// @dev The address of the account code storage system contract
+address constant L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = address(0x8002);
 
 /// @dev The address of the known code storage system contract
 address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(0x8004);
@@ -44,26 +51,6 @@ address constant L2_BRIDGEHUB_ADDR = address(0x10002);
 /// @dev the address of the l2 asset router.
 address constant L2_ASSET_ROUTER_ADDR = address(0x10003);
 
-/**
- * @author Matter Labs
- * @custom:security-contact security@matterlabs.dev
- * @notice Smart contract for sending arbitrary length messages to L1
- * @dev by default ZkSync can send fixed-length messages on L1.
- * A fixed length message has 4 parameters `senderAddress`, `isService`, `key`, `value`,
- * the first one is taken from the context, the other three are chosen by the sender.
- * @dev To send a variable-length message we use this trick:
- * - This system contract accepts an arbitrary length message and sends a fixed length message with
- * parameters `senderAddress == this`, `isService == true`, `key == msg.sender`, `value == keccak256(message)`.
- * - The contract on L1 accepts all sent messages and if the message came from this system contract
- * it requires that the preimage of `value` be provided.
- */
-interface IL2Messenger {
-    /// @notice Sends an arbitrary length message to L1.
-    /// @param _message The variable length message to be sent to L1.
-    /// @return Returns the keccak256 hashed value of the message.
-    function sendToL1(bytes calldata _message) external returns (bytes32);
-}
-
 /// @dev An l2 system contract address, used in the assetId calculation for native assets.
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
 /// if the assetId can be calculated with this address then it is in fact an NTV asset
@@ -71,6 +58,15 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(0x10004);
 
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(0x10005);
+
+/// @dev the address of the L2 interop center
+address constant L2_INTEROP_CENTER_ADDR = address(0x10008);
+
+/// @dev the address of the L2 interop handler
+address constant L2_INTEROP_HANDLER_ADDR = address(0x10009);
+
+/// @dev the address of the L2 interop account
+address constant L2_INTEROP_ACCOUNT_ADDR = address(0x1000a);
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -80,3 +76,9 @@ IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSE
 
 /// @dev the address of the msg value system contract
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
+
+IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x02)
+);
+
+IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));

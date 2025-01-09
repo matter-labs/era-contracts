@@ -172,4 +172,6 @@ struct ZKChainStorage {
     /// @dev Whether the chain is a permanent rollup. Note, that it only enforces the DA validator pair, but
     /// it does not enforce any other parameters, e.g. `pubdataPricingMode`
     bool isPermanentRollup;
+    /// @dev Interop Center, responsible for starting L1->L2 messages
+    address interopCenter;
 }

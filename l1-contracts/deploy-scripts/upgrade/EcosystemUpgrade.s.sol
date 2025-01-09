@@ -10,7 +10,7 @@ import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openze
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {Verifier} from "../../contracts/state-transition/Verifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -45,7 +45,7 @@ import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -63,7 +63,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+
+import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
@@ -159,6 +160,8 @@ contract EcosystemUpgrade is Script {
         address ctmDeploymentTrackerProxy;
         address messageRootImplementation;
         address messageRootProxy;
+        address interopCenterImplementation;
+        address interopCenterProxy;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -529,7 +532,8 @@ contract EcosystemUpgrade is Script {
             fixedForceDeploymentsData: generatedData.forceDeploymentsData,
             oldValidatorTimelock: config.contracts.oldValidatorTimelock,
             newValidatorTimelock: addresses.validatorTimelock,
-            wrappedBaseTokenStore: addresses.l2WrappedBaseTokenStore
+            wrappedBaseTokenStore: addresses.l2WrappedBaseTokenStore,
+            interopCenter: addresses.bridgehub.interopCenterProxy
         });
 
         bytes memory postUpgradeCalldata = abi.encode(gateUpgradeInput);
@@ -635,7 +639,8 @@ contract EcosystemUpgrade is Script {
                 (
                     addresses.bridges.sharedBridgeProxy,
                     CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-                    MessageRoot(addresses.bridgehub.messageRootProxy)
+                    MessageRoot(addresses.bridgehub.messageRootProxy),
+                    addresses.bridgehub.interopCenterProxy
                 )
             ),
             value: 0

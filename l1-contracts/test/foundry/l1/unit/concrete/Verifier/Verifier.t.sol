@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {Verifier} from "../../../../../../contracts/state-transition/Verifier.sol";
 import {VerifierTest} from "contracts/dev-contracts/test/VerifierTest.sol";
 
 contract VerifierTestTest is Test {

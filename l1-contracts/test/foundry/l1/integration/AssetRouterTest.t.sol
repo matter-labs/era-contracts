@@ -16,10 +16,12 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, INSERT_MSG_ADDRESS_ON_DESTINATION} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+import {InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -29,7 +31,7 @@ import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -81,8 +83,8 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(interopCenter),
+            abi.encodeWithSelector(IInteropCenter.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         uint256 chainId = eraZKChainId;
@@ -172,7 +174,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-        bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
+        interopCenter.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
@@ -183,6 +185,69 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 secondBridgeAddress: address(sharedBridge),
                 secondBridgeValue: 0,
                 secondBridgeCalldata: secondBridgeCalldata
+            })
+        );
+    }
+
+    function test_DepositDirect() public {
+        depositToL1(ETH_TOKEN_ADDRESS);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+        );
+        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
+        interopCenter.requestL2TransactionDirect{value: 250000000000100}(
+            L2TransactionRequestDirect({
+                chainId: eraZKChainId,
+                mintValue: 250000000000100,
+                l2Contract: address(sharedBridge),
+                l2Value: 0,
+                l2Calldata: secondBridgeCalldata,
+                l2GasLimit: 1000000,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: address(0)
+            })
+        );
+    }
+
+    function test_requestInterop() public {
+        depositToL1(ETH_TOKEN_ADDRESS);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+        );
+        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
+
+        InteropCallStarter[] memory feePaymentCallStarters = new InteropCallStarter[](1);
+        uint256 value = 250000000000100;
+        feePaymentCallStarters[0] = InteropCallStarter({
+            directCall: true,
+            to: INSERT_MSG_ADDRESS_ON_DESTINATION,
+            from: address(this),
+            data: "",
+            value: value,
+            requestedInteropCallValue: value
+        });
+        InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);
+        executionCallStarters[0] = InteropCallStarter({
+            directCall: false,
+            to: address(0), // to address determined by bridge
+            from: address(sharedBridge),
+            data: secondBridgeCalldata,
+            value: 0,
+            requestedInteropCallValue: 0
+        });
+
+        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
+        interopCenter.requestInterop{value: 250000000000100}(
+            eraZKChainId,
+            feePaymentCallStarters,
+            executionCallStarters,
+            GasFields({
+                gasLimit: uint256(1000000),
+                gasPerPubdataByteLimit: uint256(REQUIRED_L2_GAS_PRICE_PER_PUBDATA),
+                refundRecipient: address(0)
             })
         );
     }

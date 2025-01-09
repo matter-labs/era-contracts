@@ -8,38 +8,50 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {BridgedStandardERC20} from "../../../../../contracts/bridge/BridgedStandardERC20.sol";
+import {L2AssetRouter} from "../../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
+import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
-import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../../../contracts/common/Config.sol";
 
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
+import {AddressAliasHelper} from "../../../../../contracts/vendor/AddressAliasHelper.sol";
+import {BridgehubMintCTMAssetData} from "../../../../../contracts/bridgehub/IBridgehub.sol";
+import {IAdmin} from "../../../../../contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {Bridgehub, IBridgehub, BridgehubL2TransactionRequest} from "../../../../../contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter, IInteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
+import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
+import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
+import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
+import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {IChainTypeManager} from "../../../../../contracts/state-transition/IChainTypeManager.sol";
+import {IZKChain} from "../../../../../contracts/state-transition/chain-interfaces/IZKChain.sol";
+// import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
 
-abstract contract SharedL2ContractDeployer is Test, DeployUtils {
+import {DeployUtils} from "../../../../../deploy-scripts/DeployUtils.s.sol";
+
+struct SystemContractsArgs {
+    bool broadcast;
+    uint256 l1ChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    address legacySharedBridge;
+    address l2TokenBeacon;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedOwner;
+    bool contractsDeployedAlready;
+    address l1CtmDeployer;
+}
+
+abstract contract SharedL2ContractDeployer is DeployUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -53,6 +65,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
     IBridgehub l2Bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
+    IInteropCenter l2InteropCenter = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
@@ -79,7 +92,14 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
 
     IChainTypeManager internal chainTypeManager;
 
-    function setUp() public {
+    function setUp() public virtual {
+        setUpInner(false);
+    }
+
+    function setUpInner(bool _skip) public virtual {
+        if (_skip) {
+            vm.startBroadcast();
+        }
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
         beacon.transferOwnership(ownerWallet);
@@ -101,9 +121,12 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         );
 
         L2WrappedBaseToken weth = deployL2Weth();
-
+        if (_skip) {
+            vm.stopBroadcast();
+        }
         initSystemContracts(
             SystemContractsArgs({
+                broadcast: _skip,
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
@@ -115,19 +138,21 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
                 l1CtmDeployer: l1CTMDeployer
             })
         );
-        deployL2Contracts(L1_CHAIN_ID);
+        if (!_skip) {
+            deployL2Contracts(L1_CHAIN_ID);
 
-        vm.prank(aliasedL1AssetRouter);
-        l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_BRIDGEHUB_ADDR);
-        vm.prank(ownerWallet);
-        l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-        l2Bridgehub.setCTMAssetAddress(
-            bytes32(uint256(uint160(l1CTM))),
-            address(addresses.stateTransition.chainTypeManagerProxy)
-        );
-        chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        getExampleChainCommitment();
+            vm.prank(aliasedL1AssetRouter);
+            l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_BRIDGEHUB_ADDR);
+            vm.prank(ownerWallet);
+            l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
+            l2Bridgehub.setCTMAssetAddress(
+                bytes32(uint256(uint160(l1CTM))),
+                address(addresses.stateTransition.chainTypeManagerProxy)
+            );
+            chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+            getExampleChainCommitment();
+        }
     }
 
     function getExampleChainCommitment() internal returns (bytes memory) {

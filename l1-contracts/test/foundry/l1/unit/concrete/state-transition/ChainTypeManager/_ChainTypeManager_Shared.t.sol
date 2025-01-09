@@ -38,6 +38,7 @@ contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
+    address internal interopCenterAddress = address(0x1010101);
     address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
@@ -57,7 +58,7 @@ contract ChainTypeManagerTest is Test {
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
         vm.prank(governor);
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)), address(0));
 
         vm.mockCall(
             address(sharedBridge),
@@ -68,7 +69,7 @@ contract ChainTypeManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
+        chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))), address(interopCenterAddress));
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 

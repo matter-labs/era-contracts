@@ -11,6 +11,8 @@ error OnlySelfAllowed();
 error RestrictionWasNotPresent(address restriction);
 // 0xf126e113
 error RestrictionWasAlreadyPresent(address restriction);
+//
+error BridgehubOnL1();
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
 // 0xf6fd7071
@@ -65,6 +67,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+//
+error ChainNotLegacy();
 // 0xf7a01e4d
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
@@ -135,6 +139,22 @@ error InvalidSelector(bytes4 func);
 error InvalidTxType(uint256 txType);
 // 0x0214acb6
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
+// // 0xaa7feadc
+// error InvalidValue();
+//
+error L2AssetRouter_LegacyDataNotImplemented();
+//
+error L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
+//
+error L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
+// // 0x888b2f09
+// error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
+// // 0xa4f62e33
+// error L2BridgeNotDeployed(uint256 chainId);
+// // 0xff8811ff
+// error L2BridgeNotSet(uint256 chainId);
+// // 0xcb5e4247
+// error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0xd2c011d6
@@ -179,6 +199,10 @@ error NonIncreasingTimestamp();
 error NonSequentialBatch();
 // 0x0ac76f01
 error NonSequentialVersion();
+// 0x4ef79e5a
+error NonZeroAddress(address);
+//
+error NotCurrentSettlementLayer();
 // 0xdd629f86
 error NotEnoughGas();
 // 0xdd7e3621
@@ -239,6 +263,8 @@ error ReplaceFunctionFacetAddressZero();
 error RevertedBatchNotAfterNewLastBatch();
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
+// //
+// error SettlementLayerNotRegistered();
 // 0xd7a6b5e6
 error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0x856d5b77

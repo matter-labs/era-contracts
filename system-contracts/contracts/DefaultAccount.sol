@@ -7,7 +7,7 @@ import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol"
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, L2_INTEROP_HANDLER} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
 
@@ -57,6 +57,17 @@ contract DefaultAccount is IAccount {
         // Continue execution if not delegate called.
         _;
     }
+    event Hello(uint256 indexed);
+    function hello() external payable {
+        emit Hello(17);
+    }
+
+    function forwardFromIC(address _to, bytes memory _data) external payable {
+        (bool success, bytes memory returnData) = _to.call{value: msg.value}(_data);
+        // if (!success) {
+        // revert("Forwarding call failed");
+        // }
+    }
 
     /// @notice Validates the transaction & increments nonce.
     /// @dev The transaction is considered accepted by the account if
@@ -89,6 +100,11 @@ contract DefaultAccount is IAccount {
             0,
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
+
+        if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
+            magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            return magic;
+        }
 
         // Even though for the transaction types present in the system right now,
         // we always provide the suggested signed hash, this should not be
@@ -138,6 +154,10 @@ contract DefaultAccount is IAccount {
         uint128 value = Utils.safeCastToU128(_transaction.value);
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
+        if (to == (address((L2_INTEROP_HANDLER)))) {
+            L2_INTEROP_HANDLER.executeInteropBundle(_transaction);
+            return;
+        }
 
         // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
         bool isSystemCall;
@@ -215,6 +235,9 @@ contract DefaultAccount is IAccount {
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
+        if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
+            L2_INTEROP_HANDLER.executePaymasterBundle(_transaction);
+        }
         bool success = _transaction.payToTheBootloader();
         if (!success) {
             revert FailedToPayOperator();

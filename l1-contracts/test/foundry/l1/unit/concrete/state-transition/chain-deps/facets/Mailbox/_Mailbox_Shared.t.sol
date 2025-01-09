@@ -22,10 +22,12 @@ contract MailboxTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier());
     address diamondProxy;
     address bridgehub;
+    address interopCenter;
 
     function deployDiamondProxy() internal returns (address proxy) {
         sender = makeAddr("sender");
         bridgehub = makeAddr("bridgehub");
+        interopCenter = makeAddr("interopCenter");
         vm.deal(sender, 100 ether);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
@@ -59,6 +61,9 @@ contract MailboxTest is Test {
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
         gettersFacet = IGetters(diamondProxy);
+
+        // utilsFacet.util_setBridgehub(bridgehub);
+        // utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     // add this to be excluded from coverage report

@@ -9,7 +9,7 @@ import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
-import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {BLS_MODULUS} from "../../../da-contracts-imports/DAUtils.sol";
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
 import {PubdataCommitmentsEmpty, BlobHashCommitmentError, OperatorDAInputTooSmall, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, NonEmptyBlobVersionHash} from "../../../da-contracts-imports/DAContractsErrors.sol";

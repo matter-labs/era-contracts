@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER, L2_INTEROP_HANDLER} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -17,7 +17,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 /// @custom:security-contact security@matterlabs.dev
 /// @notice A helper library for initializing and managing force-deployed contracts during either the L2 gateway upgrade or
 /// the genesis after the gateway protocol upgrade.
-library L2GatewayUpgradeHelper {
+library L2GenesisUpgradeHelper {
     /// @notice Initializes force-deployed contracts required for the L2 genesis upgrade.
     /// @param _ctmDeployer Address of the CTM Deployer contract.
     /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
@@ -46,16 +46,16 @@ library L2GatewayUpgradeHelper {
         address bridgehubOwner = L2_BRIDGE_HUB.owner();
 
         // Prepare calldata to set addresses in BridgeHub.
-        bytes memory data = abi.encodeCall(
+        bytes memory bridgehubConstructorData = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT))
+            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_INTEROP_CENTER))
         );
 
         // Execute the call to set addresses in BridgeHub.
         (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
             address(L2_BRIDGE_HUB),
             bridgehubOwner,
-            data
+            bridgehubConstructorData
         );
 
         // Revert with the original revert reason if the call failed.
@@ -63,6 +63,34 @@ library L2GatewayUpgradeHelper {
             /// @dev Propagate the revert reason from the failed call.
             assembly {
                 revert(add(returnData, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory interopCenterConstructorData = abi.encodeCall(L2_INTEROP_CENTER.setAddresses, (L2_ASSET_ROUTER));
+
+        (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
+            address(L2_INTEROP_CENTER),
+            bridgehubOwner,
+            interopCenterConstructorData
+        );
+        if (!success2) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData2, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory interopHandlerConstructorData = abi.encodeCall(L2_INTEROP_HANDLER.setInteropAccountBytecode, ());
+
+        (bool success3, bytes memory returnData3) = SystemContractHelper.mimicCall(
+            address(L2_INTEROP_HANDLER),
+            bridgehubOwner,
+            interopHandlerConstructorData
+        );
+        if (!success3) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData3, 0x20), returndatasize())
             }
         }
     }
@@ -89,7 +117,7 @@ library L2GatewayUpgradeHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployments = new ForceDeployment[](4);
+        forceDeployments = new ForceDeployment[](5);
 
         // Configure the MessageRoot deployment.
         forceDeployments[0] = ForceDeployment({
@@ -173,6 +201,18 @@ library L2GatewayUpgradeHelper {
                 contractsDeployedAlready,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId
+            )
+        });
+
+        forceDeployments[4] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.interopCenterBytecodeHash,
+            newAddress: address(L2_INTEROP_CENTER),
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(
+                L2_BRIDGE_HUB,
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance
             )
         });
     }

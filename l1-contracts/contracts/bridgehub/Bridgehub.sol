@@ -7,17 +7,20 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData, RouteBridgehubDepositStruct} from "./IBridgehub.sol";
+import {IInteropCenter} from "./IInteropCenter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, INTEROP_OPERATION_TX_TYPE} from "../common/Config.sol";
+import {L2_MESSENGER} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
@@ -104,6 +107,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
+    /// @notice chain balance STM address
+    address public chainBalanceSTM;
+
+    /// @notice chain balance address
+    mapping(uint256 chainId => address) public chainBalanceAddress;
+
+    /// @notice interopCenter used for L1<>L2 communication
+    IInteropCenter public override interopCenter;
+
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
             revert Unauthorized(msg.sender);
@@ -129,6 +141,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     modifier onlyAssetRouter() {
         if (msg.sender != assetRouter) {
             revert NotAssetRouter(msg.sender, assetRouter);
+        }
+        _;
+    }
+
+    modifier onlyInteropCenter() {
+        if (msg.sender != address(interopCenter)) {
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -213,11 +232,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot
+        IMessageRoot _messageRoot,
+        address _interopCenter
     ) external onlyOwner {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
+        interopCenter = IInteropCenter(_interopCenter);
     }
 
     /// @notice Used to set the legacy chain data for the upgrade.
@@ -453,54 +474,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Mailbox forwarder
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice the mailbox is called directly after the assetRouter received the deposit
     /// this assumes that either ether is the base token or
     /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
     /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
     function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        // Note: If the ZK chain with corresponding `chainId` is not yet created,
-        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                if (msg.value != _request.mintValue) {
-                    revert MsgValueMismatch(_request.mintValue, msg.value);
-                }
-            } else {
-                if (msg.value != 0) {
-                    revert MsgValueMismatch(0, msg.value);
-                }
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: msg.sender,
-                contractL2: _request.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: _request.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: _request.factoryDeps,
-                refundRecipient: address(0)
-            })
-        );
+        L2TransactionRequestDirect calldata _request // todo onlyL1
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        return interopCenter.requestL2TransactionDirectSender{value: msg.value}(msg.sender, _request);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice After depositing funds to the assetRouter, the secondBridge is called
     ///  to return the actual L2 message which is sent to the Mailbox.
     ///  This assumes that either ether is the base token or
@@ -514,69 +500,38 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _request the request for the L2 transaction
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
-            revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
-        }
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        // todo onlyL1
+        return interopCenter.requestL2TransactionTwoBridgesSender{value: msg.value}(msg.sender, _request);
+    }
 
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                if (msg.value != _request.mintValue + _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = _request.mintValue;
-            } else {
-                if (msg.value != _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = 0;
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
-        }
-
+    /// @notice Used to route BridgehubDeposits to legacy bridges
+    /// @param _request the forwarded bridgehubDepositRequest
+    function routeBridgehubDeposit(
+        RouteBridgehubDepositStruct calldata _request
+    ) external payable onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory outputRequest) {
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
-            .bridgehubDeposit{value: _request.secondBridgeValue}(
+        outputRequest = IAssetRouterBase(_request.secondBridgeAddress).bridgehubDeposit{value: msg.value}(
             _request.chainId,
-            msg.sender,
+            _request.sender,
             _request.l2Value,
             _request.secondBridgeCalldata
         );
+    }
 
-        if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
-            revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: _request.secondBridgeAddress,
-                contractL2: outputRequest.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: outputRequest.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: address(0)
-            })
-        );
-
-        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-            _request.chainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
+    /// @notice Used to route confirmL2Transaction to legacy bridges
+    /// @notice Used by the InteropCenter to route the bridgehubConfirmL2Transaction.
+    /// @param _secondBridgeAddress the address of the bridge
+    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _canonicalTxHash The hash of the L1->L2 transaction to confirm the deposit.
+    function routeBridgehubConfirmL2Transaction(
+        address _secondBridgeAddress,
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _canonicalTxHash
+    ) external override onlyInteropCenter {
+        IAssetRouterBase(_secondBridgeAddress).bridgehubConfirmL2Transaction(_chainId, _txDataHash, _canonicalTxHash);
     }
 
     /// @notice This function is used to send a request to the ZK chain.
@@ -591,9 +546,35 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) internal returns (bytes32 canonicalTxHash) {
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
-        address zkChain = zkChainMap.get(_chainId);
+        (bool registered, address zkChain) = zkChainMap.tryGet(_chainId);
+        if (registered) {
+            canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
+        } else {
+            L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
+                txType: INTEROP_OPERATION_TX_TYPE,
+                from: uint256(uint160(_request.sender)),
+                to: uint256(uint160(_request.contractL2)),
+                gasLimit: _request.l2GasLimit,
+                gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                maxFeePerGas: uint256(276250000), // todo change in the bootloader
+                maxPriorityFeePerGas: uint256(140000000),
+                paymaster: uint256(0),
+                nonce: uint256(0), //todo
+                value: _request.l2Value,
+                reserved: [81667768061025231231209905783624370749440, uint256(uint160(refundRecipient)), 0, 0], //[_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
+                data: _request.l2Calldata,
+                signature: new bytes(0),
+                factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
+                paymasterInput: new bytes(0),
+                reservedDynamic: new bytes(0)
+            });
+            /// Fixme this does not have a unique hash atm.
+            // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(_request));
+            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
 
-        canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
+            // solhint-disable-next-line func-named-parameters
+            emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
+        }
     }
 
     /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
@@ -612,6 +593,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 message inclusion.
     /// @param _batchNumber The executed L2 batch number in which the message appeared
@@ -630,6 +612,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 log inclusion.
     /// @param _batchNumber The executed L2 batch number in which the log appeared
@@ -648,6 +631,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L1->L2 tx status.
     /// @param _l2TxHash The L2 canonical transaction hash
@@ -679,6 +663,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             });
     }
 
+    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     function l2TransactionBaseCost(
         uint256 _chainId,
