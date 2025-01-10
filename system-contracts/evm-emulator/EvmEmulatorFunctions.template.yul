@@ -271,7 +271,7 @@ function swapActivePointer(index0, index1) {
     verbatim_2i_0o("active_ptr_swap", index0, index1)
 }
 
-function swapActivePointerWithBytecodePointer() {
+function swapActivePointerWithEvmReturndataPointer() {
     verbatim_2i_0o("active_ptr_swap", 0, 2)
 }
 
@@ -974,15 +974,15 @@ function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
 }
 
 function _saveReturndataAfterZkEVMCall() {
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
     loadReturndataIntoActivePtr()
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
     mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
 }
 
 function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
     let rtsz := returndatasize()
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
     loadReturndataIntoActivePtr()
 
     // if (rtsz > 31)
@@ -1006,14 +1006,14 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             // Skip first 32 bytes of the returnData
             ptrAddIntoActive(32)
         }
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
 }
 
 function _eraseReturndataPointer() {
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
     let activePtrSize := getActivePtrDataSize()
     ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
     mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
 }
 
@@ -1175,7 +1175,7 @@ function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> succes
 }
 
 function _saveConstructorReturnGas() -> gasLeft, addr {
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
     loadReturndataIntoActivePtr()
 
     if lt(returndatasize(), 64) {
@@ -1187,7 +1187,7 @@ function _saveConstructorReturnGas() -> gasLeft, addr {
     gasLeft := activePointerLoad(0)
     addr := activePointerLoad(32)
 
-    swapActivePointerWithBytecodePointer()
+    swapActivePointerWithEvmReturndataPointer()
 
     _eraseReturndataPointer()
 }
