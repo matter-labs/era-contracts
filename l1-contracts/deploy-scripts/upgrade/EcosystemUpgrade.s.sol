@@ -600,7 +600,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function getStage2UpgradeCalls() public returns (Call[] memory calls) {
-        calls = new Call[](11);
+        calls = new Call[](10);
 
         // We need to firstly update all the contracts
         calls[0] = Call({
