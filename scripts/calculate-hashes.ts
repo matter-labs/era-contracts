@@ -291,7 +291,7 @@ const findDifferences = (newHashes: ContractsInfo[], oldHashes: ContractsInfo[])
   return differencesList;
 };
 
-const SOLIDITY_SOURCE_CODE_PATHS = ["system-contracts/", "l2-contracts/", "l1-contracts/"];
+const SOLIDITY_SOURCE_CODE_PATHS = ["system-contracts/", "l2-contracts/", "l1-contracts/", "da-contracts/"];
 const YUL_SOURCE_CODE_PATHS = ["system-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
