@@ -16,6 +16,7 @@ import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -225,5 +226,30 @@ contract AcceptAdmin is Script {
         }
 
         Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
+    }
+
+    /// @notice Adds L2WrappedBaseToken of a chain to the store.
+    /// @param storeAddress THe address of the `L2WrappedBaseTokenStore`.
+    /// @param ecosystemAdmin The address of the ecosystem admin contract.
+    /// @param chainId The chain id of the chain.
+    /// @param l2WBaseToken The address of the L2WrappedBaseToken.
+    function addL2WethToStore(
+        address storeAddress,
+        ChainAdmin ecosystemAdmin,
+        uint256 chainId,
+        address l2WBaseToken
+    ) public {
+        L2WrappedBaseTokenStore l2WrappedBaseTokenStore = L2WrappedBaseTokenStore(storeAddress);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: storeAddress,
+            value: 0,
+            data: abi.encodeCall(l2WrappedBaseTokenStore.initializeChain, (chainId, l2WBaseToken))
+        });
+
+        vm.startBroadcast();
+        ecosystemAdmin.multicall(calls, true);
+        vm.stopBroadcast();
     }
 }
