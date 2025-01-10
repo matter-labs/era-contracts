@@ -23,12 +23,12 @@ async function main() {
       const bridgehubAddr = await l2Provider.getBridgehubContractAddress();
       const proxyAdmin = await l1Provider.getStorageAt(
         bridgehubAddr,
-        // This is the storage slot where TransparentUpgradeableProxy stores 
+        // This is the storage slot where TransparentUpgradeableProxy stores
         // its admin
         "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
       );
 
-      if (!proxyAdmin.startsWith('0x' + '0'.repeat(24)) || proxyAdmin == ethers.constants.HashZero) {
+      if (!proxyAdmin.startsWith("0x" + "0".repeat(24)) || proxyAdmin == ethers.constants.HashZero) {
         throw new Error(`Invalid ProxyAdmin: ${proxyAdmin}`);
       }
 

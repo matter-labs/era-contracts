@@ -315,7 +315,10 @@ contract EcosystemUpgrade is Script {
         config.contracts.oldProtocolVersion = getOldProtocolVersion();
 
         uint256 ctmProtocolVersion = ChainTypeManager(config.contracts.stateTransitionManagerAddress).protocolVersion();
-        require(ctmProtocolVersion != getNewProtocolVersion(), "The new protocol version is already present on the ChainTypeManager");
+        require(
+            ctmProtocolVersion != getNewProtocolVersion(),
+            "The new protocol version is already present on the ChainTypeManager"
+        );
 
         config.contracts.oldValidatorTimelock = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
             .validatorTimelock();
@@ -434,7 +437,7 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
         // Note, that the server requires that the validator timelock is updated together with the protocol version
-        // as it relies on it to dynamically fetch the validator timelock address. 
+        // as it relies on it to dynamically fetch the validator timelock address.
         Call memory setValidatorTimelockCall = Call({
             target: config.contracts.stateTransitionManagerAddress,
             data: abi.encodeCall(ChainTypeManager.setValidatorTimelock, (addresses.validatorTimelock)),
