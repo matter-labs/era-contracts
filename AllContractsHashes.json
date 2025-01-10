@@ -1712,10 +1712,10 @@
     "zkBytecodePath": null
   },
   {
-    "contractName": "l1-contracts/CreateAndTransfer",
-    "evmBytecodeHash": "0x3ef11e5b831a5114a37d3daa2265740bd39b5302b11d972a872462c747f991ed",
-    "evmBytecodePath": "/l1-contracts/out/CreateAndTransfer.sol/CreateAndTransfer.json",
-    "evmDeployedBytecodeHash": "0xae6d5f0e37eb646c6f61340d8ba97f1c23f3b022500f99c089e5ef95a6332c87",
+    "contractName": "l1-contracts/Create2AndTransfer",
+    "evmBytecodeHash": "0x95d7ded2a7e878aa82674a330a2b3638b0efa6168a4e0af9b30afdf68384cabb",
+    "evmBytecodePath": "/l1-contracts/out/Create2AndTransfer.sol/Create2AndTransfer.json",
+    "evmDeployedBytecodeHash": "0xdfaa9e7594513b81050146de2564399318a7f5be75c6b55bda5309368de2d6c1",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
