@@ -254,16 +254,12 @@ function insufficientBalance(value) -> res {
 
 // It is the responsibility of the caller to ensure that ip is correct
 function $llvm_AlwaysInline_llvm$_readIP(ip) -> opcode {
-    swapActivePointerWithBytecodePointer()
     opcode := shr(248, activePointerLoad(ip))
-    swapActivePointerWithBytecodePointer()
 }
 
 // It is the responsibility of the caller to ensure that start and length is correct
 function readBytes(start, length) -> value {
-    swapActivePointerWithBytecodePointer()
     let rawValue := activePointerLoad(start)
-    swapActivePointerWithBytecodePointer()
 
     value := shr(mul(8, sub(32, length)), rawValue)
     // will be padded by zeroes if out of bounds
@@ -980,12 +976,15 @@ function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
 }
 
 function _saveReturndataAfterZkEVMCall() {
+    swapActivePointerWithBytecodePointer()
     loadReturndataIntoActivePtr()
+    swapActivePointerWithBytecodePointer()
     mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
 }
 
 function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
     let rtsz := returndatasize()
+    swapActivePointerWithBytecodePointer()
     loadReturndataIntoActivePtr()
 
     // if (rtsz > 31)
@@ -1009,11 +1008,14 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             // Skip first 32 bytes of the returnData
             ptrAddIntoActive(32)
         }
+    swapActivePointerWithBytecodePointer()
 }
 
 function _eraseReturndataPointer() {
+    swapActivePointerWithBytecodePointer()
     let activePtrSize := getActivePtrDataSize()
     ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
+    swapActivePointerWithBytecodePointer()
     mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
 }
 
@@ -1175,6 +1177,7 @@ function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> succes
 }
 
 function _saveConstructorReturnGas() -> gasLeft, addr {
+    swapActivePointerWithBytecodePointer()
     loadReturndataIntoActivePtr()
 
     if lt(returndatasize(), 64) {
@@ -1185,6 +1188,8 @@ function _saveConstructorReturnGas() -> gasLeft, addr {
     // ContractDeployer returns (uint256 gasLeft, address createdContract)
     gasLeft := activePointerLoad(0)
     addr := activePointerLoad(32)
+
+    swapActivePointerWithBytecodePointer()
 
     _eraseReturndataPointer()
 }
