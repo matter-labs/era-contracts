@@ -536,9 +536,9 @@ for { } true { } {
             panic()
         }
 
-        swapActivePointerWithBytecodePointer()
+        swapActivePointerWithEvmReturndataPointer()
         copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
-        swapActivePointerWithBytecodePointer()
+        swapActivePointerWithEvmReturndataPointer()
         ip := add(ip, 1)
     }
     case 0x3F { // OP_EXTCODEHASH

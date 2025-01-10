@@ -335,7 +335,7 @@ object "EvmEmulator" {
             verbatim_2i_0o("active_ptr_swap", index0, index1)
         }
         
-        function swapActivePointerWithBytecodePointer() {
+        function swapActivePointerWithEvmReturndataPointer() {
             verbatim_2i_0o("active_ptr_swap", 0, 2)
         }
         
@@ -1034,15 +1034,15 @@ object "EvmEmulator" {
         }
         
         function _saveReturndataAfterZkEVMCall() {
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
             loadReturndataIntoActivePtr()
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
             mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
         }
         
         function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             let rtsz := returndatasize()
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
             loadReturndataIntoActivePtr()
         
             // if (rtsz > 31)
@@ -1066,14 +1066,14 @@ object "EvmEmulator" {
                     // Skip first 32 bytes of the returnData
                     ptrAddIntoActive(32)
                 }
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
         }
         
         function _eraseReturndataPointer() {
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
             let activePtrSize := getActivePtrDataSize()
             ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
             mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
         }
         
@@ -1235,7 +1235,7 @@ object "EvmEmulator" {
         }
         
         function _saveConstructorReturnGas() -> gasLeft, addr {
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
             loadReturndataIntoActivePtr()
         
             if lt(returndatasize(), 64) {
@@ -1247,7 +1247,7 @@ object "EvmEmulator" {
             gasLeft := activePointerLoad(0)
             addr := activePointerLoad(32)
         
-            swapActivePointerWithBytecodePointer()
+            swapActivePointerWithEvmReturndataPointer()
         
             _eraseReturndataPointer()
         }
@@ -1888,9 +1888,9 @@ object "EvmEmulator" {
                         panic()
                     }
             
-                    swapActivePointerWithBytecodePointer()
+                    swapActivePointerWithEvmReturndataPointer()
                     copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
-                    swapActivePointerWithBytecodePointer()
+                    swapActivePointerWithEvmReturndataPointer()
                     ip := add(ip, 1)
                 }
                 case 0x3F { // OP_EXTCODEHASH
@@ -3272,7 +3272,7 @@ object "EvmEmulator" {
                 verbatim_2i_0o("active_ptr_swap", index0, index1)
             }
             
-            function swapActivePointerWithBytecodePointer() {
+            function swapActivePointerWithEvmReturndataPointer() {
                 verbatim_2i_0o("active_ptr_swap", 0, 2)
             }
             
@@ -3971,15 +3971,15 @@ object "EvmEmulator" {
             }
             
             function _saveReturndataAfterZkEVMCall() {
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
                 loadReturndataIntoActivePtr()
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
                 mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
             }
             
             function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
                 let rtsz := returndatasize()
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
                 loadReturndataIntoActivePtr()
             
                 // if (rtsz > 31)
@@ -4003,14 +4003,14 @@ object "EvmEmulator" {
                         // Skip first 32 bytes of the returnData
                         ptrAddIntoActive(32)
                     }
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
             }
             
             function _eraseReturndataPointer() {
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
                 let activePtrSize := getActivePtrDataSize()
                 ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
                 mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
             }
             
@@ -4172,7 +4172,7 @@ object "EvmEmulator" {
             }
             
             function _saveConstructorReturnGas() -> gasLeft, addr {
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
                 loadReturndataIntoActivePtr()
             
                 if lt(returndatasize(), 64) {
@@ -4184,7 +4184,7 @@ object "EvmEmulator" {
                 gasLeft := activePointerLoad(0)
                 addr := activePointerLoad(32)
             
-                swapActivePointerWithBytecodePointer()
+                swapActivePointerWithEvmReturndataPointer()
             
                 _eraseReturndataPointer()
             }
@@ -4813,9 +4813,9 @@ object "EvmEmulator" {
                             panic()
                         }
                 
-                        swapActivePointerWithBytecodePointer()
+                        swapActivePointerWithEvmReturndataPointer()
                         copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
-                        swapActivePointerWithBytecodePointer()
+                        swapActivePointerWithEvmReturndataPointer()
                         ip := add(ip, 1)
                     }
                     case 0x3F { // OP_EXTCODEHASH
