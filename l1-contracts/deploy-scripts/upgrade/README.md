@@ -6,5 +6,5 @@
 2. Run the following to prepare the ecosystem:
 
 ```sh
-GATEWAY_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/<input-file> forge script --sig 0xc0406226 EcosystemUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
+GATEWAY_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/<input-file> forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
 ```

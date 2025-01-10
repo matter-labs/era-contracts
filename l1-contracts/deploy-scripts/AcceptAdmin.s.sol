@@ -228,9 +228,14 @@ contract AcceptAdmin is Script {
         Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
     }
 
+    /// @notice Adds L2WrappedBaseToken of a chain to the store.
+    /// @param storeAddress THe address of the `L2WrappedBaseTokenStore`.
+    /// @param ecosystemAdmin The address of the ecosystem admin contract.
+    /// @param chainId The chain id of the chain.
+    /// @param l2WBaseToken The address of the L2WrappedBaseToken.
     function addL2WethToStore(
         address storeAddress,
-        ChainAdmin chainAdmin,
+        ChainAdmin ecosystemAdmin,
         uint256 chainId,
         address l2WBaseToken
     ) public {
@@ -244,7 +249,7 @@ contract AcceptAdmin is Script {
         });
 
         vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
+        ecosystemAdmin.multicall(calls, true);
         vm.stopBroadcast();
     }
 }
