@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {UnknownVerifierType, EmptyRecursiveAggregationInputLength} from "../../common/L1ContractErrors.sol";
+import {UnknownVerifierType, EmptyProofLength} from "../errors/L2ContractErrors.sol";
 
 /// @title Dual Verifier
 /// @author Matter Labs
@@ -42,12 +42,12 @@ contract DualVerifier is IVerifier {
     /// @return Returns `true` if the proof verification succeeds, otherwise throws an error.
     function verify(
         uint256[] calldata _publicInputs,
-        uint256[] calldata _proof,
+        uint256[] calldata _proof
     ) public view virtual returns (bool) {
         // Ensure the proof has a valid length (at least one element
         // for the proof system differentiator).
         if (_proof.length == 0) {
-            revert EmptyRecursiveAggregationInputLength();
+            revert EmptyProofLength();
         }
 
         // The first element of `_recursiveAggregationInput` determines the verifier type (either FFLONK or PLONK).
@@ -58,7 +58,7 @@ contract DualVerifier is IVerifier {
             return
                 PLONK_VERIFIER.verify(
                     _publicInputs,
-                    _extractProof(_proof),
+                    _extractProof(_proof)
                 );
         }
         // If the verifier type is unknown, revert with an error.

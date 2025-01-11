@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {UnknownVerifierType, EmptyRecursiveAggregationInputLength} from "../../common/L1ContractErrors.sol";
+import {UnknownVerifierType, EmptyProofLength} from "../../common/L1ContractErrors.sol";
 
 /// @title Dual Verifier
 /// @author Matter Labs
@@ -47,7 +47,7 @@ contract DualVerifier is IVerifier {
         // Ensure the proof has a valid length (at least one element
         // for the proof system differentiator).
         if (_proof.length == 0) {
-            revert EmptyRecursiveAggregationInputLength();
+            revert EmptyProofLength();
         }
 
         // The first element of `_recursiveAggregationInput` determines the verifier type (either FFLONK or PLONK).
