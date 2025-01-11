@@ -18,10 +18,11 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -189,8 +190,7 @@ contract ExecutorTest is Test {
             timestamp: 0,
             commitment: bytes32("")
         });
-
-        TestnetVerifier testnetVerifier = new TestnetVerifier();
+        TestnetVerifier testnetVerifier = new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW

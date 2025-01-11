@@ -12,9 +12,12 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-import {Verifier} from "../Verifier.sol";
+import {DualVerifier} from "../verifiers/DualVerifier.sol";
+import {VerifierFflonk} from "../verifiers/VerifierFflonk.sol";
+import {VerifierPlonk} from "../verifiers/VerifierPlonk.sol";
+
 import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {TestnetVerifier} from "../TestnetVerifier.sol";
+import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
@@ -232,10 +235,12 @@ contract GatewayCTMDeployer {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts
     ) internal {
+        VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
+        VerifierPlonk verifierPlonk = new VerifierPlonk{salt: _salt}();
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(new TestnetVerifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk));
         } else {
-            _deployedContracts.stateTransition.verifier = address(new Verifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk));
         }
     }
 

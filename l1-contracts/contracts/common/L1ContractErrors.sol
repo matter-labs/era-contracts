@@ -391,6 +391,10 @@ error InvalidSystemLogsLength();
 error LegacyBridgeNotSet();
 // 0x767eed08
 error LegacyMethodForNonL1Token();
+// 0xc352bb73
+error UnknownVerifierType();
+// 0xdf320f0a
+error EmptyRecursiveAggregationInputLength();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
