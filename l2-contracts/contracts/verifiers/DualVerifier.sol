@@ -40,10 +40,7 @@ contract DualVerifier is IVerifier {
     ///     - 0 indicates the FFLONK verifier should be used.
     ///     - 1 indicates the PLONK verifier should be used.
     /// @return Returns `true` if the proof verification succeeds, otherwise throws an error.
-    function verify(
-        uint256[] calldata _publicInputs,
-        uint256[] calldata _proof
-    ) public view virtual returns (bool) {
+    function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view virtual returns (bool) {
         // Ensure the proof has a valid length (at least one element
         // for the proof system differentiator).
         if (_proof.length == 0) {
@@ -55,11 +52,7 @@ contract DualVerifier is IVerifier {
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
             return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
-            return
-                PLONK_VERIFIER.verify(
-                    _publicInputs,
-                    _extractProof(_proof)
-                );
+            return PLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -90,9 +83,7 @@ contract DualVerifier is IVerifier {
     /// @param _proof The proof array array.
     /// @return result A new array with the first element removed. The first element was used as a hack for
     /// differentiator between FFLONK and PLONK proofs.
-    function _extractProof(
-        uint256[] calldata _proof
-    ) internal pure returns (uint256[] memory result) {
+    function _extractProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
         uint256 length = _proof.length;
 
         // Allocate memory for the new array (length - 1) since the first element is omitted.

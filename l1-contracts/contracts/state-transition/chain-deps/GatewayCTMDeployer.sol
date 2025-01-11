@@ -238,9 +238,13 @@ contract GatewayCTMDeployer {
         VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
         VerifierPlonk verifierPlonk = new VerifierPlonk{salt: _salt}();
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk));
+            _deployedContracts.stateTransition.verifier = address(
+                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+            );
         } else {
-            _deployedContracts.stateTransition.verifier = address(new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk));
+            _deployedContracts.stateTransition.verifier = address(
+                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+            );
         }
     }
 
