@@ -374,16 +374,18 @@ contract VerifierPlonk is IVerifier {
 
             /// @dev Performs modular exponentiation using the formula (value ^ power) mod R_MOD.
             function modexp(value, power) -> res {
-                mstore(0x00, 0x20)
-                mstore(0x20, 0x20)
-                mstore(0x40, 0x20)
-                mstore(0x60, value)
-                mstore(0x80, power)
-                mstore(0xa0, R_MOD)
-                if iszero(staticcall(gas(), 5, 0, 0xc0, 0x00, 0x20)) {
-                    revertWithMessage(24, "modexp precompile failed")
+                res := 1
+                for {
+
+                } gt(power, 0) {
+
+                } {
+                    if mod(power, 2) {
+                        res := mulmod(res, value, R_MOD)
+                    }
+                    value := mulmod(value, value, R_MOD)
+                    power := shr(1, power)
                 }
-                res := mload(0x00)
             }
 
             /// @dev Performs a point multiplication operation and stores the result in a given memory destination.

@@ -1587,16 +1587,18 @@ contract VerifierFflonk is IVerifierV2 {
              * The free memory pointer is not updated as it stays unused throughout the code execution.
              */
             function modexp(value, power) -> res {
-                mstore(0x80, 0x20)
-                mstore(0xa0, 0x20)
-                mstore(0xc0, 0x20)
-                mstore(0xe0, value)
-                mstore(0x100, power)
-                mstore(0x120, R_MOD)
-                if iszero(staticcall(gas(), 5, 0x80, 0xc0, 0x80, 0x20)) {
-                    revertWithMessage(24, "modexp precompile failed")
+                res := 1
+                for {
+
+                } gt(power, 0) {
+
+                } {
+                    if mod(power, 2) {
+                        res := mulmod(res, value, R_MOD)
+                    }
+                    value := mulmod(value, value, R_MOD)
+                    power := shr(1, power)
                 }
-                res := mload(0x80)
             }
         }
     }
