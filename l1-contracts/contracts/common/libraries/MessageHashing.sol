@@ -48,9 +48,7 @@ library MessageHashing {
         bool finalProofNode;
     }
 
-    function parseProofMetadata(
-        bytes32[] calldata _proof
-    ) internal pure returns (ProofMetadata memory result) {
+    function parseProofMetadata(bytes32[] calldata _proof) internal pure returns (ProofMetadata memory result) {
         bytes32 proofMetadata = _proof[0];
 
         // We support two formats of the proofs:
