@@ -17,6 +17,8 @@ bootloaderArtifacts.forEach((file) => {
   if (data.bytecode && data.bytecode.object) {
     const bytecodeObject = data.bytecode.object;
 
+    let bytecode = Uint8Array.from(Buffer.from(bytecodeObject));
+
     if (!fs.existsSync(path.join(__dirname, OUTPUT_DIR))) {
       fs.mkdirSync(OUTPUT_DIR, { recursive: true });
       console.log(`Created directory ${OUTPUT_DIR}`);
@@ -24,7 +26,7 @@ bootloaderArtifacts.forEach((file) => {
       console.log(`Directory ${OUTPUT_DIR} already exists`);
     }
 
-    fs.writeFileSync(outputFilePath, bytecodeObject, { flag: "w+" });
+    fs.writeFileSync(outputFilePath, bytecode, { flag: "w+" });
     console.log(`Saved bytecode to ${outputFilePath}`);
   } else {
     console.error(`Invalid schema in ${file}: bytecode or object field is missing.`);
