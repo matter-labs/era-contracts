@@ -415,12 +415,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function getOldProtocolVersion() public returns (uint256) {
-        // Mainnet is the only network that has not been upgraded.
-        if (block.chainid == 1) {
-            return 0x1800000002;
-        } else {
-            return 0x1900000000;
-        }
+        return 0x1900000000;
     }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
@@ -1366,7 +1361,10 @@ contract EcosystemUpgrade is Script {
         notifyAboutDeployment(
             addresses.l2WrappedBaseTokenStore,
             "L2WrappedBaseTokenStore",
-            abi.encode(config.ownerAddress, config.ecosystemAdminAddress)
+            // We set a temoprary admin there. This is needed for easier/quicker setting of
+            // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the 
+            // decentralized upgrade voting starts.
+            abi.encode(config.ownerAddress, msg.sender)
         );
     }
 
