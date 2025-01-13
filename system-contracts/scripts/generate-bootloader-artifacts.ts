@@ -17,7 +17,7 @@ bootloaderArtifacts.forEach((file) => {
   if (data.bytecode && data.bytecode.object) {
     const bytecodeObject = data.bytecode.object;
 
-    let bytecode = Uint8Array.from(Buffer.from(bytecodeObject));
+    const bytecode = Uint8Array.from(Buffer.from(bytecodeObject));
 
     if (!fs.existsSync(path.join(__dirname, OUTPUT_DIR))) {
       fs.mkdirSync(OUTPUT_DIR, { recursive: true });
