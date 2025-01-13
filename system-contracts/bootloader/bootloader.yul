@@ -4089,7 +4089,7 @@ object "Bootloader" {
             mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), EMPTY_STRING_KECCAK())
             mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), 0)
 
-            setMessageRoots()
+            // setMessageRoots()
 
             // Iterating through transaction descriptions
             let transactionIndex := 0

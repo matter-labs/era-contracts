@@ -8,6 +8,7 @@ import {MerklePathEmpty, BatchNotExecuted} from "../L1ContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
 
 import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../state-transition/L1StateTransitionErrors.sol";
+import {InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
 
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
@@ -40,9 +41,16 @@ library MessageHashing {
         return keccak256(abi.encodePacked(CHAIN_ID_LEAF_PADDING, chainIdRoot, chainId));
     }
 
+    struct ProofMetadata {
+        uint256 proofStartIndex;
+        uint256 logLeafProofLen;
+        uint256 batchLeafProofLen;
+        bool finalProofNode;
+    }
+
     function parseProofMetadata(
         bytes32[] calldata _proof
-    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+    ) internal pure returns (ProofMetadata memory result) {
         bytes32 proofMetadata = _proof[0];
 
         // We support two formats of the proofs:
@@ -52,13 +60,14 @@ library MessageHashing {
         // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
         // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
         // - the rest of the bytes are zeroes.
+        // - fourth byte: whether the current proof is the last in the links of recursive proofs for settlement layers.
         //
         // In the future the old version will be disabled, and only the new version will be supported.
-        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 29 bytes are zeroes.
-        // It is safe, since the elements of the proof are hashes and are unlikely to have 29 zero bytes in them.
+        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 28 bytes are zeroes.
+        // It is safe, since the elements of the proof are hashes and are unlikely to have 28 zero bytes in them.
 
-        // We shift left by 3 bytes = 24 bits to remove the top 24 bits of the metadata.
-        uint256 metadataAsUint256 = (uint256(proofMetadata) << 24);
+        // We shift left by 4 bytes = 32 bits to remove the top 32 bits of the metadata.
+        uint256 metadataAsUint256 = (uint256(proofMetadata) << 32);
 
         if (metadataAsUint256 == 0) {
             // It is the new version
@@ -67,16 +76,21 @@ library MessageHashing {
                 revert UnsupportedProofMetadataVersion(uint256(uint8(metadataVersion)));
             }
 
-            proofStartIndex = 1;
-            logLeafProofLen = uint256(uint8(proofMetadata[1]));
-            batchLeafProofLen = uint256(uint8(proofMetadata[2]));
+            result.proofStartIndex = 1;
+            result.logLeafProofLen = uint256(uint8(proofMetadata[1]));
+            result.batchLeafProofLen = uint256(uint8(proofMetadata[2]));
+            result.finalProofNode = uint256(uint8(proofMetadata[3])) != 0;
         } else {
             // It is the old version
 
             // The entire proof is a merkle path
-            proofStartIndex = 0;
-            logLeafProofLen = _proof.length;
-            batchLeafProofLen = 0;
+            result.proofStartIndex = 0;
+            result.logLeafProofLen = _proof.length;
+            result.batchLeafProofLen = 0;
+            result.finalProofNode = true;
+        }
+        if (result.finalProofNode && result.batchLeafProofLen != 0) {
+            revert InvalidProofLengthForFinalNode();
         }
     }
 
@@ -91,20 +105,20 @@ library MessageHashing {
             revert MerklePathEmpty();
         }
 
-        (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = MessageHashing
-            .parseProofMetadata(_proof);
-        result.ptr = proofStartIndex;
+        ProofMetadata memory proofMetadata = MessageHashing.parseProofMetadata(_proof);
+        result.ptr = proofMetadata.proofStartIndex;
 
         {
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
-                extractSlice(_proof, result.ptr, result.ptr + logLeafProofLen),
+                extractSlice(_proof, result.ptr, result.ptr + proofMetadata.logLeafProofLen),
                 _leafProofMask,
                 _leaf
             );
-            result.ptr += logLeafProofLen;
+            result.ptr += proofMetadata.logLeafProofLen;
             result.batchSettlementRoot = batchSettlementRoot;
+            result.finalProofNode = proofMetadata.finalProofNode;
 
-            if (batchLeafProofLen == 0) {
+            if (proofMetadata.batchLeafProofLen == 0) {
                 return result;
             }
             // Now, we'll have to check that the Gateway included the message.
@@ -114,11 +128,11 @@ library MessageHashing {
             ++result.ptr;
 
             bytes32 chainIdRoot = Merkle.calculateRootMemory(
-                extractSlice(_proof, result.ptr, result.ptr + batchLeafProofLen),
+                extractSlice(_proof, result.ptr, result.ptr + proofMetadata.batchLeafProofLen),
                 batchLeafProofMask,
                 localBatchLeafHash
             );
-            result.ptr += batchLeafProofLen;
+            result.ptr += proofMetadata.batchLeafProofLen;
 
             result.chainIdLeaf = MessageHashing.chainIdLeafHash(chainIdRoot, _chainId);
         }
@@ -141,11 +155,11 @@ library MessageHashing {
             settlementLayerChainId: settlementLayerChainId,
             settlementLayerBatchNumber: settlementLayerBatchNumber,
             settlementLayerBatchRootMask: settlementLayerBatchRootMask,
-            batchLeafProofLen: batchLeafProofLen,
+            batchLeafProofLen: proofMetadata.batchLeafProofLen,
             batchSettlementRoot: result.batchSettlementRoot,
             chainIdLeaf: result.chainIdLeaf,
             ptr: result.ptr,
-            finalProofNode: true // kl todo?
+            finalProofNode: proofMetadata.finalProofNode
         });
     }
 

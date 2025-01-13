@@ -78,7 +78,7 @@ error DeployFailed();
 // 0x138ee1a3
 error DeployingBridgedTokenForNativeToken();
 // 0xc7c9660f
-error DepositDoesNotExist();
+error DepositDoesNotExist(bytes32, bytes32);
 // 0xad2fa98e
 error DepositExists();
 // 0x0e7ee319

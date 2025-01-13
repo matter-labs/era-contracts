@@ -394,7 +394,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                     _transferData: _assetData
                 });
                 if (dataHash != txDataHash) {
-                    revert DepositDoesNotExist();
+                    revert DepositDoesNotExist(dataHash, txDataHash);
                 }
             }
         }

@@ -646,6 +646,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override returns (bytes32 canonicalTxHash) {
         // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
+        // note claimFailedDeposit does not work with this hack!
         // return _requestL2TransactionTwoBridges(msg.sender, false, _request);
         return _requestInteropSingleCall(_request, msg.sender);
     }
@@ -655,6 +656,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
         // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
+        // note claimFailedDeposit does not work with this hack!
         // return _requestL2TransactionTwoBridges(_sender, true, _request);
         return _requestInteropSingleCall(_request, _sender);
     }
