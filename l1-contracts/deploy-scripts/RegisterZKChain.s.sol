@@ -31,7 +31,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {CreateAndTransfer} from "./CreateAndTransfer.sol";
+import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 // solhint-disable-next-line gas-struct-packing
@@ -460,10 +460,10 @@ contract RegisterZKChainScript is Script {
 
     function deployChainProxyAddress() internal {
         bytes memory input = abi.encode(type(ProxyAdmin).creationCode, config.create2Salt, output.chainAdmin);
-        bytes memory encoded = abi.encodePacked(type(CreateAndTransfer).creationCode, input);
-        address createAndTransfer = Utils.deployViaCreate2(encoded, config.create2Salt, config.create2FactoryAddress);
+        bytes memory encoded = abi.encodePacked(type(Create2AndTransfer).creationCode, input);
+        address create2AndTransfer = Utils.deployViaCreate2(encoded, config.create2Salt, config.create2FactoryAddress);
 
-        address proxyAdmin = vm.computeCreate2Address(config.create2Salt, keccak256(encoded), createAndTransfer);
+        address proxyAdmin = vm.computeCreate2Address(config.create2Salt, keccak256(encoded), create2AndTransfer);
 
         console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
         output.chainProxyAdmin = address(proxyAdmin);

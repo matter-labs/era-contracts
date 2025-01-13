@@ -57,8 +57,6 @@
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
     "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",
-    "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
-    "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "clean": "yarn clean:bootloader && yarn clean:system-contracts",
     "clean:bootloader": "rm -rf ./bootloader/build ./bootloader/tests/artifacts",
     "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean",

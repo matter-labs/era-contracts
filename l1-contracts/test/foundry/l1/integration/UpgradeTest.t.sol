@@ -11,9 +11,9 @@ import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 
-string constant ECOSYSTEM_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-config/mainnet.toml";
+string constant ECOSYSTEM_INPUT = "/upgrade-envs/mainnet.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
-string constant CHAIN_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-config/mainnet-era.toml";
+string constant CHAIN_INPUT = "/upgrade-envs/mainnet-era.toml";
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-era.toml";
 
 contract UpgradeTest is Test {
@@ -58,6 +58,8 @@ contract UpgradeTest is Test {
         // including era specific deposit/withdraw functions
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
         // so it was tested in e2e local environment.
+
+        vm.warp(block.timestamp + generateUpgradeData.getInitialDelay());
 
         console.log("Starting stage2 of the upgrade!");
         governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());
