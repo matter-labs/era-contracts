@@ -47,7 +47,7 @@ async function main() {
   outputToml.transactions = transactionsArray;
 
   // Convert the final object into YAML and output it.
-  const yamlOutput = stringify(outputToml);
+  const yamlOutput = stringify(outputToml, {lineWidth: -1});
   console.log(yamlOutput);
 }
 
