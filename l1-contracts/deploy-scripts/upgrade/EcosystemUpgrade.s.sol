@@ -1068,7 +1068,7 @@ contract EcosystemUpgrade is Script {
         address executorFacet = deployViaCreate2(
             abi.encodePacked(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId))
         );
-        notifyAboutDeployment(executorFacet, "ExecutorFacet", hex"");
+        notifyAboutDeployment(executorFacet, "ExecutorFacet", abi.encode(config.l1ChainId));
         addresses.stateTransition.executorFacet = executorFacet;
 
         address adminFacet = deployViaCreate2(
@@ -1251,7 +1251,7 @@ contract EcosystemUpgrade is Script {
         );
 
         address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
-        notifyAboutDeployment(beacon, "UpgradeableBeacon", hex"");
+        notifyAboutDeployment(beacon, "UpgradeableBeacon", abi.encode(addresses.bridges.bridgedStandardERC20Implementation));
         addresses.bridges.bridgedTokenBeacon = beacon;
     }
 
@@ -1354,16 +1354,16 @@ contract EcosystemUpgrade is Script {
     function deployL2WrappedBaseTokenStore() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L2WrappedBaseTokenStore).creationCode,
-            abi.encode(config.ownerAddress, config.ecosystemAdminAddress)
+            // We set a temoprary admin there. This is needed for easier/quicker setting of
+            // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the 
+            // decentralized upgrade voting starts.
+            abi.encode(config.ownerAddress, msg.sender)
         );
 
         addresses.l2WrappedBaseTokenStore = deployViaCreate2(bytecode);
         notifyAboutDeployment(
             addresses.l2WrappedBaseTokenStore,
             "L2WrappedBaseTokenStore",
-            // We set a temoprary admin there. This is needed for easier/quicker setting of
-            // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the 
-            // decentralized upgrade voting starts.
             abi.encode(config.ownerAddress, msg.sender)
         );
     }
