@@ -16,7 +16,7 @@ bootloaderArtifacts.forEach((file) => {
   const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
 
   if (data.bytecode && data.bytecode.object) {
-    const bytecodeObject: String = data.bytecode.object;
+    const bytecodeObject: string = data.bytecode.object;
 
     const bytecode = ethers.utils.arrayify(ethers.utils.hexlify(`0x${bytecodeObject}`));
     console.log(bytecode.length);
