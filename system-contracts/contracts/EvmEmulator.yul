@@ -909,14 +909,13 @@ object "EvmEmulator" {
         function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
             let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
         
+            let emptyContractExecutionCost := 500 // enough to call "empty" contract
             let isEmptyContract := or(eq(addr, 0), iszero(and(shr(224, rawCodeHash), 0xffff)))
-            let additionalStipend
             if isEmptyContract {
-                // we should add some gas to cover overhead of calling empty contract
-                // if value isn't zero, MsgValueSimulator will take required gas directly from our frame
+                // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+                // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
                 if iszero(value) {
-                    additionalStipend := 6000 // just enough to call empty contract
-                    zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
+                    zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
                 }
             }
         
@@ -924,6 +923,7 @@ object "EvmEmulator" {
                 zkEvmGasToPass := MAX_UINT32()
             }
         
+            // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
             let zkEvmGasBefore := gas()
             switch isStatic
             case 0 {
@@ -941,11 +941,8 @@ object "EvmEmulator" {
             }
         
             if isEmptyContract {
-                zkEvmGasToPass := sub(zkEvmGasToPass, additionalStipend)
-        
-                if value {
-                    // MsgValueSimulator could use up to 27000 gas directly from our frame
-                    additionalStipend := 27000
+                if iszero(value) {
+                    zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
                 }
             
                 zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
@@ -3832,14 +3829,13 @@ object "EvmEmulator" {
             function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
                 let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
             
+                let emptyContractExecutionCost := 500 // enough to call "empty" contract
                 let isEmptyContract := or(eq(addr, 0), iszero(and(shr(224, rawCodeHash), 0xffff)))
-                let additionalStipend
                 if isEmptyContract {
-                    // we should add some gas to cover overhead of calling empty contract
-                    // if value isn't zero, MsgValueSimulator will take required gas directly from our frame
+                    // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+                    // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
                     if iszero(value) {
-                        additionalStipend := 6000 // just enough to call empty contract
-                        zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
+                        zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
                     }
                 }
             
@@ -3847,6 +3843,7 @@ object "EvmEmulator" {
                     zkEvmGasToPass := MAX_UINT32()
                 }
             
+                // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
                 let zkEvmGasBefore := gas()
                 switch isStatic
                 case 0 {
@@ -3864,11 +3861,8 @@ object "EvmEmulator" {
                 }
             
                 if isEmptyContract {
-                    zkEvmGasToPass := sub(zkEvmGasToPass, additionalStipend)
-            
-                    if value {
-                        // MsgValueSimulator could use up to 27000 gas directly from our frame
-                        additionalStipend := 27000
+                    if iszero(value) {
+                        zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
                     }
                 
                     zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
