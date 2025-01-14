@@ -186,6 +186,8 @@ object "EvmEmulator" {
         
         function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
         
+        function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+        
         function EMPTY_KECCAK() -> value {  // keccak("")
             value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
         }
@@ -1703,14 +1705,14 @@ object "EvmEmulator" {
                     dstOffset := add(dstOffset, MEM_OFFSET())
             
                     // EraVM will revert if offset + length overflows uint32
-                    if gt(sourceOffset, MAX_UINT32()) {
-                        sourceOffset := MAX_UINT32()
+                    if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
+                        sourceOffset := MAX_CALLDATA_OFFSET()
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), MAX_UINT32()) {
-                        truncatedLen := sub(MAX_UINT32(), sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                        truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -3105,6 +3107,8 @@ object "EvmEmulator" {
             function OVERHEAD() -> overhead { overhead := 2000 }
             
             function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
+            
+            function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
             
             function EMPTY_KECCAK() -> value {  // keccak("")
                 value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -4611,14 +4615,14 @@ object "EvmEmulator" {
                         dstOffset := add(dstOffset, MEM_OFFSET())
                 
                         // EraVM will revert if offset + length overflows uint32
-                        if gt(sourceOffset, MAX_UINT32()) {
-                            sourceOffset := MAX_UINT32()
+                        if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
+                            sourceOffset := MAX_CALLDATA_OFFSET()
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), MAX_UINT32()) {
-                            truncatedLen := sub(MAX_UINT32(), sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                            truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
@@ -5844,7 +5848,7 @@ object "EvmEmulator" {
                 
                 function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
                     // EraVM will revert if offset + length overflows uint32
-                    if lt(calldataOffset, MAX_UINT32()) {
+                    if lt(calldataOffset, MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
                         res := calldataload(calldataOffset)
                     }
                 }
