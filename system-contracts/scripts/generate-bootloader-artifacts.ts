@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { ethers } from "ethers";
 
 const OUTPUT_DIR = "bootloader/artifacts";
 
@@ -15,9 +16,10 @@ bootloaderArtifacts.forEach((file) => {
   const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
 
   if (data.bytecode && data.bytecode.object) {
-    const bytecodeObject = data.bytecode.object;
+    const bytecodeObject: String = data.bytecode.object;
 
-    const bytecode = Uint8Array.from(Buffer.from(bytecodeObject));
+    const bytecode = ethers.utils.arrayify(ethers.utils.hexlify(`0x${bytecodeObject}`));
+    console.log(bytecode.length);
 
     if (!fs.existsSync(path.join(__dirname, OUTPUT_DIR))) {
       fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -26,7 +28,7 @@ bootloaderArtifacts.forEach((file) => {
       console.log(`Directory ${OUTPUT_DIR} already exists`);
     }
 
-    fs.writeFileSync(outputFilePath, bytecode, { flag: "w+" });
+    fs.writeFileSync(outputFilePath, bytecode);
     console.log(`Saved bytecode to ${outputFilePath}`);
   } else {
     console.error(`Invalid schema in ${file}: bytecode or object field is missing.`);
