@@ -1554,6 +1554,17 @@ contract EcosystemUpgrade is Script {
             "shared_bridge_implementation_addr",
             addresses.bridges.sharedBridgeImplementation
         );
+        vm.serializeAddress(
+            "bridges",
+            "bridged_standard_erc20_impl",
+            addresses.bridges.bridgedStandardERC20Implementation
+        );
+        vm.serializeAddress(
+            "bridges",
+            "bridged_token_beacon",
+            addresses.bridges.bridgedTokenBeacon
+        );
+
         string memory bridges = vm.serializeAddress(
             "bridges",
             "shared_bridge_proxy_addr",
@@ -1659,6 +1670,16 @@ contract EcosystemUpgrade is Script {
             "deployed_addresses",
             "l2_wrapped_base_token_store_addr",
             addresses.l2WrappedBaseTokenStore
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_gateway_upgrade",
+            addresses.gatewayUpgrade
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_transitionary_owner",
+            addresses.transitionaryOwner
         );
 
         string memory deployedAddresses = vm.serializeAddress(
