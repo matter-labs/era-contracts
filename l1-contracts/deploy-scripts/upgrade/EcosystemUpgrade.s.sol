@@ -415,12 +415,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function getOldProtocolVersion() public returns (uint256) {
-        // Mainnet is the only network that has not been upgraded.
-        if (block.chainid == 1) {
-            return 0x1800000002;
-        } else {
-            return 0x1900000000;
-        }
+        return 0x1900000000;
     }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
@@ -1073,7 +1068,7 @@ contract EcosystemUpgrade is Script {
         address executorFacet = deployViaCreate2(
             abi.encodePacked(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId))
         );
-        notifyAboutDeployment(executorFacet, "ExecutorFacet", hex"");
+        notifyAboutDeployment(executorFacet, "ExecutorFacet", abi.encode(config.l1ChainId));
         addresses.stateTransition.executorFacet = executorFacet;
 
         address adminFacet = deployViaCreate2(
@@ -1256,7 +1251,11 @@ contract EcosystemUpgrade is Script {
         );
 
         address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
-        notifyAboutDeployment(beacon, "UpgradeableBeacon", hex"");
+        notifyAboutDeployment(
+            beacon,
+            "UpgradeableBeacon",
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        );
         addresses.bridges.bridgedTokenBeacon = beacon;
     }
 
@@ -1359,14 +1358,17 @@ contract EcosystemUpgrade is Script {
     function deployL2WrappedBaseTokenStore() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L2WrappedBaseTokenStore).creationCode,
-            abi.encode(config.ownerAddress, config.ecosystemAdminAddress)
+            // We set a temoprary admin there. This is needed for easier/quicker setting of
+            // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the
+            // decentralized upgrade voting starts.
+            abi.encode(config.ownerAddress, msg.sender)
         );
 
         addresses.l2WrappedBaseTokenStore = deployViaCreate2(bytecode);
         notifyAboutDeployment(
             addresses.l2WrappedBaseTokenStore,
             "L2WrappedBaseTokenStore",
-            abi.encode(config.ownerAddress, config.ecosystemAdminAddress)
+            abi.encode(config.ownerAddress, msg.sender)
         );
     }
 
@@ -1556,6 +1558,13 @@ contract EcosystemUpgrade is Script {
             "shared_bridge_implementation_addr",
             addresses.bridges.sharedBridgeImplementation
         );
+        vm.serializeAddress(
+            "bridges",
+            "bridged_standard_erc20_impl",
+            addresses.bridges.bridgedStandardERC20Implementation
+        );
+        vm.serializeAddress("bridges", "bridged_token_beacon", addresses.bridges.bridgedTokenBeacon);
+
         string memory bridges = vm.serializeAddress(
             "bridges",
             "shared_bridge_proxy_addr",
@@ -1662,6 +1671,8 @@ contract EcosystemUpgrade is Script {
             "l2_wrapped_base_token_store_addr",
             addresses.l2WrappedBaseTokenStore
         );
+        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", addresses.gatewayUpgrade);
+        vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", addresses.transitionaryOwner);
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
