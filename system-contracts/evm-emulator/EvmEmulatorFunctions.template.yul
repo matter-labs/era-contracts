@@ -854,7 +854,7 @@ function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffs
     let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
 
     let emptyContractExecutionCost := 500 // enough to call "empty" contract
-    let isEmptyContract := or(eq(addr, 0), iszero(and(shr(224, rawCodeHash), 0xffff)))
+    let isEmptyContract := or(iszero(addr), iszero(and(shr(224, rawCodeHash), 0xffff)))
     if isEmptyContract {
         // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
         // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
