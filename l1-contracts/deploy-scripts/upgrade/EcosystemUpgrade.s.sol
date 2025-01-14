@@ -1251,7 +1251,11 @@ contract EcosystemUpgrade is Script {
         );
 
         address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
-        notifyAboutDeployment(beacon, "UpgradeableBeacon", abi.encode(addresses.bridges.bridgedStandardERC20Implementation));
+        notifyAboutDeployment(
+            beacon,
+            "UpgradeableBeacon",
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        );
         addresses.bridges.bridgedTokenBeacon = beacon;
     }
 
@@ -1355,7 +1359,7 @@ contract EcosystemUpgrade is Script {
         bytes memory bytecode = abi.encodePacked(
             type(L2WrappedBaseTokenStore).creationCode,
             // We set a temoprary admin there. This is needed for easier/quicker setting of
-            // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the 
+            // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the
             // decentralized upgrade voting starts.
             abi.encode(config.ownerAddress, msg.sender)
         );
@@ -1559,11 +1563,7 @@ contract EcosystemUpgrade is Script {
             "bridged_standard_erc20_impl",
             addresses.bridges.bridgedStandardERC20Implementation
         );
-        vm.serializeAddress(
-            "bridges",
-            "bridged_token_beacon",
-            addresses.bridges.bridgedTokenBeacon
-        );
+        vm.serializeAddress("bridges", "bridged_token_beacon", addresses.bridges.bridgedTokenBeacon);
 
         string memory bridges = vm.serializeAddress(
             "bridges",
@@ -1671,16 +1671,8 @@ contract EcosystemUpgrade is Script {
             "l2_wrapped_base_token_store_addr",
             addresses.l2WrappedBaseTokenStore
         );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "l1_gateway_upgrade",
-            addresses.gatewayUpgrade
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "l1_transitionary_owner",
-            addresses.transitionaryOwner
-        );
+        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", addresses.gatewayUpgrade);
+        vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", addresses.transitionaryOwner);
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
