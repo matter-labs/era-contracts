@@ -64,6 +64,7 @@
     "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
     "copy:typechain": "mkdir -p ../l2-contracts/typechain && cp ./typechain/ContractDeployerFactory.ts ../l2-contracts/typechain/",
+    "generate-bootloader-artifacts": "yarn build:foundry && ts-node scripts/generate-bootloader-artifacts.ts",
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
