@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
@@ -32,11 +33,12 @@ import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBe
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
+import {MailboxAbstract} from "./MailboxAbstract.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailbox {
+contract MailboxFacet is ZKChainBase, IMailboxImpl, MailboxAbstract {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
@@ -63,34 +65,13 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehubOrInteropCenter returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
-
-    /// @inheritdoc IMailbox
-    function proveL2MessageInclusion(
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Message calldata _message,
-        bytes32[] calldata _proof
-    ) public view returns (bool) {
-        return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
-    }
-
-    /// @inheritdoc IMailbox
-    function proveL2LogInclusion(
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Log calldata _log,
-        bytes32[] calldata _proof
-    ) external view returns (bool) {
-        return _proveL2LogInclusion(_batchNumber, _index, _log, _proof);
-    }
-
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function proveL1ToL2TransactionStatus(
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
@@ -119,23 +100,12 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         });
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
-
-    /// @inheritdoc IMailbox
-    function proveL2LeafInclusion(
-        uint256 _batchNumber,
-        uint256 _leafProofMask,
-        bytes32 _leaf,
-        bytes32[] calldata _proof
-    ) external view override returns (bool) {
-        return _proveL2LeafInclusion(_batchNumber, _leafProofMask, _leaf, _proof);
-    }
-
     function _proveL2LeafInclusion(
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) internal view returns (bool) {
+    ) internal view override returns (bool) {
         ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
             s.chainId,
             _batchNumber,
@@ -182,46 +152,8 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             );
     }
 
-    /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
-    function _proveL2LogInclusion(
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Log memory _log,
-        bytes32[] calldata _proof
-    ) internal view returns (bool) {
-        bytes32 hashedLog = keccak256(
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
-        );
-        // Check that hashed log is not the default one,
-        // otherwise it means that the value is out of range of sent L2 -> L1 logs
-        if (hashedLog == L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH) {
-            revert HashedLogIsDefault();
-        }
 
-        // It is ok to not check length of `_proof` array, as length
-        // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
-        // equal to the length of other nodes preimages (which are `2 * 32`)
-
-        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
-
-        return _proveL2LeafInclusion(_batchNumber, _index, hashedLog, _proof);
-    }
-
-    /// @dev Convert arbitrary-length message to the raw l2 log
-    function _L2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
-        return
-            L2Log({
-                l2ShardId: 0,
-                isService: true,
-                txNumberInBatch: _message.txNumberInBatch,
-                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                key: bytes32(uint256(uint160(_message.sender))),
-                value: keccak256(_message.data)
-            });
-    }
-
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function l2TransactionBaseCost(
         uint256 _gasPrice,
         uint256 _l2GasLimit,
@@ -260,7 +192,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         return Math.max(l2GasPrice, minL2GasPriceBaseToken);
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -281,7 +213,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         canonicalTxHash = _requestL2TransactionToGatewayFree(wrappedRequest);
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
@@ -484,7 +416,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     ///////////////////////////////////////////////////////
     //////// Legacy Era functions
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function finalizeEthWithdrawal(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -506,7 +438,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         });
     }
 
-    ///  @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function requestL2Transaction(
         address _contractL2,
         uint256 _l2Value,

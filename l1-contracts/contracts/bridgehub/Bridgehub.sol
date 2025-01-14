@@ -15,7 +15,7 @@ import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, INTEROP_OPERATION_TX_TYPE} from "../common/Config.sol";
 import {L2_MESSENGER} from "../common/l2-helpers/L2ContractAddresses.sol";
@@ -573,7 +573,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
 
             // solhint-disable-next-line func-named-parameters
-            emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
+            emit IMailboxImpl.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
         }
     }
 

@@ -22,7 +22,7 @@ import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log,
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "../common/L1ContractErrors.sol";
 import {NotL1, NotRelayedSender, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
-import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {TransientInterop} from "./TransientInterop.sol";
@@ -767,7 +767,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(_request));
             // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
             // solhint-disable-next-line func-named-parameters
-            // emit IMailbox.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
+            // emit IMailboxImpl.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
         }
     }
 

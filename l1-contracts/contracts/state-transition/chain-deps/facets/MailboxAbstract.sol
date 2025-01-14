@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.24;
+
+import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
+import {IMailboxAbstract} from "../../chain-interfaces/IMailboxAbstract.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow, InvalidProofLengthForFinalNode} from "../../../common/L1ContractErrors.sol";
+
+abstract contract MailboxAbstract is IMailboxAbstract {
+    /// @inheritdoc IMailboxAbstract
+    function proveL2MessageInclusion(
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Message calldata _message,
+        bytes32[] calldata _proof
+    ) public view returns (bool) {
+        return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
+    }
+
+    /// @inheritdoc IMailboxAbstract
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view override returns (bool) {
+        return _proveL2LeafInclusion(_batchNumber, _leafProofMask, _leaf, _proof);
+    }
+
+    function _proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) internal view virtual returns (bool);
+
+    /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
+    function _proveL2LogInclusion(
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Log memory _log,
+        bytes32[] calldata _proof
+    ) internal view returns (bool) {
+        bytes32 hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
+        );
+        // Check that hashed log is not the default one,
+        // otherwise it means that the value is out of range of sent L2 -> L1 logs
+        if (hashedLog == L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH) {
+            revert HashedLogIsDefault();
+        }
+
+        // It is ok to not check length of `_proof` array, as length
+        // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
+        // equal to the length of other nodes preimages (which are `2 * 32`)
+
+        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
+
+        return _proveL2LeafInclusion(_batchNumber, _index, hashedLog, _proof);
+    }
+
+    /// @dev Convert arbitrary-length message to the raw l2 log
+    function _L2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
+        return
+            L2Log({
+                l2ShardId: 0,
+                isService: true,
+                txNumberInBatch: _message.txNumberInBatch,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                key: bytes32(uint256(uint160(_message.sender))),
+                value: keccak256(_message.data)
+            });
+    }
+
+    /// @inheritdoc IMailboxAbstract
+    function proveL2LogInclusion(
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Log calldata _log,
+        bytes32[] calldata _proof
+    ) external view returns (bool) {
+        return _proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+    }
+}

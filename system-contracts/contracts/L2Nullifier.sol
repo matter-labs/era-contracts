@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {IL2Nullifier} from "./interfaces/IL2Nullifier.sol";
 // import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
-// import {IMailbox} from "./interfaces/IMailbox.sol";
+// import {IMailbox} from "./interfaces/IMailboxImpl.sol";
 import {Unauthorized} from "./SystemContractErrors.sol";
 
 /**

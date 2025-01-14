@@ -12,6 +12,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MailboxAbstract} from "contracts/state-transition/chain-deps/facets/MailboxAbstract.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -299,14 +300,14 @@ library Utils {
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](8);
-        selectors[0] = MailboxFacet.proveL2MessageInclusion.selector;
-        selectors[1] = MailboxFacet.proveL2LogInclusion.selector;
+        selectors[0] = MailboxAbstract.proveL2MessageInclusion.selector;
+        selectors[1] = MailboxAbstract.proveL2LogInclusion.selector;
         selectors[2] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
         selectors[3] = MailboxFacet.finalizeEthWithdrawal.selector;
         selectors[4] = MailboxFacet.requestL2Transaction.selector;
         selectors[5] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[6] = MailboxFacet.l2TransactionBaseCost.selector;
-        selectors[7] = MailboxFacet.proveL2LeafInclusion.selector;
+        selectors[7] = MailboxAbstract.proveL2LeafInclusion.selector;
         return selectors;
     }
 
