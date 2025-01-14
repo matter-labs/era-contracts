@@ -849,25 +849,21 @@ function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, args
 function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
     let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
 
-    let additionalStipend := 6000 // should cover first access to empty account
-    switch value 
-    case 0 {
-        if gt(addr, 0) { // zero address is always "empty"
-            if and(shr(224, rawCodeHash), 0xffff) { // if codelen is not zero
-                additionalStipend := 0
-            }
+    let emptyContractExecutionCost := 500 // enough to call "empty" contract
+    let isEmptyContract := or(eq(addr, 0), iszero(and(shr(224, rawCodeHash), 0xffff)))
+    if isEmptyContract {
+        // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+        // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
+        if iszero(value) {
+            zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
         }
     }
-    default {
-        additionalStipend := 27000 // Stipend for MsgValueSimulator. Covered by positive_value_cost
-    }
-
-    zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
 
     if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
         zkEvmGasToPass := MAX_UINT32()
     }
 
+    // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
     let zkEvmGasBefore := gas()
     switch isStatic
     case 0 {
@@ -884,15 +880,13 @@ function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffs
         zkEvmGasUsed := 0 // should never happen
     }
 
-    switch gt(zkEvmGasUsed, additionalStipend)
-    case 0 {
-        zkEvmGasUsed := 0
+    if isEmptyContract {
+        if iszero(value) {
+            zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
+        }
+    
+        zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
     }
-    default {
-        zkEvmGasUsed := sub(zkEvmGasUsed, additionalStipend)
-    }
-
-    zkEvmGasToPass := sub(zkEvmGasToPass, additionalStipend)
 
     // refund gas
     if gt(zkEvmGasToPass, zkEvmGasUsed) {
