@@ -746,6 +746,8 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
             }
 
             if isCallToEmptyContract {
+                // In case of a call to the EVM contract that is currently being constructed, 
+                // the DefaultAccount bytecode will be used instead. This is implemented at the virtual machine level.
                 success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()               
             }
@@ -753,7 +755,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
             // We forbid delegatecalls to EraVM native contracts
         } 
         default {
-            // Precompile. Simlate using staticcall, since EraVM behavior differs here
+            // Precompile. Simulate using staticcall, since EraVM behavior differs here
             success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
         }
     }
