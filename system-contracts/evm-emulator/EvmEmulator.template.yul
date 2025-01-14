@@ -30,12 +30,12 @@ object "EvmEmulator" {
 
             blobLen := len
 
-            if iszero(eq(mod(blobLen, 32), 0)) {
+            if mod(blobLen, 32) {
                 blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
             }
 
             // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
-            if iszero(eq(mod(blobLen, 64), 32)) {
+            if iszero(mod(blobLen, 64)) {
                 blobLen := add(blobLen, 32)
             }
         }
