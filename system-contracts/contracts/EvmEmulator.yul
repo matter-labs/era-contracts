@@ -2947,7 +2947,8 @@ object "EvmEmulator" {
 
         if iszero(isCallerEVM) {
             evmGasLeft := getEvmGasFromContext()
-            evmGasLeft := chargeGas(evmGasLeft, 32000)
+            // Charge additional creation cost
+            evmGasLeft := chargeGas(evmGasLeft, 32000) 
         }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)

@@ -31,8 +31,8 @@
     "contractName": "ContractDeployer",
     "bytecodePath": "zkout/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "contracts-preprocessed/ContractDeployer.sol",
-    "bytecodeHash": "0x010006d1863074c74b08fa628699b4a38599f234ada0322c430bebf62a9b28d1",
-    "sourceCodeHash": "0x857490d38ca4a071602c65a2463eaedd7b6a9727fe147ca0f5345a911876dac1"
+    "bytecodeHash": "0x010006f5ebddced229f5e5df868c4ad8c11c2875f09c9d3654a8262c2993f353",
+    "sourceCodeHash": "0x478a9ddf9309c7c047b0913360c7b54a6662cc78021c9881fbb40696eed52184"
   },
   {
     "contractName": "Create2Factory",
@@ -122,8 +122,8 @@
     "contractName": "EvmEmulator",
     "bytecodePath": "zkout/EvmEmulator.yul/contracts-preprocessed/EvmEmulator.yul.json",
     "sourceCodePath": "contracts-preprocessed/EvmEmulator.yul",
-    "bytecodeHash": "0x01000bc1e9dd8a2f03462607f313ea4eef563b7625c643b512ddd0b8ab338e7e",
-    "sourceCodeHash": "0x197c5e14c8f9cdfd1a170fb97bbc5297aaa549818734928df23fa438da5c886f"
+    "bytecodeHash": "0x01000bbbd68833b14b8dc6b4b9331185c1e02e9c90fcdd0874c6b97c9f9ede6a",
+    "sourceCodeHash": "0x6ca0844e27e2e75b7c5e59f67a2effcd1b9cd1ce305efcda260a6848ea7e7b8a"
   },
   {
     "contractName": "EvmGasManager",
@@ -136,8 +136,8 @@
     "contractName": "CodeOracle",
     "bytecodePath": "zkout/CodeOracle.yul/contracts-preprocessed/precompiles/CodeOracle.yul.json",
     "sourceCodePath": "contracts-preprocessed/precompiles/CodeOracle.yul",
-    "bytecodeHash": "0x01000025b1cdbcd1552a815e8d5049404dec6709f86cc057e4326484e6a1a706",
-    "sourceCodeHash": "0x420719c88c00478214d5babde85eb093c0bce1048c391ad67e2510ed3a61272b"
+    "bytecodeHash": "0x01000025c0dedc05a88665dd99d6e9a6e48800f250b4945d507268b9c872c3b6",
+    "sourceCodeHash": "0x0f26872aa0baae2a0c46eb8b436536c02d53d7fa97b2ae688d58bf2a20a2b73d"
   },
   {
     "contractName": "EcAdd",
