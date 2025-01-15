@@ -4,7 +4,7 @@ on: pull_request
 
 jobs:
   slither:
-    name: Slither check for L1 contracts
+    name: Slither check
     runs-on: ubuntu-latest
 
     steps:
@@ -56,4 +56,3 @@ jobs:
         working-directory: ./l2-contracts
         run: |
           slither --config ./slither.config.json .
-
