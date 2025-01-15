@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {Utils} from "../Utils/Utils.sol";
+import {Utils} from "../../Utils/Utils.sol";
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 

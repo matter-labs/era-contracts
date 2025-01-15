@@ -33,6 +33,9 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The address of the base token
     function getBaseToken() external view returns (address);
 
+    /// @return The chain id of the ZK Chain.
+    function getChainId() external view returns (uint256);
+
     /// @return The address of the base token bridge
     function getBaseTokenBridge() external view returns (address);
 
@@ -77,6 +80,9 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return Bytecode hash of default account (bytecode for EOA).
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
+
+    /// @return Bytecode hash of EVM emulator.
+    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32);
 
     /// @return Verifier parameters.
     /// @dev This function is deprecated and will soon be removed.

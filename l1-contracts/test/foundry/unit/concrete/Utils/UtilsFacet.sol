@@ -80,6 +80,14 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         return s.l2DefaultAccountBytecodeHash;
     }
 
+    function util_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
+        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
+    }
+
+    function util_getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
+        return s.l2EvmEmulatorBytecodeHash;
+    }
+
     function util_setPendingAdmin(address _pendingAdmin) external {
         s.pendingAdmin = _pendingAdmin;
     }

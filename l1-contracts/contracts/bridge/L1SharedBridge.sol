@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, DepositIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, DepositIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch, SharedBridgeValueNotSet, NotPendingAdmin, L2BridgeAlreadySet} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -130,7 +130,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Checks that the message sender is either the owner or admin.
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == owner() || msg.sender == admin, "ShB not owner or admin");
+        if (msg.sender != owner() && msg.sender != admin) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -174,7 +176,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
-        require(msg.sender == currentPendingAdmin, "ShB not pending admin"); // Only proposed by current admin address can claim the admin rights
+        if (msg.sender != currentPendingAdmin) {
+            revert NotPendingAdmin();
+        }
 
         address previousAdmin = admin;
         admin = currentPendingAdmin;
@@ -276,8 +280,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
     /// @param _l2BridgeAddress The address of the L2 bridge contract.
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwnerOrAdmin {
-        require(l2BridgeAddress[_chainId] == address(0), "ShB: l2 bridge already set");
-        require(_l2BridgeAddress != address(0), "ShB: l2 bridge 0");
+        if (l2BridgeAddress[_chainId] != address(0)) {
+            revert L2BridgeAlreadySet(_chainId);
+        }
+        if (_l2BridgeAddress == address(0)) {
+            revert ZeroAddress();
+        }
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
@@ -287,7 +295,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
     /// @param _l2BridgeAddress The address of the L2 bridge contract.
     function reinitializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
-        require(l2BridgeAddress[_chainId] != address(0), "ShB: l2 bridge not yet set");
+        if (l2BridgeAddress[_chainId] == address(0)) {
+            revert L2BridgeNotSet(_chainId);
+        }
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 

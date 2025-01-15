@@ -8,6 +8,10 @@ import {StateTransitionManagerInitializeData, ChainCreationParams} from "contrac
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract initializingSTMOwnerZeroTest is StateTransitionManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_InitializingSTMWithGovernorZeroShouldRevert() public {
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: address(genesisUpgradeContract),

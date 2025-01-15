@@ -28,3 +28,5 @@ l1-contracts/script-config/*
 l1-contracts/script-out/*
 !l1-contracts/script-out/.gitkeep
 *.timestamp
+l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*
+l1-contracts/zkout/*

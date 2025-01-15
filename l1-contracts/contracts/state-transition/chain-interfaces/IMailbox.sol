@@ -95,6 +95,15 @@ interface IMailbox is IZkSyncHyperchainBase {
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash);
 
+    /// @notice Request execution of service L2 transaction from L1.
+    /// @dev Used for chain configuration. Can be called only by DiamondProxy itself.
+    /// @param _contractL2 The L2 receiver address
+    /// @param _l2Calldata The input of the L2 transaction
+    function requestL2ServiceTransaction(
+        address _contractL2,
+        bytes calldata _l2Calldata
+    ) external returns (bytes32 canonicalTxHash);
+
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash);

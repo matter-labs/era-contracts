@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Utils} from "../Utils/Utils.sol";
+import {Utils} from "../../Utils/Utils.sol";
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
