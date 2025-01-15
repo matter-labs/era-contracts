@@ -30,12 +30,12 @@ object "EvmEmulator" {
 
             blobLen := len
 
-            if iszero(eq(mod(blobLen, 32), 0)) {
+            if mod(blobLen, 32) {
                 blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
             }
 
             // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
-            if iszero(eq(mod(blobLen, 64), 32)) {
+            if iszero(mod(blobLen, 64)) {
                 blobLen := add(blobLen, 32)
             }
         }
@@ -185,6 +185,8 @@ object "EvmEmulator" {
         function OVERHEAD() -> overhead { overhead := 2000 }
         
         function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
+        
+        function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
         
         function EMPTY_KECCAK() -> value {  // keccak("")
             value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -804,6 +806,8 @@ object "EvmEmulator" {
                     }
         
                     if isCallToEmptyContract {
+                        // In case of a call to the EVM contract that is currently being constructed, 
+                        // the DefaultAccount bytecode will be used instead. This is implemented at the virtual machine level.
                         success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
                         _saveReturndataAfterZkEVMCall()               
                     }
@@ -811,7 +815,7 @@ object "EvmEmulator" {
                     // We forbid delegatecalls to EraVM native contracts
                 } 
                 default {
-                    // Precompile. Simlate using staticcall, since EraVM behavior differs here
+                    // Precompile. Simulate using staticcall, since EraVM behavior differs here
                     success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
                 }
             }
@@ -909,25 +913,21 @@ object "EvmEmulator" {
         function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
             let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
         
-            let additionalStipend := 6000 // should cover first access to empty account
-            switch value 
-            case 0 {
-                if gt(addr, 0) { // zero address is always "empty"
-                    if and(shr(224, rawCodeHash), 0xffff) { // if codelen is not zero
-                        additionalStipend := 0
-                    }
+            let emptyContractExecutionCost := 500 // enough to call "empty" contract
+            let isEmptyContract := or(iszero(addr), iszero(and(shr(224, rawCodeHash), 0xffff)))
+            if isEmptyContract {
+                // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+                // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
+                if iszero(value) {
+                    zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
                 }
             }
-            default {
-                additionalStipend := 27000 // Stipend for MsgValueSimulator. Covered by positive_value_cost
-            }
-        
-            zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
         
             if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
                 zkEvmGasToPass := MAX_UINT32()
             }
         
+            // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
             let zkEvmGasBefore := gas()
             switch isStatic
             case 0 {
@@ -944,15 +944,13 @@ object "EvmEmulator" {
                 zkEvmGasUsed := 0 // should never happen
             }
         
-            switch gt(zkEvmGasUsed, additionalStipend)
-            case 0 {
-                zkEvmGasUsed := 0
+            if isEmptyContract {
+                if iszero(value) {
+                    zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
+                }
+            
+                zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
             }
-            default {
-                zkEvmGasUsed := sub(zkEvmGasUsed, additionalStipend)
-            }
-        
-            zkEvmGasToPass := sub(zkEvmGasToPass, additionalStipend)
         
             // refund gas
             if gt(zkEvmGasToPass, zkEvmGasUsed) {
@@ -1709,14 +1707,14 @@ object "EvmEmulator" {
                     dstOffset := add(dstOffset, MEM_OFFSET())
             
                     // EraVM will revert if offset + length overflows uint32
-                    if gt(sourceOffset, MAX_UINT32()) {
-                        sourceOffset := MAX_UINT32()
+                    if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
+                        sourceOffset := MAX_CALLDATA_OFFSET()
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), MAX_UINT32()) {
-                        truncatedLen := sub(MAX_UINT32(), sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                        truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -2949,6 +2947,7 @@ object "EvmEmulator" {
 
         if iszero(isCallerEVM) {
             evmGasLeft := getEvmGasFromContext()
+            evmGasLeft := chargeGas(evmGasLeft, 32000)
         }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
@@ -3111,6 +3110,8 @@ object "EvmEmulator" {
             function OVERHEAD() -> overhead { overhead := 2000 }
             
             function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
+            
+            function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
             
             function EMPTY_KECCAK() -> value {  // keccak("")
                 value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -3730,6 +3731,8 @@ object "EvmEmulator" {
                         }
             
                         if isCallToEmptyContract {
+                            // In case of a call to the EVM contract that is currently being constructed, 
+                            // the DefaultAccount bytecode will be used instead. This is implemented at the virtual machine level.
                             success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
                             _saveReturndataAfterZkEVMCall()               
                         }
@@ -3737,7 +3740,7 @@ object "EvmEmulator" {
                         // We forbid delegatecalls to EraVM native contracts
                     } 
                     default {
-                        // Precompile. Simlate using staticcall, since EraVM behavior differs here
+                        // Precompile. Simulate using staticcall, since EraVM behavior differs here
                         success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
                     }
                 }
@@ -3835,25 +3838,21 @@ object "EvmEmulator" {
             function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
                 let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
             
-                let additionalStipend := 6000 // should cover first access to empty account
-                switch value 
-                case 0 {
-                    if gt(addr, 0) { // zero address is always "empty"
-                        if and(shr(224, rawCodeHash), 0xffff) { // if codelen is not zero
-                            additionalStipend := 0
-                        }
+                let emptyContractExecutionCost := 500 // enough to call "empty" contract
+                let isEmptyContract := or(iszero(addr), iszero(and(shr(224, rawCodeHash), 0xffff)))
+                if isEmptyContract {
+                    // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+                    // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
+                    if iszero(value) {
+                        zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
                     }
                 }
-                default {
-                    additionalStipend := 27000 // Stipend for MsgValueSimulator. Covered by positive_value_cost
-                }
-            
-                zkEvmGasToPass := add(zkEvmGasToPass, additionalStipend)
             
                 if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
                     zkEvmGasToPass := MAX_UINT32()
                 }
             
+                // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
                 let zkEvmGasBefore := gas()
                 switch isStatic
                 case 0 {
@@ -3870,15 +3869,13 @@ object "EvmEmulator" {
                     zkEvmGasUsed := 0 // should never happen
                 }
             
-                switch gt(zkEvmGasUsed, additionalStipend)
-                case 0 {
-                    zkEvmGasUsed := 0
+                if isEmptyContract {
+                    if iszero(value) {
+                        zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
+                    }
+                
+                    zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
                 }
-                default {
-                    zkEvmGasUsed := sub(zkEvmGasUsed, additionalStipend)
-                }
-            
-                zkEvmGasToPass := sub(zkEvmGasToPass, additionalStipend)
             
                 // refund gas
                 if gt(zkEvmGasToPass, zkEvmGasUsed) {
@@ -4623,14 +4620,14 @@ object "EvmEmulator" {
                         dstOffset := add(dstOffset, MEM_OFFSET())
                 
                         // EraVM will revert if offset + length overflows uint32
-                        if gt(sourceOffset, MAX_UINT32()) {
-                            sourceOffset := MAX_UINT32()
+                        if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
+                            sourceOffset := MAX_CALLDATA_OFFSET()
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), MAX_UINT32()) {
-                            truncatedLen := sub(MAX_UINT32(), sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                            truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
@@ -5856,7 +5853,7 @@ object "EvmEmulator" {
                 
                 function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
                     // EraVM will revert if offset + length overflows uint32
-                    if lt(calldataOffset, MAX_UINT32()) {
+                    if lt(calldataOffset, MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
                         res := calldataload(calldataOffset)
                     }
                 }

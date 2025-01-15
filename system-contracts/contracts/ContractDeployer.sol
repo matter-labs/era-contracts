@@ -318,6 +318,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // contract is acceptable.
 
         if (Utils.isCodeHashEVM(_deployment.bytecodeHash)) {
+            // Note, that for contracts the "nonce" is set as deployment nonce.
+            uint256 deploymentNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(_deployment.newAddress);
+            if (deploymentNonce == 0) {
+                NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_deployment.newAddress);
+            }
+
             // It is not possible to change the AccountInfo for EVM contracts.
             _constructEVMContract(_sender, _deployment.newAddress, _deployment.input);
         } else {

@@ -373,14 +373,14 @@ for { } true { } {
         dstOffset := add(dstOffset, MEM_OFFSET())
 
         // EraVM will revert if offset + length overflows uint32
-        if gt(sourceOffset, MAX_UINT32()) {
-            sourceOffset := MAX_UINT32()
+        if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
+            sourceOffset := MAX_CALLDATA_OFFSET()
         }
 
         // Check bytecode out-of-bounds access
         let truncatedLen := len
-        if gt(add(sourceOffset, len), MAX_UINT32()) {
-            truncatedLen := sub(MAX_UINT32(), sourceOffset) // truncate
+        if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+            truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
         }
 
