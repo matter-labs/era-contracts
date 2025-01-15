@@ -93,6 +93,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @param _l1Token The address of the token that was locked on the L1
     /// @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
+    // slither-disable-next-line reentrancy-no-eth
     function finalizeDeposit(
         address _l1Sender,
         address _l2Receiver,
@@ -155,6 +156,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         }
 
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
+        // slither-disable-next-line unused-return
         L2ContractHelper.sendMessageToL1(message);
 
         emit WithdrawalInitiated(msg.sender, _l1Receiver, _l2Token, _amount);

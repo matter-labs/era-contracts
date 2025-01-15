@@ -3,7 +3,7 @@ name: Slither scanner
 on: pull_request
 
 jobs:
-  slither-l1:
+  slither:
     name: Slither check for L1 contracts
     runs-on: ubuntu-latest
 
@@ -47,7 +47,13 @@ jobs:
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierTest.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol
 
-      - name: Run Slither
-        working-directory: l1-contracts
+      - name: Run Slither for L1 contracts
+        working-directory: ./l1-contracts
         run: |
           slither --config ./slither.config.json .
+
+      - name: Run Slither for L2 contracts
+        working-directory: ./l2-contracts
+        run: |
+          slither --config ./slither.config.json .
+
