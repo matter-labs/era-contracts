@@ -1,6 +1,6 @@
 era_chain_id = 271
-testnet_verifier = false
-governance_upgrade_timer_initial_delay = 1058400
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 86400
 
 [contracts]
 max_number_of_chains = 100
