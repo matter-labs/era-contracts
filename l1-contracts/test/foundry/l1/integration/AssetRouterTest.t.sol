@@ -215,7 +215,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         depositToL1(ETH_TOKEN_ADDRESS);
         bytes memory secondBridgeCalldata = bytes.concat(
             NEW_ENCODING_VERSION,
-            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
         );
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
 
@@ -223,8 +223,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         uint256 value = 250000000000100;
         feePaymentCallStarters[0] = InteropCallStarter({
             directCall: true,
-            to: INSERT_MSG_ADDRESS_ON_DESTINATION,
-            from: address(this),
+            nextContract: INSERT_MSG_ADDRESS_ON_DESTINATION,
             data: "",
             value: value,
             requestedInteropCallValue: value
@@ -232,8 +231,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);
         executionCallStarters[0] = InteropCallStarter({
             directCall: false,
-            to: address(0), // to address determined by bridge
-            from: address(sharedBridge),
+            nextContract: address(sharedBridge),
             data: secondBridgeCalldata,
             value: 0,
             requestedInteropCallValue: 0

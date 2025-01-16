@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 import {IBaseToken} from "./IBaseToken.sol";
 import {IL2Messenger} from "./IL2Messenger.sol";
 import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
+import {IL2MessageRootStorage} from "../interfaces/IL2MessageRootStorage.sol";
+import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(0x8001);
@@ -82,3 +84,7 @@ IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCode
 );
 
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+
+IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE_ADDRESS = IL2MessageRootStorage(address(0x1000b));
+
+IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(0x1000c));

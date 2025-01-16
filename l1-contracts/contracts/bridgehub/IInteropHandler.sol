@@ -3,10 +3,10 @@
 pragma solidity ^0.8.20;
 
 import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
+import {InteropCall, InteropBundle, MessageInclusionProof, L2Message} from "../common/Messaging.sol";
 
 interface IInteropHandler {
     function setInteropAccountBytecode() external;
-    function executePaymasterBundle(Transaction calldata _transaction) external;
-    function executeInteropBundle(Transaction calldata _transaction) external;
+    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
     function getAliasedAccount(address fromAsSalt, uint256) external view returns (address);
 }

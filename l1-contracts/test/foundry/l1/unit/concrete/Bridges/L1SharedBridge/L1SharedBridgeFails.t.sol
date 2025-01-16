@@ -8,15 +8,16 @@ import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IMailboxAbstract} from "contracts/state-transition/chain-interfaces/IMailboxAbstract.sol";
+import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
@@ -27,6 +28,7 @@ import {BurningNativeWETHNotSupported, AddressAlreadyUsed, WithdrawFailed, Unaut
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 import {WrongCounterpart, EthTransferFailed, EmptyToken, NativeTokenVaultAlreadySet, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -473,7 +475,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(DepositDoesNotExist.selector);
+        bytes32 txDataHash = DataEncoding.encodeTxDataHash(
+            NEW_ENCODING_VERSION,
+            alice,
+            ETH_TOKEN_ASSET_ID,
+            address(l1Nullifier.l1NativeTokenVault()),
+            DataEncoding.encodeBridgeBurnData(amount, address(0), address(0))
+        );
+        vm.expectRevert(abi.encodeWithSelector(DepositDoesNotExist.selector, 0, txDataHash));
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -750,9 +759,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_parseL2WithdrawalMessage_wrongSelector() public {
         // notice that the selector is wrong
-        bytes memory message = abi.encodePacked(IMailboxAbstract.proveL2LogInclusion.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.proveL2LogInclusion.selector, alice, amount);
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, IMailboxAbstract.proveL2LogInclusion.selector));
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, IMailboxImpl.proveL2LogInclusion.selector));
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: l2BatchNumber,

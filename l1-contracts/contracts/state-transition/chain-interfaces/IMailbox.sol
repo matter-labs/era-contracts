@@ -4,11 +4,11 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
-import {IMailboxAbstract} from "./IMailboxAbstract.sol";
+import {IMessageVerification} from "./IMessageVerification.sol";
 import {IMailboxImpl} from "./IMailboxImpl.sol";
 
 /// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IMailbox is IMailboxAbstract, IMailboxImpl {
+interface IMailbox is IMessageVerification, IMailboxImpl {
 }

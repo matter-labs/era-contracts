@@ -33,12 +33,12 @@ import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBe
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {MailboxAbstract} from "./MailboxAbstract.sol";
+import {MessageVerification} from "./MessageVerification.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailboxImpl, MailboxAbstract {
+contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
@@ -71,6 +71,27 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MailboxAbstract {
     ) external onlyBridgehubOrInteropCenter returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
+
+    /// @inheritdoc IMailboxImpl
+    function proveL2MessageInclusion(
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Message calldata _message,
+        bytes32[] calldata _proof
+    ) public view returns (bool) {
+        return _proveL2LogInclusion(0, _batchNumber, _index, _L2MessageToLog(_message), _proof);
+    }
+
+    /// @inheritdoc IMailboxImpl
+    function proveL2LogInclusion(
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Log calldata _log,
+        bytes32[] calldata _proof
+    ) external view returns (bool) {
+        return _proveL2LogInclusion(0, _batchNumber, _index, _log, _proof);
+    }
+
     /// @inheritdoc IMailboxImpl
     function proveL1ToL2TransactionStatus(
         bytes32 _l2TxHash,
@@ -98,9 +119,21 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MailboxAbstract {
             key: _l2TxHash,
             value: bytes32(uint256(_status))
         });
-        return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
+        return _proveL2LogInclusion(0, _l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
+
+    /// @inheritdoc IMailboxImpl
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view returns (bool) {
+        return _proveL2LeafInclusion(0, _batchNumber, _leafProofMask, _leaf, _proof);
+    }
+
     function _proveL2LeafInclusion(
+        uint256, // _chainId
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,

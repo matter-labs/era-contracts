@@ -252,7 +252,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(bridgehub),
+            address(interopCenter),
             abi.encodeWithSelector(IInteropCenter.proveL2MessageInclusion.selector),
             abi.encode(true)
         );

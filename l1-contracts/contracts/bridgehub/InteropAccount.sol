@@ -15,7 +15,7 @@ contract InteropAccount {
         (bool success, bytes memory returnData) = _to.call{value: msg.value}(_data); //
         if (!success) {
             emit ReturnMessage(returnData);
-            revert("Forwarding call failed");
+            // revert("Forwarding call failed");
         }
     }
 

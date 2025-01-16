@@ -384,7 +384,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             if (!callStarter.directCall) {
                 feeValue += callStarter.value;
                 // console.log("fee indirect call");
-                IL1AssetRouter(callStarter.from).bridgehubAddCallToBundle{value: callStarter.value}(
+                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{value: callStarter.value}(
                     _destinationChainId,
                     viaIR.feeBundleId,
                     _extraInputs.sender,
@@ -410,7 +410,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             InteropCallStarter memory callStarter = _executionCallStarters[i];
             if (!callStarter.directCall) {
                 // console.log("execution indirect call");
-                IL1AssetRouter(callStarter.from).bridgehubAddCallToBundle{value: callStarter.value}(
+                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{value: callStarter.value}(
                     _destinationChainId,
                     viaIR.executionBundleId,
                     _extraInputs.sender,
@@ -449,7 +449,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     function _requestFromStarter(InteropCallStarter memory callStarter) internal returns (InteropCallRequest memory) {
-        return InteropCallRequest({to: callStarter.to, data: callStarter.data, value: callStarter.value});
+        return InteropCallRequest({to: callStarter.nextContract, data: callStarter.data, value: callStarter.value});
     }
 
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
@@ -464,11 +464,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender
     ) internal returns (bytes32 canonicalTxHash) {
         InteropCallStarter[] memory feePaymentCallStarters = new InteropCallStarter[](1);
-        require(_request.mintValue > _request.l2Value, "InteropCenter: mintValue must be greater than l2Value");
+        if (_request.mintValue <= _request.l2Value) {
+            revert MsgValueMismatch(_request.mintValue, _request.l2Value);
+        }
         feePaymentCallStarters[0] = InteropCallStarter({
             directCall: true,
-            to: INSERT_MSG_ADDRESS_ON_DESTINATION,
-            from: _sender,
+            nextContract: INSERT_MSG_ADDRESS_ON_DESTINATION,
             data: "",
             value: _request.mintValue - _request.l2Value,
             requestedInteropCallValue: _request.l2Value
@@ -476,8 +477,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);
         executionCallStarters[0] = InteropCallStarter({
             directCall: false,
-            to: address(0), // to address determined by the bridge.
-            from: _request.secondBridgeAddress,
+            nextContract: _request.secondBridgeAddress,
             data: _request.secondBridgeCalldata,
             value: _request.secondBridgeValue,
             requestedInteropCallValue: _request.l2Value
@@ -508,12 +508,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender
     ) internal returns (bytes32 canonicalTxHash) {
         InteropCallStarter[] memory feePaymentDirectCalls = new InteropCallStarter[](1);
-        require(_request.mintValue > _request.l2Value, "InteropCenter: mintValue must be greater than l2Value");
+        if (_request.mintValue <= _request.l2Value) { // todo inequality here?
+            revert MsgValueMismatch(_request.mintValue, _request.l2Value);
+        }
         uint256 feeValue = _request.mintValue - _request.l2Value;
         feePaymentDirectCalls[0] = InteropCallStarter({
             directCall: true,
-            to: INSERT_MSG_ADDRESS_ON_DESTINATION,
-            from: _sender,
+            nextContract: INSERT_MSG_ADDRESS_ON_DESTINATION,
             data: "0x",
             value: feeValue,
             requestedInteropCallValue: feeValue
@@ -521,8 +522,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropCallStarter[] memory executionDirectCall = new InteropCallStarter[](1);
         executionDirectCall[0] = InteropCallStarter({
             directCall: true,
-            to: _request.l2Contract,
-            from: _sender,
+            nextContract: _request.l2Contract,
             data: _request.l2Calldata,
             value: _request.l2Value,
             requestedInteropCallValue: _request.l2Value
@@ -647,8 +647,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     ) external payable override returns (bytes32 canonicalTxHash) {
         // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
         // note claimFailedDeposit does not work with this hack!
-        // return _requestL2TransactionTwoBridges(msg.sender, false, _request);
-        return _requestInteropSingleCall(_request, msg.sender);
+        return _requestL2TransactionTwoBridges(msg.sender, false, _request);
+        // return _requestInteropSingleCall(_request, msg.sender);
     }
 
     function requestL2TransactionTwoBridgesSender(
@@ -657,8 +657,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
         // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
         // note claimFailedDeposit does not work with this hack!
-        // return _requestL2TransactionTwoBridges(_sender, true, _request);
-        return _requestInteropSingleCall(_request, _sender);
+        return _requestL2TransactionTwoBridges(_sender, true, _request);
+        // return _requestInteropSingleCall(_request, _sender);
     }
 
     function _requestL2TransactionTwoBridges(

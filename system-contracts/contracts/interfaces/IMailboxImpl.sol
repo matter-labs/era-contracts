@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-interface IMailbox {
+interface IMailboxImpl {
     function finalizeEthWithdrawal(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,

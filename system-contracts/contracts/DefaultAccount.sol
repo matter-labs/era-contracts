@@ -10,6 +10,7 @@ import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, L2_INTEROP_HANDLER} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
+import {MessageInclusionProof} from "./libraries/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -155,7 +156,10 @@ contract DefaultAccount is IAccount {
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
         if (to == (address((L2_INTEROP_HANDLER)))) {
-            L2_INTEROP_HANDLER.executeInteropBundle(_transaction);
+            (, bytes memory executionBundle) = abi.decode(_transaction.data, (bytes, bytes));
+            (, bytes memory executionProof) = abi.decode(_transaction.signature, (bytes, bytes));
+            MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
+            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof);
             return;
         }
 
@@ -236,7 +240,10 @@ contract DefaultAccount is IAccount {
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
         if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
-            L2_INTEROP_HANDLER.executePaymasterBundle(_transaction);
+            (bytes memory paymasterBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
+            (bytes memory paymasterProof, ) = abi.decode(_transaction.signature, (bytes, bytes));
+            MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
+            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof);
         }
         bool success = _transaction.payToTheBootloader();
         if (!success) {

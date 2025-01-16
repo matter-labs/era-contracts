@@ -3,33 +3,36 @@
 pragma solidity 0.8.24;
 
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import {IMailboxAbstract} from "../../chain-interfaces/IMailboxAbstract.sol";
+import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow, InvalidProofLengthForFinalNode} from "../../../common/L1ContractErrors.sol";
 
-abstract contract MailboxAbstract is IMailboxAbstract {
-    /// @inheritdoc IMailboxAbstract
-    function proveL2MessageInclusion(
+abstract contract MessageVerification is IMessageVerification {
+    /// @inheritdoc IMessageVerification
+    function proveL2MessageInclusionShared(
+        uint256 _chainId,
         uint256 _batchNumber,
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
-        return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
+        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _L2MessageToLog(_message), _proof);
     }
 
-    /// @inheritdoc IMailboxAbstract
-    function proveL2LeafInclusion(
+    /// @inheritdoc IMessageVerification
+    function proveL2LeafInclusionShared(
+        uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        return _proveL2LeafInclusion(_batchNumber, _leafProofMask, _leaf, _proof);
+        return _proveL2LeafInclusion(_chainId, _batchNumber, _leafProofMask, _leaf, _proof);
     }
 
     function _proveL2LeafInclusion(
+        uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
@@ -38,6 +41,7 @@ abstract contract MailboxAbstract is IMailboxAbstract {
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
+        uint256 _chainId,
         uint256 _batchNumber,
         uint256 _index,
         L2Log memory _log,
@@ -59,7 +63,7 @@ abstract contract MailboxAbstract is IMailboxAbstract {
 
         // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
 
-        return _proveL2LeafInclusion(_batchNumber, _index, hashedLog, _proof);
+        return _proveL2LeafInclusion(_chainId, _batchNumber, _index, hashedLog, _proof);
     }
 
     /// @dev Convert arbitrary-length message to the raw l2 log
@@ -75,13 +79,14 @@ abstract contract MailboxAbstract is IMailboxAbstract {
             });
     }
 
-    /// @inheritdoc IMailboxAbstract
-    function proveL2LogInclusion(
+    /// @inheritdoc IMessageVerification
+    function proveL2LogInclusionShared(
+        uint256 _chainId,
         uint256 _batchNumber,
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view returns (bool) {
-        return _proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _log, _proof);
     }
 }

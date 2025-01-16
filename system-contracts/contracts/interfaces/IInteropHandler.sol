@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {Transaction} from "../libraries/TransactionHelper.sol";
+import {MessageInclusionProof} from "../libraries/Messaging.sol";
 
 struct InteropCall {
     address to;
@@ -22,6 +23,5 @@ struct InteropBundle {
 
 interface IInteropHandler {
     function setInteropAccountBytecode() external;
-    function executePaymasterBundle(Transaction calldata _transaction) external;
-    function executeInteropBundle(Transaction calldata _transaction) external;
+    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
 }

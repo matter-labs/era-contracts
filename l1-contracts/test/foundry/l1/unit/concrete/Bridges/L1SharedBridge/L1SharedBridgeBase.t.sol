@@ -480,7 +480,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
     function test_bridgehubDeposit_Eth_storesCorrectTxHash() public {
         _setBaseTokenAssetId(tokenAssetId);
-        vm.prank(bridgehubAddress);
+        vm.prank(interopCenterAddress);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
