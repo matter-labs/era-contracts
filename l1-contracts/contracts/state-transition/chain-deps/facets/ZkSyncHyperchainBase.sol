@@ -64,4 +64,11 @@ contract ZkSyncHyperchainBase is ReentrancyGuard {
         }
         _;
     }
+
+    modifier onlySelf() {
+        if (msg.sender != address(this)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
 }

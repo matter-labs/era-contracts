@@ -51,6 +51,7 @@ object "EvmGasManager" {
             }
 
             function $llvm_AlwaysInline_llvm$__getRawSenderCodeHash() -> hash {
+                // function getRawCodeHash(address _address)
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, caller())
             
@@ -71,9 +72,9 @@ object "EvmGasManager" {
                 let notSystemCall := iszero(and(callFlags, 2))
 
                 if notSystemCall {
-                    // error CallerMustBeEvmContract()
-                    mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
-                    revert(0, 32)
+                    // error SystemCallFlagRequired()
+                    mstore(0, 0x71C3DA0100000000000000000000000000000000000000000000000000000000)
+                    revert(0, 4)
                 }
 
                 // SELFDESTRUCT is not supported, so it is ok to cache here
@@ -86,7 +87,7 @@ object "EvmGasManager" {
                     if iszero(isEVM) {
                         // error CallerMustBeEvmContract()
                         mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
-                        revert(0, 32)
+                        revert(0, 4)
                     }
 
                     // we will not cache contract if it is being constructed
@@ -220,7 +221,7 @@ object "EvmGasManager" {
 
                 // We do not have active frame. This means that the EVM contract was called from the EraVM contract.
                 // mark caller and txorigin as warm
-                let _msgsender := calldataload(1)
+                let _msgsender := and(ADDRESS_MASK(), _calldata0Slot)
                 let _origin := origin()
                 warmAccount(_msgsender)
                 if iszero(eq(_msgsender, _origin)) {

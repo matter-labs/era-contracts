@@ -34,6 +34,8 @@ error EmptyVirtualBlocks();
 error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
 // 0x2bfbfc11
 error EncodedLengthNotFourTimesSmallerThanOriginal();
+// 0x39bae0e6
+error EVMBytecodeHash();
 // 0xb9e6e31f
 error EVMEmulationNotSupported();
 // 0xe95a1fbe
@@ -54,8 +56,6 @@ error IndexSizeError();
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0x1c26714c
 error InsufficientGas();
-// 0x8322ca79
-error InvalidAllowedBytecodeTypesMode();
 // 0xae962d4e
 error InvalidCall();
 // 0x6a84bc39
@@ -145,5 +145,6 @@ enum BytecodeError {
     Length,
     WordsMustBeOdd,
     DictionaryLength,
-    EvmBytecodeLength
+    EvmBytecodeLength,
+    EvmBytecodeLengthTooBig
 }

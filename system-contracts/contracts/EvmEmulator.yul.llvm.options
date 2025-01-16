@@ -1,1 +1,1 @@
-'-eravm-jump-table-density-threshold=10 -tail-dup-size=6 -eravm-enable-split-loop-phi-live-ranges -tail-merge-only-bbs-without-succ -join-globalcopies -disable-early-taildup'
+'-eravm-jump-table-density-threshold=10 -tail-dup-size=6 -eravm-enable-split-loop-phi-live-ranges -tail-merge-only-bbs-without-succ -tail-dup-fallthrough-bbs'

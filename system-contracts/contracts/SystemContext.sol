@@ -8,7 +8,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, SystemLogKey} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -42,10 +42,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
     /// @notice The `block.coinbase` in the current transaction.
     /// @dev For the support of coinbase, we will use the bootloader formal address for now
-    /// @dev (!) EVM emulator doesn't expect this value to change
     address public coinbase = BOOTLOADER_FORMAL_ADDRESS;
 
     /// @notice Formal `block.difficulty` parameter.
+    /// @dev (!) EVM emulator doesn't expect this value to change
     uint256 public difficulty = 2.5e15;
 
     /// @notice The `block.basefee`.
@@ -88,17 +88,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @param _newChainId The chainId
     function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
         chainId = _newChainId;
-    }
-
-    /// @notice Set the chain configuration.
-    /// @param _newChainId The chainId
-    /// @param _newAllowedBytecodeTypes The new allowed bytecode types mode.
-    function setChainConfiguration(
-        uint256 _newChainId,
-        uint256 _newAllowedBytecodeTypes
-    ) external onlyCallFromForceDeployer {
-        chainId = _newChainId;
-        DEPLOYER_SYSTEM_CONTRACT.setAllowedBytecodeTypesToDeploy(_newAllowedBytecodeTypes);
     }
 
     /// @notice Number of current transaction in block.

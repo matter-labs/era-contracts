@@ -15,7 +15,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SERVICE_TRANSACTION_SENDER} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
@@ -248,6 +248,28 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
     }
 
+    ///  @inheritdoc IMailbox
+    function requestL2ServiceTransaction(
+        address _contractL2,
+        bytes calldata _l2Calldata
+    ) external onlySelf returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = _requestL2TransactionFree(
+            BridgehubL2TransactionRequest({
+                sender: SERVICE_TRANSACTION_SENDER,
+                contractL2: _contractL2,
+                mintValue: 0,
+                l2Value: 0,
+                // Very large amount
+                l2GasLimit: 72_000_000,
+                l2Calldata: _l2Calldata,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                // Tx is free, so no refund recipient needed
+                refundRecipient: address(0)
+            })
+        );
+    }
+
     function _requestL2TransactionSender(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
@@ -311,6 +333,19 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
 
         canonicalTxHash = _writePriorityOp(_params);
+    }
+
+    function _requestL2TransactionFree(
+        BridgehubL2TransactionRequest memory _request
+    ) internal nonReentrant returns (bytes32 canonicalTxHash) {
+        WritePriorityOpParams memory params = WritePriorityOpParams({
+            request: _request,
+            txId: s.priorityQueue.getTotalPriorityTxs(),
+            l2GasPrice: 0,
+            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+        });
+
+        canonicalTxHash = _writePriorityOp(params);
     }
 
     function _serializeL2Transaction(

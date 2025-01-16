@@ -21,23 +21,21 @@ object "EvmEmulator" {
             copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
-        function padBytecode(offset, len) -> blobOffset, blobLen {
-            blobOffset := sub(offset, 32)
+        function padBytecode(offset, len) -> blobLen {
             let trueLastByte := add(offset, len)
 
-            mstore(blobOffset, len)
             // clearing out additional bytes
             mstore(trueLastByte, 0)
             mstore(add(trueLastByte, 32), 0)
 
-            blobLen := add(len, 32)
+            blobLen := len
 
-            if iszero(eq(mod(blobLen, 32), 0)) {
+            if mod(blobLen, 32) {
                 blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
             }
 
             // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
-            if iszero(eq(mod(blobLen, 64), 32)) {
+            if iszero(mod(blobLen, 64)) {
                 blobLen := add(blobLen, 32)
             }
         }
@@ -62,6 +60,8 @@ object "EvmEmulator" {
 
         <!-- @include EvmEmulatorFunctions.template.yul -->
 
+        <!-- @include calldata-opcodes/ConstructorScope.template.yul -->
+
         function simulate(
             isCallerEVM,
             evmGasLeft,
@@ -79,8 +79,6 @@ object "EvmEmulator" {
         ////////////////////////////////////////////////////////////////
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
-
-        pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
         
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
@@ -92,17 +90,20 @@ object "EvmEmulator" {
 
         if iszero(isCallerEVM) {
             evmGasLeft := getEvmGasFromContext()
+            // Charge additional creation cost
+            evmGasLeft := chargeGas(evmGasLeft, 32000) 
         }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
 
         gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
 
-        offset, len := padBytecode(offset, len)
+        let blobLen := padBytecode(offset, len)
 
-        mstore(add(offset, len), gasToReturn)
+        mstore(add(offset, blobLen), len)
+        mstore(add(offset, add(32, blobLen)), gasToReturn)
 
-        verbatim_2i_0o("return_deployed", offset, add(len, 32))
+        verbatim_2i_0o("return_deployed", offset, add(blobLen, 64))
     }
     object "EvmEmulator_deployed" {
         code {
@@ -115,8 +116,12 @@ object "EvmEmulator" {
                     getCodeAddress(), 
                     BYTECODE_OFFSET(), // destination offset
                     0, // source offset
-                    MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
+                    add(MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN(), 1) // so we can check that bytecode isn't too big
                 )
+
+                if gt(codeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
+                    panic()
+                }
             
                 mstore(EMPTY_CODE_OFFSET(), 0)
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
@@ -124,7 +129,7 @@ object "EvmEmulator" {
 
             <!-- @include EvmEmulatorFunctions.template.yul -->
 
-            function $llvm_NoInline_llvm$_simulate(
+            function simulate(
                 isCallerEVM,
                 evmGasLeft,
                 isStatic,
@@ -135,7 +140,9 @@ object "EvmEmulator" {
 
                 <!-- @include EvmEmulatorLoop.template.yul -->
 
-                if eq(isCallerEVM, 1) {
+                <!-- @include calldata-opcodes/RuntimeScope.template.yul -->
+
+                if isCallerEVM {
                     // Includes gas
                     returnOffset := sub(returnOffset, 32)
                     checkOverflow(returnLen, 32)
@@ -160,7 +167,7 @@ object "EvmEmulator" {
             // segment of memory.
             getDeployedBytecode()
 
-            let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
+            let returnOffset, returnLen := simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
         }
     }

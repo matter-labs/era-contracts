@@ -21,23 +21,21 @@ object "EvmEmulator" {
             copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
-        function padBytecode(offset, len) -> blobOffset, blobLen {
-            blobOffset := sub(offset, 32)
+        function padBytecode(offset, len) -> blobLen {
             let trueLastByte := add(offset, len)
 
-            mstore(blobOffset, len)
             // clearing out additional bytes
             mstore(trueLastByte, 0)
             mstore(add(trueLastByte, 32), 0)
 
-            blobLen := add(len, 32)
+            blobLen := len
 
-            if iszero(eq(mod(blobLen, 32), 0)) {
+            if mod(blobLen, 32) {
                 blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
             }
 
             // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
-            if iszero(eq(mod(blobLen, 64), 32)) {
+            if iszero(mod(blobLen, 64)) {
                 blobLen := add(blobLen, 32)
             }
         }
@@ -88,52 +86,58 @@ object "EvmEmulator" {
             addr :=  0x0000000000000000000000000000000000008009
         }
         
-        function ORIGIN_CACHE_OFFSET() -> offset {
+        function PANIC_RETURNDATASIZE_OFFSET() -> offset {
             offset := mul(23, 32)
         }
         
+        function ORIGIN_CACHE_OFFSET() -> offset {
+            offset := add(PANIC_RETURNDATASIZE_OFFSET(), 32)
+        }
+        
         function GASPRICE_CACHE_OFFSET() -> offset {
-            offset := mul(24, 32)
+            offset := add(ORIGIN_CACHE_OFFSET(), 32)
         }
         
         function COINBASE_CACHE_OFFSET() -> offset {
-            offset := mul(25, 32)
+            offset := add(GASPRICE_CACHE_OFFSET(), 32)
         }
         
         function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
-            offset := mul(26, 32)
+            offset := add(COINBASE_CACHE_OFFSET(), 32)
         }
         
         function BLOCKNUMBER_CACHE_OFFSET() -> offset {
-            offset := mul(27, 32)
-        }
-        
-        function PREVRANDAO_CACHE_OFFSET() -> offset {
-            offset := mul(28, 32)
+            offset := add(BLOCKTIMESTAMP_CACHE_OFFSET(), 32)
         }
         
         function GASLIMIT_CACHE_OFFSET() -> offset {
-            offset := mul(29, 32)
+            offset := add(BLOCKNUMBER_CACHE_OFFSET(), 32)
         }
         
         function CHAINID_CACHE_OFFSET() -> offset {
-            offset := mul(30, 32)
+            offset := add(GASLIMIT_CACHE_OFFSET(), 32)
         }
         
         function BASEFEE_CACHE_OFFSET() -> offset {
-            offset := mul(31, 32)
+            offset := add(CHAINID_CACHE_OFFSET(), 32)
         }
         
         function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
             offset := add(BASEFEE_CACHE_OFFSET(), 32)
         }
         
+        // Note: we have an empty memory slot after LAST_RETURNDATA_SIZE_OFFSET(), it is used to simplify stack logic
+        
         function STACK_OFFSET() -> offset {
             offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
         }
         
+        function MAX_STACK_SLOT_OFFSET() -> offset {
+            offset := add(STACK_OFFSET(), mul(1023, 32))
+        }
+        
         function BYTECODE_LEN_OFFSET() -> offset {
-            offset := add(STACK_OFFSET(), mul(1024, 32))
+            offset := add(MAX_STACK_SLOT_OFFSET(), 32)
         }
         
         function BYTECODE_OFFSET() -> offset {
@@ -162,13 +166,9 @@ object "EvmEmulator" {
         }
         
         // Used to simplify gas calculations for memory expansion.
-        // The cost to increase the memory to 4 MB is close to 30M gas
+        // The cost to increase the memory to 12 MB is close to 277M EVM gas
         function MAX_POSSIBLE_MEM_LEN() -> max {
-            max := 0x400000 // 4MB
-        }
-        
-        function MAX_MEMORY_SLOT() -> max {
-            max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
+            max := 0xC00000 // 12MB
         }
         
         function MAX_UINT() -> max_uint {
@@ -182,17 +182,23 @@ object "EvmEmulator" {
         // Each evm gas is 5 zkEVM one
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         
-        // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
-        function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                gas_stipend := 35000 // 27000 + a little bit more
-        }
-        
         function OVERHEAD() -> overhead { overhead := 2000 }
         
-        // From precompiles/CodeOracle
-        function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
+        function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
         
-        function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+        function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+        
+        function EMPTY_KECCAK() -> value {  // keccak("")
+            value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+        }
+        
+        function ADDRESS_MASK() -> value { // mask for lower 160 bits
+            value := 0xffffffffffffffffffffffffffffffffffffffff
+        }
+        
+        function PREVRANDAO_VALUE() -> value {
+            value := 2500000000000000 // This value is fixed in EraVM
+        }
         
         ////////////////////////////////////////////////////////////////
         //                  GENERAL FUNCTIONS
@@ -203,19 +209,15 @@ object "EvmEmulator" {
             revert(0, 0)
         }
         
-        function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
-            mstore(0, 0)
-            revert(0, 32)
-        }
-        
-        function revertWithGas(evmGasLeft) {
-            mstore(0, evmGasLeft)
-            revert(0, 32)
+        function $llvm_NoInline_llvm$_invalid() { // revert consuming all EVM gas
+            panic()
         }
         
         function panic() { // revert consuming all EVM gas
+            // we return empty 32 bytes encoding 0 gas left if caller is EVM, and 0 bytes if caller isn't EVM
+            // it is done without if-else block so this function will be inlined
             mstore(0, 0)
-            revert(0, 32)
+            revert(0, mload(PANIC_RETURNDATASIZE_OFFSET()))
         }
         
         function cached(cacheIndex, value) -> _value {
@@ -239,60 +241,79 @@ object "EvmEmulator" {
             }
         }
         
-        // This function can overflow, it is the job of the caller to ensure that it does not.
         // The argument to this function is the offset into the memory region IN BYTES.
         function expandMemory(offset, size) -> gasCost {
             // memory expansion costs 0 if size is 0
             if size {
-                let oldSizeInWords := mload(MEM_LEN_OFFSET())
-        
-                // div rounding up
-                let newSizeInWords := div(add(add(offset, size), 31), 32)
-            
-                // memory_size_word = (memory_byte_size + 31) / 32
-                // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
-                // memory_expansion_cost = new_memory_cost - last_memory_cost
-                if gt(newSizeInWords, oldSizeInWords) {
-                    let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
-                    let quadraticPart := sub(
-                        div(
-                            mul(newSizeInWords, newSizeInWords),
-                            512
-                        ),
-                        div(
-                            mul(oldSizeInWords, oldSizeInWords),
-                            512
-                        )
-                    )
-            
-                    gasCost := add(linearPart, quadraticPart)
-            
-                    mstore(MEM_LEN_OFFSET(), newSizeInWords)
-                }
+                checkOverflow(offset, size)
+                gasCost := _expandMemoryInternal(add(offset, size))
             }
         }
         
-        function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-            switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
-            case 0 {
-                maxExpand := expandMemory(retOffset, retSize)
-            }
-            default {
-                maxExpand := expandMemory(argsOffset, argsSize)
-            }
-        }
-        
-        function checkMemIsAccessible(index, offset) {
-            checkOverflow(index, offset)
-        
-            if gt(add(index, offset), MAX_MEMORY_SLOT()) {
+        // This function can overflow, it is the job of the caller to ensure that it does not.
+        // The argument to this function is the new size of memory IN BYTES.
+        function _expandMemoryInternal(newMemsize) -> gasCost {
+            if gt(newMemsize, MAX_POSSIBLE_MEM_LEN()) {
                 panic()
+            }   
+        
+            let oldSizeInWords := mload(MEM_LEN_OFFSET())
+        
+            // div rounding up
+            let newSizeInWords := shr(5, add(newMemsize, 31))
+        
+            // memory_size_word = (memory_byte_size + 31) / 32
+            // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+            // memory_expansion_cost = new_memory_cost - last_memory_cost
+            if gt(newSizeInWords, oldSizeInWords) {
+                let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+                let quadraticPart := sub(
+                    shr(
+                        9,
+                        mul(newSizeInWords, newSizeInWords),
+                    ),
+                    shr(
+                        9,
+                        mul(oldSizeInWords, oldSizeInWords),
+                    )
+                )
+        
+                gasCost := add(linearPart, quadraticPart)
+        
+                mstore(MEM_LEN_OFFSET(), newSizeInWords)
+            }
+        }
+        
+        // Returns 0 if size is 0
+        function _memsizeRequired(offset, size) -> memorySize {
+            if size {
+                checkOverflow(offset, size)
+                memorySize := add(offset, size)
+            }
+        }
+        
+        function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> gasCost {
+            let maxNewMemsize := _memsizeRequired(retOffset, retSize)
+            let argsMemsize := _memsizeRequired(argsOffset, argsSize)
+        
+            if lt(maxNewMemsize, argsMemsize) {
+                maxNewMemsize := argsMemsize  
+            }
+        
+            if maxNewMemsize { // Memory expansion costs 0 if size is 0
+                gasCost := _expandMemoryInternal(maxNewMemsize)
             }
         }
         
         function checkOverflow(data1, data2) {
             if lt(add(data1, data2), data2) {
                 panic()
+            }
+        }
+        
+        function insufficientBalance(value) -> res {
+            if value {
+                res := gt(value, selfbalance())
             }
         }
         
@@ -375,80 +396,70 @@ object "EvmEmulator" {
         }
         
         function getRawCodeHash(addr) -> hash {
+            // function getRawCodeHash(address _address)
             mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
             hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
         }
         
         function getEvmExtcodehash(addr) -> evmCodeHash {
+            // function evmCodeHash(address _address)
             mstore(0, 0x54A3314700000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
             evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
         }
         
-        function isEvmContract(addr) -> isEVM {
-            // function isAccountEVM(address addr) external view returns (bool);
-            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-            mstore(4, addr)
-            isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
+        function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
+            let version := shr(248, rawCodeHash)
+            let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
+            isConstructedEVM := and(eq(version, 2), isConstructedFlag)
         }
         
         // Basically performs an extcodecopy, while returning the length of the copied bytecode.
         function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-            let codeHash := getRawCodeHash(addr)
-            mstore(0, codeHash)
-            // The first word of returndata is the true length of the bytecode
-            let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
-        
-            if gt(len, codeLen) {
-                len := codeLen
-            }
-        
-            let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
-        
-            let _returndatasize := returndatasize()
-            if gt(shiftedSrcOffset, _returndatasize) {
-                shiftedSrcOffset := _returndatasize
-            }
-        
-            if gt(add(len, shiftedSrcOffset), _returndatasize) {
-                len := sub(_returndatasize, shiftedSrcOffset)
-            }
-        
-            if len {
-                returndatacopy(dstOffset, shiftedSrcOffset, len)
-            }
-        
-            copiedLen := len
-        }
-        
-        // Returns the length of the EVM bytecode.
-        function fetchDeployedEvmCodeLen(addr) -> codeLen {
-            let codeHash := getRawCodeHash(addr)
-            mstore(0, codeHash)
-        
+            let rawCodeHash := getRawCodeHash(addr)
+            mstore(0, rawCodeHash)
+            
             let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+            // it fails if we don't have any code deployed at this address
+            if success {
+                // The length of the bytecode is encoded in versioned bytecode hash
+                let codeLen := and(shr(224, rawCodeHash), 0xffff)
         
-            switch iszero(success)
-            case 1 {
-                // The code oracle call can only fail in the case where the contract
-                // we are querying is the current one executing and it has not yet been
-                // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                // inside the constructor. In that case, code length is zero.
-                codeLen := 0
-            }
-            default {
-                // The first word is the true length of the bytecode
-                returndatacopy(0, 0, 32)
-                codeLen := mload(0)
-            }
+                if eq(shr(248, rawCodeHash), 1) {
+                    // For native zkVM contracts length encoded in words, not bytes
+                    codeLen := shl(5, codeLen) // * 32
+                }
+        
+                if gt(len, codeLen) {
+                    len := codeLen
+                }
+            
+                let _returndatasize := returndatasize()
+                if gt(srcOffset, _returndatasize) {
+                    srcOffset := _returndatasize
+                }
+            
+                if gt(add(len, srcOffset), _returndatasize) {
+                    len := sub(_returndatasize, srcOffset)
+                }
+            
+                if len {
+                    returndatacopy(dstOffset, srcOffset, len)
+                }
+            
+                copiedLen := len
+            } 
         }
         
-        function getMax(a, b) -> max {
-            max := b
-            if gt(a, b) {
-                max := a
-            }
+        function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
+            farCallAbi := shl(248, isSystemCall)
+            // dataOffset is 0
+            farCallAbi := or(farCallAbi, shl(64, dataStart))
+            farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+            farCallAbi :=  or(farCallAbi, shl(192, gas))
+            // shardId is 0
+            // forwardingMode is 0
         }
         
         function performSystemCall(to, dataLength) {
@@ -461,24 +472,60 @@ object "EvmEmulator" {
         }
         
         function performSystemCallRevertable(to, dataLength) -> success {
-            let farCallAbi := shl(248, 1) // system call
-            // dataOffset is 0
-            // dataStart is 0
-            farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-            farCallAbi :=  or(farCallAbi, shl(192, gas()))
-            // shardId is 0
-            // forwardingMode is 0
-            // not constructor call
-        
+            // system call, dataStart is 0
+            let farCallAbi := build_farcall_abi(1, gas(), 0, dataLength)
             success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+        }
+        
+        function rawCall(gas, to, value, dataStart, dataLength, outputOffset, outputLen) -> success {
+            switch iszero(value)
+            case 0 {
+                // system call to MsgValueSimulator, but call to "to" will be non-system
+                let farCallAbi := build_farcall_abi(1, gas, dataStart, dataLength)
+                success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, to, 0, 0)
+                if outputLen {
+                    if success {
+                        let rtdz := returndatasize()
+                        switch lt(rtdz, outputLen)
+                        case 0 { returndatacopy(outputOffset, 0, outputLen) }
+                        default { returndatacopy(outputOffset, 0, rtdz) }
+                    }
+                }
+            }
+            default {
+                // not a system call
+                let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+                success := verbatim_4i_1o("raw_call", to, farCallAbi, outputOffset, outputLen)
+            }
+        }
+        
+        function rawStaticcall(gas, to, dataStart, dataLength, outputOffset, outputLen) -> success {
+            // not a system call
+            let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+            success := verbatim_4i_1o("raw_static_call", to, farCallAbi, outputOffset, outputLen)
         }
         
         ////////////////////////////////////////////////////////////////
         //                     STACK OPERATIONS
         ////////////////////////////////////////////////////////////////
         
+        function pushOpcodeInner(size, ip, sp, evmGas, oldStackHead) -> newIp, newSp, evmGasLeft, stackHead {
+            evmGasLeft := chargeGas(evmGas, 3)
+        
+            newIp := add(ip, 1)
+            let value := readBytes(newIp, size)
+        
+            newSp, stackHead := pushStackItem(sp, value, oldStackHead)
+            newIp := add(newIp, size)
+        }
+        
         function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
             evmGasLeft := chargeGas(evmGas, 3)
+        
+            if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
+                panic()
+            }
+            
             let tempSp := sub(sp, mul(0x20, sub(position, 1)))
         
             if lt(tempSp, STACK_OFFSET())  {
@@ -514,7 +561,7 @@ object "EvmEmulator" {
         }
         
         function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-            if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
+            if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
                 panic()
             }
         
@@ -529,20 +576,8 @@ object "EvmEmulator" {
             stackHead := mload(newSp)
         }
         
-        function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
-            mstore(sp, oldStackHead)
-            stackHead := item
-            newSp := add(sp, 0x20)
-        }
-        
         function popStackCheck(sp, numInputs) {
             if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-                panic()
-            }
-        }
-        
-        function pushStackCheck(sp, numInputs) {
-            if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
                 panic()
             }
         }
@@ -559,11 +594,12 @@ object "EvmEmulator" {
         //               EVM GAS MANAGER FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
         
+        // Address higher bytes must be cleaned before
         function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
             // function warmAccount(address account)
             // non-standard selector 0x00
             // addr is packed in the same word with selector
-            mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+            mstore(0, addr)
         
             performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
         
@@ -576,8 +612,7 @@ object "EvmEmulator" {
             // non-standard selector 0x01
             mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
             mstore(1, key)
-            // should be call since we use TSTORE in gas manager
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
+            let success := staticcall(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 33, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
@@ -597,6 +632,7 @@ object "EvmEmulator" {
         
             performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
         
+            originalValue := currentValue
             if returndatasize() {
                 isWarm := true
                 returndatacopy(0, 0, 32)
@@ -614,16 +650,16 @@ object "EvmEmulator" {
         }
         
         function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-            // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
+            // function consumeEvmFrame(_caller) external returns (uint256 passGas, uint256 auxDataRes)
             // non-standard selector 0x04
-            mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
-            mstore(1, caller())
+            mstore(0, or(0x0400000000000000000000000000000000000000000000000000000000000000, caller()))
         
-            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
+            performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
         
             let _returndatasize := returndatasize()
             if _returndatasize {
                 callerEVM := true
+                mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
         
                 returndatacopy(0, 0, 32)
                 passGas := mload(0)
@@ -644,21 +680,16 @@ object "EvmEmulator" {
         //               CALLS FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
         
-        function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-            let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
+        function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
+            let gasToPass, rawAddr, value, argsOffset, argsSize, retOffset, retSize
         
             popStackCheck(oldSp, 7)
             gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-        
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
-            checkMemIsAccessible(argsOffset, argsSize)
-            checkMemIsAccessible(retOffset, retSize)
         
             // static_gas = 0
             // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -667,15 +698,13 @@ object "EvmEmulator" {
             // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called.
             // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
         
-            let gasUsed := 100 // warm address access cost
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600 // cold address access cost
-            }
-        
-            // memory_expansion_cost
-            gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+            let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
         
             if gt(value, 0) {
+                if isStatic {
+                    panic()
+                }
+        
                 gasUsed := add(gasUsed, 9000) // positive_value_cost
         
                 if isAddrEmpty(addr) {
@@ -699,7 +728,7 @@ object "EvmEmulator" {
                 argsSize,
                 add(retOffset, MEM_OFFSET()),
                 retSize,
-                false
+                isStatic
             )
         
             newGasLeft := add(evmGasLeft, frameGasLeft)
@@ -707,27 +736,16 @@ object "EvmEmulator" {
         }
         
         function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-            let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+            let gasToPass, rawAddr, argsOffset, argsSize, retOffset, retSize
         
             popStackCheck(oldSp, 6)
             gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+            rawAddr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
             argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
         
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        
-            checkMemIsAccessible(argsOffset, argsSize)
-            checkMemIsAccessible(retOffset, retSize)
-        
-            let gasUsed := 100 // warm address access cost
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600 // cold address access cost
-            }
-        
-            // memory_expansion_cost
-            gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+            let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
         
             evmGasLeft := chargeGas(evmGasLeft, gasUsed)
             gasToPass := capGasForCall(evmGasLeft, gasToPass)
@@ -750,66 +768,97 @@ object "EvmEmulator" {
         
         
         function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGasLeft, sp, stackHead {
-            let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
+            let gasToPass, rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize
         
             popStackCheck(oldSp, 6)
             gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            rawArgsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+            rawRetOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
         
-            addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+            let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize)
         
-            checkMemIsAccessible(argsOffset, argsSize)
-            checkMemIsAccessible(retOffset, retSize)
+            newGasLeft := chargeGas(evmGasLeft, gasUsed)
+            gasToPass := capGasForCall(newGasLeft, gasToPass)
         
-            let gasUsed := 100 // warm address access cost
-            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                gasUsed := 2600 // cold address access cost
+            newGasLeft := sub(newGasLeft, gasToPass)
+        
+            let success
+            let frameGasLeft := gasToPass
+        
+            let retOffset := add(MEM_OFFSET(), rawRetOffset)
+            let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+        
+            let rawCodeHash := getRawCodeHash(addr)
+            switch isHashOfConstructedEvmContract(rawCodeHash)
+            case 0 {
+                // Not a constructed EVM contract
+                let precompileCost := getGasForPrecompiles(addr, argsSize)
+                switch precompileCost
+                case 0 {
+                    // Not a precompile
+                    _eraseReturndataPointer()
+        
+                    let isCallToEmptyContract := iszero(addr) // 0x00 is always "empty"
+                    if iszero(isCallToEmptyContract) {
+                        isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
+                    }
+        
+                    if isCallToEmptyContract {
+                        // In case of a call to the EVM contract that is currently being constructed, 
+                        // the DefaultAccount bytecode will be used instead. This is implemented at the virtual machine level.
+                        success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
+                        _saveReturndataAfterZkEVMCall()               
+                    }
+        
+                    // We forbid delegatecalls to EraVM native contracts
+                } 
+                default {
+                    // Precompile. Simulate using staticcall, since EraVM behavior differs here
+                    success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
+                }
+            }
+            default {
+                // Constructed EVM contract
+                pushEvmFrame(gasToPass, isStatic)
+                // pass all remaining native gas
+                success := delegatecall(gas(), addr, argsOffset, argsSize, 0, 0)
+        
+                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                if iszero(success) {
+                    resetEvmFrame()
+                }
             }
         
-            // memory_expansion_cost
-            gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
-        
-            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-        
-            // it is also not possible to delegatecall precompiles
-            if iszero(isEvmContract(addr)) {
-                revertWithGas(evmGasLeft)
-            }
-        
-            gasToPass := capGasForCall(evmGasLeft, gasToPass)
-            evmGasLeft := sub(evmGasLeft, gasToPass)
-        
-            pushEvmFrame(gasToPass, isStatic)
-            let success := delegatecall(
-                gas(), // pass all remaining native gas
-                addr,
-                add(MEM_OFFSET(), argsOffset),
-                argsSize,
-                0,
-                0
-            )
-        
-            let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
-            if iszero(success) {
-                resetEvmFrame()
-            }
-        
-            newGasLeft := add(evmGasLeft, frameGasLeft)
+            newGasLeft := add(newGasLeft, frameGasLeft)
             stackHead := success
         }
         
+        function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
+            // memory_expansion_cost
+            gasUsed := expandMemory2(retOffset, retSize, argsOffset, argsSize)
+        
+            addr := and(rawAddr, ADDRESS_MASK())
+        
+            let addressAccessCost := 100 // warm address access cost
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                addressAccessCost := 2600 // cold address access cost
+            }
+        
+            gasUsed := add(gasUsed, addressAccessCost)
+        }
+        
         function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-            switch isEvmContract(addr)
+            let rawCodeHash := getRawCodeHash(addr)
+            switch isHashOfConstructedEvmContract(rawCodeHash)
             case 0 {
                 // zkEVM native call
-                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                let precompileCost := getGasForPrecompiles(addr, argsSize)
                 switch precompileCost
                 case 0 {
                     // just smart contract
-                    success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                    success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash)
                 } 
                 default {
                     // precompile
@@ -817,57 +866,68 @@ object "EvmEmulator" {
                 }
             }
             default {
-                pushEvmFrame(gasToPass, isStatic)
-                // pass all remaining native gas
-                success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
-                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                if iszero(success) {
-                    resetEvmFrame()
+                switch insufficientBalance(value)
+                case 0 {
+                    pushEvmFrame(gasToPass, isStatic)
+                    // pass all remaining native gas
+                    success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                    if iszero(success) {
+                        resetEvmFrame()
+                    }
+                }
+                default {
+                    frameGasLeft := gasToPass
+                    _eraseReturndataPointer()
                 }
             }
         }
         
         function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-            let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
-            if lt(gasToPass, precompileCost) {
-                zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
-            }
-        
-            switch isStatic
+            switch lt(gasToPass, precompileCost)
             case 0 {
-                success := call(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
+        
+                switch isStatic
+                case 0 {
+                    success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                }
+                default {
+                    success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                }
+                
+                _saveReturndataAfterZkEVMCall()
+            
+                if success {
+                    frameGasLeft := sub(gasToPass, precompileCost)
+                }
+                // else consume all provided gas
             }
             default {
-                success := staticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                // consume all provided gas
+                _eraseReturndataPointer()
             }
-            
-            _saveReturndataAfterZkEVMCall()
-        
-            if success {
-                frameGasLeft := sub(gasToPass, precompileCost)
-            }
-            // else consume all provided gas
         }
         
         // Call native ZkVm contract from EVM context
-        function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
+        function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
             let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
-            let decommitZkVmGasCost := decommitmentCost(addr)
         
-            // we are going to charge decommit cost even if address is already warm
-            // decommit cost is subtracted from the callee frame
-            switch gt(decommitZkVmGasCost, zkEvmGasToPass)
-            case 0 {
-                zkEvmGasToPass := sub(zkEvmGasToPass, decommitZkVmGasCost)
-            }
-            default {
-                zkEvmGasToPass := 0
-            }
-        
-            if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
-                zkEvmGasToPass := UINT32_MAX()
+            let emptyContractExecutionCost := 500 // enough to call "empty" contract
+            let isEmptyContract := or(iszero(addr), iszero(and(shr(224, rawCodeHash), 0xffff)))
+            if isEmptyContract {
+                // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+                // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
+                if iszero(value) {
+                    zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
+                }
             }
         
+            if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
+                zkEvmGasToPass := MAX_UINT32()
+            }
+        
+            // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
             let zkEvmGasBefore := gas()
             switch isStatic
             case 0 {
@@ -879,24 +939,23 @@ object "EvmEmulator" {
             let zkEvmGasUsed := sub(zkEvmGasBefore, gas())
         
             _saveReturndataAfterZkEVMCall()
-            
+        
             if gt(zkEvmGasUsed, zkEvmGasBefore) { // overflow case
-                zkEvmGasUsed := zkEvmGasToPass // should never happen
+                zkEvmGasUsed := 0 // should never happen
+            }
+        
+            if isEmptyContract {
+                if iszero(value) {
+                    zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
+                }
+            
+                zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
             }
         
             // refund gas
             if gt(zkEvmGasToPass, zkEvmGasUsed) {
                 frameGasLeft := div(sub(zkEvmGasToPass, zkEvmGasUsed), GAS_DIVISOR())
             }
-        }
-        
-        function decommitmentCost(addr) -> cost {
-            // charge for contract decommitment
-            let byteSize := extcodesize(addr)
-            cost := mul(
-                div(add(byteSize, 31), 32), // rounding up
-                DECOMMIT_COST_PER_WORD()
-            ) 
         }
         
         function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
@@ -910,8 +969,7 @@ object "EvmEmulator" {
         // The gas cost mentioned here is purely the cost of the contract, 
         // and does not consider the cost of the call itself nor the instructions 
         // to put the parameters in memory. 
-        // Take into account MEM_OFFSET() when passing the argsOffset
-        function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
+        function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
             switch addr
                 case 0x01 { // ecRecover
                     gasToCharge := 3000
@@ -991,7 +1049,7 @@ object "EvmEmulator" {
         
                     mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
         
-                    // Skip the returnData
+                    // Skip first 32 bytes of the returnData
                     ptrAddIntoActive(32)
                 }
         }
@@ -1028,8 +1086,6 @@ object "EvmEmulator" {
         }
         
         function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
-            checkMemIsAccessible(offset, size)
-        
             // EIP-3860
             if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
                 panic()
@@ -1040,7 +1096,7 @@ object "EvmEmulator" {
             // minimum_word_size = (size + 31) / 32
             // init_code_cost = 2 * minimum_word_size, EIP-3860
             // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-            let minimum_word_size := div(add(size, 31), 32) // rounding up
+            let minimum_word_size := shr(5, add(size, 31)) // rounding up
             let dynamicGas := add(
                 mul(2, minimum_word_size),
                 expandMemory(offset, size)
@@ -1053,12 +1109,7 @@ object "EvmEmulator" {
         
             _eraseReturndataPointer()
         
-            let err := 0
-            if value {
-                if gt(value, selfbalance()) {
-                    err := 1
-                }
-            }
+            let err := insufficientBalance(value)
         
             if iszero(err) {
                 offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
@@ -1069,9 +1120,15 @@ object "EvmEmulator" {
         function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
             let gasForTheCall := capGasForCall(evmGasLeftOld, evmGasLeftOld) // pass 63/64 of remaining gas
         
-            let bytecodeHash := 0
+            let bytecodeHash
             if isCreate2 {
-                bytecodeHash := keccak256(offset, size)
+                switch size
+                case 0 {
+                    bytecodeHash := EMPTY_KECCAK()
+                }
+                default {
+                    bytecodeHash := keccak256(offset, size)
+                }
             }
         
             // we want to calculate the address of new contract, and if it is deployable (no collision),
@@ -1081,30 +1138,42 @@ object "EvmEmulator" {
             mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
             mstore(4, salt)
             mstore(36, bytecodeHash)
-            let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
+            let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
         
-            if iszero(precreateResult) {
-                // Collision, nonce overflow or EVM not allowed.
+            if canBeDeployed {
+                returndatacopy(0, 0, 32)
+                addr := and(mload(0), ADDRESS_MASK())
+                pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
+                // so even if constructor reverts, nonce stays incremented and addr stays warm
+        
+                // check for code collision
+                canBeDeployed := 0
+                if iszero(getRawCodeHash(addr)) {
+                    // check for nonce collision
+                    if iszero(getRawNonce(addr)) {
+                        canBeDeployed := 1
+                    }     
+                }
+            }
+        
+            if iszero(canBeDeployed) {
+                // Nonce overflow, EVM not allowed or collision.
                 // This is *internal* panic, consuming all passed gas.
                 // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
                 evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
+                addr := 0
             }
         
-            if precreateResult {
-                returndatacopy(0, 0, 32)
-                addr := mload(0)
-            
-                pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
-                // so even if constructor reverts, nonce stays incremented and addr stays warm
-            
+        
+            if canBeDeployed {
                 // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
                 pushEvmFrame(gasForTheCall, false)
         
                 // move needed memory slots to the scratch space
-                mstore(mul(10, 32), mload(sub(offset, 0x80))
-                mstore(mul(11, 32), mload(sub(offset, 0x60))
-                mstore(mul(12, 32), mload(sub(offset, 0x40))
-                mstore(mul(13, 32), mload(sub(offset, 0x20))
+                mstore(mul(10, 32), mload(sub(offset, 0x80)))
+                mstore(mul(11, 32), mload(sub(offset, 0x60)))
+                mstore(mul(12, 32), mload(sub(offset, 0x40)))
+                mstore(mul(13, 32), mload(sub(offset, 0x20)))
             
                 // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
                 mstore(sub(offset, 0x80), 0xe43cec64)
@@ -1115,10 +1184,10 @@ object "EvmEmulator" {
                 let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
         
                 // move memory slots back
-                mstore(sub(offset, 0x80), mload(mul(10, 32))
-                mstore(sub(offset, 0x60), mload(mul(11, 32))
-                mstore(sub(offset, 0x40), mload(mul(12, 32))
-                mstore(sub(offset, 0x20), mload(mul(13, 32))
+                mstore(sub(offset, 0x80), mload(mul(10, 32)))
+                mstore(sub(offset, 0x60), mload(mul(11, 32)))
+                mstore(sub(offset, 0x40), mload(mul(12, 32)))
+                mstore(sub(offset, 0x20), mload(mul(13, 32)))
             
                 let gasLeft
                 switch result
@@ -1137,14 +1206,8 @@ object "EvmEmulator" {
         }
         
         function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
-            let farCallAbi := shl(248, 1) // system call
-            // dataOffset is 0
-            farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
-            farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-            farCallAbi :=  or(farCallAbi, shl(192, gas()))
-            // shardId is 0
-            // forwardingMode is 0
-            // not constructor call (ContractDeployer will call constructor)
+            // system call, not constructor call (ContractDeployer will call constructor)
+            let farCallAbi := build_farcall_abi(1, gas(), bytecodeStart, bytecodeLen) 
         
             switch iszero(value)
             case 0 {
@@ -1172,46 +1235,92 @@ object "EvmEmulator" {
         }
         
         ////////////////////////////////////////////////////////////////
-        //               EXTCODECOPY FUNCTIONALITY
+        //               MEMORY REGIONS FUNCTIONALITY
         ////////////////////////////////////////////////////////////////
         
-        function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
-            let rest_bits := shl(3, len)
-            let upper_bits := sub(256, rest_bits)
-            let val_mask := shl(upper_bits, MAX_UINT())
-            let val_masked := and(val, val_mask)
-            let dst_val := mload(dest)
-            let dst_mask := shr(rest_bits, MAX_UINT())
-            let dst_masked := and(dst_val, dst_mask)
-            mstore(dest, or(val_masked, dst_masked))
-        }
-        
+        // Copy the region of memory
         function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
-            let dest_addr := dest
-            let src_addr := src
-            let dest_end := add(dest, and(len, sub(0, 32)))
-            for { } lt(dest_addr, dest_end) {} {
-                mstore(dest_addr, mload(src_addr))
-                dest_addr := add(dest_addr, 32)
-                src_addr := add(src_addr, 32)
+            // Copy all the whole memory words in a cycle
+            let destIndex := dest
+            let srcIndex := src
+            let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+            for { } lt(destIndex, destEndIndex) {} {
+                mstore(destIndex, mload(srcIndex))
+                destIndex := add(destIndex, 32)
+                srcIndex := add(srcIndex, 32)
             }
         
-            let rest_len := and(len, 31)
-            if rest_len {
-                $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+            // Copy the remainder (if any)
+            let remainderLen := and(len, 31)
+            if remainderLen {
+                $llvm_AlwaysInline_llvm$_memWriteRemainder(destIndex, mload(srcIndex), remainderLen)
             }
         }
         
-        function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
-            let dest_end := add(dest, and(len, sub(0, 32)))
-            for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+        // Write the last part of the copied/cleaned memory region (smaller than the memory word)
+        function $llvm_AlwaysInline_llvm$_memWriteRemainder(dest, remainder, len) {
+            let remainderBitLength := shl(3, len) // bytes to bits
+        
+            let existingValue := mload(dest)
+            let existingValueMask := shr(remainderBitLength, MAX_UINT())
+            let existingValueMasked := and(existingValue, existingValueMask) // clean up place for remainder
+        
+            let remainderMasked := and(remainder, not(existingValueMask)) // using only `len` higher bytes of remainder word
+            mstore(dest, or(remainderMasked, existingValueMasked))
+        }
+        
+        // Clean the region of memory
+        function $llvm_AlwaysInline_llvm$_memsetToZero(dest, len) {
+            // Clean all the whole memory words in a cycle
+            let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+            for {let i := dest} lt(i, destEndIndex) { i := add(i, 32) } {
                 mstore(i, 0)
             }
         
-            let rest_len := and(len, 31)
-            if rest_len {
-                $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+            // Clean the remainder (if any)
+            let remainderLen := and(len, 31)
+            if remainderLen {
+                $llvm_AlwaysInline_llvm$_memWriteRemainder(destEndIndex, 0, remainderLen)
             }
+        }
+        
+        ////////////////////////////////////////////////////////////////
+        //                 LOGS FUNCTIONALITY 
+        ////////////////////////////////////////////////////////////////
+        
+        function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmGasLeft, offset, size, newSp, newStackHead {
+            newEvmGasLeft := chargeGas(evmGasLeft, 375)
+        
+            if isStatic {
+                panic()
+            }
+        
+            let rawOffset
+            popStackCheck(sp, add(2, topicCount))
+            rawOffset, newSp, newStackHead := popStackItemWithoutCheck(sp, stackHead)
+            size, newSp, newStackHead := popStackItemWithoutCheck(newSp, newStackHead)
+        
+            // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+            let dynamicGas := add(shl(3, size), expandMemory(rawOffset, size))
+            dynamicGas := add(dynamicGas, mul(375, topicCount))
+        
+            newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
+        
+            if size {
+                offset := add(rawOffset, MEM_OFFSET())
+            }
+        }
+
+        function $llvm_AlwaysInline_llvm$_calldatasize() -> size {
+            size := 0
+        }
+        
+        function $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen) {
+            $llvm_AlwaysInline_llvm$_memsetToZero(dstOffset, truncatedLen)
+        }
+        
+        function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
+            res := 0
         }
 
         function simulate(
@@ -1503,21 +1612,25 @@ object "EvmEmulator" {
                 case 0x20 { // OP_KECCAK256
                     evmGasLeft := chargeGas(evmGasLeft, 30)
             
-                    let offset, size
+                    let rawOffset, size
             
                     popStackCheck(sp, 2)
-                    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, size)
+                    rawOffset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
                     // When an offset is first accessed (either read or write), memory may trigger 
                     // an expansion, which costs gas.
                     // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
-                    let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
+                    let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(rawOffset, size))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    stackHead := keccak256(add(MEM_OFFSET(), offset), size)
+                    let offset
+                    if size {
+                        // use 0 as offset if size is 0
+                        offset := add(MEM_OFFSET(), rawOffset)
+                    }
+            
+                    stackHead := keccak256(offset, size)
             
                     ip := add(ip, 1)
                 }
@@ -1530,7 +1643,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     let addr := accessStackHead(sp, stackHead)
-                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                    addr := and(addr, ADDRESS_MASK())
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -1564,38 +1677,51 @@ object "EvmEmulator" {
                 case 0x35 { // OP_CALLDATALOAD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    stackHead := calldataload(accessStackHead(sp, stackHead))
+                    let calldataOffset := accessStackHead(sp, stackHead)
+            
+                    stackHead := $llvm_AlwaysInline_llvm$_calldataload(calldataOffset)
             
                     ip := add(ip, 1)
                 }
                 case 0x36 { // OP_CALLDATASIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp, stackHead := pushStackItem(sp, calldatasize(), stackHead)
+                    sp, stackHead := pushStackItem(sp, $llvm_AlwaysInline_llvm$_calldatasize(), stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x37 { // OP_CALLDATACOPY
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    let destOffset, offset, size
+                    let dstOffset, sourceOffset, len
             
                     popStackCheck(sp, 3)
-                    destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(destOffset, size)
-            
-                    if gt(offset, MAX_UINT64()) {
-                        offset := MAX_UINT64()
-                    } 
+                    dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
-                    let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
+                    let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    calldatacopy(add(destOffset, MEM_OFFSET()), offset, size)
+                    dstOffset := add(dstOffset, MEM_OFFSET())
+            
+                    // EraVM will revert if offset + length overflows uint32
+                    if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
+                        sourceOffset := MAX_CALLDATA_OFFSET()
+                    }
+            
+                    // Check bytecode out-of-bounds access
+                    let truncatedLen := len
+                    if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                        truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
+                        $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
+                    }
+            
+                    if truncatedLen {
+                        $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen)
+                    }
+            
                     ip := add(ip, 1)
                     
                 }
@@ -1607,7 +1733,6 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0x39 { // OP_CODECOPY
-                
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
                     let dstOffset, sourceOffset, len
@@ -1616,8 +1741,6 @@ object "EvmEmulator" {
                     dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(dstOffset, len)
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
@@ -1632,14 +1755,14 @@ object "EvmEmulator" {
             
                     sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
             
-                    if gt(sourceOffset, MEM_LEN_OFFSET()) {
-                        sourceOffset := MEM_LEN_OFFSET()
+                    if gt(sourceOffset, bytecodeEndOffset) {
+                        sourceOffset := bytecodeEndOffset
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
-                        truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), bytecodeEndOffset) {
+                        truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -1663,14 +1786,22 @@ object "EvmEmulator" {
             
                     let addr := accessStackHead(sp, stackHead)
             
-                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                    addr := and(addr, ADDRESS_MASK())
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    switch isEvmContract(addr) 
-                        case 0  { stackHead := extcodesize(addr) }
-                        default { stackHead := fetchDeployedEvmCodeLen(addr) }
+                    let rawCodeHash := getRawCodeHash(addr)
+                    switch shr(248, rawCodeHash)
+                    case 1 {
+                        stackHead := extcodesize(addr)
+                    }
+                    case 2 {
+                        stackHead := and(shr(224, rawCodeHash), 0xffff)
+                    }
+                    default {
+                        stackHead := 0
+                    }
             
                     ip := add(ip, 1)
                 }
@@ -1683,9 +1814,7 @@ object "EvmEmulator" {
                     dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                    checkMemIsAccessible(dstOffset, len)
-                
+            
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
                     // minimum_word_size = (size + 31) / 32
                     let dynamicGas := add(
@@ -1693,22 +1822,22 @@ object "EvmEmulator" {
                         expandMemory(dstOffset, len)
                     )
                     
+                    addr := and(addr, ADDRESS_MASK())
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         dynamicGas := add(dynamicGas, 2500)
                     }
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
+                    dstOffset := add(dstOffset, MEM_OFFSET())
+            
                     if gt(srcOffset, MAX_UINT64()) {
                         srcOffset := MAX_UINT64()
                     } 
                     
                     if gt(len, 0) {
-                        let copiedLen
-                        if getRawCodeHash(addr) {
-                             // Gets the code from the addr
-                             copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
-                        }
+                        // Gets the code from the addr
+                        let copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
             
                         if lt(copiedLen, len) {
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))
@@ -1733,8 +1862,6 @@ object "EvmEmulator" {
                     sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemIsAccessible(dstOffset, len)
-            
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
@@ -1754,26 +1881,45 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     let addr := accessStackHead(sp, stackHead)
-                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                    addr := and(addr, ADDRESS_MASK())
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
                     }
             
-                    ip := add(ip, 1)
-                    if iszero(addr) {
-                        stackHead := 0
-                        continue
-                    }
-            
-                    switch isEvmContract(addr)
+                    let rawCodeHash := getRawCodeHash(addr)
+                    switch isHashOfConstructedEvmContract(rawCodeHash)
                     case 0 {
-                        stackHead := extcodehash(addr)
+                        let codeLen := and(shr(224, rawCodeHash), 0xffff)
+            
+                        if codeLen {
+                            if lt(addr, 0x100) {
+                                // precompiles and 0x00
+                                codeLen := 0
+                            }
+                        }
+            
+                        switch codeLen
+                        case 0 {
+                            stackHead := EMPTY_KECCAK()
+            
+                            if iszero(getRawNonce(addr)) {
+                                if iszero(balance(addr)) {
+                                    stackHead := 0
+                                }
+                            }
+                        }
+                        default {
+                            // zkVM contract
+                            stackHead := rawCodeHash
+                        }
                     }
                     default {
+                        // Get precalculated keccak of EVM code
                         stackHead := getEvmExtcodehash(addr)
                     }
                     
+                    ip := add(ip, 1)
                 }
                 case 0x40 { // OP_BLOCKHASH
                     evmGasLeft := chargeGas(evmGasLeft, 20)
@@ -1811,11 +1957,7 @@ object "EvmEmulator" {
                 }
                 case 0x44 { // OP_PREVRANDAO
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    let _prevrandao := mload(PREVRANDAO_CACHE_OFFSET())
-                    if iszero(_prevrandao) {
-                        _prevrandao := cached(PREVRANDAO_CACHE_OFFSET(), prevrandao())
-                    }
-                    sp, stackHead := pushStackItem(sp, _prevrandao, stackHead)
+                    sp, stackHead := pushStackItem(sp, PREVRANDAO_VALUE(), stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x45 { // OP_GASLIMIT
@@ -1862,10 +2004,7 @@ object "EvmEmulator" {
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
                     let offset := accessStackHead(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, 32)
-                    let expansionGas := expandMemory(offset, 32)
-                    evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 32))
             
                     stackHead := mload(add(MEM_OFFSET(), offset))
             
@@ -1880,9 +2019,7 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemIsAccessible(offset, 32)
-                    let expansionGas := expandMemory(offset, 32)
-                    evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 32))
             
                     mstore(add(MEM_OFFSET(), offset), value)
                     ip := add(ip, 1)
@@ -1896,9 +2033,7 @@ object "EvmEmulator" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemIsAccessible(offset, 1)
-                    let expansionGas := expandMemory(offset, 1)
-                    evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 1))
             
                     mstore8(add(MEM_OFFSET(), offset), value)
                     ip := add(ip, 1)
@@ -1975,6 +2110,11 @@ object "EvmEmulator" {
                     let counter
                     counter, sp, stackHead := popStackItem(sp, stackHead)
             
+                    // Counter certainly can't be bigger than uint64.
+                    if gt(counter, MAX_UINT64()) {
+                        panic()
+                    } 
+            
                     ip := add(BYTECODE_OFFSET(), counter)
             
                     // Check next opcode is JUMPDEST
@@ -2000,6 +2140,11 @@ object "EvmEmulator" {
                         continue
                     }
             
+                    // Counter certainly can't be bigger than uint64.
+                    if gt(counter, MAX_UINT64()) {
+                        panic()
+                    } 
+            
                     ip := add(BYTECODE_OFFSET(), counter)
             
                     // Check next opcode is JUMPDEST
@@ -2014,10 +2159,10 @@ object "EvmEmulator" {
                 }
                 case 0x58 { // OP_PC
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    ip := add(ip, 1)
             
-                    // PC = ip - 32 (bytecode size) - 1 (current instruction)
-                    sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_LEN_OFFSET()), 33), stackHead)
+                    sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+            
+                    ip := add(ip, 1)
                 }
                 case 0x59 { // OP_MSIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
@@ -2061,18 +2206,17 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0x5E { // OP_MCOPY
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+            
                     let destOffset, offset, size
                     popStackCheck(sp, 3)
                     destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemIsAccessible(offset, size)
-                    checkMemIsAccessible(destOffset, size)
-            
                     // dynamic_gas = 3 * words_copied + memory_expansion_cost
                     let dynamicGas := expandMemory2(offset, size, destOffset, size)
-                    let wordsCopied := div(add(size, 31), 32) // div rounding up
+                    let wordsCopied := shr(5, add(size, 31)) // div rounding up
                     dynamicGas := add(dynamicGas, mul(3, wordsCopied))
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
@@ -2082,303 +2226,108 @@ object "EvmEmulator" {
                 }
                 case 0x5F { // OP_PUSH0
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-            
-                    let value := 0
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
+                    sp, stackHead := pushStackItem(sp, 0, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x60 { // OP_PUSH1
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 1)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 1)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(1, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x61 { // OP_PUSH2
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 2)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 2)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(2, ip, sp, evmGasLeft, stackHead)
                 }     
                 case 0x62 { // OP_PUSH3
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 3)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 3)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(3, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x63 { // OP_PUSH4
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 4)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 4)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(4, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x64 { // OP_PUSH5
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 5)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 5)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(5, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x65 { // OP_PUSH6
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 6)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 6)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(6, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x66 { // OP_PUSH7
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 7)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 7)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(7, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x67 { // OP_PUSH8
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 8)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 8)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(8, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x68 { // OP_PUSH9
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 9)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 9)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(9, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x69 { // OP_PUSH10
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 10)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 10)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(10, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x6A { // OP_PUSH11
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 11)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 11)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(11, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x6B { // OP_PUSH12
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 12)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 12)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(12, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x6C { // OP_PUSH13
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 13)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 13)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(13, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x6D { // OP_PUSH14
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 14)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 14)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(14, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x6E { // OP_PUSH15
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 15)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 15)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(15, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x6F { // OP_PUSH16
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 16)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 16)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(16, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x70 { // OP_PUSH17
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 17)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 17)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(17, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x71 { // OP_PUSH18
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 18)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 18)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(18, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x72 { // OP_PUSH19
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 19)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 19)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(19, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x73 { // OP_PUSH20
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 20)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 20)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(20, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x74 { // OP_PUSH21
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 21)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 21)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(21, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x75 { // OP_PUSH22
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 22)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 22)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(22, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x76 { // OP_PUSH23
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 23)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 23)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(23, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x77 { // OP_PUSH24
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 24)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 24)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(24, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x78 { // OP_PUSH25
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 25)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 25)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(25, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x79 { // OP_PUSH26
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 26)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 26)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(26, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x7A { // OP_PUSH27
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 27)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 27)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(27, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x7B { // OP_PUSH28
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 28)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 28)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(28, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x7C { // OP_PUSH29
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 29)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 29)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(29, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x7D { // OP_PUSH30
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 30)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 30)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(30, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x7E { // OP_PUSH31
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 31)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 31)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(31, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x7F { // OP_PUSH32
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-            
-                    ip := add(ip, 1)
-                    let value := readBytes(ip, 32)
-            
-                    sp, stackHead := pushStackItem(sp, value, stackHead)
-                    ip := add(ip, 32)
+                    ip, sp, evmGasLeft, stackHead := pushOpcodeInner(32, ip, sp, evmGasLeft, stackHead)
                 }
                 case 0x80 { // OP_DUP1 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
-                    sp, stackHead := pushStackItem(sp, stackHead, stackHead)
+                    sp, stackHead := pushStackItem(sp, accessStackHead(sp, stackHead), stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x81 { // OP_DUP2
@@ -2506,125 +2455,49 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0xA0 { // OP_LOG0
-                    evmGasLeft := chargeGas(evmGasLeft, 375)
-            
-                    if isStatic {
-                        panic()
-                    }
-            
                     let offset, size
-                    popStackCheck(sp, 2)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, size)
-            
-                    // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-            
-                    log0(add(offset, MEM_OFFSET()), size)
+                    evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 0, isStatic)
+                    log0(offset, size)
                     ip := add(ip, 1)
                 }
                 case 0xA1 { // OP_LOG1
-                    evmGasLeft := chargeGas(evmGasLeft, 375)
-            
-                    if isStatic {
-                        panic()
-                    }
-            
                     let offset, size
-                    popStackCheck(sp, 3)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, size)
-            
-                    // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                    dynamicGas := add(dynamicGas, 375)
-                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-            
+                    evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 1, isStatic)
                     {   
                         let topic1
                         topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log1(add(offset, MEM_OFFSET()), size, topic1)
+                        log1(offset, size, topic1)
                     }
                     ip := add(ip, 1)
                 }
                 case 0xA2 { // OP_LOG2
-                    evmGasLeft := chargeGas(evmGasLeft, 375)
-            
-                    if isStatic {
-                        panic()
-                    }
-            
                     let offset, size
-                    popStackCheck(sp, 4)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, size)
-            
-                    // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                    dynamicGas := add(dynamicGas, 750)
-                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+                    evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 2, isStatic)
             
                     {
                         let topic1, topic2
                         topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log2(add(offset, MEM_OFFSET()), size, topic1, topic2)
+                        log2(offset, size, topic1, topic2)
                     }
                     ip := add(ip, 1)
                 }
                 case 0xA3 { // OP_LOG3
-                    evmGasLeft := chargeGas(evmGasLeft, 375)
-            
-                    if isStatic {
-                        panic()
-                    }
-            
                     let offset, size
-                    popStackCheck(sp, 5)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, size)
-            
-                    // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                    dynamicGas := add(dynamicGas, 1125)
-                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+                    evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 3, isStatic)
             
                     {
                         let topic1, topic2, topic3
                         topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log3(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3)
+                        log3(offset, size, topic1, topic2, topic3)
                     }     
                     ip := add(ip, 1)
                 }
                 case 0xA4 { // OP_LOG4
-                    evmGasLeft := chargeGas(evmGasLeft, 375)
-            
-                    if isStatic {
-                        panic()
-                    }
-            
                     let offset, size
-                    popStackCheck(sp, 6)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-            
-                    checkMemIsAccessible(offset, size)
-            
-                    // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                    let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                    dynamicGas := add(dynamicGas, 1500)
-                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+                    evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 4, isStatic)
             
                     {
                         let topic1, topic2, topic3, topic4
@@ -2632,7 +2505,7 @@ object "EvmEmulator" {
                         topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        log4(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3, topic4)
+                        log4(offset, size, topic1, topic2, topic3, topic4)
                     }     
                     ip := add(ip, 1)
                 }
@@ -2648,30 +2521,24 @@ object "EvmEmulator" {
                 }
                 case 0xF1 { // OP_CALL
                     // A function was implemented in order to avoid stack depth errors.
-                    switch isStatic
-                    case 0 {
-                        evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead)
-                    }
-                    default {
-                        evmGasLeft, sp, stackHead := performStaticCall(sp, evmGasLeft, stackHead)
-                    }
+                    evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead, isStatic)
                     ip := add(ip, 1)
                 }
                 case 0xF3 { // OP_RETURN
                     let offset, size
             
                     popStackCheck(sp, 2)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemIsAccessible(offset, size)
+                    if size {
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                
+                        returnLen := size
+                        
+                        // Don't check overflow here since previous checks are enough to ensure this is safe
+                        returnOffset := add(MEM_OFFSET(), offset)
+                    }
             
-                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
-            
-                    returnLen := size
-                    
-                    // Don't check overflow here since previous checks are enough to ensure this is safe
-                    returnOffset := add(MEM_OFFSET(), offset)
                     break
                 }
                 case 0xF4 { // OP_DELEGATECALL
@@ -2693,19 +2560,24 @@ object "EvmEmulator" {
                     ip := add(ip, 1)
                 }
                 case 0xFD { // OP_REVERT
-                    let offset,size
+                    let offset, size
             
                     popStackCheck(sp, 2)
-                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
+                    
+                    switch iszero(size)
+                    case 0 {
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                        
+                        // Don't check overflow here since check in expandMemory is enough to ensure this is safe
+                        offset := add(offset, MEM_OFFSET())
+                    }
+                    default {
+                        offset := MEM_OFFSET()
+                    }
+                    
             
-                    checkMemIsAccessible(offset, size)
-                    evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
-            
-                    // Don't check overflow here since previous checks are enough to ensure this is safe
-                    offset := add(offset, MEM_OFFSET())
-            
-                    if eq(isCallerEVM, 1) {
+                    if isCallerEVM {
                         offset := sub(offset, 32)
                         size := add(size, 32)
                 
@@ -2716,345 +2588,344 @@ object "EvmEmulator" {
                     revert(offset, size)
                 }
                 case 0xFE { // OP_INVALID
-                    evmGasLeft := 0
-                    revertWithGas(evmGasLeft)
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 // We explicitly add unused opcodes to optimize the jump table by compiler.
                 case 0x0C { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x0D { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x0E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x0F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x1E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x1F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x21 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x22 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x23 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x24 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x25 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x26 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x27 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x28 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x29 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2A { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2B { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2C { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2D { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x49 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4A { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4B { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4C { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4D { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4E { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4F { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xA9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xAF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xB9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xBF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xC9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xCF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xD9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDD { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xDF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE0 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE1 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE3 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE4 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE5 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xE9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEA { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xED { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEE { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xEF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF2 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF6 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF7 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF8 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xF9 { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xFB { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xFC { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xFF { // Unused opcode
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
                 default {
-                    $llvm_NoInline_llvm$_panic()
+                    $llvm_NoInline_llvm$_invalid()
                 }
             }
             
@@ -3065,8 +2936,6 @@ object "EvmEmulator" {
         ////////////////////////////////////////////////////////////////
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
-
-        pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
         
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
@@ -3078,17 +2947,20 @@ object "EvmEmulator" {
 
         if iszero(isCallerEVM) {
             evmGasLeft := getEvmGasFromContext()
+            // Charge additional creation cost
+            evmGasLeft := chargeGas(evmGasLeft, 32000) 
         }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
 
         gasToReturn := validateBytecodeAndChargeGas(offset, len, gasToReturn)
 
-        offset, len := padBytecode(offset, len)
+        let blobLen := padBytecode(offset, len)
 
-        mstore(add(offset, len), gasToReturn)
+        mstore(add(offset, blobLen), len)
+        mstore(add(offset, add(32, blobLen)), gasToReturn)
 
-        verbatim_2i_0o("return_deployed", offset, add(len, 32))
+        verbatim_2i_0o("return_deployed", offset, add(blobLen, 64))
     }
     object "EvmEmulator_deployed" {
         code {
@@ -3101,8 +2973,12 @@ object "EvmEmulator" {
                     getCodeAddress(), 
                     BYTECODE_OFFSET(), // destination offset
                     0, // source offset
-                    MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
+                    add(MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN(), 1) // so we can check that bytecode isn't too big
                 )
+
+                if gt(codeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
+                    panic()
+                }
             
                 mstore(EMPTY_CODE_OFFSET(), 0)
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
@@ -3136,52 +3012,58 @@ object "EvmEmulator" {
                 addr :=  0x0000000000000000000000000000000000008009
             }
             
-            function ORIGIN_CACHE_OFFSET() -> offset {
+            function PANIC_RETURNDATASIZE_OFFSET() -> offset {
                 offset := mul(23, 32)
             }
             
+            function ORIGIN_CACHE_OFFSET() -> offset {
+                offset := add(PANIC_RETURNDATASIZE_OFFSET(), 32)
+            }
+            
             function GASPRICE_CACHE_OFFSET() -> offset {
-                offset := mul(24, 32)
+                offset := add(ORIGIN_CACHE_OFFSET(), 32)
             }
             
             function COINBASE_CACHE_OFFSET() -> offset {
-                offset := mul(25, 32)
+                offset := add(GASPRICE_CACHE_OFFSET(), 32)
             }
             
             function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
-                offset := mul(26, 32)
+                offset := add(COINBASE_CACHE_OFFSET(), 32)
             }
             
             function BLOCKNUMBER_CACHE_OFFSET() -> offset {
-                offset := mul(27, 32)
-            }
-            
-            function PREVRANDAO_CACHE_OFFSET() -> offset {
-                offset := mul(28, 32)
+                offset := add(BLOCKTIMESTAMP_CACHE_OFFSET(), 32)
             }
             
             function GASLIMIT_CACHE_OFFSET() -> offset {
-                offset := mul(29, 32)
+                offset := add(BLOCKNUMBER_CACHE_OFFSET(), 32)
             }
             
             function CHAINID_CACHE_OFFSET() -> offset {
-                offset := mul(30, 32)
+                offset := add(GASLIMIT_CACHE_OFFSET(), 32)
             }
             
             function BASEFEE_CACHE_OFFSET() -> offset {
-                offset := mul(31, 32)
+                offset := add(CHAINID_CACHE_OFFSET(), 32)
             }
             
             function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
                 offset := add(BASEFEE_CACHE_OFFSET(), 32)
             }
             
+            // Note: we have an empty memory slot after LAST_RETURNDATA_SIZE_OFFSET(), it is used to simplify stack logic
+            
             function STACK_OFFSET() -> offset {
                 offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
             }
             
+            function MAX_STACK_SLOT_OFFSET() -> offset {
+                offset := add(STACK_OFFSET(), mul(1023, 32))
+            }
+            
             function BYTECODE_LEN_OFFSET() -> offset {
-                offset := add(STACK_OFFSET(), mul(1024, 32))
+                offset := add(MAX_STACK_SLOT_OFFSET(), 32)
             }
             
             function BYTECODE_OFFSET() -> offset {
@@ -3210,13 +3092,9 @@ object "EvmEmulator" {
             }
             
             // Used to simplify gas calculations for memory expansion.
-            // The cost to increase the memory to 4 MB is close to 30M gas
+            // The cost to increase the memory to 12 MB is close to 277M EVM gas
             function MAX_POSSIBLE_MEM_LEN() -> max {
-                max := 0x400000 // 4MB
-            }
-            
-            function MAX_MEMORY_SLOT() -> max {
-                max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
+                max := 0xC00000 // 12MB
             }
             
             function MAX_UINT() -> max_uint {
@@ -3230,17 +3108,23 @@ object "EvmEmulator" {
             // Each evm gas is 5 zkEVM one
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             
-            // We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
-            function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-                    gas_stipend := 35000 // 27000 + a little bit more
-            }
-            
             function OVERHEAD() -> overhead { overhead := 2000 }
             
-            // From precompiles/CodeOracle
-            function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
+            function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
             
-            function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+            function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+            
+            function EMPTY_KECCAK() -> value {  // keccak("")
+                value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+            }
+            
+            function ADDRESS_MASK() -> value { // mask for lower 160 bits
+                value := 0xffffffffffffffffffffffffffffffffffffffff
+            }
+            
+            function PREVRANDAO_VALUE() -> value {
+                value := 2500000000000000 // This value is fixed in EraVM
+            }
             
             ////////////////////////////////////////////////////////////////
             //                  GENERAL FUNCTIONS
@@ -3251,19 +3135,15 @@ object "EvmEmulator" {
                 revert(0, 0)
             }
             
-            function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
-                mstore(0, 0)
-                revert(0, 32)
-            }
-            
-            function revertWithGas(evmGasLeft) {
-                mstore(0, evmGasLeft)
-                revert(0, 32)
+            function $llvm_NoInline_llvm$_invalid() { // revert consuming all EVM gas
+                panic()
             }
             
             function panic() { // revert consuming all EVM gas
+                // we return empty 32 bytes encoding 0 gas left if caller is EVM, and 0 bytes if caller isn't EVM
+                // it is done without if-else block so this function will be inlined
                 mstore(0, 0)
-                revert(0, 32)
+                revert(0, mload(PANIC_RETURNDATASIZE_OFFSET()))
             }
             
             function cached(cacheIndex, value) -> _value {
@@ -3287,60 +3167,79 @@ object "EvmEmulator" {
                 }
             }
             
-            // This function can overflow, it is the job of the caller to ensure that it does not.
             // The argument to this function is the offset into the memory region IN BYTES.
             function expandMemory(offset, size) -> gasCost {
                 // memory expansion costs 0 if size is 0
                 if size {
-                    let oldSizeInWords := mload(MEM_LEN_OFFSET())
-            
-                    // div rounding up
-                    let newSizeInWords := div(add(add(offset, size), 31), 32)
-                
-                    // memory_size_word = (memory_byte_size + 31) / 32
-                    // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
-                    // memory_expansion_cost = new_memory_cost - last_memory_cost
-                    if gt(newSizeInWords, oldSizeInWords) {
-                        let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
-                        let quadraticPart := sub(
-                            div(
-                                mul(newSizeInWords, newSizeInWords),
-                                512
-                            ),
-                            div(
-                                mul(oldSizeInWords, oldSizeInWords),
-                                512
-                            )
-                        )
-                
-                        gasCost := add(linearPart, quadraticPart)
-                
-                        mstore(MEM_LEN_OFFSET(), newSizeInWords)
-                    }
+                    checkOverflow(offset, size)
+                    gasCost := _expandMemoryInternal(add(offset, size))
                 }
             }
             
-            function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-                switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
-                case 0 {
-                    maxExpand := expandMemory(retOffset, retSize)
-                }
-                default {
-                    maxExpand := expandMemory(argsOffset, argsSize)
-                }
-            }
-            
-            function checkMemIsAccessible(index, offset) {
-                checkOverflow(index, offset)
-            
-                if gt(add(index, offset), MAX_MEMORY_SLOT()) {
+            // This function can overflow, it is the job of the caller to ensure that it does not.
+            // The argument to this function is the new size of memory IN BYTES.
+            function _expandMemoryInternal(newMemsize) -> gasCost {
+                if gt(newMemsize, MAX_POSSIBLE_MEM_LEN()) {
                     panic()
+                }   
+            
+                let oldSizeInWords := mload(MEM_LEN_OFFSET())
+            
+                // div rounding up
+                let newSizeInWords := shr(5, add(newMemsize, 31))
+            
+                // memory_size_word = (memory_byte_size + 31) / 32
+                // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+                // memory_expansion_cost = new_memory_cost - last_memory_cost
+                if gt(newSizeInWords, oldSizeInWords) {
+                    let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+                    let quadraticPart := sub(
+                        shr(
+                            9,
+                            mul(newSizeInWords, newSizeInWords),
+                        ),
+                        shr(
+                            9,
+                            mul(oldSizeInWords, oldSizeInWords),
+                        )
+                    )
+            
+                    gasCost := add(linearPart, quadraticPart)
+            
+                    mstore(MEM_LEN_OFFSET(), newSizeInWords)
+                }
+            }
+            
+            // Returns 0 if size is 0
+            function _memsizeRequired(offset, size) -> memorySize {
+                if size {
+                    checkOverflow(offset, size)
+                    memorySize := add(offset, size)
+                }
+            }
+            
+            function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> gasCost {
+                let maxNewMemsize := _memsizeRequired(retOffset, retSize)
+                let argsMemsize := _memsizeRequired(argsOffset, argsSize)
+            
+                if lt(maxNewMemsize, argsMemsize) {
+                    maxNewMemsize := argsMemsize  
+                }
+            
+                if maxNewMemsize { // Memory expansion costs 0 if size is 0
+                    gasCost := _expandMemoryInternal(maxNewMemsize)
                 }
             }
             
             function checkOverflow(data1, data2) {
                 if lt(add(data1, data2), data2) {
                     panic()
+                }
+            }
+            
+            function insufficientBalance(value) -> res {
+                if value {
+                    res := gt(value, selfbalance())
                 }
             }
             
@@ -3423,80 +3322,70 @@ object "EvmEmulator" {
             }
             
             function getRawCodeHash(addr) -> hash {
+                // function getRawCodeHash(address _address)
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
                 hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
             }
             
             function getEvmExtcodehash(addr) -> evmCodeHash {
+                // function evmCodeHash(address _address)
                 mstore(0, 0x54A3314700000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
                 evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
             }
             
-            function isEvmContract(addr) -> isEVM {
-                // function isAccountEVM(address addr) external view returns (bool);
-                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-                mstore(4, addr)
-                isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
+            function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
+                let version := shr(248, rawCodeHash)
+                let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
+                isConstructedEVM := and(eq(version, 2), isConstructedFlag)
             }
             
             // Basically performs an extcodecopy, while returning the length of the copied bytecode.
             function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-                let codeHash := getRawCodeHash(addr)
-                mstore(0, codeHash)
-                // The first word of returndata is the true length of the bytecode
-                let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
-            
-                if gt(len, codeLen) {
-                    len := codeLen
-                }
-            
-                let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
-            
-                let _returndatasize := returndatasize()
-                if gt(shiftedSrcOffset, _returndatasize) {
-                    shiftedSrcOffset := _returndatasize
-                }
-            
-                if gt(add(len, shiftedSrcOffset), _returndatasize) {
-                    len := sub(_returndatasize, shiftedSrcOffset)
-                }
-            
-                if len {
-                    returndatacopy(dstOffset, shiftedSrcOffset, len)
-                }
-            
-                copiedLen := len
-            }
-            
-            // Returns the length of the EVM bytecode.
-            function fetchDeployedEvmCodeLen(addr) -> codeLen {
-                let codeHash := getRawCodeHash(addr)
-                mstore(0, codeHash)
-            
+                let rawCodeHash := getRawCodeHash(addr)
+                mstore(0, rawCodeHash)
+                
                 let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+                // it fails if we don't have any code deployed at this address
+                if success {
+                    // The length of the bytecode is encoded in versioned bytecode hash
+                    let codeLen := and(shr(224, rawCodeHash), 0xffff)
             
-                switch iszero(success)
-                case 1 {
-                    // The code oracle call can only fail in the case where the contract
-                    // we are querying is the current one executing and it has not yet been
-                    // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                    // inside the constructor. In that case, code length is zero.
-                    codeLen := 0
-                }
-                default {
-                    // The first word is the true length of the bytecode
-                    returndatacopy(0, 0, 32)
-                    codeLen := mload(0)
-                }
+                    if eq(shr(248, rawCodeHash), 1) {
+                        // For native zkVM contracts length encoded in words, not bytes
+                        codeLen := shl(5, codeLen) // * 32
+                    }
+            
+                    if gt(len, codeLen) {
+                        len := codeLen
+                    }
+                
+                    let _returndatasize := returndatasize()
+                    if gt(srcOffset, _returndatasize) {
+                        srcOffset := _returndatasize
+                    }
+                
+                    if gt(add(len, srcOffset), _returndatasize) {
+                        len := sub(_returndatasize, srcOffset)
+                    }
+                
+                    if len {
+                        returndatacopy(dstOffset, srcOffset, len)
+                    }
+                
+                    copiedLen := len
+                } 
             }
             
-            function getMax(a, b) -> max {
-                max := b
-                if gt(a, b) {
-                    max := a
-                }
+            function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
+                farCallAbi := shl(248, isSystemCall)
+                // dataOffset is 0
+                farCallAbi := or(farCallAbi, shl(64, dataStart))
+                farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+                farCallAbi :=  or(farCallAbi, shl(192, gas))
+                // shardId is 0
+                // forwardingMode is 0
             }
             
             function performSystemCall(to, dataLength) {
@@ -3509,24 +3398,60 @@ object "EvmEmulator" {
             }
             
             function performSystemCallRevertable(to, dataLength) -> success {
-                let farCallAbi := shl(248, 1) // system call
-                // dataOffset is 0
-                // dataStart is 0
-                farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-                farCallAbi :=  or(farCallAbi, shl(192, gas()))
-                // shardId is 0
-                // forwardingMode is 0
-                // not constructor call
-            
+                // system call, dataStart is 0
+                let farCallAbi := build_farcall_abi(1, gas(), 0, dataLength)
                 success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+            }
+            
+            function rawCall(gas, to, value, dataStart, dataLength, outputOffset, outputLen) -> success {
+                switch iszero(value)
+                case 0 {
+                    // system call to MsgValueSimulator, but call to "to" will be non-system
+                    let farCallAbi := build_farcall_abi(1, gas, dataStart, dataLength)
+                    success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, to, 0, 0)
+                    if outputLen {
+                        if success {
+                            let rtdz := returndatasize()
+                            switch lt(rtdz, outputLen)
+                            case 0 { returndatacopy(outputOffset, 0, outputLen) }
+                            default { returndatacopy(outputOffset, 0, rtdz) }
+                        }
+                    }
+                }
+                default {
+                    // not a system call
+                    let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+                    success := verbatim_4i_1o("raw_call", to, farCallAbi, outputOffset, outputLen)
+                }
+            }
+            
+            function rawStaticcall(gas, to, dataStart, dataLength, outputOffset, outputLen) -> success {
+                // not a system call
+                let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+                success := verbatim_4i_1o("raw_static_call", to, farCallAbi, outputOffset, outputLen)
             }
             
             ////////////////////////////////////////////////////////////////
             //                     STACK OPERATIONS
             ////////////////////////////////////////////////////////////////
             
+            function pushOpcodeInner(size, ip, sp, evmGas, oldStackHead) -> newIp, newSp, evmGasLeft, stackHead {
+                evmGasLeft := chargeGas(evmGas, 3)
+            
+                newIp := add(ip, 1)
+                let value := readBytes(newIp, size)
+            
+                newSp, stackHead := pushStackItem(sp, value, oldStackHead)
+                newIp := add(newIp, size)
+            }
+            
             function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
                 evmGasLeft := chargeGas(evmGas, 3)
+            
+                if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
+                    panic()
+                }
+                
                 let tempSp := sub(sp, mul(0x20, sub(position, 1)))
             
                 if lt(tempSp, STACK_OFFSET())  {
@@ -3562,7 +3487,7 @@ object "EvmEmulator" {
             }
             
             function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-                if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
+                if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
                     panic()
                 }
             
@@ -3577,20 +3502,8 @@ object "EvmEmulator" {
                 stackHead := mload(newSp)
             }
             
-            function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
-                mstore(sp, oldStackHead)
-                stackHead := item
-                newSp := add(sp, 0x20)
-            }
-            
             function popStackCheck(sp, numInputs) {
                 if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-                    panic()
-                }
-            }
-            
-            function pushStackCheck(sp, numInputs) {
-                if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
                     panic()
                 }
             }
@@ -3607,11 +3520,12 @@ object "EvmEmulator" {
             //               EVM GAS MANAGER FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
             
+            // Address higher bytes must be cleaned before
             function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
                 // function warmAccount(address account)
                 // non-standard selector 0x00
                 // addr is packed in the same word with selector
-                mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+                mstore(0, addr)
             
                 performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
             
@@ -3624,8 +3538,7 @@ object "EvmEmulator" {
                 // non-standard selector 0x01
                 mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
                 mstore(1, key)
-                // should be call since we use TSTORE in gas manager
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
+                let success := staticcall(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 33, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
@@ -3645,6 +3558,7 @@ object "EvmEmulator" {
             
                 performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
             
+                originalValue := currentValue
                 if returndatasize() {
                     isWarm := true
                     returndatacopy(0, 0, 32)
@@ -3662,16 +3576,16 @@ object "EvmEmulator" {
             }
             
             function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-                // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
+                // function consumeEvmFrame(_caller) external returns (uint256 passGas, uint256 auxDataRes)
                 // non-standard selector 0x04
-                mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
-                mstore(1, caller())
+                mstore(0, or(0x0400000000000000000000000000000000000000000000000000000000000000, caller()))
             
-                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
+                performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
             
                 let _returndatasize := returndatasize()
                 if _returndatasize {
                     callerEVM := true
+                    mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
             
                     returndatacopy(0, 0, 32)
                     passGas := mload(0)
@@ -3692,21 +3606,16 @@ object "EvmEmulator" {
             //               CALLS FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
             
-            function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-                let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
+            function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
+                let gasToPass, rawAddr, value, argsOffset, argsSize, retOffset, retSize
             
                 popStackCheck(oldSp, 7)
                 gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-            
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
-                checkMemIsAccessible(argsOffset, argsSize)
-                checkMemIsAccessible(retOffset, retSize)
             
                 // static_gas = 0
                 // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -3715,15 +3624,13 @@ object "EvmEmulator" {
                 // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called.
                 // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
             
-                let gasUsed := 100 // warm address access cost
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600 // cold address access cost
-                }
-            
-                // memory_expansion_cost
-                gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+                let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
             
                 if gt(value, 0) {
+                    if isStatic {
+                        panic()
+                    }
+            
                     gasUsed := add(gasUsed, 9000) // positive_value_cost
             
                     if isAddrEmpty(addr) {
@@ -3747,7 +3654,7 @@ object "EvmEmulator" {
                     argsSize,
                     add(retOffset, MEM_OFFSET()),
                     retSize,
-                    false
+                    isStatic
                 )
             
                 newGasLeft := add(evmGasLeft, frameGasLeft)
@@ -3755,27 +3662,16 @@ object "EvmEmulator" {
             }
             
             function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-                let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+                let gasToPass, rawAddr, argsOffset, argsSize, retOffset, retSize
             
                 popStackCheck(oldSp, 6)
                 gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+                rawAddr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
                 argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
             
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-            
-                checkMemIsAccessible(argsOffset, argsSize)
-                checkMemIsAccessible(retOffset, retSize)
-            
-                let gasUsed := 100 // warm address access cost
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600 // cold address access cost
-                }
-            
-                // memory_expansion_cost
-                gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+                let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
             
                 evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                 gasToPass := capGasForCall(evmGasLeft, gasToPass)
@@ -3798,66 +3694,97 @@ object "EvmEmulator" {
             
             
             function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGasLeft, sp, stackHead {
-                let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
+                let gasToPass, rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize
             
                 popStackCheck(oldSp, 6)
                 gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                rawArgsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+                rawRetOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
             
-                addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize)
             
-                checkMemIsAccessible(argsOffset, argsSize)
-                checkMemIsAccessible(retOffset, retSize)
+                newGasLeft := chargeGas(evmGasLeft, gasUsed)
+                gasToPass := capGasForCall(newGasLeft, gasToPass)
             
-                let gasUsed := 100 // warm address access cost
-                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-                    gasUsed := 2600 // cold address access cost
+                newGasLeft := sub(newGasLeft, gasToPass)
+            
+                let success
+                let frameGasLeft := gasToPass
+            
+                let retOffset := add(MEM_OFFSET(), rawRetOffset)
+                let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+            
+                let rawCodeHash := getRawCodeHash(addr)
+                switch isHashOfConstructedEvmContract(rawCodeHash)
+                case 0 {
+                    // Not a constructed EVM contract
+                    let precompileCost := getGasForPrecompiles(addr, argsSize)
+                    switch precompileCost
+                    case 0 {
+                        // Not a precompile
+                        _eraseReturndataPointer()
+            
+                        let isCallToEmptyContract := iszero(addr) // 0x00 is always "empty"
+                        if iszero(isCallToEmptyContract) {
+                            isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
+                        }
+            
+                        if isCallToEmptyContract {
+                            // In case of a call to the EVM contract that is currently being constructed, 
+                            // the DefaultAccount bytecode will be used instead. This is implemented at the virtual machine level.
+                            success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
+                            _saveReturndataAfterZkEVMCall()               
+                        }
+            
+                        // We forbid delegatecalls to EraVM native contracts
+                    } 
+                    default {
+                        // Precompile. Simulate using staticcall, since EraVM behavior differs here
+                        success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
+                    }
+                }
+                default {
+                    // Constructed EVM contract
+                    pushEvmFrame(gasToPass, isStatic)
+                    // pass all remaining native gas
+                    success := delegatecall(gas(), addr, argsOffset, argsSize, 0, 0)
+            
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                    if iszero(success) {
+                        resetEvmFrame()
+                    }
                 }
             
-                // memory_expansion_cost
-                gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
-            
-                evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-            
-                // it is also not possible to delegatecall precompiles
-                if iszero(isEvmContract(addr)) {
-                    revertWithGas(evmGasLeft)
-                }
-            
-                gasToPass := capGasForCall(evmGasLeft, gasToPass)
-                evmGasLeft := sub(evmGasLeft, gasToPass)
-            
-                pushEvmFrame(gasToPass, isStatic)
-                let success := delegatecall(
-                    gas(), // pass all remaining native gas
-                    addr,
-                    add(MEM_OFFSET(), argsOffset),
-                    argsSize,
-                    0,
-                    0
-                )
-            
-                let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
-                if iszero(success) {
-                    resetEvmFrame()
-                }
-            
-                newGasLeft := add(evmGasLeft, frameGasLeft)
+                newGasLeft := add(newGasLeft, frameGasLeft)
                 stackHead := success
             }
             
+            function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
+                // memory_expansion_cost
+                gasUsed := expandMemory2(retOffset, retSize, argsOffset, argsSize)
+            
+                addr := and(rawAddr, ADDRESS_MASK())
+            
+                let addressAccessCost := 100 // warm address access cost
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+                    addressAccessCost := 2600 // cold address access cost
+                }
+            
+                gasUsed := add(gasUsed, addressAccessCost)
+            }
+            
             function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-                switch isEvmContract(addr)
+                let rawCodeHash := getRawCodeHash(addr)
+                switch isHashOfConstructedEvmContract(rawCodeHash)
                 case 0 {
                     // zkEVM native call
-                    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                    let precompileCost := getGasForPrecompiles(addr, argsSize)
                     switch precompileCost
                     case 0 {
                         // just smart contract
-                        success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+                        success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash)
                     } 
                     default {
                         // precompile
@@ -3865,57 +3792,68 @@ object "EvmEmulator" {
                     }
                 }
                 default {
-                    pushEvmFrame(gasToPass, isStatic)
-                    // pass all remaining native gas
-                    success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
-                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                    if iszero(success) {
-                        resetEvmFrame()
+                    switch insufficientBalance(value)
+                    case 0 {
+                        pushEvmFrame(gasToPass, isStatic)
+                        // pass all remaining native gas
+                        success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
+                        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                        if iszero(success) {
+                            resetEvmFrame()
+                        }
+                    }
+                    default {
+                        frameGasLeft := gasToPass
+                        _eraseReturndataPointer()
                     }
                 }
             }
             
             function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-                let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
-                if lt(gasToPass, precompileCost) {
-                    zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
-                }
-            
-                switch isStatic
+                switch lt(gasToPass, precompileCost)
                 case 0 {
-                    success := call(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
+            
+                    switch isStatic
+                    case 0 {
+                        success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    }
+                    default {
+                        success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                    }
+                    
+                    _saveReturndataAfterZkEVMCall()
+                
+                    if success {
+                        frameGasLeft := sub(gasToPass, precompileCost)
+                    }
+                    // else consume all provided gas
                 }
                 default {
-                    success := staticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+                    // consume all provided gas
+                    _eraseReturndataPointer()
                 }
-                
-                _saveReturndataAfterZkEVMCall()
-            
-                if success {
-                    frameGasLeft := sub(gasToPass, precompileCost)
-                }
-                // else consume all provided gas
             }
             
             // Call native ZkVm contract from EVM context
-            function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
+            function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
                 let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
-                let decommitZkVmGasCost := decommitmentCost(addr)
             
-                // we are going to charge decommit cost even if address is already warm
-                // decommit cost is subtracted from the callee frame
-                switch gt(decommitZkVmGasCost, zkEvmGasToPass)
-                case 0 {
-                    zkEvmGasToPass := sub(zkEvmGasToPass, decommitZkVmGasCost)
-                }
-                default {
-                    zkEvmGasToPass := 0
-                }
-            
-                if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
-                    zkEvmGasToPass := UINT32_MAX()
+                let emptyContractExecutionCost := 500 // enough to call "empty" contract
+                let isEmptyContract := or(iszero(addr), iszero(and(shr(224, rawCodeHash), 0xffff)))
+                if isEmptyContract {
+                    // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+                    // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
+                    if iszero(value) {
+                        zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
+                    }
                 }
             
+                if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
+                    zkEvmGasToPass := MAX_UINT32()
+                }
+            
+                // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
                 let zkEvmGasBefore := gas()
                 switch isStatic
                 case 0 {
@@ -3927,24 +3865,23 @@ object "EvmEmulator" {
                 let zkEvmGasUsed := sub(zkEvmGasBefore, gas())
             
                 _saveReturndataAfterZkEVMCall()
-                
+            
                 if gt(zkEvmGasUsed, zkEvmGasBefore) { // overflow case
-                    zkEvmGasUsed := zkEvmGasToPass // should never happen
+                    zkEvmGasUsed := 0 // should never happen
+                }
+            
+                if isEmptyContract {
+                    if iszero(value) {
+                        zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
+                    }
+                
+                    zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
                 }
             
                 // refund gas
                 if gt(zkEvmGasToPass, zkEvmGasUsed) {
                     frameGasLeft := div(sub(zkEvmGasToPass, zkEvmGasUsed), GAS_DIVISOR())
                 }
-            }
-            
-            function decommitmentCost(addr) -> cost {
-                // charge for contract decommitment
-                let byteSize := extcodesize(addr)
-                cost := mul(
-                    div(add(byteSize, 31), 32), // rounding up
-                    DECOMMIT_COST_PER_WORD()
-                ) 
             }
             
             function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
@@ -3958,8 +3895,7 @@ object "EvmEmulator" {
             // The gas cost mentioned here is purely the cost of the contract, 
             // and does not consider the cost of the call itself nor the instructions 
             // to put the parameters in memory. 
-            // Take into account MEM_OFFSET() when passing the argsOffset
-            function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
+            function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
                 switch addr
                     case 0x01 { // ecRecover
                         gasToCharge := 3000
@@ -4039,7 +3975,7 @@ object "EvmEmulator" {
             
                         mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
             
-                        // Skip the returnData
+                        // Skip first 32 bytes of the returnData
                         ptrAddIntoActive(32)
                     }
             }
@@ -4076,8 +4012,6 @@ object "EvmEmulator" {
             }
             
             function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
-                checkMemIsAccessible(offset, size)
-            
                 // EIP-3860
                 if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
                     panic()
@@ -4088,7 +4022,7 @@ object "EvmEmulator" {
                 // minimum_word_size = (size + 31) / 32
                 // init_code_cost = 2 * minimum_word_size, EIP-3860
                 // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-                let minimum_word_size := div(add(size, 31), 32) // rounding up
+                let minimum_word_size := shr(5, add(size, 31)) // rounding up
                 let dynamicGas := add(
                     mul(2, minimum_word_size),
                     expandMemory(offset, size)
@@ -4101,12 +4035,7 @@ object "EvmEmulator" {
             
                 _eraseReturndataPointer()
             
-                let err := 0
-                if value {
-                    if gt(value, selfbalance()) {
-                        err := 1
-                    }
-                }
+                let err := insufficientBalance(value)
             
                 if iszero(err) {
                     offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
@@ -4117,9 +4046,15 @@ object "EvmEmulator" {
             function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
                 let gasForTheCall := capGasForCall(evmGasLeftOld, evmGasLeftOld) // pass 63/64 of remaining gas
             
-                let bytecodeHash := 0
+                let bytecodeHash
                 if isCreate2 {
-                    bytecodeHash := keccak256(offset, size)
+                    switch size
+                    case 0 {
+                        bytecodeHash := EMPTY_KECCAK()
+                    }
+                    default {
+                        bytecodeHash := keccak256(offset, size)
+                    }
                 }
             
                 // we want to calculate the address of new contract, and if it is deployable (no collision),
@@ -4129,30 +4064,42 @@ object "EvmEmulator" {
                 mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
                 mstore(4, salt)
                 mstore(36, bytecodeHash)
-                let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
+                let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
             
-                if iszero(precreateResult) {
-                    // Collision, nonce overflow or EVM not allowed.
+                if canBeDeployed {
+                    returndatacopy(0, 0, 32)
+                    addr := and(mload(0), ADDRESS_MASK())
+                    pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
+                    // so even if constructor reverts, nonce stays incremented and addr stays warm
+            
+                    // check for code collision
+                    canBeDeployed := 0
+                    if iszero(getRawCodeHash(addr)) {
+                        // check for nonce collision
+                        if iszero(getRawNonce(addr)) {
+                            canBeDeployed := 1
+                        }     
+                    }
+                }
+            
+                if iszero(canBeDeployed) {
+                    // Nonce overflow, EVM not allowed or collision.
                     // This is *internal* panic, consuming all passed gas.
                     // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
                     evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
+                    addr := 0
                 }
             
-                if precreateResult {
-                    returndatacopy(0, 0, 32)
-                    addr := mload(0)
-                
-                    pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
-                    // so even if constructor reverts, nonce stays incremented and addr stays warm
-                
+            
+                if canBeDeployed {
                     // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
                     pushEvmFrame(gasForTheCall, false)
             
                     // move needed memory slots to the scratch space
-                    mstore(mul(10, 32), mload(sub(offset, 0x80))
-                    mstore(mul(11, 32), mload(sub(offset, 0x60))
-                    mstore(mul(12, 32), mload(sub(offset, 0x40))
-                    mstore(mul(13, 32), mload(sub(offset, 0x20))
+                    mstore(mul(10, 32), mload(sub(offset, 0x80)))
+                    mstore(mul(11, 32), mload(sub(offset, 0x60)))
+                    mstore(mul(12, 32), mload(sub(offset, 0x40)))
+                    mstore(mul(13, 32), mload(sub(offset, 0x20)))
                 
                     // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
                     mstore(sub(offset, 0x80), 0xe43cec64)
@@ -4163,10 +4110,10 @@ object "EvmEmulator" {
                     let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
             
                     // move memory slots back
-                    mstore(sub(offset, 0x80), mload(mul(10, 32))
-                    mstore(sub(offset, 0x60), mload(mul(11, 32))
-                    mstore(sub(offset, 0x40), mload(mul(12, 32))
-                    mstore(sub(offset, 0x20), mload(mul(13, 32))
+                    mstore(sub(offset, 0x80), mload(mul(10, 32)))
+                    mstore(sub(offset, 0x60), mload(mul(11, 32)))
+                    mstore(sub(offset, 0x40), mload(mul(12, 32)))
+                    mstore(sub(offset, 0x20), mload(mul(13, 32)))
                 
                     let gasLeft
                     switch result
@@ -4185,14 +4132,8 @@ object "EvmEmulator" {
             }
             
             function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
-                let farCallAbi := shl(248, 1) // system call
-                // dataOffset is 0
-                farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
-                farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-                farCallAbi :=  or(farCallAbi, shl(192, gas()))
-                // shardId is 0
-                // forwardingMode is 0
-                // not constructor call (ContractDeployer will call constructor)
+                // system call, not constructor call (ContractDeployer will call constructor)
+                let farCallAbi := build_farcall_abi(1, gas(), bytecodeStart, bytecodeLen) 
             
                 switch iszero(value)
                 case 0 {
@@ -4220,49 +4161,83 @@ object "EvmEmulator" {
             }
             
             ////////////////////////////////////////////////////////////////
-            //               EXTCODECOPY FUNCTIONALITY
+            //               MEMORY REGIONS FUNCTIONALITY
             ////////////////////////////////////////////////////////////////
             
-            function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
-                let rest_bits := shl(3, len)
-                let upper_bits := sub(256, rest_bits)
-                let val_mask := shl(upper_bits, MAX_UINT())
-                let val_masked := and(val, val_mask)
-                let dst_val := mload(dest)
-                let dst_mask := shr(rest_bits, MAX_UINT())
-                let dst_masked := and(dst_val, dst_mask)
-                mstore(dest, or(val_masked, dst_masked))
-            }
-            
+            // Copy the region of memory
             function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
-                let dest_addr := dest
-                let src_addr := src
-                let dest_end := add(dest, and(len, sub(0, 32)))
-                for { } lt(dest_addr, dest_end) {} {
-                    mstore(dest_addr, mload(src_addr))
-                    dest_addr := add(dest_addr, 32)
-                    src_addr := add(src_addr, 32)
+                // Copy all the whole memory words in a cycle
+                let destIndex := dest
+                let srcIndex := src
+                let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+                for { } lt(destIndex, destEndIndex) {} {
+                    mstore(destIndex, mload(srcIndex))
+                    destIndex := add(destIndex, 32)
+                    srcIndex := add(srcIndex, 32)
                 }
             
-                let rest_len := and(len, 31)
-                if rest_len {
-                    $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+                // Copy the remainder (if any)
+                let remainderLen := and(len, 31)
+                if remainderLen {
+                    $llvm_AlwaysInline_llvm$_memWriteRemainder(destIndex, mload(srcIndex), remainderLen)
                 }
             }
             
-            function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
-                let dest_end := add(dest, and(len, sub(0, 32)))
-                for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+            // Write the last part of the copied/cleaned memory region (smaller than the memory word)
+            function $llvm_AlwaysInline_llvm$_memWriteRemainder(dest, remainder, len) {
+                let remainderBitLength := shl(3, len) // bytes to bits
+            
+                let existingValue := mload(dest)
+                let existingValueMask := shr(remainderBitLength, MAX_UINT())
+                let existingValueMasked := and(existingValue, existingValueMask) // clean up place for remainder
+            
+                let remainderMasked := and(remainder, not(existingValueMask)) // using only `len` higher bytes of remainder word
+                mstore(dest, or(remainderMasked, existingValueMasked))
+            }
+            
+            // Clean the region of memory
+            function $llvm_AlwaysInline_llvm$_memsetToZero(dest, len) {
+                // Clean all the whole memory words in a cycle
+                let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+                for {let i := dest} lt(i, destEndIndex) { i := add(i, 32) } {
                     mstore(i, 0)
                 }
             
-                let rest_len := and(len, 31)
-                if rest_len {
-                    $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+                // Clean the remainder (if any)
+                let remainderLen := and(len, 31)
+                if remainderLen {
+                    $llvm_AlwaysInline_llvm$_memWriteRemainder(destEndIndex, 0, remainderLen)
+                }
+            }
+            
+            ////////////////////////////////////////////////////////////////
+            //                 LOGS FUNCTIONALITY 
+            ////////////////////////////////////////////////////////////////
+            
+            function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmGasLeft, offset, size, newSp, newStackHead {
+                newEvmGasLeft := chargeGas(evmGasLeft, 375)
+            
+                if isStatic {
+                    panic()
+                }
+            
+                let rawOffset
+                popStackCheck(sp, add(2, topicCount))
+                rawOffset, newSp, newStackHead := popStackItemWithoutCheck(sp, stackHead)
+                size, newSp, newStackHead := popStackItemWithoutCheck(newSp, newStackHead)
+            
+                // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+                let dynamicGas := add(shl(3, size), expandMemory(rawOffset, size))
+                dynamicGas := add(dynamicGas, mul(375, topicCount))
+            
+                newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
+            
+                if size {
+                    offset := add(rawOffset, MEM_OFFSET())
                 }
             }
 
-            function $llvm_NoInline_llvm$_simulate(
+            function simulate(
                 isCallerEVM,
                 evmGasLeft,
                 isStatic,
@@ -4551,21 +4526,25 @@ object "EvmEmulator" {
                     case 0x20 { // OP_KECCAK256
                         evmGasLeft := chargeGas(evmGasLeft, 30)
                 
-                        let offset, size
+                        let rawOffset, size
                 
                         popStackCheck(sp, 2)
-                        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, size)
+                        rawOffset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                 
                         // When an offset is first accessed (either read or write), memory may trigger 
                         // an expansion, which costs gas.
                         // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
-                        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(offset, size))
+                        let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(rawOffset, size))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        stackHead := keccak256(add(MEM_OFFSET(), offset), size)
+                        let offset
+                        if size {
+                            // use 0 as offset if size is 0
+                            offset := add(MEM_OFFSET(), rawOffset)
+                        }
+                
+                        stackHead := keccak256(offset, size)
                 
                         ip := add(ip, 1)
                     }
@@ -4578,7 +4557,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         let addr := accessStackHead(sp, stackHead)
-                        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                        addr := and(addr, ADDRESS_MASK())
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -4612,38 +4591,51 @@ object "EvmEmulator" {
                     case 0x35 { // OP_CALLDATALOAD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        stackHead := calldataload(accessStackHead(sp, stackHead))
+                        let calldataOffset := accessStackHead(sp, stackHead)
+                
+                        stackHead := $llvm_AlwaysInline_llvm$_calldataload(calldataOffset)
                 
                         ip := add(ip, 1)
                     }
                     case 0x36 { // OP_CALLDATASIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp, stackHead := pushStackItem(sp, calldatasize(), stackHead)
+                        sp, stackHead := pushStackItem(sp, $llvm_AlwaysInline_llvm$_calldatasize(), stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x37 { // OP_CALLDATACOPY
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        let destOffset, offset, size
+                        let dstOffset, sourceOffset, len
                 
                         popStackCheck(sp, 3)
-                        destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(destOffset, size)
-                
-                        if gt(offset, MAX_UINT64()) {
-                            offset := MAX_UINT64()
-                        } 
+                        dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
-                        let dynamicGas := add(mul(3, shr(5, add(size, 31))), expandMemory(destOffset, size))
+                        let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        calldatacopy(add(destOffset, MEM_OFFSET()), offset, size)
+                        dstOffset := add(dstOffset, MEM_OFFSET())
+                
+                        // EraVM will revert if offset + length overflows uint32
+                        if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
+                            sourceOffset := MAX_CALLDATA_OFFSET()
+                        }
+                
+                        // Check bytecode out-of-bounds access
+                        let truncatedLen := len
+                        if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                            truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
+                            $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
+                        }
+                
+                        if truncatedLen {
+                            $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen)
+                        }
+                
                         ip := add(ip, 1)
                         
                     }
@@ -4655,7 +4647,6 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0x39 { // OP_CODECOPY
-                    
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
                         let dstOffset, sourceOffset, len
@@ -4664,8 +4655,6 @@ object "EvmEmulator" {
                         dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(dstOffset, len)
                 
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
@@ -4680,14 +4669,14 @@ object "EvmEmulator" {
                 
                         sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
                 
-                        if gt(sourceOffset, MEM_LEN_OFFSET()) {
-                            sourceOffset := MEM_LEN_OFFSET()
+                        if gt(sourceOffset, bytecodeEndOffset) {
+                            sourceOffset := bytecodeEndOffset
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), MEM_LEN_OFFSET()) {
-                            truncatedLen := sub(MEM_LEN_OFFSET(), sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), bytecodeEndOffset) {
+                            truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
@@ -4711,14 +4700,22 @@ object "EvmEmulator" {
                 
                         let addr := accessStackHead(sp, stackHead)
                 
-                        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                        addr := and(addr, ADDRESS_MASK())
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        switch isEvmContract(addr) 
-                            case 0  { stackHead := extcodesize(addr) }
-                            default { stackHead := fetchDeployedEvmCodeLen(addr) }
+                        let rawCodeHash := getRawCodeHash(addr)
+                        switch shr(248, rawCodeHash)
+                        case 1 {
+                            stackHead := extcodesize(addr)
+                        }
+                        case 2 {
+                            stackHead := and(shr(224, rawCodeHash), 0xffff)
+                        }
+                        default {
+                            stackHead := 0
+                        }
                 
                         ip := add(ip, 1)
                     }
@@ -4731,9 +4728,7 @@ object "EvmEmulator" {
                         dstOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         srcOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                    
-                        checkMemIsAccessible(dstOffset, len)
-                    
+                
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
                         // minimum_word_size = (size + 31) / 32
                         let dynamicGas := add(
@@ -4741,22 +4736,22 @@ object "EvmEmulator" {
                             expandMemory(dstOffset, len)
                         )
                         
+                        addr := and(addr, ADDRESS_MASK())
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             dynamicGas := add(dynamicGas, 2500)
                         }
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
+                        dstOffset := add(dstOffset, MEM_OFFSET())
+                
                         if gt(srcOffset, MAX_UINT64()) {
                             srcOffset := MAX_UINT64()
                         } 
                         
                         if gt(len, 0) {
-                            let copiedLen
-                            if getRawCodeHash(addr) {
-                                 // Gets the code from the addr
-                                 copiedLen := fetchDeployedCode(addr, add(dstOffset, MEM_OFFSET()), srcOffset, len)
-                            }
+                            // Gets the code from the addr
+                            let copiedLen := fetchDeployedCode(addr, dstOffset, srcOffset, len)
                 
                             if lt(copiedLen, len) {
                                 $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, copiedLen), sub(len, copiedLen))
@@ -4781,8 +4776,6 @@ object "EvmEmulator" {
                         sourceOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemIsAccessible(dstOffset, len)
-                
                         // minimum_word_size = (size + 31) / 32
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
@@ -4802,26 +4795,45 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         let addr := accessStackHead(sp, stackHead)
-                        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+                        addr := and(addr, ADDRESS_MASK())
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500) 
                         }
                 
-                        ip := add(ip, 1)
-                        if iszero(addr) {
-                            stackHead := 0
-                            continue
-                        }
-                
-                        switch isEvmContract(addr)
+                        let rawCodeHash := getRawCodeHash(addr)
+                        switch isHashOfConstructedEvmContract(rawCodeHash)
                         case 0 {
-                            stackHead := extcodehash(addr)
+                            let codeLen := and(shr(224, rawCodeHash), 0xffff)
+                
+                            if codeLen {
+                                if lt(addr, 0x100) {
+                                    // precompiles and 0x00
+                                    codeLen := 0
+                                }
+                            }
+                
+                            switch codeLen
+                            case 0 {
+                                stackHead := EMPTY_KECCAK()
+                
+                                if iszero(getRawNonce(addr)) {
+                                    if iszero(balance(addr)) {
+                                        stackHead := 0
+                                    }
+                                }
+                            }
+                            default {
+                                // zkVM contract
+                                stackHead := rawCodeHash
+                            }
                         }
                         default {
+                            // Get precalculated keccak of EVM code
                             stackHead := getEvmExtcodehash(addr)
                         }
                         
+                        ip := add(ip, 1)
                     }
                     case 0x40 { // OP_BLOCKHASH
                         evmGasLeft := chargeGas(evmGasLeft, 20)
@@ -4859,11 +4871,7 @@ object "EvmEmulator" {
                     }
                     case 0x44 { // OP_PREVRANDAO
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        let _prevrandao := mload(PREVRANDAO_CACHE_OFFSET())
-                        if iszero(_prevrandao) {
-                            _prevrandao := cached(PREVRANDAO_CACHE_OFFSET(), prevrandao())
-                        }
-                        sp, stackHead := pushStackItem(sp, _prevrandao, stackHead)
+                        sp, stackHead := pushStackItem(sp, PREVRANDAO_VALUE(), stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x45 { // OP_GASLIMIT
@@ -4910,10 +4918,7 @@ object "EvmEmulator" {
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
                         let offset := accessStackHead(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, 32)
-                        let expansionGas := expandMemory(offset, 32)
-                        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 32))
                 
                         stackHead := mload(add(MEM_OFFSET(), offset))
                 
@@ -4928,9 +4933,7 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemIsAccessible(offset, 32)
-                        let expansionGas := expandMemory(offset, 32)
-                        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 32))
                 
                         mstore(add(MEM_OFFSET(), offset), value)
                         ip := add(ip, 1)
@@ -4944,9 +4947,7 @@ object "EvmEmulator" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemIsAccessible(offset, 1)
-                        let expansionGas := expandMemory(offset, 1)
-                        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, 1))
                 
                         mstore8(add(MEM_OFFSET(), offset), value)
                         ip := add(ip, 1)
@@ -5023,6 +5024,11 @@ object "EvmEmulator" {
                         let counter
                         counter, sp, stackHead := popStackItem(sp, stackHead)
                 
+                        // Counter certainly can't be bigger than uint64.
+                        if gt(counter, MAX_UINT64()) {
+                            panic()
+                        } 
+                
                         ip := add(BYTECODE_OFFSET(), counter)
                 
                         // Check next opcode is JUMPDEST
@@ -5048,6 +5054,11 @@ object "EvmEmulator" {
                             continue
                         }
                 
+                        // Counter certainly can't be bigger than uint64.
+                        if gt(counter, MAX_UINT64()) {
+                            panic()
+                        } 
+                
                         ip := add(BYTECODE_OFFSET(), counter)
                 
                         // Check next opcode is JUMPDEST
@@ -5062,10 +5073,10 @@ object "EvmEmulator" {
                     }
                     case 0x58 { // OP_PC
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        ip := add(ip, 1)
                 
-                        // PC = ip - 32 (bytecode size) - 1 (current instruction)
-                        sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_LEN_OFFSET()), 33), stackHead)
+                        sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+                
+                        ip := add(ip, 1)
                     }
                     case 0x59 { // OP_MSIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
@@ -5109,18 +5120,17 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0x5E { // OP_MCOPY
+                        evmGasLeft := chargeGas(evmGasLeft, 3)
+                
                         let destOffset, offset, size
                         popStackCheck(sp, 3)
                         destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemIsAccessible(offset, size)
-                        checkMemIsAccessible(destOffset, size)
-                
                         // dynamic_gas = 3 * words_copied + memory_expansion_cost
                         let dynamicGas := expandMemory2(offset, size, destOffset, size)
-                        let wordsCopied := div(add(size, 31), 32) // div rounding up
+                        let wordsCopied := shr(5, add(size, 31)) // div rounding up
                         dynamicGas := add(dynamicGas, mul(3, wordsCopied))
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
@@ -5130,303 +5140,108 @@ object "EvmEmulator" {
                     }
                     case 0x5F { // OP_PUSH0
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                
-                        let value := 0
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
+                        sp, stackHead := pushStackItem(sp, 0, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x60 { // OP_PUSH1
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 1)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 1)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(1, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x61 { // OP_PUSH2
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 2)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 2)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(2, ip, sp, evmGasLeft, stackHead)
                     }     
                     case 0x62 { // OP_PUSH3
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 3)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 3)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(3, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x63 { // OP_PUSH4
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 4)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 4)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(4, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x64 { // OP_PUSH5
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 5)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 5)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(5, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x65 { // OP_PUSH6
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 6)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 6)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(6, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x66 { // OP_PUSH7
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 7)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 7)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(7, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x67 { // OP_PUSH8
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 8)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 8)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(8, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x68 { // OP_PUSH9
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 9)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 9)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(9, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x69 { // OP_PUSH10
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 10)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 10)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(10, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x6A { // OP_PUSH11
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 11)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 11)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(11, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x6B { // OP_PUSH12
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 12)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 12)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(12, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x6C { // OP_PUSH13
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 13)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 13)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(13, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x6D { // OP_PUSH14
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 14)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 14)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(14, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x6E { // OP_PUSH15
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 15)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 15)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(15, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x6F { // OP_PUSH16
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 16)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 16)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(16, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x70 { // OP_PUSH17
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 17)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 17)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(17, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x71 { // OP_PUSH18
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 18)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 18)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(18, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x72 { // OP_PUSH19
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 19)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 19)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(19, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x73 { // OP_PUSH20
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 20)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 20)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(20, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x74 { // OP_PUSH21
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 21)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 21)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(21, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x75 { // OP_PUSH22
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 22)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 22)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(22, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x76 { // OP_PUSH23
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 23)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 23)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(23, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x77 { // OP_PUSH24
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 24)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 24)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(24, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x78 { // OP_PUSH25
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 25)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 25)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(25, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x79 { // OP_PUSH26
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 26)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 26)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(26, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x7A { // OP_PUSH27
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 27)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 27)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(27, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x7B { // OP_PUSH28
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 28)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 28)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(28, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x7C { // OP_PUSH29
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 29)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 29)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(29, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x7D { // OP_PUSH30
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 30)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 30)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(30, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x7E { // OP_PUSH31
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 31)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 31)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(31, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x7F { // OP_PUSH32
-                        evmGasLeft := chargeGas(evmGasLeft, 3)
-                
-                        ip := add(ip, 1)
-                        let value := readBytes(ip, 32)
-                
-                        sp, stackHead := pushStackItem(sp, value, stackHead)
-                        ip := add(ip, 32)
+                        ip, sp, evmGasLeft, stackHead := pushOpcodeInner(32, ip, sp, evmGasLeft, stackHead)
                     }
                     case 0x80 { // OP_DUP1 
                         evmGasLeft := chargeGas(evmGasLeft, 3)
-                        sp, stackHead := pushStackItem(sp, stackHead, stackHead)
+                        sp, stackHead := pushStackItem(sp, accessStackHead(sp, stackHead), stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x81 { // OP_DUP2
@@ -5554,125 +5369,49 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0xA0 { // OP_LOG0
-                        evmGasLeft := chargeGas(evmGasLeft, 375)
-                
-                        if isStatic {
-                            panic()
-                        }
-                
                         let offset, size
-                        popStackCheck(sp, 2)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, size)
-                
-                        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-                
-                        log0(add(offset, MEM_OFFSET()), size)
+                        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 0, isStatic)
+                        log0(offset, size)
                         ip := add(ip, 1)
                     }
                     case 0xA1 { // OP_LOG1
-                        evmGasLeft := chargeGas(evmGasLeft, 375)
-                
-                        if isStatic {
-                            panic()
-                        }
-                
                         let offset, size
-                        popStackCheck(sp, 3)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, size)
-                
-                        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                        dynamicGas := add(dynamicGas, 375)
-                        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
-                
+                        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 1, isStatic)
                         {   
                             let topic1
                             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log1(add(offset, MEM_OFFSET()), size, topic1)
+                            log1(offset, size, topic1)
                         }
                         ip := add(ip, 1)
                     }
                     case 0xA2 { // OP_LOG2
-                        evmGasLeft := chargeGas(evmGasLeft, 375)
-                
-                        if isStatic {
-                            panic()
-                        }
-                
                         let offset, size
-                        popStackCheck(sp, 4)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, size)
-                
-                        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                        dynamicGas := add(dynamicGas, 750)
-                        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+                        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 2, isStatic)
                 
                         {
                             let topic1, topic2
                             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log2(add(offset, MEM_OFFSET()), size, topic1, topic2)
+                            log2(offset, size, topic1, topic2)
                         }
                         ip := add(ip, 1)
                     }
                     case 0xA3 { // OP_LOG3
-                        evmGasLeft := chargeGas(evmGasLeft, 375)
-                
-                        if isStatic {
-                            panic()
-                        }
-                
                         let offset, size
-                        popStackCheck(sp, 5)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, size)
-                
-                        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                        dynamicGas := add(dynamicGas, 1125)
-                        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+                        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 3, isStatic)
                 
                         {
                             let topic1, topic2, topic3
                             topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log3(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3)
+                            log3(offset, size, topic1, topic2, topic3)
                         }     
                         ip := add(ip, 1)
                     }
                     case 0xA4 { // OP_LOG4
-                        evmGasLeft := chargeGas(evmGasLeft, 375)
-                
-                        if isStatic {
-                            panic()
-                        }
-                
                         let offset, size
-                        popStackCheck(sp, 6)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                
-                        checkMemIsAccessible(offset, size)
-                
-                        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
-                        let dynamicGas := add(shl(3, size), expandMemory(offset, size))
-                        dynamicGas := add(dynamicGas, 1500)
-                        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+                        evmGasLeft, offset, size, sp, stackHead := _genericLog(sp, stackHead, evmGasLeft, 4, isStatic)
                 
                         {
                             let topic1, topic2, topic3, topic4
@@ -5680,7 +5419,7 @@ object "EvmEmulator" {
                             topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                            log4(add(offset, MEM_OFFSET()), size, topic1, topic2, topic3, topic4)
+                            log4(offset, size, topic1, topic2, topic3, topic4)
                         }     
                         ip := add(ip, 1)
                     }
@@ -5696,30 +5435,24 @@ object "EvmEmulator" {
                     }
                     case 0xF1 { // OP_CALL
                         // A function was implemented in order to avoid stack depth errors.
-                        switch isStatic
-                        case 0 {
-                            evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead)
-                        }
-                        default {
-                            evmGasLeft, sp, stackHead := performStaticCall(sp, evmGasLeft, stackHead)
-                        }
+                        evmGasLeft, sp, stackHead := performCall(sp, evmGasLeft, stackHead, isStatic)
                         ip := add(ip, 1)
                     }
                     case 0xF3 { // OP_RETURN
                         let offset, size
                 
                         popStackCheck(sp, 2)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemIsAccessible(offset, size)
+                        if size {
+                            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                    
+                            returnLen := size
+                            
+                            // Don't check overflow here since previous checks are enough to ensure this is safe
+                            returnOffset := add(MEM_OFFSET(), offset)
+                        }
                 
-                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
-                
-                        returnLen := size
-                        
-                        // Don't check overflow here since previous checks are enough to ensure this is safe
-                        returnOffset := add(MEM_OFFSET(), offset)
                         break
                     }
                     case 0xF4 { // OP_DELEGATECALL
@@ -5741,19 +5474,24 @@ object "EvmEmulator" {
                         ip := add(ip, 1)
                     }
                     case 0xFD { // OP_REVERT
-                        let offset,size
+                        let offset, size
                 
                         popStackCheck(sp, 2)
-                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
+                        
+                        switch iszero(size)
+                        case 0 {
+                            evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
+                            
+                            // Don't check overflow here since check in expandMemory is enough to ensure this is safe
+                            offset := add(offset, MEM_OFFSET())
+                        }
+                        default {
+                            offset := MEM_OFFSET()
+                        }
+                        
                 
-                        checkMemIsAccessible(offset, size)
-                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(offset, size))
-                
-                        // Don't check overflow here since previous checks are enough to ensure this is safe
-                        offset := add(offset, MEM_OFFSET())
-                
-                        if eq(isCallerEVM, 1) {
+                        if isCallerEVM {
                             offset := sub(offset, 32)
                             size := add(size, 32)
                     
@@ -5764,350 +5502,364 @@ object "EvmEmulator" {
                         revert(offset, size)
                     }
                     case 0xFE { // OP_INVALID
-                        evmGasLeft := 0
-                        revertWithGas(evmGasLeft)
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     // We explicitly add unused opcodes to optimize the jump table by compiler.
                     case 0x0C { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x0D { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x0E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x0F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x1E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x1F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x21 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x22 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x23 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x24 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x25 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x26 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x27 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x28 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x29 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2A { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2B { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2C { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2D { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x49 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4A { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4B { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4C { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4D { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4E { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4F { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xA9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xAF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xB9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xBF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xC9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xCF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xD9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDD { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xDF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE0 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE1 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE3 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE4 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE5 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xE9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEA { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xED { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEE { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xEF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF2 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF6 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF7 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF8 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xF9 { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xFB { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xFC { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xFF { // Unused opcode
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                     default {
-                        $llvm_NoInline_llvm$_panic()
+                        $llvm_NoInline_llvm$_invalid()
                     }
                 }
                 
 
-                if eq(isCallerEVM, 1) {
+                function $llvm_AlwaysInline_llvm$_calldatasize() -> size {
+                    size := calldatasize()
+                }
+                
+                function $llvm_AlwaysInline_llvm$_calldatacopy(dstOffset, sourceOffset, truncatedLen) {
+                    calldatacopy(dstOffset, sourceOffset, truncatedLen)
+                }
+                
+                function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
+                    // EraVM will revert if offset + length overflows uint32
+                    if lt(calldataOffset, MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                        res := calldataload(calldataOffset)
+                    }
+                }
+
+                if isCallerEVM {
                     // Includes gas
                     returnOffset := sub(returnOffset, 32)
                     checkOverflow(returnLen, 32)
@@ -6132,7 +5884,7 @@ object "EvmEmulator" {
             // segment of memory.
             getDeployedBytecode()
 
-            let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
+            let returnOffset, returnLen := simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
         }
     }

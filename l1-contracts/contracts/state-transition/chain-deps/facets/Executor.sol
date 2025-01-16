@@ -599,14 +599,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
-        bytes32 l2DefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
-        bytes32 l2EvmEmulatorBytecodeHash = s.l2EvmEmulatorBytecodeHash;
         return
             abi.encodePacked(
                 s.zkPorterIsAvailable,
                 s.l2BootloaderBytecodeHash,
-                l2DefaultAccountBytecodeHash,
-                l2EvmEmulatorBytecodeHash
+                s.l2DefaultAccountBytecodeHash,
+                s.l2EvmEmulatorBytecodeHash
             );
     }
 

@@ -26,52 +26,58 @@ function MSG_VALUE_SYSTEM_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008009
 }
 
-function ORIGIN_CACHE_OFFSET() -> offset {
+function PANIC_RETURNDATASIZE_OFFSET() -> offset {
     offset := mul(23, 32)
 }
 
+function ORIGIN_CACHE_OFFSET() -> offset {
+    offset := add(PANIC_RETURNDATASIZE_OFFSET(), 32)
+}
+
 function GASPRICE_CACHE_OFFSET() -> offset {
-    offset := mul(24, 32)
+    offset := add(ORIGIN_CACHE_OFFSET(), 32)
 }
 
 function COINBASE_CACHE_OFFSET() -> offset {
-    offset := mul(25, 32)
+    offset := add(GASPRICE_CACHE_OFFSET(), 32)
 }
 
 function BLOCKTIMESTAMP_CACHE_OFFSET() -> offset {
-    offset := mul(26, 32)
+    offset := add(COINBASE_CACHE_OFFSET(), 32)
 }
 
 function BLOCKNUMBER_CACHE_OFFSET() -> offset {
-    offset := mul(27, 32)
-}
-
-function PREVRANDAO_CACHE_OFFSET() -> offset {
-    offset := mul(28, 32)
+    offset := add(BLOCKTIMESTAMP_CACHE_OFFSET(), 32)
 }
 
 function GASLIMIT_CACHE_OFFSET() -> offset {
-    offset := mul(29, 32)
+    offset := add(BLOCKNUMBER_CACHE_OFFSET(), 32)
 }
 
 function CHAINID_CACHE_OFFSET() -> offset {
-    offset := mul(30, 32)
+    offset := add(GASLIMIT_CACHE_OFFSET(), 32)
 }
 
 function BASEFEE_CACHE_OFFSET() -> offset {
-    offset := mul(31, 32)
+    offset := add(CHAINID_CACHE_OFFSET(), 32)
 }
 
 function LAST_RETURNDATA_SIZE_OFFSET() -> offset {
     offset := add(BASEFEE_CACHE_OFFSET(), 32)
 }
 
+// Note: we have an empty memory slot after LAST_RETURNDATA_SIZE_OFFSET(), it is used to simplify stack logic
+
 function STACK_OFFSET() -> offset {
     offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
 }
 
+function MAX_STACK_SLOT_OFFSET() -> offset {
+    offset := add(STACK_OFFSET(), mul(1023, 32))
+}
+
 function BYTECODE_LEN_OFFSET() -> offset {
-    offset := add(STACK_OFFSET(), mul(1024, 32))
+    offset := add(MAX_STACK_SLOT_OFFSET(), 32)
 }
 
 function BYTECODE_OFFSET() -> offset {
@@ -100,13 +106,9 @@ function MEM_OFFSET() -> offset {
 }
 
 // Used to simplify gas calculations for memory expansion.
-// The cost to increase the memory to 4 MB is close to 30M gas
+// The cost to increase the memory to 12 MB is close to 277M EVM gas
 function MAX_POSSIBLE_MEM_LEN() -> max {
-    max := 0x400000 // 4MB
-}
-
-function MAX_MEMORY_SLOT() -> max {
-    max := add(MEM_OFFSET(), MAX_POSSIBLE_MEM_LEN())
+    max := 0xC00000 // 12MB
 }
 
 function MAX_UINT() -> max_uint {
@@ -120,17 +122,23 @@ function MAX_UINT64() -> max {
 // Each evm gas is 5 zkEVM one
 function GAS_DIVISOR() -> gas_div { gas_div := 5 }
 
-// We need to pass some gas for MsgValueSimulator internal logic to decommit emulator etc
-function MSG_VALUE_SIMULATOR_STIPEND_GAS() -> gas_stipend {
-        gas_stipend := 35000 // 27000 + a little bit more
-}
-
 function OVERHEAD() -> overhead { overhead := 2000 }
 
-// From precompiles/CodeOracle
-function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
+function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
 
-function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
+function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+
+function EMPTY_KECCAK() -> value {  // keccak("")
+    value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+}
+
+function ADDRESS_MASK() -> value { // mask for lower 160 bits
+    value := 0xffffffffffffffffffffffffffffffffffffffff
+}
+
+function PREVRANDAO_VALUE() -> value {
+    value := 2500000000000000 // This value is fixed in EraVM
+}
 
 ////////////////////////////////////////////////////////////////
 //                  GENERAL FUNCTIONS
@@ -141,19 +149,15 @@ function abortEvmEnvironment() {
     revert(0, 0)
 }
 
-function $llvm_NoInline_llvm$_panic() { // revert consuming all EVM gas
-    mstore(0, 0)
-    revert(0, 32)
-}
-
-function revertWithGas(evmGasLeft) {
-    mstore(0, evmGasLeft)
-    revert(0, 32)
+function $llvm_NoInline_llvm$_invalid() { // revert consuming all EVM gas
+    panic()
 }
 
 function panic() { // revert consuming all EVM gas
+    // we return empty 32 bytes encoding 0 gas left if caller is EVM, and 0 bytes if caller isn't EVM
+    // it is done without if-else block so this function will be inlined
     mstore(0, 0)
-    revert(0, 32)
+    revert(0, mload(PANIC_RETURNDATASIZE_OFFSET()))
 }
 
 function cached(cacheIndex, value) -> _value {
@@ -177,60 +181,79 @@ function getEvmGasFromContext() -> evmGas {
     }
 }
 
-// This function can overflow, it is the job of the caller to ensure that it does not.
 // The argument to this function is the offset into the memory region IN BYTES.
 function expandMemory(offset, size) -> gasCost {
     // memory expansion costs 0 if size is 0
     if size {
-        let oldSizeInWords := mload(MEM_LEN_OFFSET())
-
-        // div rounding up
-        let newSizeInWords := div(add(add(offset, size), 31), 32)
-    
-        // memory_size_word = (memory_byte_size + 31) / 32
-        // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
-        // memory_expansion_cost = new_memory_cost - last_memory_cost
-        if gt(newSizeInWords, oldSizeInWords) {
-            let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
-            let quadraticPart := sub(
-                div(
-                    mul(newSizeInWords, newSizeInWords),
-                    512
-                ),
-                div(
-                    mul(oldSizeInWords, oldSizeInWords),
-                    512
-                )
-            )
-    
-            gasCost := add(linearPart, quadraticPart)
-    
-            mstore(MEM_LEN_OFFSET(), newSizeInWords)
-        }
+        checkOverflow(offset, size)
+        gasCost := _expandMemoryInternal(add(offset, size))
     }
 }
 
-function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> maxExpand {
-    switch lt(add(retOffset, retSize), add(argsOffset, argsSize)) 
-    case 0 {
-        maxExpand := expandMemory(retOffset, retSize)
-    }
-    default {
-        maxExpand := expandMemory(argsOffset, argsSize)
-    }
-}
-
-function checkMemIsAccessible(index, offset) {
-    checkOverflow(index, offset)
-
-    if gt(add(index, offset), MAX_MEMORY_SLOT()) {
+// This function can overflow, it is the job of the caller to ensure that it does not.
+// The argument to this function is the new size of memory IN BYTES.
+function _expandMemoryInternal(newMemsize) -> gasCost {
+    if gt(newMemsize, MAX_POSSIBLE_MEM_LEN()) {
         panic()
+    }   
+
+    let oldSizeInWords := mload(MEM_LEN_OFFSET())
+
+    // div rounding up
+    let newSizeInWords := shr(5, add(newMemsize, 31))
+
+    // memory_size_word = (memory_byte_size + 31) / 32
+    // memory_cost = (memory_size_word ** 2) / 512 + (3 * memory_size_word)
+    // memory_expansion_cost = new_memory_cost - last_memory_cost
+    if gt(newSizeInWords, oldSizeInWords) {
+        let linearPart := mul(3, sub(newSizeInWords, oldSizeInWords))
+        let quadraticPart := sub(
+            shr(
+                9,
+                mul(newSizeInWords, newSizeInWords),
+            ),
+            shr(
+                9,
+                mul(oldSizeInWords, oldSizeInWords),
+            )
+        )
+
+        gasCost := add(linearPart, quadraticPart)
+
+        mstore(MEM_LEN_OFFSET(), newSizeInWords)
+    }
+}
+
+// Returns 0 if size is 0
+function _memsizeRequired(offset, size) -> memorySize {
+    if size {
+        checkOverflow(offset, size)
+        memorySize := add(offset, size)
+    }
+}
+
+function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> gasCost {
+    let maxNewMemsize := _memsizeRequired(retOffset, retSize)
+    let argsMemsize := _memsizeRequired(argsOffset, argsSize)
+
+    if lt(maxNewMemsize, argsMemsize) {
+        maxNewMemsize := argsMemsize  
+    }
+
+    if maxNewMemsize { // Memory expansion costs 0 if size is 0
+        gasCost := _expandMemoryInternal(maxNewMemsize)
     }
 }
 
 function checkOverflow(data1, data2) {
     if lt(add(data1, data2), data2) {
         panic()
+    }
+}
+
+function insufficientBalance(value) -> res {
+    if value {
+        res := gt(value, selfbalance())
     }
 }
 
@@ -313,80 +336,70 @@ function getRawNonce(addr) -> nonce {
 }
 
 function getRawCodeHash(addr) -> hash {
+    // function getRawCodeHash(address _address)
     mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
     hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 
 function getEvmExtcodehash(addr) -> evmCodeHash {
+    // function evmCodeHash(address _address)
     mstore(0, 0x54A3314700000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
     evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
 }
 
-function isEvmContract(addr) -> isEVM {
-    // function isAccountEVM(address addr) external view returns (bool);
-    mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
-    mstore(4, addr)
-    isEVM := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
+function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
+    let version := shr(248, rawCodeHash)
+    let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
+    isConstructedEVM := and(eq(version, 2), isConstructedFlag)
 }
 
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
 function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-    let codeHash := getRawCodeHash(addr)
-    mstore(0, codeHash)
-    // The first word of returndata is the true length of the bytecode
-    let codeLen := fetchFromSystemContract(CODE_ORACLE_SYSTEM_CONTRACT(), 32)
-
-    if gt(len, codeLen) {
-        len := codeLen
-    }
-
-    let shiftedSrcOffset := add(32, srcOffset) // first 32 bits is length
-
-    let _returndatasize := returndatasize()
-    if gt(shiftedSrcOffset, _returndatasize) {
-        shiftedSrcOffset := _returndatasize
-    }
-
-    if gt(add(len, shiftedSrcOffset), _returndatasize) {
-        len := sub(_returndatasize, shiftedSrcOffset)
-    }
-
-    if len {
-        returndatacopy(dstOffset, shiftedSrcOffset, len)
-    }
-
-    copiedLen := len
-}
-
-// Returns the length of the EVM bytecode.
-function fetchDeployedEvmCodeLen(addr) -> codeLen {
-    let codeHash := getRawCodeHash(addr)
-    mstore(0, codeHash)
-
+    let rawCodeHash := getRawCodeHash(addr)
+    mstore(0, rawCodeHash)
+    
     let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+    // it fails if we don't have any code deployed at this address
+    if success {
+        // The length of the bytecode is encoded in versioned bytecode hash
+        let codeLen := and(shr(224, rawCodeHash), 0xffff)
 
-    switch iszero(success)
-    case 1 {
-        // The code oracle call can only fail in the case where the contract
-        // we are querying is the current one executing and it has not yet been
-        // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-        // inside the constructor. In that case, code length is zero.
-        codeLen := 0
-    }
-    default {
-        // The first word is the true length of the bytecode
-        returndatacopy(0, 0, 32)
-        codeLen := mload(0)
-    }
+        if eq(shr(248, rawCodeHash), 1) {
+            // For native zkVM contracts length encoded in words, not bytes
+            codeLen := shl(5, codeLen) // * 32
+        }
+
+        if gt(len, codeLen) {
+            len := codeLen
+        }
+    
+        let _returndatasize := returndatasize()
+        if gt(srcOffset, _returndatasize) {
+            srcOffset := _returndatasize
+        }
+    
+        if gt(add(len, srcOffset), _returndatasize) {
+            len := sub(_returndatasize, srcOffset)
+        }
+    
+        if len {
+            returndatacopy(dstOffset, srcOffset, len)
+        }
+    
+        copiedLen := len
+    } 
 }
 
-function getMax(a, b) -> max {
-    max := b
-    if gt(a, b) {
-        max := a
-    }
+function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
+    farCallAbi := shl(248, isSystemCall)
+    // dataOffset is 0
+    farCallAbi := or(farCallAbi, shl(64, dataStart))
+    farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+    farCallAbi :=  or(farCallAbi, shl(192, gas))
+    // shardId is 0
+    // forwardingMode is 0
 }
 
 function performSystemCall(to, dataLength) {
@@ -399,24 +412,60 @@ function performSystemCall(to, dataLength) {
 }
 
 function performSystemCallRevertable(to, dataLength) -> success {
-    let farCallAbi := shl(248, 1) // system call
-    // dataOffset is 0
-    // dataStart is 0
-    farCallAbi :=  or(farCallAbi, shl(96, dataLength))
-    farCallAbi :=  or(farCallAbi, shl(192, gas()))
-    // shardId is 0
-    // forwardingMode is 0
-    // not constructor call
-
+    // system call, dataStart is 0
+    let farCallAbi := build_farcall_abi(1, gas(), 0, dataLength)
     success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+}
+
+function rawCall(gas, to, value, dataStart, dataLength, outputOffset, outputLen) -> success {
+    switch iszero(value)
+    case 0 {
+        // system call to MsgValueSimulator, but call to "to" will be non-system
+        let farCallAbi := build_farcall_abi(1, gas, dataStart, dataLength)
+        success := verbatim_6i_1o("system_call", MSG_VALUE_SYSTEM_CONTRACT(), farCallAbi, value, to, 0, 0)
+        if outputLen {
+            if success {
+                let rtdz := returndatasize()
+                switch lt(rtdz, outputLen)
+                case 0 { returndatacopy(outputOffset, 0, outputLen) }
+                default { returndatacopy(outputOffset, 0, rtdz) }
+            }
+        }
+    }
+    default {
+        // not a system call
+        let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+        success := verbatim_4i_1o("raw_call", to, farCallAbi, outputOffset, outputLen)
+    }
+}
+
+function rawStaticcall(gas, to, dataStart, dataLength, outputOffset, outputLen) -> success {
+    // not a system call
+    let farCallAbi := build_farcall_abi(0, gas, dataStart, dataLength)
+    success := verbatim_4i_1o("raw_static_call", to, farCallAbi, outputOffset, outputLen)
 }
 
 ////////////////////////////////////////////////////////////////
 //                     STACK OPERATIONS
 ////////////////////////////////////////////////////////////////
 
+function pushOpcodeInner(size, ip, sp, evmGas, oldStackHead) -> newIp, newSp, evmGasLeft, stackHead {
+    evmGasLeft := chargeGas(evmGas, 3)
+
+    newIp := add(ip, 1)
+    let value := readBytes(newIp, size)
+
+    newSp, stackHead := pushStackItem(sp, value, oldStackHead)
+    newIp := add(newIp, size)
+}
+
 function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
     evmGasLeft := chargeGas(evmGas, 3)
+
+    if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
+        panic()
+    }
+    
     let tempSp := sub(sp, mul(0x20, sub(position, 1)))
 
     if lt(tempSp, STACK_OFFSET())  {
@@ -452,7 +501,7 @@ function popStackItem(sp, oldStackHead) -> a, newSp, stackHead {
 }
 
 function pushStackItem(sp, item, oldStackHead) -> newSp, stackHead {
-    if iszero(lt(sp, BYTECODE_LEN_OFFSET())) {
+    if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
         panic()
     }
 
@@ -467,20 +516,8 @@ function popStackItemWithoutCheck(sp, oldStackHead) -> a, newSp, stackHead {
     stackHead := mload(newSp)
 }
 
-function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
-    mstore(sp, oldStackHead)
-    stackHead := item
-    newSp := add(sp, 0x20)
-}
-
 function popStackCheck(sp, numInputs) {
     if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-        panic()
-    }
-}
-
-function pushStackCheck(sp, numInputs) {
-    if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_LEN_OFFSET())) {
         panic()
     }
 }
@@ -497,11 +534,12 @@ function accessStackHead(sp, stackHead) -> value {
 //               EVM GAS MANAGER FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
+// Address higher bytes must be cleaned before
 function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
     // function warmAccount(address account)
     // non-standard selector 0x00
     // addr is packed in the same word with selector
-    mstore(0, and(addr, 0xffffffffffffffffffffffffffffffffffffffff))
+    mstore(0, addr)
 
     performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
 
@@ -514,8 +552,7 @@ function isSlotWarm(key) -> isWarm {
     // non-standard selector 0x01
     mstore(0, 0x0100000000000000000000000000000000000000000000000000000000000000)
     mstore(1, key)
-    // should be call since we use TSTORE in gas manager
-    let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 33, 0, 0)
+    let success := staticcall(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 33, 0, 0)
 
     if iszero(success) {
         // This error should never happen
@@ -535,6 +572,7 @@ function warmSlot(key, currentValue) -> isWarm, originalValue {
 
     performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 65)
 
+    originalValue := currentValue
     if returndatasize() {
         isWarm := true
         returndatacopy(0, 0, 32)
@@ -552,16 +590,16 @@ function pushEvmFrame(passGas, isStatic) {
 }
 
 function consumeEvmFrame() -> passGas, isStatic, callerEVM {
-    // function consumeEvmFrame() external returns (uint256 passGas, uint256 auxDataRes)
+    // function consumeEvmFrame(_caller) external returns (uint256 passGas, uint256 auxDataRes)
     // non-standard selector 0x04
-    mstore(0, 0x0400000000000000000000000000000000000000000000000000000000000000)
-    mstore(1, caller())
+    mstore(0, or(0x0400000000000000000000000000000000000000000000000000000000000000, caller()))
 
-    performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 33)
+    performSystemCall(EVM_GAS_MANAGER_CONTRACT(), 32)
 
     let _returndatasize := returndatasize()
     if _returndatasize {
         callerEVM := true
+        mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
 
         returndatacopy(0, 0, 32)
         passGas := mload(0)
@@ -582,21 +620,16 @@ function resetEvmFrame() {
 //               CALLS FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
-function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-    let gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize
+function performCall(oldSp, evmGasLeft, oldStackHead, isStatic) -> newGasLeft, sp, stackHead {
+    let gasToPass, rawAddr, value, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, 7)
     gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-    addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
-
-    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-
-    checkMemIsAccessible(argsOffset, argsSize)
-    checkMemIsAccessible(retOffset, retSize)
 
     // static_gas = 0
     // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -605,15 +638,13 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
     // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called.
     // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
 
-    let gasUsed := 100 // warm address access cost
-    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        gasUsed := 2600 // cold address access cost
-    }
-
-    // memory_expansion_cost
-    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+    let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
 
     if gt(value, 0) {
+        if isStatic {
+            panic()
+        }
+
         gasUsed := add(gasUsed, 9000) // positive_value_cost
 
         if isAddrEmpty(addr) {
@@ -637,7 +668,7 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
         argsSize,
         add(retOffset, MEM_OFFSET()),
         retSize,
-        false
+        isStatic
     )
 
     newGasLeft := add(evmGasLeft, frameGasLeft)
@@ -645,27 +676,16 @@ function performCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHe
 }
 
 function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, stackHead {
-    let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
+    let gasToPass, rawAddr, argsOffset, argsSize, retOffset, retSize
 
     popStackCheck(oldSp, 6)
     gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-    addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+    rawAddr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
     argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
-    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-
-    checkMemIsAccessible(argsOffset, argsSize)
-    checkMemIsAccessible(retOffset, retSize)
-
-    let gasUsed := 100 // warm address access cost
-    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        gasUsed := 2600 // cold address access cost
-    }
-
-    // memory_expansion_cost
-    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
+    let addr, gasUsed := _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize)
 
     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
     gasToPass := capGasForCall(evmGasLeft, gasToPass)
@@ -688,66 +708,97 @@ function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> newGasLeft, sp, s
 
 
 function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGasLeft, sp, stackHead {
-    let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
+    let gasToPass, rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize
 
     popStackCheck(oldSp, 6)
     gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
-    addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    rawAddr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+    rawArgsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
     argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
-    retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
+    rawRetOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
 
-    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+    let addr, gasUsed := _genericPrecallLogic(rawAddr, rawArgsOffset, argsSize, rawRetOffset, retSize)
 
-    checkMemIsAccessible(argsOffset, argsSize)
-    checkMemIsAccessible(retOffset, retSize)
+    newGasLeft := chargeGas(evmGasLeft, gasUsed)
+    gasToPass := capGasForCall(newGasLeft, gasToPass)
 
-    let gasUsed := 100 // warm address access cost
-    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-        gasUsed := 2600 // cold address access cost
+    newGasLeft := sub(newGasLeft, gasToPass)
+
+    let success
+    let frameGasLeft := gasToPass
+
+    let retOffset := add(MEM_OFFSET(), rawRetOffset)
+    let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+
+    let rawCodeHash := getRawCodeHash(addr)
+    switch isHashOfConstructedEvmContract(rawCodeHash)
+    case 0 {
+        // Not a constructed EVM contract
+        let precompileCost := getGasForPrecompiles(addr, argsSize)
+        switch precompileCost
+        case 0 {
+            // Not a precompile
+            _eraseReturndataPointer()
+
+            let isCallToEmptyContract := iszero(addr) // 0x00 is always "empty"
+            if iszero(isCallToEmptyContract) {
+                isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
+            }
+
+            if isCallToEmptyContract {
+                // In case of a call to the EVM contract that is currently being constructed, 
+                // the DefaultAccount bytecode will be used instead. This is implemented at the virtual machine level.
+                success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
+                _saveReturndataAfterZkEVMCall()               
+            }
+
+            // We forbid delegatecalls to EraVM native contracts
+        } 
+        default {
+            // Precompile. Simulate using staticcall, since EraVM behavior differs here
+            success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
+        }
+    }
+    default {
+        // Constructed EVM contract
+        pushEvmFrame(gasToPass, isStatic)
+        // pass all remaining native gas
+        success := delegatecall(gas(), addr, argsOffset, argsSize, 0, 0)
+
+        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+        if iszero(success) {
+            resetEvmFrame()
+        }
     }
 
-    // memory_expansion_cost
-    gasUsed := add(gasUsed, expandMemory2(retOffset, retSize, argsOffset, argsSize))
-
-    evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-
-    // it is also not possible to delegatecall precompiles
-    if iszero(isEvmContract(addr)) {
-        revertWithGas(evmGasLeft)
-    }
-
-    gasToPass := capGasForCall(evmGasLeft, gasToPass)
-    evmGasLeft := sub(evmGasLeft, gasToPass)
-
-    pushEvmFrame(gasToPass, isStatic)
-    let success := delegatecall(
-        gas(), // pass all remaining native gas
-        addr,
-        add(MEM_OFFSET(), argsOffset),
-        argsSize,
-        0,
-        0
-    )
-
-    let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET(), retOffset), retSize)
-    if iszero(success) {
-        resetEvmFrame()
-    }
-
-    newGasLeft := add(evmGasLeft, frameGasLeft)
+    newGasLeft := add(newGasLeft, frameGasLeft)
     stackHead := success
 }
 
+function _genericPrecallLogic(rawAddr, argsOffset, argsSize, retOffset, retSize) -> addr, gasUsed {
+    // memory_expansion_cost
+    gasUsed := expandMemory2(retOffset, retSize, argsOffset, argsSize)
+
+    addr := and(rawAddr, ADDRESS_MASK())
+
+    let addressAccessCost := 100 // warm address access cost
+    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
+        addressAccessCost := 2600 // cold address access cost
+    }
+
+    gasUsed := add(gasUsed, addressAccessCost)
+}
+
 function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-    switch isEvmContract(addr)
+    let rawCodeHash := getRawCodeHash(addr)
+    switch isHashOfConstructedEvmContract(rawCodeHash)
     case 0 {
         // zkEVM native call
-        let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+        let precompileCost := getGasForPrecompiles(addr, argsSize)
         switch precompileCost
         case 0 {
             // just smart contract
-            success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
+            success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash)
         } 
         default {
             // precompile
@@ -755,57 +806,68 @@ function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, r
         }
     }
     default {
-        pushEvmFrame(gasToPass, isStatic)
-        // pass all remaining native gas
-        success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
-        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-        if iszero(success) {
-            resetEvmFrame()
+        switch insufficientBalance(value)
+        case 0 {
+            pushEvmFrame(gasToPass, isStatic)
+            // pass all remaining native gas
+            success := call(gas(), addr, value, argsOffset, argsSize, 0, 0)
+            frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+            if iszero(success) {
+                resetEvmFrame()
+            }
+        }
+        default {
+            frameGasLeft := gasToPass
+            _eraseReturndataPointer()
         }
     }
 }
 
 function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
-    let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
-    if lt(gasToPass, precompileCost) {
-        zkVmGasToPass := 0  // in EVM precompile should revert consuming all gas in that case
-    }
-
-    switch isStatic
+    switch lt(gasToPass, precompileCost)
     case 0 {
-        success := call(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+        let zkVmGasToPass := gas() // pass all remaining gas, precompiles should not call any contracts
+
+        switch isStatic
+        case 0 {
+            success := rawCall(zkVmGasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
+        }
+        default {
+            success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+        }
+        
+        _saveReturndataAfterZkEVMCall()
+    
+        if success {
+            frameGasLeft := sub(gasToPass, precompileCost)
+        }
+        // else consume all provided gas
     }
     default {
-        success := staticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
+        // consume all provided gas
+        _eraseReturndataPointer()
     }
-    
-    _saveReturndataAfterZkEVMCall()
-
-    if success {
-        frameGasLeft := sub(gasToPass, precompileCost)
-    }
-    // else consume all provided gas
 }
 
 // Call native ZkVm contract from EVM context
-function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic) -> success, frameGasLeft {
+function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash) -> success, frameGasLeft {
     let zkEvmGasToPass := mul(evmGasToPass, GAS_DIVISOR()) // convert EVM gas -> ZkVM gas
-    let decommitZkVmGasCost := decommitmentCost(addr)
 
-    // we are going to charge decommit cost even if address is already warm
-    // decommit cost is subtracted from the callee frame
-    switch gt(decommitZkVmGasCost, zkEvmGasToPass)
-    case 0 {
-        zkEvmGasToPass := sub(zkEvmGasToPass, decommitZkVmGasCost)
-    }
-    default {
-        zkEvmGasToPass := 0
-    }
-
-    if gt(zkEvmGasToPass, UINT32_MAX()) { // just in case
-        zkEvmGasToPass := UINT32_MAX()
+    let emptyContractExecutionCost := 500 // enough to call "empty" contract
+    let isEmptyContract := or(iszero(addr), iszero(and(shr(224, rawCodeHash), 0xffff)))
+    if isEmptyContract {
+        // we should add some gas to cover overhead of calling EmptyContract or DefaultAccount
+        // if value isn't zero, MsgValueSimulator will take required gas directly from our frame (as 2300 stipend)
+        if iszero(value) {
+            zkEvmGasToPass := add(zkEvmGasToPass, emptyContractExecutionCost)
+        }
     }
 
+    if gt(zkEvmGasToPass, MAX_UINT32()) { // just in case
+        zkEvmGasToPass := MAX_UINT32()
+    }
+
+    // Please note, that decommitment cost and MsgValueSimulator additional overhead will be charged directly from this frame
     let zkEvmGasBefore := gas()
     switch isStatic
     case 0 {
@@ -817,24 +879,23 @@ function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffs
     let zkEvmGasUsed := sub(zkEvmGasBefore, gas())
 
     _saveReturndataAfterZkEVMCall()
-    
+
     if gt(zkEvmGasUsed, zkEvmGasBefore) { // overflow case
-        zkEvmGasUsed := zkEvmGasToPass // should never happen
+        zkEvmGasUsed := 0 // should never happen
+    }
+
+    if isEmptyContract {
+        if iszero(value) {
+            zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
+        }
+    
+        zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
     }
 
     // refund gas
     if gt(zkEvmGasToPass, zkEvmGasUsed) {
         frameGasLeft := div(sub(zkEvmGasToPass, zkEvmGasUsed), GAS_DIVISOR())
     }
-}
-
-function decommitmentCost(addr) -> cost {
-    // charge for contract decommitment
-    let byteSize := extcodesize(addr)
-    cost := mul(
-        div(add(byteSize, 31), 32), // rounding up
-        DECOMMIT_COST_PER_WORD()
-    ) 
 }
 
 function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
@@ -848,8 +909,7 @@ function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
 // The gas cost mentioned here is purely the cost of the contract, 
 // and does not consider the cost of the call itself nor the instructions 
 // to put the parameters in memory. 
-// Take into account MEM_OFFSET() when passing the argsOffset
-function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
+function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
     switch addr
         case 0x01 { // ecRecover
             gasToCharge := 3000
@@ -929,7 +989,7 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
 
             mstore(LAST_RETURNDATA_SIZE_OFFSET(), sub(rtsz, 32))
 
-            // Skip the returnData
+            // Skip first 32 bytes of the returnData
             ptrAddIntoActive(32)
         }
 }
@@ -966,8 +1026,6 @@ function performCreate2(oldEvmGasLeft, oldSp, oldStackHead) -> evmGasLeft, sp, s
 }
 
 function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
-    checkMemIsAccessible(offset, size)
-
     // EIP-3860
     if gt(size, MAX_POSSIBLE_INIT_BYTECODE_LEN()) {
         panic()
@@ -978,7 +1036,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
     // minimum_word_size = (size + 31) / 32
     // init_code_cost = 2 * minimum_word_size, EIP-3860
     // code_deposit_cost = 200 * deployed_code_size, (charged inside call)
-    let minimum_word_size := div(add(size, 31), 32) // rounding up
+    let minimum_word_size := shr(5, add(size, 31)) // rounding up
     let dynamicGas := add(
         mul(2, minimum_word_size),
         expandMemory(offset, size)
@@ -991,12 +1049,7 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
 
     _eraseReturndataPointer()
 
-    let err := 0
-    if value {
-        if gt(value, selfbalance()) {
-            err := 1
-        }
-    }
+    let err := insufficientBalance(value)
 
     if iszero(err) {
         offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
@@ -1007,9 +1060,15 @@ function $llvm_NoInline_llvm$_genericCreate(offset, size, value, evmGasLeftOld, 
 function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> evmGasLeft, addr  {
     let gasForTheCall := capGasForCall(evmGasLeftOld, evmGasLeftOld) // pass 63/64 of remaining gas
 
-    let bytecodeHash := 0
+    let bytecodeHash
     if isCreate2 {
-        bytecodeHash := keccak256(offset, size)
+        switch size
+        case 0 {
+            bytecodeHash := EMPTY_KECCAK()
+        }
+        default {
+            bytecodeHash := keccak256(offset, size)
+        }
     }
 
     // we want to calculate the address of new contract, and if it is deployable (no collision),
@@ -1019,30 +1078,42 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
     mstore(0, 0xf81dae8600000000000000000000000000000000000000000000000000000000)
     mstore(4, salt)
     mstore(36, bytecodeHash)
-    let precreateResult := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
+    let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
 
-    if iszero(precreateResult) {
-        // Collision, nonce overflow or EVM not allowed.
+    if canBeDeployed {
+        returndatacopy(0, 0, 32)
+        addr := and(mload(0), ADDRESS_MASK())
+        pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
+        // so even if constructor reverts, nonce stays incremented and addr stays warm
+
+        // check for code collision
+        canBeDeployed := 0
+        if iszero(getRawCodeHash(addr)) {
+            // check for nonce collision
+            if iszero(getRawNonce(addr)) {
+                canBeDeployed := 1
+            }     
+        }
+    }
+
+    if iszero(canBeDeployed) {
+        // Nonce overflow, EVM not allowed or collision.
         // This is *internal* panic, consuming all passed gas.
         // Note: we should not consume all gas if nonce overflowed, but this should not happen in reality anyway
         evmGasLeft := chargeGas(evmGasLeftOld, gasForTheCall)
+        addr := 0
     }
 
-    if precreateResult {
-        returndatacopy(0, 0, 32)
-        addr := mload(0)
-    
-        pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
-        // so even if constructor reverts, nonce stays incremented and addr stays warm
-    
+
+    if canBeDeployed {
         // verification of the correctness of the deployed bytecode and payment of gas for its storage will occur in the frame of the new contract
         pushEvmFrame(gasForTheCall, false)
 
         // move needed memory slots to the scratch space
-        mstore(mul(10, 32), mload(sub(offset, 0x80))
-        mstore(mul(11, 32), mload(sub(offset, 0x60))
-        mstore(mul(12, 32), mload(sub(offset, 0x40))
-        mstore(mul(13, 32), mload(sub(offset, 0x20))
+        mstore(mul(10, 32), mload(sub(offset, 0x80)))
+        mstore(mul(11, 32), mload(sub(offset, 0x60)))
+        mstore(mul(12, 32), mload(sub(offset, 0x40)))
+        mstore(mul(13, 32), mload(sub(offset, 0x20)))
     
         // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
         mstore(sub(offset, 0x80), 0xe43cec64)
@@ -1053,10 +1124,10 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
         let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
 
         // move memory slots back
-        mstore(sub(offset, 0x80), mload(mul(10, 32))
-        mstore(sub(offset, 0x60), mload(mul(11, 32))
-        mstore(sub(offset, 0x40), mload(mul(12, 32))
-        mstore(sub(offset, 0x20), mload(mul(13, 32))
+        mstore(sub(offset, 0x80), mload(mul(10, 32)))
+        mstore(sub(offset, 0x60), mload(mul(11, 32)))
+        mstore(sub(offset, 0x40), mload(mul(12, 32)))
+        mstore(sub(offset, 0x20), mload(mul(13, 32)))
     
         let gasLeft
         switch result
@@ -1075,14 +1146,8 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
 }
 
 function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
-    let farCallAbi := shl(248, 1) // system call
-    // dataOffset is 0
-    farCallAbi :=  or(farCallAbi, shl(64, bytecodeStart))
-    farCallAbi :=  or(farCallAbi, shl(96, bytecodeLen))
-    farCallAbi :=  or(farCallAbi, shl(192, gas()))
-    // shardId is 0
-    // forwardingMode is 0
-    // not constructor call (ContractDeployer will call constructor)
+    // system call, not constructor call (ContractDeployer will call constructor)
+    let farCallAbi := build_farcall_abi(1, gas(), bytecodeStart, bytecodeLen) 
 
     switch iszero(value)
     case 0 {
@@ -1110,44 +1175,78 @@ function _saveConstructorReturnGas() -> gasLeft, addr {
 }
 
 ////////////////////////////////////////////////////////////////
-//               EXTCODECOPY FUNCTIONALITY
+//               MEMORY REGIONS FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
-function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
-    let rest_bits := shl(3, len)
-    let upper_bits := sub(256, rest_bits)
-    let val_mask := shl(upper_bits, MAX_UINT())
-    let val_masked := and(val, val_mask)
-    let dst_val := mload(dest)
-    let dst_mask := shr(rest_bits, MAX_UINT())
-    let dst_masked := and(dst_val, dst_mask)
-    mstore(dest, or(val_masked, dst_masked))
-}
-
+// Copy the region of memory
 function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
-    let dest_addr := dest
-    let src_addr := src
-    let dest_end := add(dest, and(len, sub(0, 32)))
-    for { } lt(dest_addr, dest_end) {} {
-        mstore(dest_addr, mload(src_addr))
-        dest_addr := add(dest_addr, 32)
-        src_addr := add(src_addr, 32)
+    // Copy all the whole memory words in a cycle
+    let destIndex := dest
+    let srcIndex := src
+    let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+    for { } lt(destIndex, destEndIndex) {} {
+        mstore(destIndex, mload(srcIndex))
+        destIndex := add(destIndex, 32)
+        srcIndex := add(srcIndex, 32)
     }
 
-    let rest_len := and(len, 31)
-    if rest_len {
-        $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+    // Copy the remainder (if any)
+    let remainderLen := and(len, 31)
+    if remainderLen {
+        $llvm_AlwaysInline_llvm$_memWriteRemainder(destIndex, mload(srcIndex), remainderLen)
     }
 }
 
-function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
-    let dest_end := add(dest, and(len, sub(0, 32)))
-    for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+// Write the last part of the copied/cleaned memory region (smaller than the memory word)
+function $llvm_AlwaysInline_llvm$_memWriteRemainder(dest, remainder, len) {
+    let remainderBitLength := shl(3, len) // bytes to bits
+
+    let existingValue := mload(dest)
+    let existingValueMask := shr(remainderBitLength, MAX_UINT())
+    let existingValueMasked := and(existingValue, existingValueMask) // clean up place for remainder
+
+    let remainderMasked := and(remainder, not(existingValueMask)) // using only `len` higher bytes of remainder word
+    mstore(dest, or(remainderMasked, existingValueMasked))
+}
+
+// Clean the region of memory
+function $llvm_AlwaysInline_llvm$_memsetToZero(dest, len) {
+    // Clean all the whole memory words in a cycle
+    let destEndIndex := add(dest, and(len, sub(0, 32))) // len / 32 words
+    for {let i := dest} lt(i, destEndIndex) { i := add(i, 32) } {
         mstore(i, 0)
     }
 
-    let rest_len := and(len, 31)
-    if rest_len {
-        $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+    // Clean the remainder (if any)
+    let remainderLen := and(len, 31)
+    if remainderLen {
+        $llvm_AlwaysInline_llvm$_memWriteRemainder(destEndIndex, 0, remainderLen)
+    }
+}
+
+////////////////////////////////////////////////////////////////
+//                 LOGS FUNCTIONALITY 
+////////////////////////////////////////////////////////////////
+
+function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmGasLeft, offset, size, newSp, newStackHead {
+    newEvmGasLeft := chargeGas(evmGasLeft, 375)
+
+    if isStatic {
+        panic()
+    }
+
+    let rawOffset
+    popStackCheck(sp, add(2, topicCount))
+    rawOffset, newSp, newStackHead := popStackItemWithoutCheck(sp, stackHead)
+    size, newSp, newStackHead := popStackItemWithoutCheck(newSp, newStackHead)
+
+    // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+    let dynamicGas := add(shl(3, size), expandMemory(rawOffset, size))
+    dynamicGas := add(dynamicGas, mul(375, topicCount))
+
+    newEvmGasLeft := chargeGas(newEvmGasLeft, dynamicGas)
+
+    if size {
+        offset := add(rawOffset, MEM_OFFSET())
     }
 }
