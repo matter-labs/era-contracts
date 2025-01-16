@@ -964,11 +964,7 @@ contract EcosystemUpgrade is Script {
             abi.encode(config.deployerAddress, executionDelay)
         );
         address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "ValidatorTimelock",
-            abi.encode(config.deployerAddress, executionDelay)
-        );
+        notifyAboutDeployment(contractAddress, "ValidatorTimelock", abi.encode(config.deployerAddress, executionDelay));
         addresses.validatorTimelock = contractAddress;
     }
 
