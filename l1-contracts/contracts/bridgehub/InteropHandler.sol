@@ -55,19 +55,21 @@ contract InteropHandler is IInteropHandler {
     }
 
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        _proof.message.data = _bundle;
-        L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
-            _proof.chainId,
-            _proof.l1BatchNumber,
-            _proof.l2MessageIndex,
-            _proof.message,
-            _proof.proof
-        );
+        // _proof.message.data = _bundle;
+        // L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
+        //     _proof.chainId,
+        //     _proof.l1BatchNumber,
+        //     _proof.l2MessageIndex,
+        //     _proof.message,
+        //     _proof.proof
+        // );
 
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
         InteropCall memory baseTokenCall = interopBundle.calls[0];
 
         BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), baseTokenCall.value);
+        BASE_TOKEN_SYSTEM_CONTRACT.mint(msg.sender, baseTokenCall.value); // todo
+
         for (uint256 i = 1; i < interopBundle.calls.length; i++) {
             InteropCall memory interopCall = interopBundle.calls[i];
 

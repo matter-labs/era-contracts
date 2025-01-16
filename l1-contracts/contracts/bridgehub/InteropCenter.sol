@@ -628,7 +628,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                 factoryDeps: _request.factoryDeps,
                 refundRecipient: address(0)
-            })
+            }),
+            _sender
         );
     }
 
@@ -729,7 +730,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                 factoryDeps: outputRequest.factoryDeps,
                 refundRecipient: address(0)
-            })
+            }),
+            _sender
         );
 
         if (_request.secondBridgeAddress == address(assetRouter)) {
@@ -756,9 +758,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function _sendRequest(
         uint256 _chainId,
         address _refundRecipient,
-        BridgehubL2TransactionRequest memory _request
+        BridgehubL2TransactionRequest memory _request,
+        address _sender
     ) internal returns (bytes32 canonicalTxHash) {
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _sender);
         _request.refundRecipient = refundRecipient;
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         if (zkChain != address(0)) {
