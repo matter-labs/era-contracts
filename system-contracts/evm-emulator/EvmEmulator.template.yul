@@ -17,8 +17,8 @@ object "EvmEmulator" {
             }
 
             mstore(BYTECODE_LEN_OFFSET(), size)
-            mstore(EMPTY_CODE_OFFSET(), 0)
-            copyActivePtrData(BYTECODE_OFFSET(), 0, size)
+
+            swapActivePointerWithBytecodePointer()
         }
 
         function padBytecode(offset, len) -> blobLen {
@@ -112,19 +112,14 @@ object "EvmEmulator" {
             }
 
             function getDeployedBytecode() {
-                let codeLen := fetchDeployedCode(
-                    getCodeAddress(), 
-                    BYTECODE_OFFSET(), // destination offset
-                    0, // source offset
-                    add(MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN(), 1) // so we can check that bytecode isn't too big
-                )
-
-                if gt(codeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
-                    panic()
-                }
+                let success, rawCodeHash := fetchBytecode(getCodeAddress())
+                let codeLen := and(shr(224, rawCodeHash), 0xffff)
+                
+                loadReturndataIntoActivePtr()
             
-                mstore(EMPTY_CODE_OFFSET(), 0)
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
+
+                swapActivePointerWithBytecodePointer()
             }
 
             <!-- @include EvmEmulatorFunctions.template.yul -->
