@@ -10,5 +10,4 @@ import {IMailboxImpl} from "./IMailboxImpl.sol";
 /// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IMailbox is IMessageVerification, IMailboxImpl {
-}
+interface IMailbox is IMessageVerification, IMailboxImpl {}

@@ -9,7 +9,6 @@ import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2Transacti
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMailboxImpl is IZKChainBase {
-
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -124,7 +123,6 @@ interface IMailboxImpl is IZKChainBase {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
-
 
     /// Proves that a certain leaf was included as part of the log merkle tree.
     function proveL2LeafInclusion(

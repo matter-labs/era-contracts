@@ -508,7 +508,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender
     ) internal returns (bytes32 canonicalTxHash) {
         InteropCallStarter[] memory feePaymentDirectCalls = new InteropCallStarter[](1);
-        if (_request.mintValue <= _request.l2Value) { // todo inequality here?
+        if (_request.mintValue <= _request.l2Value) {
+            // todo inequality here?
             revert MsgValueMismatch(_request.mintValue, _request.l2Value);
         }
         uint256 feeValue = _request.mintValue - _request.l2Value;

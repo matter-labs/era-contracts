@@ -185,7 +185,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             );
     }
 
-
     /// @inheritdoc IMailboxImpl
     function l2TransactionBaseCost(
         uint256 _gasPrice,

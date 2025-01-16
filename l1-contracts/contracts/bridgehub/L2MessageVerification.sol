@@ -23,10 +23,7 @@ contract L2MessageVerification is MessageVerification {
             _proof
         );
         if (proofVerificationResult.finalProofNode) {
-            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE_ADDRESS.msgRoots(
-                _chainId,
-                _batchNumber
-            );
+            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE_ADDRESS.msgRoots(_chainId, _batchNumber);
             return true; // kl todo.
 
             // if (correctBatchRoot == bytes32(0)) {
@@ -35,12 +32,13 @@ contract L2MessageVerification is MessageVerification {
             // return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
 
-        return this.proveL2LeafInclusionShared(
-            proofVerificationResult.settlementLayerChainId,
-            proofVerificationResult.settlementLayerBatchNumber,
-            proofVerificationResult.settlementLayerBatchRootMask,
-            proofVerificationResult.chainIdLeaf,
-            MessageHashing.extractSliceUntilEnd(_proof, proofVerificationResult.ptr)
-        );
+        return
+            this.proveL2LeafInclusionShared(
+                proofVerificationResult.settlementLayerChainId,
+                proofVerificationResult.settlementLayerBatchNumber,
+                proofVerificationResult.settlementLayerBatchRootMask,
+                proofVerificationResult.chainIdLeaf,
+                MessageHashing.extractSliceUntilEnd(_proof, proofVerificationResult.ptr)
+            );
     }
 }

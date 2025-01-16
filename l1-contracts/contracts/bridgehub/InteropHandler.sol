@@ -30,7 +30,6 @@ event Bytes32(bytes32 indexed data);
 event Number(uint256 indexed number);
 event Address(address indexed _address);
 
-
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
@@ -57,7 +56,13 @@ contract InteropHandler is IInteropHandler {
 
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         _proof.message.data = _bundle;
-        L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(_proof.chainId, _proof.l1BatchNumber, _proof.l2MessageIndex, _proof.message, _proof.proof);
+        L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
+            _proof.chainId,
+            _proof.l1BatchNumber,
+            _proof.l2MessageIndex,
+            _proof.message,
+            _proof.proof
+        );
 
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
         InteropCall memory baseTokenCall = interopBundle.calls[0];
