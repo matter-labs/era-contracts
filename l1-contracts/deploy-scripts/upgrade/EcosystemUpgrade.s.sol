@@ -961,13 +961,13 @@ contract EcosystemUpgrade is Script {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         bytes memory bytecode = abi.encodePacked(
             type(ValidatorTimelock).creationCode,
-            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
+            abi.encode(config.deployerAddress, executionDelay)
         );
         address contractAddress = deployViaCreate2(bytecode);
         notifyAboutDeployment(
             contractAddress,
             "ValidatorTimelock",
-            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
+            abi.encode(config.deployerAddress, executionDelay)
         );
         addresses.validatorTimelock = contractAddress;
     }
