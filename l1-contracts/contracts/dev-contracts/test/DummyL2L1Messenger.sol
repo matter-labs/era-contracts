@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);
 

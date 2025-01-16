@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {InteropCall, BundleMetadata} from "../../common/Messaging.sol";
 import {TransientInterop} from "../../bridgehub/TransientInterop.sol";

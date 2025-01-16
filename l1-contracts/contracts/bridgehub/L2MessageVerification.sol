@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
 import {MessageHashing, ProofVerificationResult} from "../common/libraries/MessageHashing.sol";

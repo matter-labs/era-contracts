@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {L1ERC20Bridge} from "../bridge/L1ERC20Bridge.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
