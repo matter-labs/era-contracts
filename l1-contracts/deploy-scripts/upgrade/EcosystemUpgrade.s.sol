@@ -1673,8 +1673,8 @@ contract EcosystemUpgrade is Script {
         );
         vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", addresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", addresses.transitionaryOwner);
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", daAddresses.rollupDAManager);
-        vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", daAddresses.upgradeTimer);
+        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
+        vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", addresses.upgradeTimer);
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",

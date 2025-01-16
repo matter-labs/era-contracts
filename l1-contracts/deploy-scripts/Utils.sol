@@ -19,6 +19,7 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
 import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
 import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
+import {ISecurityCouncil} from  "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
@@ -37,6 +38,11 @@ bytes32 constant EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
     "ExecuteEmergencyUpgradeZKFoundation(bytes32 id)"
 );
+
+/// @dev EIP-712 TypeHash for protocol upgrades approval by the Security Council.
+bytes32 constant APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH =
+    keccak256("ApproveUpgradeSecurityCouncil(bytes32 id)");
+
 
 /// @dev The offset from which the built-in, but user space contracts are located.
 uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
@@ -1001,6 +1007,58 @@ library Utils {
             vm.stopBroadcast();
         }
     }
+
+    function securityCouncilApproveUpgrade(
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        Vm.Wallet memory _governorWallet,
+        bytes32 upgradeId
+    ) internal returns (bytes memory) {
+        address securityCouncilAddr = _protocolUpgradeHandler.securityCouncil();
+        bytes32 securityCouncilDigest;
+        {
+            securityCouncilDigest = EIP712Utils.buildDomainHash(
+                securityCouncilAddr,
+                "SecurityCouncil",
+                "1"
+            );
+        }
+
+        bytes[] memory securityCouncilRawSignatures = new bytes[](12);
+        address[] memory securityCouncilMembers = new address[](12);
+        {
+            {
+                IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
+                for (uint256 i = 0; i < 12; i++) {
+                    securityCouncilMembers[i] = securityCouncil.members(i);
+                }
+            }
+            for (uint256 i = 0; i < securityCouncilMembers.length; i++) {
+                bytes32 safeDigest;
+                {
+                    bytes32 digest = EIP712Utils.buildDigest(
+                        securityCouncilDigest,
+                        keccak256(abi.encode(APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH, upgradeId))
+                    );
+                    safeDigest = ISafe(securityCouncilMembers[i]).getMessageHash(abi.encode(digest));
+                }
+                {
+                    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+                    securityCouncilRawSignatures[i] = abi.encodePacked(r, s, v);
+                }
+            }
+        }
+
+        {
+            vm.startBroadcast(msg.sender);
+            ISecurityCouncil(securityCouncilAddr).approveUpgradeSecurityCouncil(
+                upgradeId,
+                securityCouncilMembers,
+                securityCouncilRawSignatures
+            );
+            vm.stopBroadcast();
+        }
+    }
+
 
     function adminExecute(
         address _admin,
