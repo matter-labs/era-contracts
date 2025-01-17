@@ -70,10 +70,14 @@ contract L2BaseToken is IBaseToken, ISystemContract {
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
     function withdraw(bytes calldata _l1Receiver) external payable override {
+        // Scaled down the amount to L1 BTC with 8 decimals.
+        uint256 l1Amount = msg.value / 10_000_000_000;
+        require(l1Amount > 0, "Minimum withdrawal amount not met");
+
         uint256 amount = _burnMsgValue();
 
         // Send the L2 log, a user could use it as proof of the withdrawal
-        bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
+        bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Amount);
         L1_MESSENGER_CONTRACT.sendToL1(message);
 
         emit Withdrawal(msg.sender, _l1Receiver, amount);
