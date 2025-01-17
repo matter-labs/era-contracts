@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable reason-string, gas-custom-errors
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
@@ -8,20 +7,25 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Utils} from "./Utils.sol";
+import {ProxyAdminIncorrect, ProxyAdminIncorrectOwner} from "./ZkSyncScriptErrors.sol";
 
 contract DecentralizeGovernanceUpgradeScript is Script {
-    function upgradeSTM(
+    function upgradeCTM(
         ProxyAdmin _proxyAdmin,
-        ITransparentUpgradeableProxy _stmProxy,
+        ITransparentUpgradeableProxy _ctmProxy,
         Governance _governance,
-        address _newStmImpl
+        address _newCtmImpl
     ) public {
-        require(_proxyAdmin.getProxyAdmin(_stmProxy) == address(_proxyAdmin));
-        require(_proxyAdmin.owner() == address(_governance));
+        if (_proxyAdmin.getProxyAdmin(_ctmProxy) != address(_proxyAdmin)) {
+            revert ProxyAdminIncorrect(_proxyAdmin.getProxyAdmin(_ctmProxy), address(_proxyAdmin));
+        }
+        if (_proxyAdmin.owner() != address(_governance)) {
+            revert ProxyAdminIncorrectOwner(_proxyAdmin.owner(), address(_governance));
+        }
 
-        bytes memory proxyAdminUpgradeData = abi.encodeCall(ProxyAdmin.upgrade, (_stmProxy, _newStmImpl));
+        bytes memory proxyAdminUpgradeData = abi.encodeCall(ProxyAdmin.upgrade, (_ctmProxy, _newCtmImpl));
 
         Utils.executeUpgrade({
             _governor: address(_governance),
@@ -34,7 +38,7 @@ contract DecentralizeGovernanceUpgradeScript is Script {
     }
 
     function setPendingAdmin(address _target, Governance _governance, address _pendingAdmin) public {
-        bytes memory upgradeData = abi.encodeCall(IStateTransitionManager.setPendingAdmin, (_pendingAdmin));
+        bytes memory upgradeData = abi.encodeCall(IChainTypeManager.setPendingAdmin, (_pendingAdmin));
         Utils.executeUpgrade({
             _governor: address(_governance),
             _salt: bytes32(0),
