@@ -12,13 +12,37 @@ const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test"];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
-function getCanonicalNameFromFile(directory: string, fileName: string) {
+// Opens a Solidity file and returns all the contracts/libraries created inside of it.
+function parseSolFile(filePath: string): string[] {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const regex = /(?:^|\s)(contract|library)\s+(\w+)/g;
+  const matches: string[] = [];
+  let match;
+
+  while ((match = regex.exec(content)) !== null) {
+      matches.push(match[2]);
+  }
+
+  return matches;
+}
+
+function getCanonicalPathsFromFile(
+  directory: string, 
+  fileName: string,
+  fullPath: string,
+) {
   const folderName = SOLIDITY_SOURCE_CODE_PATHS.find(x => directory.startsWith(x));
   if(!folderName) {
     throw new Error('Unknown directory');
   }
 
-  return `${folderName}${fileName}`;
+  const res = [];
+
+  const parsed = parseSolFile(fullPath);
+
+  return [
+    `${folderName}out/${fileName}/`
+  ];
 }
 
 // A path to the file in zkout/out folder, e.g. `/l1-contracts/zkout/ERC20.sol/ERC20.json`
