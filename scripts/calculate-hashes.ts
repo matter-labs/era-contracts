@@ -36,13 +36,16 @@ function getCanonicalPathsFromFile(
     throw new Error('Unknown directory');
   }
 
-  const res = [];
+  const res: string[] = [];
 
   const parsed = parseSolFile(fullPath);
 
-  return [
-    `${folderName}out/${fileName}/`
-  ];
+  for(const item of parsed) {
+    res.push(`${folderName}out/${fileName}/${item}.json`);
+    res.push(`${folderName}zkout/${fileName}/${item}.json`);
+  }
+
+  return res;
 }
 
 // A path to the file in zkout/out folder, e.g. `/l1-contracts/zkout/ERC20.sol/ERC20.json`
@@ -71,7 +74,7 @@ function listSolFiles(directory: string): string[] {
           if (entry.isDirectory()) {
               searchDir(fullPath);
           } else if (entry.isFile() && fullPath.endsWith('.sol')) {
-              solFiles.push(getCanonicalNameFromFile(directory, entry.name));
+              solFiles.push(...getCanonicalPathsFromFile(directory, entry.name, fullPath));
           }
       }
   }
