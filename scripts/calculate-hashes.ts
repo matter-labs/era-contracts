@@ -41,27 +41,11 @@ function getCanonicalPathsFromFile(
   const parsed = parseSolFile(fullPath);
 
   for(const item of parsed) {
-    res.push(`${folderName}out/${fileName}/${item}.json`);
-    res.push(`${folderName}zkout/${fileName}/${item}.json`);
+    res.push(`/${folderName}out/${fileName}/${item}.json`);
+    res.push(`/${folderName}zkout/${fileName}/${item}.json`);
   }
 
   return res;
-}
-
-// A path to the file in zkout/out folder, e.g. `/l1-contracts/zkout/ERC20.sol/ERC20.json`
-function getCanonicalNameFromFoundryPath(foundryPath: string) {
-  const folderName = SOLIDITY_SOURCE_CODE_PATHS.find(x => foundryPath.startsWith('/' + x));
-  if(!folderName) {
-    throw new Error('Unknown directory');
-  }
-
-  const fileName = foundryPath.split('/').find(x => x.endsWith('.sol'));
-  if(!fileName) {
-    // It may be a yul file, so we return null
-    return null;
-  }
-
-  return `${folderName}${fileName}`;
 }
 
 function listSolFiles(directory: string): string[] {
@@ -111,13 +95,7 @@ function getIgnoredFiles() {
 }
 
 function shouldSkipFolderOrFile(filePath: string): boolean {
-  const canonicalPath = getCanonicalNameFromFoundryPath(filePath);
-
-  if(!canonicalPath) {
-    return false;
-  }
-
-  return !!getIgnoredFiles()[canonicalPath]
+  return !!getIgnoredFiles()[filePath]
 }
 
 type SourceContractDetails = {
