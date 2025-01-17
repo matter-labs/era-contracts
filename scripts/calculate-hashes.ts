@@ -26,6 +26,7 @@ function parseSolFile(filePath: string): string[] {
   return matches;
 }
 
+// Returns paths where all the foundry compiled artifacts related to the file can be stored
 function getCanonicalPathsFromFile(
   directory: string, 
   fileName: string,
@@ -70,6 +71,8 @@ function listSolFiles(directory: string): string[] {
 let cachedIgnoredFiles: any = null;
 
 function shouldForceIncludeFile(filePath: string) {
+  // This is a simple substring check. It is simple and fine in most cases.
+  // In the worst case, accidentally including a file is better than accidentally excluding.
   return FORCE_INCLUDE.some(x => filePath.includes(x));
 }
 
