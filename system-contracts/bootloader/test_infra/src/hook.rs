@@ -10,7 +10,7 @@ use zksync_multivm::zk_evm_latest::{
 };
 
 use zksync_types::U256;
-use zksync_utils::u256_to_h256;
+use zksync_basic_types::u256_to_h256;
 
 #[derive(Clone, Debug)]
 pub(crate) enum TestVmHook {
