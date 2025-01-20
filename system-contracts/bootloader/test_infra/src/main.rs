@@ -1,30 +1,30 @@
 use crate::{test_count_tracer::TestCountTracer, tracer::BootloaderTestTracer};
 use colored::Colorize;
-use multivm::interface::{
-    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmExecutionMode, VmInterface,
-};
-use multivm::vm_latest::{HistoryDisabled, ToTracerPointer, Vm};
 use once_cell::sync::OnceCell;
-use zksync_types::fee_model::BatchFeeInput;
 use std::process;
+use zksync_multivm::interface::{
+    InspectExecutionMode, L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmFactory, VmInterface
+};
+use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
+use zksync_state::interface::{
+    InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
+};
+use zksync_types::fee_model::BatchFeeInput;
 
-use multivm::interface::{ExecutionResult, Halt};
 use std::{env, sync::Arc};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use zksync_contracts::{
-    read_zbin_bytecode, BaseSystemContracts, ContractLanguage, SystemContractCode,
+    read_yul_bytecode, BaseSystemContracts, ContractLanguage, SystemContractCode,
     SystemContractsRepo,
 };
-use zksync_state::{
-    InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
-};
+use zksync_multivm::interface::{ExecutionResult, Halt};
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
 use zksync_types::{block::L2BlockHasher, Address, L1BatchNumber, L2BlockNumber, U256};
 use zksync_types::{L2ChainId, Transaction};
-use zksync_utils::bytecode::hash_bytecode;
-use zksync_utils::{bytes_to_be_words, u256_to_h256};
+use zksync_basic_types::bytecode::BytecodeHash;
+use zksync_basic_types::u256_to_h256;
 
 mod hook;
 mod test_count_tracer;
@@ -32,15 +32,17 @@ mod tracer;
 
 // Executes bootloader unittests.
 fn execute_internal_bootloader_test() {
-    let test_location = env::current_dir()
-        .unwrap()
-        .join("../build/artifacts/bootloader_test.yul.zbin");
-    println!("Current dir is {:?}", test_location);
-    let bytecode = read_zbin_bytecode(test_location.as_path());
-    let hash = hash_bytecode(&bytecode);
+    let artifacts_location_path = env::current_dir().unwrap().join("../build/artifacts");
+    let artifacts_location = artifacts_location_path
+        .to_str()
+        .expect("Invalid path: {artifacts_location_path:?}");
+    println!("Current dir is {:?}", artifacts_location);
+
+    let bytecode = read_yul_bytecode(artifacts_location, "bootloader_test");
+    let hash = BytecodeHash::for_bytecode(&bytecode);
     let bootloader = SystemContractCode {
-        code: bytes_to_be_words(bytecode),
-        hash,
+        code: bytecode,
+        hash: hash.value(),
     };
 
     let repo = SystemContractsRepo {
@@ -48,15 +50,16 @@ fn execute_internal_bootloader_test() {
     };
 
     let bytecode = repo.read_sys_contract_bytecode("", "DefaultAccount", ContractLanguage::Sol);
-    let hash = hash_bytecode(&bytecode);
+    let hash = BytecodeHash::for_bytecode(&bytecode);
     let default_aa = SystemContractCode {
-        code: bytes_to_be_words(bytecode),
-        hash,
+        code: bytecode,
+        hash: hash.value(),
     };
 
     let base_system_contract = BaseSystemContracts {
         bootloader,
         default_aa,
+        evm_emulator: None,
     };
 
     let system_env = SystemEnv {
@@ -90,20 +93,23 @@ fn execute_internal_bootloader_test() {
         let storage: StoragePtr<StorageView<InMemoryStorage>> =
             StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
                 L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                hash_bytecode,
-                get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
+                get_system_smart_contracts_from_dir(
+                    env::current_dir().unwrap().join("../../"),
+                    false,
+                ),
             ))
             .to_rc_ptr();
 
         let mut vm: Vm<_, HistoryDisabled> =
-            Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
+            VmFactory::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
 
         let test_count = Arc::new(OnceCell::default());
         let custom_tracers = TestCountTracer::new(test_count.clone()).into_tracer_pointer();
 
         // We're using a TestCountTracer (and passing 0 as fee account) - this should cause the bootloader
         // test framework to report number of tests via VM hook.
-        vm.inspect(custom_tracers.into(), VmExecutionMode::Bootloader);
+        let mut tracer_dispatcher = TracerDispatcher::from(custom_tracers);
+        vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
 
         test_count.get().unwrap().clone()
     };
@@ -118,8 +124,10 @@ fn execute_internal_bootloader_test() {
         let storage: StoragePtr<StorageView<InMemoryStorage>> =
             StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
                 L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                hash_bytecode,
-                get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
+                get_system_smart_contracts_from_dir(
+                    env::current_dir().unwrap().join("../../"),
+                    false,
+                ),
             ))
             .to_rc_ptr();
 
@@ -138,13 +146,16 @@ fn execute_internal_bootloader_test() {
             test_name.clone(),
         )
         .into_tracer_pointer();
+        let mut tracer_dispatcher = TracerDispatcher::from(custom_tracers);
 
         // Let's insert transactions into slots. They are not executed, but the tests can run functions against them.
         let json_str = include_str!("test_transactions/0.json");
         let tx: Transaction = serde_json::from_str(json_str).unwrap();
         vm.push_transaction(tx);
 
-        let result = vm.inspect(custom_tracers.into(), VmExecutionMode::Bootloader);
+        let result = vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
+        drop(tracer_dispatcher);
+
         let mut test_result = Arc::into_inner(test_result).unwrap().into_inner();
         let requested_assert = Arc::into_inner(requested_assert).unwrap().into_inner();
         let test_name = Arc::into_inner(test_name)
