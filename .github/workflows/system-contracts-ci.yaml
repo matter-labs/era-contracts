@@ -79,19 +79,19 @@ jobs:
         with:
           toolchain: nightly-2024-08-01
 
-  - name: Restore artifacts cache
-    uses: actions/cache/restore@v3
-    with:
-      fail-on-cache-miss: true
-      key: artifacts-system-${{ github.sha }}
-      path: |
-        system-contracts/zkout
-        system-contracts/cache-forge
-        system-contracts/bootloader/build
-        system-contracts/artifacts-zk
-        system-contracts/cache-zk
-        system-contracts/typechain
-        system-contracts/contracts-preprocessed
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/zkout
+            system-contracts/cache-forge
+            system-contracts/bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts-preprocessed
 
       - name: Run bootloader tests
         run: |
