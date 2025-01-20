@@ -5,6 +5,7 @@ import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract DummyHyperchain is MailboxFacet {
+    address public admin;
     constructor(address bridgeHubAddress, uint256 _eraChainId) MailboxFacet(_eraChainId) {
         s.bridgehub = bridgeHubAddress;
     }
@@ -30,6 +31,18 @@ contract DummyHyperchain is MailboxFacet {
         FeeParams memory _feeParams = _randomFeeParams();
         s.feeParams = _feeParams;
         s.priorityTxMaxGasLimit = type(uint256).max;
+    }
+
+    function initialize(address _admin) external {
+        admin = _admin;
+    }
+
+    function getAdmin() external view returns (address) {
+        return admin;
+    }
+
+    function getPendingAdmin() external view returns (address) {
+        return admin;
     }
 
     function _randomFeeParams() internal pure returns (FeeParams memory) {

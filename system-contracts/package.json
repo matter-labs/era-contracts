@@ -5,7 +5,7 @@
   "license": "MIT",
   "dependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.7.0",
-    "@matterlabs/hardhat-zksync-solc": "^1.1.4",
+    "@matterlabs/hardhat-zksync-solc": "^1.2.5",
     "@matterlabs/hardhat-zksync-verify": "^1.4.3",
     "commander": "^9.4.1",
     "eslint": "^8.51.0",
@@ -50,7 +50,7 @@
     ]
   },
   "scripts": {
-    "build": "yarn build:system-contracts && yarn build:bootloader",
+    "build": "yarn build:system-contracts && yarn build:bootloader && forge build --zksync",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
     "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",

@@ -4,18 +4,17 @@ pragma solidity 0.8.24;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
@@ -25,35 +24,28 @@ contract RegisterHyperchainScript is Script {
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
-        address deployerAddress;
-        address ownerAddress;
         uint256 chainChainId;
-        bool validiumMode;
-        uint256 bridgehubCreateNewChainSalt;
-        address validatorSenderOperatorCommitEth;
-        address validatorSenderOperatorBlobsEth;
-        address baseToken;
-        uint128 baseTokenGasPriceMultiplierNominator;
-        uint128 baseTokenGasPriceMultiplierDenominator;
+        address proposalAuthor;
+        address chainRegistrar;
         address bridgehub;
+        uint256 bridgehubCreateNewChainSalt;
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
-        address governanceSecurityCouncilAddress;
-        uint256 governanceMinDelay;
         address newDiamondProxy;
-        address governance;
         address chainAdmin;
     }
 
+    ChainRegistrar internal chainRegistrar;
     Config internal config;
+    ChainRegistrar.ChainConfig internal chainConfig;
 
     function run() public {
         console.log("Deploying Hyperchain");
 
         initializeConfig();
+        loadChain();
 
-        deployGovernance();
         deployChainAdmin();
         checkTokenAddress();
         registerTokenOnBridgehub();
@@ -71,134 +63,106 @@ contract RegisterHyperchainScript is Script {
         string memory path = string.concat(root, "/script-config/register-hyperchain.toml");
         string memory toml = vm.readFile(path);
 
-        config.deployerAddress = msg.sender;
-
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.ownerAddress = toml.readAddress("$.owner_address");
-
-        config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         config.stateTransitionProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
-        config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
+        config.chainRegistrar = toml.readAddress("$.deployed_addresses.chain_registrar");
+        chainRegistrar = ChainRegistrar(config.chainRegistrar);
 
+        config.bridgehub = address(chainRegistrar.bridgehub());
+        config.validatorTimelock = StateTransitionManager(config.stateTransitionProxy).validatorTimelock();
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
 
         config.chainChainId = toml.readUint("$.chain.chain_chain_id");
+        config.proposalAuthor = toml.readAddress("$.chain.proposal_author");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
-        config.baseToken = toml.readAddress("$.chain.base_token_addr");
-        config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
-        config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
-        config.baseTokenGasPriceMultiplierNominator = uint128(
-            toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
-        );
-        config.baseTokenGasPriceMultiplierDenominator = uint128(
-            toml.readUint("$.chain.base_token_gas_price_multiplier_denominator")
-        );
-        config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
-        config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+    }
+
+    function loadChain() internal {
+        (
+            uint256 chainId,
+            ChainRegistrar.BaseToken memory baseToken,
+            address blobOperator,
+            address operator,
+            address governor,
+            PubdataPricingMode pubdataPricingMode
+        ) = chainRegistrar.proposedChains(config.proposalAuthor, config.chainChainId);
+
+        chainConfig = ChainRegistrar.ChainConfig({
+            chainId: chainId,
+            baseToken: baseToken,
+            operator: operator,
+            blobOperator: blobOperator,
+            governor: governor,
+            pubdataPricingMode: pubdataPricingMode
+        });
     }
 
     function checkTokenAddress() internal view {
-        if (config.baseToken == address(0)) {
+        if (chainConfig.baseToken.tokenAddress == address(0)) {
             revert("Token address is not set");
         }
 
         // Check if it's ethereum address
-        if (config.baseToken == ADDRESS_ONE) {
+        if (chainConfig.baseToken.tokenAddress == ADDRESS_ONE) {
             return;
         }
 
-        if (config.baseToken.code.length == 0) {
+        if (chainConfig.baseToken.tokenAddress.code.length == 0) {
             revert("Token address is not a contract address");
         }
 
-        console.log("Using base token address:", config.baseToken);
+        console.log("Using base token address:", chainConfig.baseToken.tokenAddress);
     }
 
     function registerTokenOnBridgehub() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
-        if (bridgehub.tokenIsRegistered(config.baseToken)) {
+        if (bridgehub.tokenIsRegistered(chainConfig.baseToken.tokenAddress)) {
             console.log("Token already registered on Bridgehub");
         } else {
-            bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
-            Utils.executeUpgrade({
-                _governor: ownable.owner(),
-                _salt: bytes32(config.bridgehubCreateNewChainSalt),
+            bytes memory data = abi.encodeCall(bridgehub.addToken, (chainConfig.baseToken.tokenAddress));
+            Utils.chainAdminMulticall({
+                _chainAdmin: bridgehub.admin(),
                 _target: config.bridgehub,
                 _data: data,
-                _value: 0,
-                _delay: 0
+                _value: 0
             });
             console.log("Token registered on Bridgehub");
         }
     }
 
-    function deployGovernance() internal {
-        vm.broadcast();
-        Governance governance = new Governance(
-            config.ownerAddress,
-            config.governanceSecurityCouncilAddress,
-            config.governanceMinDelay
-        );
-        console.log("Governance deployed at:", address(governance));
-        config.governance = address(governance);
-    }
-
     function deployChainAdmin() internal {
         vm.broadcast();
-        AccessControlRestriction restriction = new AccessControlRestriction(0, config.ownerAddress);
-
-        address[] memory restrictions = new address[](1);
-        restrictions[0] = address(restriction);
-
-        vm.broadcast();
-        ChainAdmin chainAdmin = new ChainAdmin(restrictions);
+        ChainAdmin chainAdmin = new ChainAdmin(chainConfig.governor, chainConfig.baseToken.tokenMultiplierSetter);
+        console.log("ChainAdmin deployed at:", address(chainAdmin));
         config.chainAdmin = address(chainAdmin);
     }
 
     function registerHyperchain() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
             (
-                config.chainChainId,
+                chainConfig.chainId,
                 config.stateTransitionProxy,
-                config.baseToken,
+                chainConfig.baseToken.tokenAddress,
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
                 config.diamondCutData
             )
         );
 
-        Utils.executeUpgrade({
-            _governor: ownable.owner(),
-            _salt: bytes32(config.bridgehubCreateNewChainSalt),
-            _target: config.bridgehub,
-            _data: data,
-            _value: 0,
-            _delay: 0
-        });
+        Utils.chainAdminMulticall({_chainAdmin: bridgehub.admin(), _target: config.bridgehub, _data: data, _value: 0});
         console.log("Hyperchain registered");
 
-        // Get new diamond proxy address from emitted events
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        address diamondProxyAddress;
-        uint256 logsLength = logs.length;
-        for (uint256 i = 0; i < logsLength; ++i) {
-            if (logs[i].topics[0] == STATE_TRANSITION_NEW_CHAIN_HASH) {
-                diamondProxyAddress = address(uint160(uint256(logs[i].topics[2])));
-                break;
-            }
-        }
+        // Get new diamond proxy address from bridgehub
+        address diamondProxyAddress = bridgehub.getHyperchain(chainConfig.chainId);
         if (diamondProxyAddress == address(0)) {
             revert("Diamond proxy address not found");
         }
@@ -210,8 +174,8 @@ contract RegisterHyperchainScript is Script {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
         vm.startBroadcast();
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorBlobsEth);
+        validatorTimelock.addValidator(chainConfig.chainId, chainConfig.blobOperator);
+        validatorTimelock.addValidator(chainConfig.chainId, chainConfig.operator);
         vm.stopBroadcast();
 
         console.log("Validators added");
@@ -222,11 +186,11 @@ contract RegisterHyperchainScript is Script {
 
         vm.startBroadcast();
         hyperchain.setTokenMultiplier(
-            config.baseTokenGasPriceMultiplierNominator,
-            config.baseTokenGasPriceMultiplierDenominator
+            chainConfig.baseToken.gasPriceMultiplierNominator,
+            chainConfig.baseToken.gasPriceMultiplierDenominator
         );
 
-        if (config.validiumMode) {
+        if (chainConfig.pubdataPricingMode == PubdataPricingMode.Validium) {
             hyperchain.setPubdataPricingMode(PubdataPricingMode.Validium);
         }
 
@@ -244,8 +208,7 @@ contract RegisterHyperchainScript is Script {
 
     function saveOutput() internal {
         vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
-        vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
-        string memory toml = vm.serializeAddress("root", "governance_addr", config.governance);
+        string memory toml = vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
         vm.writeToml(toml, path);

@@ -34,6 +34,7 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+import {ChainRegistrar} from "../contracts/chain-registrar/ChainRegistrar.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
@@ -52,6 +53,7 @@ contract DeployL1Script is Script {
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
+        address chainRegistrar;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -88,6 +90,7 @@ contract DeployL1Script is Script {
         uint256 l1ChainId;
         uint256 eraChainId;
         address deployerAddress;
+        address l2Deployer;
         address ownerAddress;
         bool testnetVerifier;
         ContractsConfig contracts;
@@ -157,6 +160,7 @@ contract DeployL1Script is Script {
         deployErc20BridgeImplementation();
         deployErc20BridgeProxy();
         updateSharedBridge();
+        deployChainRegistrar();
 
         updateOwners();
 
@@ -176,6 +180,7 @@ contract DeployL1Script is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
+        config.l2Deployer = toml.readAddress("$.l2_deployer");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
@@ -301,18 +306,32 @@ contract DeployL1Script is Script {
         addresses.governance = contractAddress;
     }
 
-    function deployChainAdmin() internal {
-        bytes memory accessControlRestrictionBytecode = abi.encodePacked(
-            type(ChainAdmin).creationCode,
-            abi.encode(uint256(0), config.ownerAddress)
+    function deployChainRegistrar() internal {
+        bytes memory bytecodeImplementation = abi.encodePacked(type(ChainRegistrar).creationCode);
+        address chainRegistrarImplementation = deployViaCreate2(bytecodeImplementation);
+        console.log("Chain Registrar implementation deployed at:", chainRegistrarImplementation);
+
+        bytes memory bytecode = abi.encodePacked(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(
+                chainRegistrarImplementation,
+                addresses.transparentProxyAdmin,
+                abi.encodeCall(
+                    ChainRegistrar.initialize,
+                    (addresses.bridgehub.bridgehubProxy, config.l2Deployer, config.ownerAddress)
+                )
+            )
         );
+        address chainRegistrar = deployViaCreate2(bytecode);
+        console.log("Chain Registrar deployed at:", chainRegistrar);
+        addresses.chainRegistrar = chainRegistrar;
+    }
 
-        address accessControlRestriction = deployViaCreate2(accessControlRestrictionBytecode);
-        console.log("Access control restriction deployed at:", accessControlRestriction);
-        address[] memory restrictions = new address[](1);
-        restrictions[0] = accessControlRestriction;
-
-        bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(restrictions));
+    function deployChainAdmin() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(ChainAdmin).creationCode,
+            abi.encode(config.ownerAddress, address(0))
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ChainAdmin deployed at:", contractAddress);
         addresses.chainAdmin = contractAddress;
@@ -600,12 +619,15 @@ contract DeployL1Script is Script {
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         bridgehub.transferOwnership(addresses.governance);
+        bridgehub.setPendingAdmin(addresses.chainAdmin);
 
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
+        sharedBridge.setPendingAdmin(addresses.chainAdmin);
 
         StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         stm.transferOwnership(addresses.governance);
+        stm.setPendingAdmin(addresses.chainAdmin);
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -716,8 +738,10 @@ contract DeployL1Script is Script {
             addresses.blobVersionedHashRetriever
         );
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
+        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+        vm.serializeAddress("deployed_addresses", "chain_registrar", addresses.chainRegistrar);
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "bridges", bridges);
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);

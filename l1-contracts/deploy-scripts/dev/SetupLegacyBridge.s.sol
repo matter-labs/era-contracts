@@ -6,8 +6,8 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../Utils.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 /// This scripts is only for developer
@@ -104,6 +104,7 @@ contract SetupLegacyBridge is Script {
     function setParamsForDummyBridge() internal {
         (address l2TokenBeacon, bytes32 l2TokenBeaconHash) = calculateTokenBeaconAddress();
         DummyL1ERC20Bridge bridge = DummyL1ERC20Bridge(addresses.erc20BridgeProxy);
+        vm.broadcast();
         bridge.setValues(config.l2SharedBridgeAddress, l2TokenBeacon, l2TokenBeaconHash);
     }
 
@@ -111,8 +112,8 @@ contract SetupLegacyBridge is Script {
         internal
         returns (address tokenBeaconAddress, bytes32 tokenBeaconBytecodeHash)
     {
-        bytes memory l2StandardTokenCode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+        bytes memory l2StandardTokenCode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/L2StandardERC20.sol/L2StandardERC20.json"
         );
         (address l2StandardToken, ) = calculateL2Create2Address(
             config.l2SharedBridgeAddress,
@@ -121,13 +122,16 @@ contract SetupLegacyBridge is Script {
             ""
         );
 
-        bytes memory beaconProxy = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+        bytes memory beaconProxy = Utils.readFoundryBytecode("/../l2-contracts/zkout/BeaconProxy.sol/BeaconProxy.json");
+        tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(beaconProxy);
+
+        bytes memory upgradableBeacon = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
 
-        (tokenBeaconAddress, tokenBeaconBytecodeHash) = calculateL2Create2Address(
+        (tokenBeaconAddress, ) = calculateL2Create2Address(
             config.l2SharedBridgeAddress,
-            beaconProxy,
+            upgradableBeacon,
             bytes32(0),
             abi.encode(l2StandardToken)
         );
