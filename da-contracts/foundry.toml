@@ -1,0 +1,32 @@
+[profile.default]
+src = 'contracts'
+out = 'out'
+libs = ['node_modules', 'lib']
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "l2-contracts/=../l2-contracts/contracts/"
+]
+allow_paths = ["../l2-contracts/contracts"]
+fs_permissions = [
+    { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
+    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
+    { access = "read", path = "../l2-contracts/artifacts-zk/" },
+    { access = "read", path = "./script-config" },
+    { access = "read-write", path = "./script-out" },
+    { access = "read", path = "./out" }
+]
+cache_path = 'cache-forge'
+test = 'test/foundry'
+solc_version = "0.8.24"
+evm_version = "cancun"
+ignored_error_codes = [
+    "missing-receive-ether",
+    "code-size",
+]
+ignored_warnings_from = [
+    "test",
+    "contracts/dev-contracts"
+]
+
+# See more config options https://github.com/foundry-rs/foundry/tree/master/crates/config

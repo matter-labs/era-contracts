@@ -5,6 +5,10 @@ import type { Contract } from "ethers";
 import { parseEther } from "ethers/lib/utils";
 
 import * as fs from "fs";
+import { isZKMode } from "./utils";
+
+import { deployContractWithArgs as deployContractWithArgsEVM } from "./deploy-utils";
+import { deployContractWithArgs as deployContractWithArgsZK } from "./deploy-utils-zk";
 
 const DEFAULT_ERC20 = "TestnetERC20Token";
 
@@ -25,10 +29,17 @@ export async function deployContracts(tokens: TokenDescription[], wallet: Wallet
 
   for (const token of tokens) {
     token.implementation = token.implementation || DEFAULT_ERC20;
-    const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
+
     const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
 
-    token.contract = await tokenFactory.deploy(...args, { gasLimit: 5000000, nonce: nonce++ });
+    if (isZKMode()) {
+      token.contract = await deployContractWithArgsZK(wallet, token.implementation, args, { nonce: nonce++ });
+    } else {
+      token.contract = await deployContractWithArgsEVM(wallet, token.implementation, args, {
+        gasLimit: 5000000,
+        nonce: nonce++,
+      });
+    }
   }
 
   await Promise.all(tokens.map(async (token) => token.contract.deployTransaction.wait()));
@@ -55,16 +66,17 @@ export async function mintTokens(
   tokens: TokenDescription[],
   wallet: Wallet,
   nonce: number,
-  mnemonic: string
+  mnemonics: string[]
 ): Promise<L1Token[]> {
-  const targetAddresses = [wallet.address, ...getTestAddresses(mnemonic)];
+  const addressArray = mnemonics.map(getTestAddresses).flat();
+  const targetAddresses = [wallet.address, ...addressArray];
 
   const results = [];
   const promises = [];
   for (const token of tokens) {
     if (token.implementation !== "WETH9") {
       for (const address of targetAddresses) {
-        const tx = await token.contract.mint(address, parseEther("3000000000"), { nonce: nonce++ });
+        const tx = await token.contract.mint(address, parseEther("300000000000000000000"), { nonce: nonce++ });
         promises.push(tx.wait());
       }
     }
@@ -113,13 +125,15 @@ export async function deployTokens(
     }
 
     if (token.symbol !== "WETH" && mintTokens) {
-      await erc20.mint(wallet.address, parseEther("3000000000"));
+      await erc20.mint(wallet.address, parseEther("3000000000000"));
     }
     if (mintTokens) {
       for (let i = 0; i < 10; ++i) {
-        const testWalletAddress = Wallet.fromMnemonic(mnemonic as string, "m/44'/60'/0'/0/" + i).address;
+        const testWalletAddress = mnemonic
+          ? Wallet.fromMnemonic(mnemonic as string, "m/44'/60'/0'/0/" + i).address
+          : wallet.address;
         if (token.symbol !== "WETH") {
-          await erc20.mint(testWalletAddress, parseEther("3000000000"));
+          await erc20.mint(testWalletAddress, parseEther("3000000000000"));
         }
       }
     }
