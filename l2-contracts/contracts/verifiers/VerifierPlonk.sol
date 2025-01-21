@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IVerifier} from "./chain-interfaces/IVerifier.sol";
+import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 
 /* solhint-disable max-line-length */
 /// @author Matter Labs
@@ -18,7 +18,7 @@ import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 /// * Plonk for ZKsync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
 /// The notation used in the code is the same as in the papers.
 /* solhint-enable max-line-length */
-contract Verifier is IVerifier {
+contract VerifierPlonk is IVerifier {
     /*//////////////////////////////////////////////////////////////
                              Verification keys
     //////////////////////////////////////////////////////////////*/

@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {Verifier} from "../../state-transition/Verifier.sol";
+import {VerifierPlonk} from "../../state-transition/verifiers/VerifierPlonk.sol";
 
 /// @author Matter Labs
-contract VerifierRecursiveTest is Verifier {
+contract PlonkVerifierRecursiveTest is VerifierPlonk {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 

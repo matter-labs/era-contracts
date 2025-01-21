@@ -2,17 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-/// @notice Part of the configuration parameters of ZKP circuits
-struct VerifierParams {
-    bytes32 recursionNodeLevelVkHash;
-    bytes32 recursionLeafLevelVkHash;
-    bytes32 recursionCircuitsSetVksHash;
-}
-
 /// @title The interface of the Verifier contract, responsible for the zero knowledge proof verification.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IVerifier {
+interface IVerifierV2 {
     /// @dev Verifies a zk-SNARK proof.
     /// @return A boolean value indicating whether the zk-SNARK proof is valid.
     /// Note: The function may revert execution instead of returning false in some cases.

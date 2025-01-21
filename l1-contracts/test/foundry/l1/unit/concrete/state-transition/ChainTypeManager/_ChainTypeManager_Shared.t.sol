@@ -23,7 +23,7 @@ import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -32,6 +32,9 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
+
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
@@ -48,7 +51,7 @@ contract ChainTypeManagerTest is Test {
     address internal constant l1Nullifier = address(0x6060606);
     address internal newChainAdmin;
     uint256 chainId = 112;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     bytes internal forceDeploymentsData = hex"";
     uint256 eraChainId = 9;
 
