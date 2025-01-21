@@ -90,6 +90,7 @@ struct DeployedAddresses {
     address blobVersionedHashRetriever;
     address validatorTimelock;
     address create2Factory;
+    address chainRegistrar;
 }
 
 // solhint-disable-next-line gas-struct-packing

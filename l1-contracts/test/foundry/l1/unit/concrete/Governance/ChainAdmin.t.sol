@@ -15,6 +15,7 @@ import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainAdminTest is Test {
     ChainAdmin internal chainAdmin;
+    AccessControlRestriction internal restriction;
     GettersFacet internal gettersFacet;
     DummyRestriction internal dummyRestriction;
 
@@ -27,7 +28,11 @@ contract ChainAdminTest is Test {
     function setUp() public {
         owner = makeAddr("random address");
 
-        chainAdmin = new ChainAdmin(owner, address(0));
+        restriction = new AccessControlRestriction(0, owner);
+        address[] memory restrictions = new address[](1);
+        restrictions[0] = address(restriction);
+
+        chainAdmin = new ChainAdmin(restrictions);
 
         gettersFacet = new GettersFacet();
         dummyRestriction = new DummyRestriction(true);
@@ -118,43 +123,67 @@ contract ChainAdminTest is Test {
         vm.expectEmit(true, false, false, true);
         emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
 
-        vm.prank(address(owner));
+        vm.prank(address(chainAdmin));
         chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp);
     }
 
     function test_multicallRevertNoCalls() public {
-        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](0);
+        Call[] memory calls = new Call[](0);
 
-        vm.prank(owner);
         vm.expectRevert(NoCallsProvided.selector);
         chainAdmin.multicall(calls, false);
     }
 
     function test_multicallRevertFailedCall() public {
-        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({
-            target: address(chainAdmin),
-            value: 0,
-            data: abi.encodeCall(gettersFacet.getAdmin, ())
-        });
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
 
         vm.expectRevert();
         vm.prank(owner);
         chainAdmin.multicall(calls, true);
     }
 
+    function test_validateCallAccessToFunctionDenied(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
+        calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
+
+        vm.prank(owner);
+        restriction.setRequiredRoleForCall(address(gettersFacet), gettersFacet.getAdmin.selector, role);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AccessToFunctionDenied.selector,
+                address(gettersFacet),
+                gettersFacet.getAdmin.selector,
+                owner
+            )
+        );
+        vm.prank(owner);
+        chainAdmin.multicall(calls, true);
+    }
+
+    function test_validateCallAccessToFallbackDenied(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({target: address(gettersFacet), value: 0, data: ""});
+        calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
+
+        vm.prank(owner);
+        restriction.setRequiredRoleForFallback(address(gettersFacet), role);
+
+        vm.expectRevert(abi.encodeWithSelector(AccessToFallbackDenied.selector, address(gettersFacet), owner));
+        vm.prank(owner);
+        chainAdmin.multicall(calls, true);
+    }
+
     function test_multicall() public {
-        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](2);
-        calls[0] = IChainAdmin.Call({
-            target: address(gettersFacet),
-            value: 0,
-            data: abi.encodeCall(gettersFacet.getAdmin, ())
-        });
-        calls[1] = IChainAdmin.Call({
-            target: address(gettersFacet),
-            value: 0,
-            data: abi.encodeCall(gettersFacet.getVerifier, ())
-        });
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
+        calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
 
         vm.prank(owner);
         chainAdmin.multicall(calls, true);

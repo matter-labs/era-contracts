@@ -120,7 +120,6 @@ contract DeployL1Script is Script, DeployUtils {
         deployErc20BridgeImplementation();
         deployErc20BridgeProxy();
         updateSharedBridge();
-
         deployChainRegistrar();
         deployCTMDeploymentTracker();
         setBridgehubParams();
@@ -212,7 +211,7 @@ contract DeployL1Script is Script, DeployUtils {
 
     function deployChainRegistrar() internal {
         bytes memory bytecodeImplementation = abi.encodePacked(type(ChainRegistrar).creationCode);
-        address chainRegistrarImplementation = deployViaCreate2(bytecodeImplementation);
+        address chainRegistrarImplementation = deployViaCreate2(bytecodeImplementation, "");
         console.log("Chain Registrar implementation deployed at:", chainRegistrarImplementation);
 
         bytes memory bytecode = abi.encodePacked(
@@ -222,11 +221,11 @@ contract DeployL1Script is Script, DeployUtils {
                 addresses.transparentProxyAdmin,
                 abi.encodeCall(
                     ChainRegistrar.initialize,
-                    (addresses.bridgehub.bridgehubProxy, config.l2Deployer, config.ownerAddress)
+                    (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
                 )
             )
         );
-        address chainRegistrar = deployViaCreate2(bytecode);
+        address chainRegistrar = deployViaCreate2(bytecode, "");
         console.log("Chain Registrar deployed at:", chainRegistrar);
         addresses.chainRegistrar = chainRegistrar;
     }
@@ -712,7 +711,6 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
 
         vm.serializeAddress("deployed_addresses", "chain_registrar", addresses.chainRegistrar);
-
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
         vm.serializeAddress(
             "deployed_addresses",

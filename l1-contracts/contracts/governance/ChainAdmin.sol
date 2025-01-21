@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+// solhint-disable gas-length-in-loops
+
+import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
@@ -67,16 +69,13 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
         if (!activeRestrictions.remove(_restriction)) {
             revert RestrictionWasNotPresent(_restriction);
         }
-        _transferOwnership(_initialOwner);
-        // Can be zero if no one has this permission.
-        tokenMultiplierSetter = _initialTokenMultiplierSetter;
-        emit NewTokenMultiplierSetter(address(0), _initialTokenMultiplierSetter);
+        emit RestrictionRemoved(_restriction);
     }
 
     /// @notice Set the expected upgrade timestamp for a specific protocol version.
     /// @param _protocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
-    function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external onlyOwner {
+    function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external onlySelf {
         protocolVersionToUpgradeTimestamp[_protocolVersion] = _upgradeTimestamp;
         emit UpdateUpgradeTimestamp(_protocolVersion, _upgradeTimestamp);
     }
@@ -85,12 +84,16 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @param _calls Array of Call structures defining target, value, and data for each call.
     /// @param _requireSuccess If true, reverts transaction on any call failure.
     /// @dev Intended for batch processing of contract interactions, managing gas efficiency and atomicity of operations.
-    function multicall(Call[] calldata _calls, bool _requireSuccess) external payable onlyOwner {
+    /// @dev Note, that this function lacks access control. It is expected that the access control is implemented in a separate restriction contract.
+    /// @dev Even though all the validation from external modules is executed via `staticcall`, the function
+    /// is marked as `nonReentrant` to prevent reentrancy attacks in case the staticcall restriction is lifted in the future.
+    function multicall(Call[] calldata _calls, bool _requireSuccess) external payable nonReentrant {
         if (_calls.length == 0) {
             revert NoCallsProvided();
         }
-        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
+            _validateCall(_calls[i]);
+
             // slither-disable-next-line arbitrary-send-eth
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
             if (_requireSuccess && !success) {

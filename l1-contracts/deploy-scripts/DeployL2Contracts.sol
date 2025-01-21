@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
