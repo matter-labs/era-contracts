@@ -54,6 +54,8 @@ address constant L2_WETH_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
 address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
+uint256 constant SECURITY_COUNCIL_SIZE = 12;
+
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
     address chainTypeManagerProxy;
@@ -944,14 +946,14 @@ library Utils {
 
         bytes memory securityCouncilSignatures;
         {
-            address[] memory securityCouncilMembers = new address[](12);
+            address[] memory securityCouncilMembers = new address[](SECURITY_COUNCIL_SIZE);
             {
                 IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
                 for (uint256 i = 0; i < 12; i++) {
                     securityCouncilMembers[i] = securityCouncil.members(i);
                 }
             }
-            bytes[] memory securityCouncilRawSignatures = new bytes[](12);
+            bytes[] memory securityCouncilRawSignatures = new bytes[](SECURITY_COUNCIL_SIZE);
             for (uint256 i = 0; i < securityCouncilMembers.length; i++) {
                 bytes32 safeDigest;
                 {
@@ -1006,18 +1008,21 @@ library Utils {
         }
     }
 
+    // Signs and approves the upgrade by the security council.
+    // It works only on staging env, since the `_governorWallet` must be the wallet
+    // that is the sole owner of the Gnosis wallets that constitute the security council.
     function securityCouncilApproveUpgrade(
         IProtocolUpgradeHandler _protocolUpgradeHandler,
         Vm.Wallet memory _governorWallet,
         bytes32 upgradeId
-    ) internal returns (bytes memory) {
+    ) internal {
         address securityCouncilAddr = _protocolUpgradeHandler.securityCouncil();
         bytes32 securityCouncilDigest;
         {
             securityCouncilDigest = EIP712Utils.buildDomainHash(securityCouncilAddr, "SecurityCouncil", "1");
         }
 
-        bytes[] memory securityCouncilRawSignatures = new bytes[](12);
+        bytes[] memory securityCouncilRawSignatures = new bytes[](SECURITY_COUNCIL_SIZE);
         address[] memory securityCouncilMembers = new address[](12);
         {
             {
