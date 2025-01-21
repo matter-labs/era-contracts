@@ -327,6 +327,7 @@ jobs:
           working-directory: l1-contracts
           minimum-coverage: 85 # Set coverage threshold.
 
+
   # FIXME: restore gas report CI
   # gas-report:
   #   needs: [build, lint]
