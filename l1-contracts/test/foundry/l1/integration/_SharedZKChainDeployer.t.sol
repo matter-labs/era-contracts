@@ -139,15 +139,15 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function getZKChainAddress(uint256 _chainId) public view returns (address) {
-        return bridgehub.getZKChain(_chainId);
+        return addresses.bridgehub.getZKChain(_chainId);
     }
 
     function getZKChainBaseToken(uint256 _chainId) public view returns (address) {
-        return bridgehub.baseToken(_chainId);
+        return addresses.bridgehub.baseToken(_chainId);
     }
 
     function acceptPendingAdmin() public {
-        IZKChain chain = IZKChain(bridgehub.getZKChain(currentZKChainId - 1));
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(currentZKChainId - 1));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();
