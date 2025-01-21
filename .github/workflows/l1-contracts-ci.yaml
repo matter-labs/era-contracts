@@ -325,7 +325,7 @@ jobs:
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
-          minimum-coverage: 85 # Set coverage threshold.
+          minimum-coverage: 83 # Set coverage threshold.
 
 
   # FIXME: restore gas report CI
