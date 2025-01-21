@@ -95,6 +95,9 @@ interface IGetters is IZKChainBase {
     /// @return Bytecode hash of default account (bytecode for EOA).
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
 
+    /// @return Bytecode hash of EVM emulator.
+    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32);
+
     /// @return Verifier parameters.
     /// @dev This function is deprecated and will soon be removed.
     function getVerifierParams() external view returns (VerifierParams memory);

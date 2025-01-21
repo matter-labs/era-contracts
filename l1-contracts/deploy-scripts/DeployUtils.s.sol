@@ -167,6 +167,7 @@ struct ContractsConfig {
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
     address availL1DAValidator;
+    bytes32 evmEmulatorHash;
 }
 
 struct TokensConfig {

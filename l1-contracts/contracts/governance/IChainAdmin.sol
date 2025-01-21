@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Call} from "./Common.sol";
+import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 /// @title ChainAdmin contract interface
 /// @author Matter Labs
@@ -19,6 +20,9 @@ interface IChainAdmin {
 
     /// @notice Emitted when a restriction is removed.
     event RestrictionRemoved(address indexed restriction);
+
+    /// @notice The EVM emulator has been enabled
+    event EnableEvmEmulator();
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() external view returns (address[] memory);
@@ -44,4 +48,6 @@ interface IChainAdmin {
     /// @dev Even though all the validation from external modules is executed via `staticcall`, the function
     /// is marked as `nonReentrant` to prevent reentrancy attacks in case the staticcall restriction is lifted in the future.
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable;
+
+    function enableEvmEmulator(IAdmin _chainContract) external returns (bytes32 canonicalTxHash);
 }

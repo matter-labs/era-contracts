@@ -4,11 +4,11 @@ pragma solidity ^0.8.20;
 
 /// @notice A struct that describes a forced deployment on an address
 struct ForceDeployment {
-    // The bytecode hash to put on an address
+    // The bytecode hash to put on an address. Hash and length parts are ignored in case of EVM bytecode.
     bytes32 bytecodeHash;
     // The address on which to deploy the bytecodehash to
     address newAddress;
-    // Whether to run the constructor on the force deployment
+    // Whether to run the constructor on the force deployment. Ignored in case of EVM deployment.
     bool callConstructor;
     // The value with which to initialize a contract
     uint256 value;
@@ -39,6 +39,14 @@ interface IContractDeployer {
         Arbitrary
     }
 
+    /// @notice Defines what types of bytecode are allowed to be deployed on this chain
+    /// - `EraVm` means that only native contracts can be deployed
+    /// - `EraVmAndEVM` means that native contracts and EVM contracts can be deployed
+    enum AllowedBytecodeTypes {
+        EraVm,
+        EraVmAndEVM
+    }
+
     struct AccountInfo {
         AccountAbstractionVersion supportedAAVersion;
         AccountNonceOrdering nonceOrdering;
@@ -53,6 +61,11 @@ interface IContractDeployer {
     event AccountNonceOrderingUpdated(address indexed accountAddress, AccountNonceOrdering nonceOrdering);
 
     event AccountVersionUpdated(address indexed accountAddress, AccountAbstractionVersion aaVersion);
+
+    event AllowedBytecodeTypesModeUpdated(AllowedBytecodeTypes mode);
+
+    /// @notice Returns what types of bytecode are allowed to be deployed on this chain
+    function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode);
 
     function getNewAddressCreate2(
         address _sender,
@@ -105,4 +118,18 @@ interface IContractDeployer {
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable;
+
+    function createEVM(bytes calldata _initCode) external payable returns (uint256 evmGasUsed, address newAddress);
+
+    function create2EVM(
+        bytes32 _salt,
+        bytes calldata _initCode
+    ) external payable returns (uint256 evmGasUsed, address newAddress);
+
+    /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
+    function evmCodeHash(address) external view returns (bytes32);
+
+    /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
+    /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
+    function setAllowedBytecodeTypesToDeploy(AllowedBytecodeTypes newAllowedBytecodeTypes) external;
 }

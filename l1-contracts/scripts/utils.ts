@@ -76,6 +76,13 @@ export function readSystemContractsBytecode(fileName: string) {
   return JSON.parse(artifact.toString()).bytecode;
 }
 
+export function readEvmEmulatorbytecode() {
+  const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts");
+  return readBytecodeUtf8(
+    `${systemContractsPath}/contracts-preprocessed/artifacts/EvmEmulator.yul/EvmEmulator.yul.zbin`
+  );
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function print(name: string, data: any) {
   console.log(`${name}:\n`, JSON.stringify(data, null, 4), "\n");

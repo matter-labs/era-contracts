@@ -24,6 +24,8 @@ error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
 error PatchUpgradeCantSetDefaultAccount();
 // 0x962fd7d0
 error PatchUpgradeCantSetBootloader();
+// 0xc231eccd
+error PatchUpgradeCantSetEvmEmulator();
 // 0x101ba748
 error PreviousUpgradeNotFinalized(bytes32 txHash);
 // 0xa0f47245

@@ -225,6 +225,7 @@ contract DeployL1Script is Script, DeployUtils {
                 )
             )
         );
+
         address chainRegistrar = deployViaCreate2(bytecode, "");
         console.log("Chain Registrar deployed at:", chainRegistrar);
         addresses.chainRegistrar = chainRegistrar;

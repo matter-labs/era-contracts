@@ -618,14 +618,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
-        bytes32 l2DefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
         return
             abi.encodePacked(
                 s.zkPorterIsAvailable,
                 s.l2BootloaderBytecodeHash,
-                l2DefaultAccountBytecodeHash,
-                // VM 1.5.0 requires us to pass the EVM simulator code hash. For now it is the same as the default account.
-                l2DefaultAccountBytecodeHash
+                s.l2DefaultAccountBytecodeHash,
+                s.l2EvmEmulatorBytecodeHash
             );
     }
 

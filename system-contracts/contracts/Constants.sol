@@ -37,10 +37,10 @@ uint160 constant USER_CONTRACTS_OFFSET = MAX_SYSTEM_CONTRACT_ADDRESS + 1;
 
 address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
+address constant IDENTITY_SYSTEM_CONTRACT = address(0x04);
 address constant ECADD_SYSTEM_CONTRACT = address(0x06);
 address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 address constant ECPAIRING_SYSTEM_CONTRACT = address(0x08);
-
 
 /// @dev The number of gas that need to be spent for a single byte of pubdata regardless of the pubdata price.
 /// This variable is used to ensure the following:
@@ -74,22 +74,6 @@ address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 IBaseToken constant REAL_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
-ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
-address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
-IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
-address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
-IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
-// Note, that on its own this contract does not provide much functionality, but having it on a constant address
-// serves as a convenient storage for its bytecode to be accessible via `extcodehash`.
-address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
-
-address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
-
-// Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
-// Precompile call depends on it.
-// And we don't want to mock this contract.
-address constant KECCAK256_SYSTEM_CONTRACT = address(0x8010);
-
 ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(SYSTEM_CONTRACTS_OFFSET + 0x0b)));
 ISystemContext constant REAL_SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0b)));
 
@@ -102,9 +86,29 @@ ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_
 
 IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(SYSTEM_CONTRACTS_OFFSET + 0x0f));
 
+// Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
+// Precompile call depends on it.
+// And we don't want to mock this contract.
+address constant KECCAK256_SYSTEM_CONTRACT = address(0x8010);
+
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
+
+address constant CODE_ORACLE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x12);
+
+address constant EVM_GAS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x13);
+
+ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
+address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
+IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
+address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
+// Note, that on its own this contract does not provide much functionality, but having it on a constant address
+// serves as a convenient storage for its bytecode to be accessible via `extcodehash`.
+address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
+
+address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
@@ -119,6 +123,9 @@ bytes32 constant CREATE2_PREFIX = 0x2020dba91b30cc0006188af794c2fb30dd8520db7e2c
 /// @dev Prefix used during derivation of account addresses using CREATE
 /// @dev keccak256("zksyncCreate")
 bytes32 constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
+
+/// @dev Prefix used during derivation of account addresses using CREATE2 within the EVM
+bytes1 constant CREATE2_EVM_PREFIX = 0xff;
 
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
@@ -172,3 +179,10 @@ uint256 constant BLOB_SIZE_BYTES = 126_976;
 
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
+
+/// @dev Marker of EraVM bytecode
+uint8 constant ERA_VM_BYTECODE_FLAG = 1;
+/// @dev Marker of EVM bytecode
+uint8 constant EVM_BYTECODE_FLAG = 2;
+
+address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;

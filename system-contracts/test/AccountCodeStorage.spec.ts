@@ -11,6 +11,7 @@ import {
 } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
+import { ZERO_HASH } from "zksync-ethers/build/utils";
 
 describe("AccountCodeStorage tests", function () {
   let wallet: Wallet;
@@ -20,6 +21,7 @@ describe("AccountCodeStorage tests", function () {
 
   const CONSTRUCTING_BYTECODE_HASH = "0x0101FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
   const CONSTRUCTED_BYTECODE_HASH = "0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
+  const CONSTRUCTED_EVM_BYTECODE_HASH = "0x0200FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
   const RANDOM_ADDRESS = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 
   before(async () => {
@@ -143,6 +145,22 @@ describe("AccountCodeStorage tests", function () {
     });
   });
 
+  describe("isAccountEVM", function () {
+    it("false", async () => {
+      expect(await accountCodeStorage.isAccountEVM(RANDOM_ADDRESS)).to.be.eq(false);
+    });
+
+    it("true", async () => {
+      await accountCodeStorage
+        .connect(deployerAccount)
+        .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_EVM_BYTECODE_HASH);
+
+      expect(await accountCodeStorage.isAccountEVM(RANDOM_ADDRESS)).to.be.eq(true);
+
+      await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
+    });
+  });
+
   describe("getCodeHash", function () {
     it("precompile min address", async () => {
       // Check that the smallest precompile has EMPTY_STRING_KECCAK hash
@@ -182,6 +200,18 @@ describe("AccountCodeStorage tests", function () {
         .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_BYTECODE_HASH);
 
       expect(await accountCodeStorage.getCodeHash(RANDOM_ADDRESS)).to.be.eq(CONSTRUCTED_BYTECODE_HASH.toLowerCase());
+
+      await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
+    });
+
+    it("constructed EVM contract", async () => {
+      await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer", false);
+
+      await accountCodeStorage
+        .connect(deployerAccount)
+        .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_EVM_BYTECODE_HASH);
+
+      expect(await accountCodeStorage.getCodeHash(RANDOM_ADDRESS)).to.be.eq(ZERO_HASH); // contract deployer doesn't have this contract hash
 
       await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
     });

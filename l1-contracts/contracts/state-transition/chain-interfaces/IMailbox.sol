@@ -103,6 +103,15 @@ interface IMailbox is IZKChainBase {
     /// @dev On the Gateway the chain's mailbox receives the tx from the bridgehub.
     function bridgehubRequestL2TransactionOnGateway(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) external;
 
+    /// @notice Request execution of service L2 transaction from L1.
+    /// @dev Used for chain configuration. Can be called only by DiamondProxy itself.
+    /// @param _contractL2 The L2 receiver address
+    /// @param _l2Calldata The input of the L2 transaction
+    function requestL2ServiceTransaction(
+        address _contractL2,
+        bytes calldata _l2Calldata
+    ) external returns (bytes32 canonicalTxHash);
+
     /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gw
     /// @param _chainId the chainId of the chain
     /// @param _canonicalTxHash the canonical transaction hash
