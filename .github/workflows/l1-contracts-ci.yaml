@@ -207,6 +207,11 @@ jobs:
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
 
+      - name: Setup LCOV
+        uses: hrishikesh-kadam/setup-lcov@v1
+        with:
+          ref: v1.16
+
       # To ignore coverage for certain directories modify the paths in this step as needed. The
       # below default ignores coverage results for the test and script directories. Alternatively,
       # to include coverage in all directories, comment out this step. Note that because this
@@ -216,8 +221,7 @@ jobs:
       # defaults to removing branch info.
       - name: Filter directories
         run: |
-          sudo apt update && sudo apt install -y lcov
-          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' '../lib/forge-std/*' '../lib/murky/*' 'lib/*' '../lib/*' 'lib/' --output-file lcov.info --rc lcov_branch_coverage=1
+          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' --output-file lcov.info --rc lcov_branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is
@@ -226,14 +230,14 @@ jobs:
       # is why we use both in this way.
       - name: Post coverage report
         if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
-        uses: romeovs/lcov-reporter-action@v0.3.1
+        uses: romeovs/lcov-reporter-action@v0.4.0
         with:
           delete-old-comments: true
           lcov-file: ./l1-contracts/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
 
       - name: Verify minimum coverage
-        uses: zgosalvez/github-actions-report-lcov@v2
+        uses: zgosalvez/github-actions-report-lcov@v4
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
