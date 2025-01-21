@@ -166,8 +166,8 @@ struct ContractsConfig {
     bytes diamondCutData;
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
-    address availL1DAValidator;
     bytes32 evmEmulatorHash;
+    address availL1DAValidator;
 }
 
 struct TokensConfig {
@@ -485,6 +485,7 @@ contract DeployUtils is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+            l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever

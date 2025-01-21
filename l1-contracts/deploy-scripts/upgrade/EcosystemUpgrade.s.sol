@@ -219,6 +219,7 @@ contract EcosystemUpgrade is Script {
         uint256 maxNumberOfChains;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
+        bytes32 evmEmulatorHash;
         address oldValidatorTimelock;
         address legacyErc20BridgeAddress;
         address bridgehubProxyAddress;
@@ -568,6 +569,7 @@ contract EcosystemUpgrade is Script {
             l2ProtocolUpgradeTx: _composeUpgradeTx(),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
+            evmEmulatorHash: config.contracts.evmEmulatorHash,
             verifier: addresses.stateTransition.verifier,
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
@@ -1455,6 +1457,7 @@ contract EcosystemUpgrade is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+            l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever

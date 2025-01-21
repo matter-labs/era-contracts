@@ -9,6 +9,7 @@ import {IChainAdmin} from "./IChainAdmin.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 import {Call} from "./Common.sol";
+import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts-v4/utils/structs/EnumerableSet.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -82,7 +83,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
     /// @notice Enable EVM emulation on chain.
     /// @param _chainContract The chain contract address where the EVM emulator will be enabled.
-    function enableEvmEmulator(IAdmin _chainContract) external onlyOwner returns (bytes32 canonicalTxHash) {
+    function enableEvmEmulator(IAdmin _chainContract) external onlySelf returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _chainContract.allowEvmEmulation();
         emit EnableEvmEmulator();
     }

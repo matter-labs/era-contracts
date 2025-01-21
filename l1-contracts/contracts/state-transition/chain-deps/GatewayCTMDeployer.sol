@@ -64,6 +64,8 @@ struct GatewayCTMDeployerConfig {
     bytes32 bootloaderHash;
     /// @notice Hash of the default account bytecode.
     bytes32 defaultAccountHash;
+    /// @notice Hash of the EVM emulator bytecode.
+    bytes32 evmEmulatorHash;
     /// @notice Maximum gas limit for priority transactions.
     uint256 priorityTxMaxGasLimit;
     /// @notice Root hash of the genesis state.
@@ -316,6 +318,7 @@ contract GatewayCTMDeployer {
             verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
             feeParams: _config.feeParams,
             blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR

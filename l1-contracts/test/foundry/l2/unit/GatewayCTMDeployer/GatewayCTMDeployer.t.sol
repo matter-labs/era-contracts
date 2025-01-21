@@ -108,6 +108,7 @@ contract GatewayCTMDeployerTest is Test {
             }),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
+            evmEmulatorHash: bytes32(uint256(0xdef)),
             priorityTxMaxGasLimit: 100000,
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,

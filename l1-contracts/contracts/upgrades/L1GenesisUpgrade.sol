@@ -87,6 +87,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Gate
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),

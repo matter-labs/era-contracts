@@ -562,7 +562,10 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
         });
 
-        canonicalTxHash = _writePriorityOp(params);
+        L2CanonicalTransaction memory transaction;
+        (transaction, canonicalTxHash) = _validateTx(params);
+
+        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
     }
 
     function _serializeL2Transaction(
