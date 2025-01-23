@@ -7,6 +7,7 @@ import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSync
 import {StateTransitionManager} from "../state-transition/StateTransitionManager.sol";
 import {Bridgehub} from "../bridgehub/Bridgehub.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
 
 struct MigrationParams {
     address newCTM;
@@ -35,5 +36,6 @@ contract Migrator is ZkSyncHyperchainBase {
         s.bridgehub = params.newBridgehub;
         s.stateTransitionManager = params.newCTM;
         s.baseTokenBridge = address(Bridgehub(params.newBridgehub).sharedBridge());
+        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }
