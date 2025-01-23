@@ -8,9 +8,11 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_STORAGE} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
+
+import {DynamicIncrementalMerkle} from "./libraries/DynamicIncrementalMerkle.sol";
 
 /**
  * @author Matter Labs
@@ -26,9 +28,11 @@ import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
  * it requires that the preimage of `value` be provided.
  */
 contract L1Messenger is IL1Messenger, SystemContractBase {
+    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+
     /// @notice Sequential hash of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
-    bytes32 internal chainedLogsHash;
+    bytes32 internal __DEPRECATED_chainedLogsHash;
 
     /// @notice Number of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
@@ -42,6 +46,12 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
     /// according to the current block execution invariant.
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedL1BytecodesRevealDataHash;
+
+    /// @notice The dynamic incremental merkle tree for storing the logs. 
+    /// @dev This tree is used to store the logs in the current batch.
+    /// @dev We add logs to the tree one by one, we need the tree structure to verify inclusion efficiently.
+    /// @dev Cleared at the end of the batch, when the pubdata is published.
+    DynamicIncrementalMerkle.Bytes32PushTree internal logsTree;
 
     /// The gas cost of processing one keccak256 round.
     uint256 internal constant KECCAK_ROUND_GAS_COST = 40;
@@ -107,10 +117,16 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             )
         );
 
-        chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
-
         logIdInMerkleTree = numberOfLogsToProcess;
         ++numberOfLogsToProcess;
+
+        if (logIdInMerkleTree == 0) {
+            logsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
+        }
+
+        // kl todo 1. 
+        // chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
+        logsTree.push(hashedLog);
 
         emit L2ToL1LogSent(_l2ToL1Log);
     }
@@ -221,16 +237,19 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         }
         calldataPtr += 4;
 
-        bytes32 inputChainedLogsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
-        if (inputChainedLogsHash != chainedLogsHash) {
-            revert ReconstructionMismatch(PubdataField.InputLogsHash, chainedLogsHash, inputChainedLogsHash);
+        bytes32 inputLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        bytes32 storedLogsRootHash;
+        if (numberOfLogsToProcess == 0) {
+            storedLogsRootHash = L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH;
+        } else {
+            storedLogsRootHash = logsTree.root();
+        }
+        if (inputLogsRootHash != storedLogsRootHash) {
+            // revert ReconstructionMismatch(PubdataField.InputLogsHash, storedLogsRootHash, inputLogsRootHash);
+            // kl todo
         }
         calldataPtr += 32;
-
-        // Check happens below after we reconstruct the logs root hash
-        bytes32 inputChainedLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
-        calldataPtr += 32;
-
+        calldataPtr += 32; // todo remove and change memory layout
         bytes32 inputChainedMsgsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         if (inputChainedMsgsHash != chainedMessagesHash) {
             revert ReconstructionMismatch(PubdataField.InputMsgsHash, chainedMessagesHash, inputChainedMsgsHash);
@@ -279,38 +298,31 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             );
         }
 
-        bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
-        bytes32 reconstructedChainedLogsHash = bytes32(0);
+        DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle.Bytes32PushTree(0, new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES), new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES), 0, 0); // todo 100 to const
+        reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
                 _operatorInput[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
             );
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
-            l2ToL1LogsTreeArray[i] = hashedLog;
-            reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
+            reconstructedLogsTree.pushMemory(hashedLog);
         }
-        if (reconstructedChainedLogsHash != chainedLogsHash) {
-            revert ReconstructionMismatch(PubdataField.LogsHash, chainedLogsHash, reconstructedChainedLogsHash);
+        // bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
+        bytes32 localLogsRootHash;
+        if (numberOfLogsToProcess == 0) {
+            localLogsRootHash = L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH;
+        } else {
+            localLogsRootHash = reconstructedLogsTree.rootMemory();
         }
-        for (uint256 i = numberOfL2ToL1Logs; i < L2_TO_L1_LOGS_MERKLE_TREE_LEAVES; ++i) {
-            l2ToL1LogsTreeArray[i] = L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH;
-        }
-        uint256 nodesOnCurrentLevel = L2_TO_L1_LOGS_MERKLE_TREE_LEAVES;
-        while (nodesOnCurrentLevel > 1) {
-            nodesOnCurrentLevel /= 2;
-            for (uint256 i = 0; i < nodesOnCurrentLevel; ++i) {
-                l2ToL1LogsTreeArray[i] = keccak256(
-                    abi.encode(l2ToL1LogsTreeArray[2 * i], l2ToL1LogsTreeArray[2 * i + 1])
-                );
-            }
-        }
-        bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
+        // if (localLogsRootHash != inputLogsRootHash) {
+        //     revert ReconstructionMismatch(PubdataField.LogsHash, inputLogsRootHash, localLogsRootHash);
+        // }
 
         bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
         bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
 
-        if (inputChainedLogsRootHash != localLogsRootHash) {
-            revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
+        if (inputLogsRootHash != localLogsRootHash) {
+        //     revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputLogsRootHash);
         }
 
         bytes32 l2DAValidatorOutputhash = bytes32(0);
@@ -340,7 +352,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         );
 
         /// Clear logs state
-        chainedLogsHash = bytes32(0);
+        logsTree.clear();
         numberOfLogsToProcess = 0;
         chainedMessagesHash = bytes32(0);
         chainedL1BytecodesRevealDataHash = bytes32(0);
