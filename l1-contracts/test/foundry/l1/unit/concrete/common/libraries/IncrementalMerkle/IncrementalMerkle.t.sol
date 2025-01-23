@@ -109,7 +109,10 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTestMemory.heightMemory(), 2);
         assertEq(merkleTestMemory._zeros[0], zero);
         assertEq(merkleTestMemory._zeros[1], keccak256(abi.encodePacked(uint256(zero), uint256(zero))));
-        assertEq(merkleTestMemory._zeros[2], keccak256(abi.encodePacked(merkleTestMemory._zeros[1], merkleTestMemory._zeros[1])));
+        assertEq(
+            merkleTestMemory._zeros[2],
+            keccak256(abi.encodePacked(merkleTestMemory._zeros[1], merkleTestMemory._zeros[1]))
+        );
         assertEq(merkleTestMemory._sides[0], bytes32((uint256(2))));
         assertEq(merkleTestMemory._sides[1], keccak256(abi.encodePacked(uint256(0), uint256(1))));
         assertEq(
@@ -194,7 +197,6 @@ contract IncrementalMerkleTestTest is Test {
         console.logBytes32(merkleTestMemory.rootMemory());
         console.logBytes32(keccak256(bytes.concat(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, aggregatedRootHash)));
         console.logBytes32(keccak256(bytes.concat(merkleTestMemory.rootMemory(), aggregatedRootHash)));
-
 
         merkleTestMemory.rootMemory();
     }

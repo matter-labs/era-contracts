@@ -47,7 +47,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedL1BytecodesRevealDataHash;
 
-    /// @notice The dynamic incremental merkle tree for storing the logs. 
+    /// @notice The dynamic incremental merkle tree for storing the logs.
     /// @dev This tree is used to store the logs in the current batch.
     /// @dev We add logs to the tree one by one, we need the tree structure to verify inclusion efficiently.
     /// @dev Cleared at the end of the batch, when the pubdata is published.
@@ -124,7 +124,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             logsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         }
 
-        // kl todo 1. 
+        // kl todo 1.
         // chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
         logsTree.push(hashedLog);
 
@@ -298,7 +298,14 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             );
         }
 
-        DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle.Bytes32PushTree(0, new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES), new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES), 0, 0); // todo 100 to const
+        DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
+            .Bytes32PushTree(
+                0,
+                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                0,
+                0
+            ); // todo 100 to const
         reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
@@ -322,7 +329,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
 
         if (inputLogsRootHash != localLogsRootHash) {
-        //     revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputLogsRootHash);
+            //     revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputLogsRootHash);
         }
 
         bytes32 l2DAValidatorOutputhash = bytes32(0);
