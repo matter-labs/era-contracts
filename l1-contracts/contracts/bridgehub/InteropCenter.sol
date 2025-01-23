@@ -591,7 +591,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function _requestL2TransactionDirect(
         address _sender,
         L2TransactionRequestDirect calldata _request
-    ) internal nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+    ) internal nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
         // Note: If the ZK chain with corresponding `chainId` is not yet created,
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
@@ -667,7 +667,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender,
         bool _routeViaBridgehub,
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) internal nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+    ) internal nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
             revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
         }

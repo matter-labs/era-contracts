@@ -163,11 +163,7 @@ contract DefaultAccount is IAccount {
                 0,
                 0,
                 0,
-                L2Message(
-                    0,
-                    address(0),
-                    new bytes(0)
-                ),
+                L2Message(0, address(0), new bytes(0)),
                 new bytes32[](0)
             );
             L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof);
@@ -255,14 +251,10 @@ contract DefaultAccount is IAccount {
             // (bytes memory paymasterProof, ) = abi.decode(_transaction.signature, (bytes, bytes));
             // MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
             MessageInclusionProof memory paymasterInclusionProof = MessageInclusionProof(
-                0, 
                 0,
                 0,
-                L2Message(
-                    0,
-                    address(0),
-                    new bytes(0)
-                ),
+                0,
+                L2Message(0, address(0), new bytes(0)),
                 new bytes32[](0)
             );
             L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof);

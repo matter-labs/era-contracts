@@ -76,7 +76,7 @@ contract InteropHandler is IInteropHandler {
             BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
 
             address accountAddress = getAliasedAccount(interopCall.from, 0);
-            InteropAccount account = InteropAccount(accountAddress); // kl todo add chainId
+            InteropAccount account = InteropAccount(payable(accountAddress)); // kl todo add chainId
             uint256 codeSize;
             assembly {
                 codeSize := extcodesize(accountAddress)

@@ -22,4 +22,6 @@ contract InteropAccount {
     function deployed() public returns (bool) {
         return true;
     }
+
+    fallback() external payable {}
 }
