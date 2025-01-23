@@ -13,7 +13,7 @@ GATEWAY_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/<input-file> forge script --sig "r
 
 This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
 
-### Deploying the multicall with gas contract.
+### Deploying the multicall with gas contract
 
 Firstly, you should deploy the `MulticallWithGas` contract.
 
