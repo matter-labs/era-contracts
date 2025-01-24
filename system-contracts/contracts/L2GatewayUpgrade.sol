@@ -72,24 +72,6 @@ contract L2GatewayUpgrade {
                 fixedForceDeploymentsData.l2BridgedStandardERC20Impl
             );
         }
-
-        if (additionalForceDeploymentsData.predeployedL2WethAddress != address(0)) {
-            // Query the old data to avoid accidentally overwriting it.
-            string memory name = IERC20Metadata(additionalForceDeploymentsData.predeployedL2WethAddress).name();
-            string memory symbol = IERC20Metadata(additionalForceDeploymentsData.predeployedL2WethAddress).symbol();
-
-            // Force upgrade the TransparentUpgradeableProxy for the predeployed L2 WETH.
-            forceUpgradeTransparentProxy(
-                additionalForceDeploymentsData.predeployedL2WethAddress,
-                WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
-                L2GatewayUpgradeHelper.getWethInitData(
-                    name,
-                    symbol,
-                    additionalForceDeploymentsData.baseTokenL1Address,
-                    additionalForceDeploymentsData.baseTokenAssetId
-                )
-            );
-        }
     }
 
     /// @notice Forces an upgrade of a TransparentUpgradeableProxy contract.
