@@ -76,15 +76,11 @@ contract FinalizeUpgrade is Script {
         }
     }
 
-    uint256 constant GAS_PER_TX = 500_000;       // Adjust as needed
-    uint256 constant MAX_CALLS_PER_BATCH = 15;     // Adjust as needed
+    uint256 constant GAS_PER_TX = 500_000; // Adjust as needed
+    uint256 constant MAX_CALLS_PER_BATCH = 15; // Adjust as needed
 
     // Helper function to flush calls to aggregator
-    function flushBatch(
-        MulticallWithGas _aggregator,
-        MulticallWithGas.Call[] memory _calls,
-        uint256 _count
-    ) internal {
+    function flushBatch(MulticallWithGas _aggregator, MulticallWithGas.Call[] memory _calls, uint256 _count) internal {
         if (_count == 0) {
             return; // nothing to flush
         }
@@ -106,11 +102,7 @@ contract FinalizeUpgrade is Script {
         address _to,
         bytes memory _data
     ) internal returns (uint256) {
-        _calls[_callIndex] = MulticallWithGas.Call({
-            to: _to,
-            gasLimit: GAS_PER_TX,
-            data: _data
-        });
+        _calls[_callIndex] = MulticallWithGas.Call({to: _to, gasLimit: GAS_PER_TX, data: _data});
 
         return _callIndex + 1; // increment the pointer
     }
@@ -123,7 +115,7 @@ contract FinalizeUpgrade is Script {
     /// @param tokens Array of token addresses to initialize
     /// @param chains Array of chain IDs to register & update balances
     function finalizeInit(
-        MulticallWithGas aggregator, 
+        MulticallWithGas aggregator,
         address bridgehub,
         address payable l1NativeTokenVault,
         address[] calldata tokens,
@@ -137,9 +129,6 @@ contract FinalizeUpgrade is Script {
         MulticallWithGas.Call[] memory calls = new MulticallWithGas.Call[](MAX_CALLS_PER_BATCH);
         uint256 callIndex = 0;
 
-
-
-
         // ---------------------------------------------------
         // 1. Combine logic of initChains
         // ---------------------------------------------------
@@ -147,10 +136,7 @@ contract FinalizeUpgrade is Script {
             Bridgehub bh = Bridgehub(bridgehub);
             if (bh.baseTokenAssetId(chains[i]) == bytes32(0)) {
                 // Register legacy chain if needed
-                bytes memory data = abi.encodeWithSelector(
-                    Bridgehub.registerLegacyChain.selector,
-                    chains[i]
-                );
+                bytes memory data = abi.encodeWithSelector(Bridgehub.registerLegacyChain.selector, chains[i]);
 
                 // Add call to aggregator calls array
                 callIndex = addCall(calls, callIndex, bridgehub, data);
@@ -184,18 +170,13 @@ contract FinalizeUpgrade is Script {
                         callIndex = addCall(calls, callIndex, l1NativeTokenVault, data);
                     } else {
                         // aggregator call: vault.registerToken(tokens[i])
-                        bytes memory data = abi.encodeWithSelector(
-                            vault.registerToken.selector,
-                            tokens[i]
-                        );
+                        bytes memory data = abi.encodeWithSelector(vault.registerToken.selector, tokens[i]);
                         callIndex = addCall(calls, callIndex, l1NativeTokenVault, data);
                     }
                 } else {
                     // aggregator call: vault.registerEthToken()
                     {
-                        bytes memory data = abi.encodeWithSelector(
-                            vault.registerEthToken.selector
-                        );
+                        bytes memory data = abi.encodeWithSelector(vault.registerEthToken.selector);
                         callIndex = addCall(calls, callIndex, l1NativeTokenVault, data);
                     }
 
@@ -224,7 +205,7 @@ contract FinalizeUpgrade is Script {
 
             // For every (token, chain) combination, aggregator call: updateChainBalancesFromSharedBridge
             for (uint256 j = 0; j < chains.length; j++) {
-                if(L1Nullifier(nullifier).chainBalance(chains[j], tokens[i]) == 0) {
+                if (L1Nullifier(nullifier).chainBalance(chains[j], tokens[i]) == 0) {
                     continue;
                 }
 
