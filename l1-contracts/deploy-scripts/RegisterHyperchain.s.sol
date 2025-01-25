@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-// solhint-disable no-console
+// solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -19,9 +18,10 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHy
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address deployerAddress;
         address ownerAddress;
@@ -44,7 +44,7 @@ contract RegisterHyperchainScript is Script {
         address chainAdmin;
     }
 
-    Config config;
+    Config internal config;
 
     function run() public {
         console.log("Deploying Hyperchain");
@@ -118,20 +118,17 @@ contract RegisterHyperchainScript is Script {
     }
 
     function registerTokenOnBridgehub() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         if (bridgehub.tokenIsRegistered(config.baseToken)) {
             console.log("Token already registered on Bridgehub");
         } else {
             bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
-            Utils.executeUpgrade({
-                _governor: ownable.owner(),
-                _salt: bytes32(config.bridgehubCreateNewChainSalt),
+            Utils.chainAdminMulticall({
+                _chainAdmin: bridgehub.admin(),
                 _target: config.bridgehub,
                 _data: data,
-                _value: 0,
-                _delay: 0
+                _value: 0
             });
             console.log("Token registered on Bridgehub");
         }
@@ -156,8 +153,7 @@ contract RegisterHyperchainScript is Script {
     }
 
     function registerHyperchain() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
@@ -172,20 +168,14 @@ contract RegisterHyperchainScript is Script {
             )
         );
 
-        Utils.executeUpgrade({
-            _governor: ownable.owner(),
-            _salt: bytes32(config.bridgehubCreateNewChainSalt),
-            _target: config.bridgehub,
-            _data: data,
-            _value: 0,
-            _delay: 0
-        });
+        Utils.chainAdminMulticall({_chainAdmin: bridgehub.admin(), _target: config.bridgehub, _data: data, _value: 0});
         console.log("Hyperchain registered");
 
         // Get new diamond proxy address from emitted events
         Vm.Log[] memory logs = vm.getRecordedLogs();
         address diamondProxyAddress;
-        for (uint256 i = 0; i < logs.length; i++) {
+        uint256 logsLength = logs.length;
+        for (uint256 i = 0; i < logsLength; ++i) {
             if (logs[i].topics[0] == STATE_TRANSITION_NEW_CHAIN_HASH) {
                 diamondProxyAddress = address(uint160(uint256(logs[i].topics[2])));
                 break;

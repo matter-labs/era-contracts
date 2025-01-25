@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
 import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
@@ -21,6 +21,7 @@ import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
 /// @param feeParams Fee parameters to be used for L1->L2 transactions
 /// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
+// solhint-disable-next-line gas-struct-packing
 struct InitializeData {
     uint256 chainId;
     address bridgehub;

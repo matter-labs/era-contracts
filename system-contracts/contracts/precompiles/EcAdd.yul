@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 object "EcAdd" {
     code {
         return(0, 0)

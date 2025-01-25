@@ -5,8 +5,8 @@ pragma solidity 0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -33,13 +33,15 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
+    // solhint-disable-next-line gas-struct-packing
     struct DeployedAddresses {
         BridgehubDeployedAddresses bridgehub;
         StateTransitionDeployedAddresses stateTransition;
@@ -52,11 +54,13 @@ contract DeployL1Script is Script {
         address create2Factory;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct BridgehubDeployedAddresses {
         address bridgehubImplementation;
         address bridgehubProxy;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct StateTransitionDeployedAddresses {
         address stateTransitionProxy;
         address stateTransitionImplementation;
@@ -71,6 +75,7 @@ contract DeployL1Script is Script {
         address diamondProxy;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct BridgesDeployedAddresses {
         address erc20BridgeImplementation;
         address erc20BridgeProxy;
@@ -78,6 +83,7 @@ contract DeployL1Script is Script {
         address sharedBridgeProxy;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         uint256 l1ChainId;
         uint256 eraChainId;
@@ -88,6 +94,7 @@ contract DeployL1Script is Script {
         TokensConfig tokens;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct ContractsConfig {
         bytes32 create2FactorySalt;
         address create2FactoryAddr;
@@ -119,8 +126,8 @@ contract DeployL1Script is Script {
         address tokenWethAddress;
     }
 
-    Config config;
-    DeployedAddresses addresses;
+    Config internal config;
+    DeployedAddresses internal addresses;
 
     function run() public {
         console.log("Deploying L1 contracts");
@@ -219,7 +226,7 @@ contract DeployL1Script is Script {
 
         if (isConfigured) {
             if (config.contracts.create2FactoryAddr.code.length == 0) {
-                revert("Create2Factory configured address is empty");
+                revert AddressHasNoCode(config.contracts.create2FactoryAddr);
             }
             contractAddress = config.contracts.create2FactoryAddr;
             console.log("Using configured Create2Factory address:", contractAddress);
@@ -586,12 +593,15 @@ contract DeployL1Script is Script {
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         bridgehub.transferOwnership(addresses.governance);
+        bridgehub.setPendingAdmin(addresses.chainAdmin);
 
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
+        sharedBridge.setPendingAdmin(addresses.chainAdmin);
 
         StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         stm.transferOwnership(addresses.governance);
+        stm.setPendingAdmin(addresses.chainAdmin);
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -702,6 +712,7 @@ contract DeployL1Script is Script {
             addresses.blobVersionedHashRetriever
         );
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
+        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "bridges", bridges);
