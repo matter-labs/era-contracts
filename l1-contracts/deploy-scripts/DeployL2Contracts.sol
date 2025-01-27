@@ -163,7 +163,7 @@ contract DeployL2Script is Script {
         } else if (config.validatorType == DAValidatorType.Avail) {
             bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
         } else if (config.validatorType == DAValidatorType.EigenDA) {
-            bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode(); // TODO: update to EigenDA for M1 implementation
+            bytecode = L2ContractsBytecodesLib.readEigenDAL2ValidatorBytecode();
         } else {
             revert("Invalid DA validator type");
         }
