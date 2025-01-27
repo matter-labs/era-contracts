@@ -63,17 +63,21 @@ object "EcMul" {
                 0, // input offset in words
                 3, // input length in words (x, y, scalar)
                 0, // output offset in words
-                2, // output length in words (x, y)
+                3, // output length in words success, (x, y)
                 0  // No special meaning, ecmul circuit doesn't check this value
             )
             let gasToPay := ECMUL_GAS_COST()
 
             let success := precompileCall(precompileParams, gasToPay)
-            if iszero(success) {
+            let internalSuccess := mload(0)
+
+            switch and(success, internalSuccess)
+            case 0 {
                 return(0, 0)
             }
-            
-            return(0, 64)
+            default {
+                return(32, 64)
+            }
         }
     }
 }
