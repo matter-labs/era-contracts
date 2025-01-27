@@ -24,5 +24,7 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         uint256 _maxBlobsSupported
     ) external returns (L1DAValidatorOutput memory output) {
 
+        KeccakInclusionToDataRootOutput memory keccakInclusionToDataRootOutput = abi.decode(_operatorDAInput, (KeccakInclusionToDataRootOutput));
+
     }
 }
