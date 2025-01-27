@@ -120,7 +120,7 @@ contract DeployL1Script is Script, DeployUtils {
         deployErc20BridgeImplementation();
         deployErc20BridgeProxy();
         updateSharedBridge();
-        deployChainRegistrar();
+        // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
         deployCTMDeploymentTracker();
         setBridgehubParams();
 
@@ -710,7 +710,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
 
-        vm.serializeAddress("deployed_addresses", "chain_registrar", addresses.chainRegistrar);
+        //vm.serializeAddress("deployed_addresses", "chain_registrar", addresses.chainRegistrar); // TODO: enable after ChainRegistrar is reviewed
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
         vm.serializeAddress(
             "deployed_addresses",
