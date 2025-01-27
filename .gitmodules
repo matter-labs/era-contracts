@@ -18,3 +18,6 @@
 [submodule "lib/sp1-contracts"]
 	path = lib/sp1-contracts
 	url = https://github.com/succinctlabs/sp1-contracts
+[submodule "lib/sp1-blobstream"]
+	path = lib/sp1-blobstream
+	url = https://github.com/succinctlabs/sp1-blobstream
