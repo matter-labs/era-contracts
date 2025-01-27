@@ -15,3 +15,6 @@
 [submodule "lib/@matterlabs/zksync-contracts"]
 	path = lib/@matterlabs/zksync-contracts
 	url = https://github.com/matter-labs/v2-testnet-contracts
+[submodule "lib/sp1-contracts"]
+	path = lib/sp1-contracts
+	url = https://github.com/succinctlabs/sp1-contracts
