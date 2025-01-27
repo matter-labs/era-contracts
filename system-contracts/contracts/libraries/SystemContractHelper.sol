@@ -2,10 +2,12 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
+import {MAX_SYSTEM_CONTRACT_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
+import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeployer.sol";
+import {SloadContract} from "../SloadContract.sol";
 
-import {CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
-import {IndexOutOfBounds, FailedToChargeGas} from "../SystemContractErrors.sol";
+import {CalldataForwardingMode, SystemContractsCaller, MIMIC_CALL_CALL_ADDRESS, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {IndexOutOfBounds, FailedToChargeGas, SloadContractBytecodeUnknown, PreviousBytecodeUnknown} from "../SystemContractErrors.sol";
 
 uint256 constant UINT32_MASK = type(uint32).max;
 uint256 constant UINT64_MASK = type(uint64).max;
@@ -356,6 +358,127 @@ library SystemContractHelper {
         );
         if (!precompileCallSuccess) {
             revert FailedToChargeGas();
+        }
+    }
+
+    /// @notice Performs a `mimicCall` to an address.
+    /// @param _to The address to call.
+    /// @param _whoToMimic The address to mimic.
+    /// @param _data The data to pass to the call.
+    /// @return success Whether the call was successful.
+    /// @return returndata The return data of the call.
+    function mimicCall(
+        address _to,
+        address _whoToMimic,
+        bytes memory _data
+    ) internal returns (bool success, bytes memory returndata) {
+        // In zkSync, no memory-related values can exceed uint32, so it is safe to convert here
+        uint32 dataStart;
+        uint32 dataLength = uint32(_data.length);
+        assembly {
+            dataStart := add(_data, 0x20)
+        }
+
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: uint32(gasleft()),
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: false
+        });
+
+        address callAddr = MIMIC_CALL_CALL_ADDRESS;
+        uint256 rtSize;
+        assembly {
+            success := call(_to, callAddr, 0, farCallAbi, _whoToMimic, 0, 0)
+            rtSize := returndatasize()
+        }
+
+        returndata = new bytes(rtSize);
+        assembly {
+            returndatacopy(add(returndata, 0x20), 0, rtSize)
+        }
+    }
+
+    /// @notice Force deploys some bytecode hash to an address
+    /// without invoking the constructor.
+    /// @param _addr The address to force-deploy the bytecodehash to.
+    /// @param _bytecodeHash The bytecode hash to force-deploy.
+    function forceDeployNoConstructor(address _addr, bytes32 _bytecodeHash) internal {
+        ForceDeployment[] memory deployments = new ForceDeployment[](1);
+        deployments[0] = ForceDeployment({
+            bytecodeHash: _bytecodeHash,
+            newAddress: _addr,
+            callConstructor: false,
+            value: 0,
+            input: hex""
+        });
+        mimicCallWithPropagatedRevert(
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            FORCE_DEPLOYER,
+            abi.encodeCall(IContractDeployer.forceDeployOnAddresses, deployments)
+        );
+    }
+
+    /// @notice Reads a certain storage slot from a contract.
+    /// @param _addr The address to read the slot from.
+    /// @param _key The key to read.
+    /// @return result The value stored at slot `_key` under the address `_addr`.
+    /// @dev zkEVM similarly to EVM only has an opcode to read
+    /// from the current contract's storage. However, sometimes system contracts
+    /// may require to read private storage slots of a contract. In order to provide
+    /// generic functionality to read arbitrary storage slots from other contracts, the following
+    /// scheme is used:
+    /// 1. Force-deploy `SloadContract` to the address.
+    /// 2. Read the required slot.
+    /// 3. Force-deploy the previous bytecode back.
+    /// @dev Note, that the function will overwrite the account states of the `_addr`, i.e.
+    /// this function should NEVER be used against custom accounts.
+    function forcedSload(address _addr, bytes32 _key) internal returns (bytes32 result) {
+        bytes32 sloadContractBytecodeHash;
+        address sloadContractAddress = SLOAD_CONTRACT_ADDRESS;
+        assembly {
+            sloadContractBytecodeHash := extcodehash(sloadContractAddress)
+        }
+
+        // Just in case, that the `sloadContractBytecodeHash` is known
+        if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(sloadContractBytecodeHash) == 0) {
+            revert SloadContractBytecodeUnknown();
+        }
+
+        bytes32 previoushHash;
+        assembly {
+            previoushHash := extcodehash(_addr)
+        }
+
+        // Just in case, double checking that the previous bytecode is known.
+        // It may be needed since `previoushHash` could be non-zero and unknown if it is
+        // equal to keccak(""). It is the case for used default accounts.
+        if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(previoushHash) == 0) {
+            revert PreviousBytecodeUnknown();
+        }
+
+        forceDeployNoConstructor(_addr, sloadContractBytecodeHash);
+        result = SloadContract(_addr).sload(_key);
+        forceDeployNoConstructor(_addr, previoushHash);
+    }
+
+    /// @notice Performs a `mimicCall` to an address, while ensuring that the call
+    /// was successful
+    /// @param _to The address to call.
+    /// @param _whoToMimic The address to mimic.
+    /// @param _data The data to pass to the call.
+    function mimicCallWithPropagatedRevert(address _to, address _whoToMimic, bytes memory _data) internal {
+        (bool success, bytes memory returnData) = mimicCall(_to, _whoToMimic, _data);
+        if (!success) {
+            // Propagate revert reason
+            assembly {
+                revert(add(returnData, 0x20), returndatasize())
+            }
         }
     }
 }
