@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
+
 import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
+import {ValL1DAWrongInputLength} from "../../DAContractsErrors.sol";
+
 contract EigenDAL1Validator is IL1DAValidator {
     function checkDA(
         uint256, // _chainId
@@ -10,8 +13,16 @@ contract EigenDAL1Validator is IL1DAValidator {
         uint256 maxBlobsSupported
     ) external override returns (L1DAValidatorOutput memory output) {
         // TODO: Implement real validation logic for M1.
-        output.stateDiffHash = bytes32(0);
-        output.blobsLinearHashes = new bytes32[](0);
-        output.blobsOpeningCommitments = new bytes32[](0);
+        // For Validiums, we expect the operator to just provide the data for us.
+        // We don't need to do any checks with regard to the l2DAValidatorOutputHash.
+        if (_operatorDAInput.length < 32) {
+            revert ValL1DAWrongInputLength(_operatorDAInput.length, 32);
+        }
+        bytes32 stateDiffHash = abi.decode(_operatorDAInput[:32], (bytes32));
+
+        output.stateDiffHash = stateDiffHash;
+
+        output.blobsLinearHashes = new bytes32[](maxBlobsSupported);
+        output.blobsOpeningCommitments = new bytes32[](maxBlobsSupported);
     }
 }
