@@ -393,7 +393,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp
         });
-        canonicalTxHash = _requestL2TransactionToGatewayFree(wrappedRequest);
+        canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
 
     /// @inheritdoc IMailbox
@@ -452,6 +452,15 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 refundRecipient: address(0)
             })
         );
+
+        if (s.settlementLayer != address(0)) {
+            // slither-disable-next-line unused-return
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+                _chainId: s.chainId,
+                _canonicalTxHash: canonicalTxHash,
+                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+            });
+        }
     }
 
     function _requestL2TransactionSender(
@@ -537,7 +546,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         }
     }
 
-    function _requestL2TransactionToGatewayFree(
+    function _requestL2TransactionFree(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({
@@ -549,22 +558,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(params);
-        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
-    }
-
-    function _requestL2TransactionFree(
-        BridgehubL2TransactionRequest memory _request
-    ) internal nonReentrant returns (bytes32 canonicalTxHash) {
-        WritePriorityOpParams memory params = WritePriorityOpParams({
-            request: _request,
-            txId: s.priorityQueue.getTotalPriorityTxs(),
-            l2GasPrice: 0,
-            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
-        });
-
-        L2CanonicalTransaction memory transaction;
-        (transaction, canonicalTxHash) = _validateTx(params);
-
         _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
     }
 
