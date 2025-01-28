@@ -979,14 +979,10 @@ contract EcosystemUpgrade is Script {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         bytes memory bytecode = abi.encodePacked(
             type(ValidatorTimelock).creationCode,
-            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
+            abi.encode(config.deployerAddress, executionDelay)
         );
         address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "ValidatorTimelock",
-            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
-        );
+        notifyAboutDeployment(contractAddress, "ValidatorTimelock", abi.encode(config.deployerAddress, executionDelay));
         addresses.validatorTimelock = contractAddress;
     }
 
@@ -1692,6 +1688,8 @@ contract EcosystemUpgrade is Script {
         );
         vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", addresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", addresses.transitionaryOwner);
+        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
+        vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", addresses.upgradeTimer);
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
