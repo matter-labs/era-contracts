@@ -188,7 +188,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function allowEvmEmulation() external onlyAdmin returns (bytes32 canonicalTxHash) {
+    function allowEvmEmulation() external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
         canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
