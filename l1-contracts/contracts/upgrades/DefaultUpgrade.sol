@@ -8,7 +8,7 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract DefaultUpgrade is BaseZkSyncUpgrade {
-    /// @notice The main function that will be called by the upgrade proxy.
+    /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);

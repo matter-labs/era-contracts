@@ -1,0 +1,7 @@
+@ensdomains/=node_modules/@ensdomains/
+ds-test/=lib/forge-std/lib/ds-test/src/
+eth-gas-reporter/=node_modules/eth-gas-reporter/
+forge-std/=lib/forge-std/src/
+hardhat/=node_modules/hardhat/
+murky/=lib/murky/src/
+foundry-test/=test/foundry/
