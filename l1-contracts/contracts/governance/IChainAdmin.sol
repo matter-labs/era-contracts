@@ -48,6 +48,4 @@ interface IChainAdmin {
     /// @dev Even though all the validation from external modules is executed via `staticcall`, the function
     /// is marked as `nonReentrant` to prevent reentrancy attacks in case the staticcall restriction is lifted in the future.
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable;
-
-    function enableEvmEmulator(IAdmin _chainContract) external returns (bytes32 canonicalTxHash);
 }
