@@ -9,7 +9,6 @@ import {IChainAdmin} from "./IChainAdmin.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 import {Call} from "./Common.sol";
-import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts-v4/utils/structs/EnumerableSet.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";

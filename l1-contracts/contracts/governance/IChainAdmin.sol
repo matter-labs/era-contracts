@@ -3,7 +3,6 @@
 pragma solidity 0.8.24;
 
 import {Call} from "./Common.sol";
-import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 /// @title ChainAdmin contract interface
 /// @author Matter Labs
