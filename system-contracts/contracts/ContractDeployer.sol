@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
-import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
+import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
@@ -198,20 +198,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         return newAddress;
     }
 
-    /// @notice A struct that describes a forced deployment on an address
-    struct ForceDeployment {
-        // The bytecode hash to put on an address
-        bytes32 bytecodeHash;
-        // The address on which to deploy the bytecodehash to
-        address newAddress;
-        // Whether to run the constructor on the force deployment
-        bool callConstructor;
-        // The value with which to initialize a contract
-        uint256 value;
-        // The constructor calldata
-        bytes input;
-    }
-
     /// @notice The method that can be used to forcefully deploy a contract.
     /// @param _deployment Information about the forced deployment.
     /// @param _sender The `msg.sender` inside the constructor call.
@@ -240,7 +226,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     /// @dev We do not require `onlySystemCall` here, since the method is accessible only
     /// by `FORCE_DEPLOYER`.
-    function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable {
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable override {
         if (msg.sender != FORCE_DEPLOYER && msg.sender != address(COMPLEX_UPGRADER_CONTRACT)) {
             revert Unauthorized(msg.sender);
         }

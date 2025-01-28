@@ -3,8 +3,9 @@
 pragma solidity 0.8.24;
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {PubdataPricingMode} from "../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
+import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
+import {PubdataPricingMode} from "../state-transition/chain-deps/ZKChainStorage.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -151,7 +152,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
             })
         });
 
-        if (bridgehub.stateTransitionManager(config.chainId) != address(0)) {
+        if (bridgehub.chainTypeManager(config.chainId) != address(0)) {
             revert ChainIsAlreadyDeployed();
         }
 
@@ -187,15 +188,15 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
     /// @param _chainId ID of the chain.
     /// @return The configuration of the registered chain.
     function getRegisteredChainConfig(uint256 _chainId) external view returns (RegisteredChainConfig memory) {
-        address stm = bridgehub.stateTransitionManager(_chainId);
-        if (stm == address(0)) {
+        address ctm = bridgehub.chainTypeManager(_chainId);
+        if (ctm == address(0)) {
             revert ChainIsNotYetDeployed();
         }
 
-        address diamondProxy = IStateTransitionManager(stm).getHyperchain(_chainId);
+        address diamondProxy = IChainTypeManager(ctm).getZKChain(_chainId);
         address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
         address chainAdmin = IGetters(diamondProxy).getAdmin();
-        address l2BridgeAddress = bridgehub.sharedBridge().l2BridgeAddress(_chainId);
+        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.sharedBridge()).l2BridgeAddress(_chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }

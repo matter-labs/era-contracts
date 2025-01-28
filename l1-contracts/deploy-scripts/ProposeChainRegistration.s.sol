@@ -5,7 +5,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
 contract ProposeChainRegistration is Script {
     using stdToml for string;
