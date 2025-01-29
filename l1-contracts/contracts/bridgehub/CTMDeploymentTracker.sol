@@ -128,9 +128,6 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1CTM)))));
     }
 
-    // This comment is to check if i have write access to neotheprogramist repo
-
-
     /// @notice Used to register the ctm asset in L2 Bridgehub.
     /// @param _chainId the chainId of the chain
     function _registerCTMAssetOnL2Bridgehub(
