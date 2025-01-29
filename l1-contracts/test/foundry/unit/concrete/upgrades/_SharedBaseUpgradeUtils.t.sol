@@ -2,10 +2,10 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
+import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
-contract BaseUpgradeUtils is Test, ZkSyncHyperchainBase {
+contract BaseUpgradeUtils is Test, ZKChainBase {
     function setL2SystemContractsUpgradeTxHash(bytes32 _l2SystemContractsUpgradeTxHash) public {
         s.l2SystemContractsUpgradeTxHash = _l2SystemContractsUpgradeTxHash;
     }
