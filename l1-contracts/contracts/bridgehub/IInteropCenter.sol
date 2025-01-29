@@ -94,4 +94,5 @@ interface IInteropCenter {
     ) external payable returns (bytes32 canonicalTxHash);
 
     event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
+    event InteropTriggerSent(InteropTrigger _interopTrigger);
 }
