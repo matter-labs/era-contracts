@@ -84,8 +84,8 @@ object "Modexp" {
             if gt(modLen, MAX_MOD_BYTES_SUPPORTED()){
                 burnGas()
             }
-            
-            // Circuit input in-memory is following: 
+
+            // Circuit input in-memory is following:
             // 1. baseLen bytes of base padded from right with (MAX_BASE_BYTES_SUPPORTED - baseLen) zeros.
             // 2. expLen bytes of exponent padded from right with (MAX_EXP_BYTES_SUPPORTED - expLen) zeros.
             // 3. modLen bytes of modulus padded from right with (MAX_MOD_BYTES_SUPPORTED - modLen) zeros.
@@ -99,13 +99,13 @@ object "Modexp" {
             // Copy input base, exp and mod from calldata to memory
             calldatacopy(0, 96, baseLen)
             calldatacopy(MAX_BASE_BYTES_SUPPORTED(), add(96, baseLen), expLen)
-            calldatacopy(MAX_EXP_BYTES_SUPPORTED(), add(add(96, baseLen), expLen), modLen)
-            
+            calldatacopy(add(MAX_EXP_BYTES_SUPPORTED(), MAX_BASE_BYTES_SUPPORTED()), add(add(96, baseLen), expLen), modLen)
+
             let precompileParams := unsafePackPrecompileParams(
                 0,                                  // input offset in words
                 div(precompileInputBytes, 32),      // input length in words
                 0,                                  // output offset in words
-                div(MAX_MOD_BYTES_SUPPORTED(), 32),   // output length in words 
+                div(MAX_MOD_BYTES_SUPPORTED(), 32),   // output length in words
                 0                                   // circuit doesn't check this value
             )
 
