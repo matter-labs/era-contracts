@@ -248,6 +248,7 @@ jobs:
         run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierFflonk.sol
 
   coverage:
+    if: false # FIXME: coverage disabled due to stack-too-deep in VerifierFflonk.sol
     defaults:
       run:
         working-directory: l1-contracts
