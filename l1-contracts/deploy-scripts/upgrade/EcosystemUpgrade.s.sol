@@ -740,7 +740,7 @@ contract EcosystemUpgrade is Script {
 
         config.contracts.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        config.ownerAddress = Bridgehub(config.contracts.bridgehubProxyAddress).owner();
+        config.ownerAddress = toml.readAddress("$.contracts.governance_address");
         config.contracts.stateTransitionManagerAddress = IBridgehubLegacy(config.contracts.bridgehubProxyAddress)
             .stateTransitionManager(config.eraChainId);
         config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
