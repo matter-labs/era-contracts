@@ -86,10 +86,13 @@ jobs:
 
       - name: Generate Verifier.sol
         working-directory: tools
-        run: cargo run --bin zksync_verifier_contract_generator --release -- --input_path data/scheduler_key.json --l2_mode
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --l2_mode
 
-      - name: Compare
-        run: diff tools/data/Verifier.sol l2-contracts/contracts/verifier/Verifier.sol
+      - name: Compare Plonk
+        run: diff tools/data/VerifierPlonk.sol l2-contracts/contracts/verifiers/VerifierPlonk.sol
+
+      - name: Compare Fflonk
+        run: diff tools/data/VerifierFflonk.sol l2-contracts/contracts/verifiers/VerifierFflonk.sol
 
   test:
     needs: [build, lint]
