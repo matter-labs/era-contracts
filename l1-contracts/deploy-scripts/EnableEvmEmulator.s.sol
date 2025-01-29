@@ -21,7 +21,6 @@ contract EnableEvmEmulator is Script {
         });
     }
 
-    // This function should be called by the owner to update token multiplier setter role
     function chainAllowEvmEmulation(address chainAdmin, address target) public {
         IChainAdmin admin = IChainAdmin(chainAdmin);
 
