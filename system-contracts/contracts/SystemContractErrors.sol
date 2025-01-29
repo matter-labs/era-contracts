@@ -40,8 +40,8 @@ error FailedToChargeGas();
 error FailedToPayOperator();
 // 0x9e4a3c8a
 error HashIsNonZero(bytes32);
-// 0x86302004
-error HashMismatch(bytes32 expected, uint256 actual);
+// 0x0b08d5be
+error HashMismatch(bytes32 expected, bytes32 actual);
 // 0x4e23d035
 error IndexOutOfBounds();
 // 0x122e73e9
