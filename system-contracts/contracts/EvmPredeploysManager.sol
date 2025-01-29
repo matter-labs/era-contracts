@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {EVMEmulationNotSupported, InvalidInput, HashMismatch} from "./SystemContractErrors.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 
