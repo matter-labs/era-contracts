@@ -27,7 +27,6 @@ uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 /// mainnet.
 uint160 constant REAL_SYSTEM_CONTRACTS_OFFSET = 0x8000;
 
-
 /// @dev All the system contracts must be located in the kernel space,
 /// i.e. their addresses must be below 2^16.
 uint160 constant MAX_SYSTEM_CONTRACT_ADDRESS = 0xffff; // 2^16 - 1
@@ -63,7 +62,9 @@ IImmutableSimulator constant IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT = IImmutableSim
     address(SYSTEM_CONTRACTS_OFFSET + 0x05)
 );
 IContractDeployer constant DEPLOYER_SYSTEM_CONTRACT = IContractDeployer(address(SYSTEM_CONTRACTS_OFFSET + 0x06));
-IContractDeployer constant REAL_DEPLOYER_SYSTEM_CONTRACT = IContractDeployer(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x06));
+IContractDeployer constant REAL_DEPLOYER_SYSTEM_CONTRACT = IContractDeployer(
+    address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x06)
+);
 
 // A contract that is allowed to deploy any codehash
 // on any address. To be used only during an upgrade.
@@ -75,7 +76,9 @@ IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTR
 IBaseToken constant REAL_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(SYSTEM_CONTRACTS_OFFSET + 0x0b)));
-ISystemContext constant REAL_SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0b)));
+ISystemContext constant REAL_SYSTEM_CONTEXT_CONTRACT = ISystemContext(
+    payable(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0b))
+);
 
 IBootloaderUtilities constant BOOTLOADER_UTILITIES = IBootloaderUtilities(address(SYSTEM_CONTRACTS_OFFSET + 0x0c));
 
@@ -98,6 +101,8 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
 address constant CODE_ORACLE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x12);
 
 address constant EVM_GAS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x13);
+
+address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14);
 
 ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
 address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
