@@ -2,15 +2,16 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
+import {ZKChainCommitment} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZkSyncHyperchainBase {
+interface IAdmin is IZKChainBase {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -52,7 +53,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
-    /// @dev Only the current admin can execute the upgrade
+    /// @dev Only the ChainTypeManager contract can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
@@ -61,8 +62,30 @@ interface IAdmin is IZkSyncHyperchainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the STM can unfreeze Diamond Proxy
+    /// @dev Only the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
+
+    function genesisUpgrade(
+        address _l1GenesisUpgrade,
+        address _ctmDeployer,
+        bytes calldata _forceDeploymentData,
+        bytes[] calldata _factoryDeps
+    ) external;
+
+    /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
+    /// @dev While in principle it is possible that updating only one of the addresses is needed,
+    /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
+    /// That's why we change those together to prevent admins of chains from shooting themselves in the foot.
+    /// @param _l1DAValidator The address of the L1 DA validator
+    /// @param _l2DAValidator The address of the L2 DA validator
+    function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
+
+    /// @notice Makes the chain as permanent rollup.
+    /// @dev This is a security feature needed for chains that should be
+    /// trusted to keep their data available even if the chain admin becomes malicious
+    /// and tries to set the DA validator pair to something which does not publish DA to Ethereum.
+    /// @dev DANGEROUS: once activated, there is no way back!
+    function makePermanentRollup() external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
@@ -84,7 +107,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
     /// @notice Validium mode status changed
-    event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
+    event PubdataPricingModeUpdate(PubdataPricingMode validiumMode);
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
@@ -100,9 +123,38 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
+    /// @notice Emitted when the migration to the new settlement layer is complete.
+    event MigrationComplete();
+
     /// @notice Emitted when the contract is frozen.
     event Freeze();
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @notice New pair of DA validators set
+    event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
+    event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
+
+    event BridgeMint(address indexed _account, uint256 _amount);
+
+    /// @dev Similar to IL1AssetHandler interface, used to send chains.
+    function forwardedBridgeBurn(
+        address _settlementLayer,
+        address _originalCaller,
+        bytes calldata _data
+    ) external payable returns (bytes memory _bridgeMintData);
+
+    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
+    function forwardedBridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _originalCaller,
+        bytes calldata _chainData
+    ) external payable;
+
+    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
+    function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
+
+    function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);
 }

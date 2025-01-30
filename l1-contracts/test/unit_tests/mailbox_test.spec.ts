@@ -105,7 +105,7 @@ describe("Mailbox tests", function () {
       )
     );
 
-    expect(revertReason).contains("LengthIsNotDivisibleBy32");
+    expect(revertReason).contains("LengthIsNotDivisibleBy32(63)");
   });
 
   it("Should not accept bytecode of even length in words", async () => {
@@ -199,7 +199,10 @@ describe("Mailbox tests", function () {
 
     before(async () => {
       const mailboxTestContractFactory = await hardhat.ethers.getContractFactory("MailboxFacetTest");
-      const mailboxTestContract = await mailboxTestContractFactory.deploy(chainId);
+      const mailboxTestContract = await mailboxTestContractFactory.deploy(
+        chainId,
+        await mailboxTestContractFactory.signer.getChainId()
+      );
       testContract = MailboxFacetTestFactory.connect(mailboxTestContract.address, mailboxTestContract.signer);
 
       // Generating 10 more gas prices for test suit
@@ -329,7 +332,7 @@ describe("Mailbox tests", function () {
       for (const [refundRecipient, externallyOwned] of refundRecipients) {
         const result = await sendTransaction(refundRecipient);
 
-        const [, event2] = (await result.transaction.wait()).logs;
+        const [, , event2] = (await result.transaction.wait()).logs;
         const parsedEvent = mailbox.interface.parseLog(event2);
         expect(parsedEvent.name).to.equal("NewPriorityRequest");
 
