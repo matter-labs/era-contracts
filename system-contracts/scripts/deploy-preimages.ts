@@ -30,6 +30,7 @@ const MAX_COMBINED_LENGTH = 125000;
 
 const DEFAULT_ACCOUNT_CONTRACT_NAME = "DefaultAccount";
 const BOOTLOADER_CONTRACT_NAME = "Bootloader";
+const EVM_EMULATOR_CONTRACT_NAME = "EvmEmulator";
 
 const CONSOLE_COLOR_RESET = "\x1b[0m";
 const CONSOLE_COLOR_RED = "\x1b[31m";
@@ -162,6 +163,55 @@ class ZkSyncDeployer {
   async currentBootloaderBytecode(): Promise<string> {
     const zkSync = await this.deployer.zkWallet.getMainContract();
     return await zkSync.getL2BootloaderBytecodeHash();
+  }
+
+  // Returns the current evm emulator bytecode on zkSync
+  async currentEvmEmulatorBytecode(): Promise<string> {
+    const zkSync = await this.deployer.zkWallet.getMainContract();
+    return await zkSync.getL2EvmEmulatorBytecodeHash();
+  }
+
+  // If needed, appends the evm emulator bytecode to the upgrade
+  async checkShouldUpgradeEvmEmulator(evmEmulatorBytecode: string) {
+    const bytecodeHash = ethers.utils.hexlify(hashBytecode(evmEmulatorBytecode));
+    const currentEvmEmulatorBytecode = ethers.utils.hexlify(await this.currentEvmEmulatorBytecode());
+
+    // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
+    if (bytecodeHash.toLowerCase() !== currentEvmEmulatorBytecode) {
+      this.defaultAccountToUpgrade = {
+        name: EVM_EMULATOR_CONTRACT_NAME,
+        bytecodeHashes: [bytecodeHash],
+      };
+    }
+  }
+
+  // Publishes the bytecode of the evm emulator and appends it to the deployed bytecodes if needed.
+  async processEvmEmulator() {
+    const defaultEvmEmulator = (await this.deployer.loadArtifact(EVM_EMULATOR_CONTRACT_NAME)).bytecode;
+
+    await this.publishEvmEmulator(defaultEvmEmulator);
+    await this.checkShouldUpgradeEvmEmulator(defaultEvmEmulator);
+  }
+
+  async publishEvmEmulator(defaultEvmEmulatorBytecode: string) {
+    const [defaultEvmEmulatorBytecodes] = await filterPublishedFactoryDeps(
+      EVM_EMULATOR_CONTRACT_NAME,
+      [defaultEvmEmulatorBytecode],
+      this.deployer
+    );
+
+    if (defaultEvmEmulatorBytecodes.length == 0) {
+      console.log("Default evm emulator is already published, skipping");
+      return;
+    }
+
+    // Publish evm emulator bytecode
+    await this.publishFactoryDeps([
+      {
+        name: EVM_EMULATOR_CONTRACT_NAME,
+        bytecodes: defaultEvmEmulatorBytecodes,
+      },
+    ]);
   }
 
   async checkShouldUpgradeBootloader(bootloaderCode: string) {
@@ -309,6 +359,7 @@ async function main() {
     .option("--l2Rpc <l2Rpc>")
     .option("--bootloader")
     .option("--default-aa")
+    .option("--evm-emulator")
     .option("--system-contracts")
     .option("--file <file>")
     .action(async (cmd) => {
@@ -345,6 +396,10 @@ async function main() {
 
       if (cmd.defaultAa) {
         await zkSyncDeployer.processDefaultAA();
+      }
+
+      if (cmd.evmEmulator) {
+        await zkSyncDeployer.processEvmEmulator();
       }
 
       if (cmd.systemContracts) {

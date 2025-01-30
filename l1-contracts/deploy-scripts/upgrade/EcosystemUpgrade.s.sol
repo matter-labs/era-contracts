@@ -10,8 +10,10 @@ import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openze
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {Verifier} from "contracts/state-transition/Verifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -219,6 +221,7 @@ contract EcosystemUpgrade is Script {
         uint256 maxNumberOfChains;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
+        bytes32 evmEmulatorHash;
         address oldValidatorTimelock;
         address legacyErc20BridgeAddress;
         address bridgehubProxyAddress;
@@ -568,6 +571,7 @@ contract EcosystemUpgrade is Script {
             l2ProtocolUpgradeTx: _composeUpgradeTx(),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
+            evmEmulatorHash: config.contracts.evmEmulatorHash,
             verifier: addresses.stateTransition.verifier,
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
@@ -887,20 +891,34 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployVerifier() internal {
+        address verifierFflonk = deployVerifierFflonk();
+        address verifierPlonk = deployVerifierPlonk();
         bytes memory code;
         string memory contractName;
         if (config.testnetVerifier) {
             code = type(TestnetVerifier).creationCode;
             contractName = "TestnetVerifier";
         } else {
-            code = type(Verifier).creationCode;
-            contractName = "Verifier";
+            code = type(DualVerifier).creationCode;
+            contractName = "DualVerifier";
         }
+        code = abi.encodePacked(code, abi.encode(verifierFflonk, verifierPlonk));
         address contractAddress = deployViaCreate2(code);
-        notifyAboutDeployment(contractAddress, contractName, hex"");
+        notifyAboutDeployment(contractAddress, contractName, abi.encode(verifierFflonk, verifierPlonk));
         addresses.stateTransition.verifier = contractAddress;
     }
 
+    function deployVerifierFflonk() internal returns (address contractAddress) {
+        bytes memory code = type(VerifierFflonk).creationCode;
+        contractAddress = deployViaCreate2(code);
+        notifyAboutDeployment(contractAddress, "VerifierFflonk", hex"");
+    }
+
+    function deployVerifierPlonk() internal returns (address contractAddress) {
+        bytes memory code = type(VerifierPlonk).creationCode;
+        contractAddress = deployViaCreate2(code);
+        notifyAboutDeployment(contractAddress, "VerifierPlonk", hex"");
+    }
     function deployDefaultUpgrade() internal {
         address contractAddress = deployViaCreate2(type(DefaultUpgrade).creationCode);
         notifyAboutDeployment(contractAddress, "DefaultUpgrade", hex"");
@@ -1451,6 +1469,7 @@ contract EcosystemUpgrade is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+            l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever

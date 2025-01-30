@@ -63,6 +63,7 @@ struct Config {
     address governance;
     address create2FactoryAddress;
     bytes32 create2Salt;
+    bool allowEvmEmulator;
 }
 
 contract RegisterZKChainScript is Script {
@@ -182,6 +183,7 @@ contract RegisterZKChainScript is Script {
         config.governance = toml.readAddress("$.governance");
         config.create2FactoryAddress = toml.readAddress("$.create2_factory_address");
         config.create2Salt = toml.readBytes32("$.create2_salt");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function getConfig() public view returns (Config memory) {
@@ -237,6 +239,7 @@ contract RegisterZKChainScript is Script {
         );
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function getOwnerAddress() public view returns (address) {

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {VerifierTestTest} from "./Verifier.t.sol";
-import {VerifierRecursiveTest} from "contracts/dev-contracts/VerifierRecursiveTest.sol";
-
-contract VerifierRecursiveTestTest is VerifierTestTest {
+import {PlonkVerifierTestTest} from "./PlonkVerifier.t.sol";
+import {PlonkVerifierRecursiveTest} from "contracts/dev-contracts/PlonkVerifierRecursiveTest.sol";
+contract PlonkVerifierRecursiveTestTest is PlonkVerifierTestTest {
     function setUp() public override {
         super.setUp();
 
@@ -13,7 +12,7 @@ contract VerifierRecursiveTestTest is VerifierTestTest {
         serializedProof.push(16188304989094043810949359833767911976672882599560690320245309499206765021563);
         serializedProof.push(3201093556796962656759050531176732990872300033146738631772984017549903765305);
 
-        verifier = new VerifierRecursiveTest();
+        verifier = new PlonkVerifierRecursiveTest();
     }
 
     function testMoreThan4WordsRecursiveInput_shouldRevert() public {

@@ -12,9 +12,12 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-import {Verifier} from "../Verifier.sol";
+import {DualVerifier} from "../verifiers/DualVerifier.sol";
+import {VerifierFflonk} from "../verifiers/VerifierFflonk.sol";
+import {VerifierPlonk} from "../verifiers/VerifierPlonk.sol";
+
 import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {TestnetVerifier} from "../TestnetVerifier.sol";
+import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
@@ -64,6 +67,8 @@ struct GatewayCTMDeployerConfig {
     bytes32 bootloaderHash;
     /// @notice Hash of the default account bytecode.
     bytes32 defaultAccountHash;
+    /// @notice Hash of the EVM emulator bytecode.
+    bytes32 evmEmulatorHash;
     /// @notice Maximum gas limit for priority transactions.
     uint256 priorityTxMaxGasLimit;
     /// @notice Root hash of the genesis state.
@@ -232,10 +237,16 @@ contract GatewayCTMDeployer {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts
     ) internal {
+        VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
+        VerifierPlonk verifierPlonk = new VerifierPlonk{salt: _salt}();
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(new TestnetVerifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(
+                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+            );
         } else {
-            _deployedContracts.stateTransition.verifier = address(new Verifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(
+                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+            );
         }
     }
 
@@ -316,6 +327,7 @@ contract GatewayCTMDeployer {
             verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
             feeParams: _config.feeParams,
             blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR

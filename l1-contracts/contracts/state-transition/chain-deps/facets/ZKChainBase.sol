@@ -69,6 +69,13 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    modifier onlySelf() {
+        if (msg.sender != address(this)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Returns whether the priority queue is still active, i.e.
     /// the chain has not processed all transactions from it
     function _isPriorityQueueActive() internal view returns (bool) {

@@ -29,6 +29,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address validatorSenderOperatorBlobsEth;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
+        bool allowEvmEmulator;
     }
 
     ChainConfig internal eraConfig;
@@ -90,7 +91,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             validatorSenderOperatorCommitEth: address(0),
             validatorSenderOperatorBlobsEth: address(1),
             baseTokenGasPriceMultiplierNominator: uint128(1),
-            baseTokenGasPriceMultiplierDenominator: uint128(1)
+            baseTokenGasPriceMultiplierDenominator: uint128(1),
+            allowEvmEmulator: false
         });
     }
 
@@ -126,6 +128,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         );
         vm.serializeUint("chain", "governance_min_delay", 0);
         vm.serializeAddress("chain", "governance_security_council_address", address(0));
+
+        vm.serializeBool("chain", "allow_evm_emulator", description.allowEvmEmulator);
 
         string memory single_serialized = vm.serializeUint(
             "chain",

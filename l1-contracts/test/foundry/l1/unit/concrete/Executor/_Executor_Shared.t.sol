@@ -18,10 +18,11 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -87,7 +88,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](29);
+        bytes4[] memory selectors = new bytes4[](30);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getAdmin.selector;
         selectors[2] = getters.getPendingAdmin.selector;
@@ -103,20 +104,21 @@ contract ExecutorTest is Test {
         selectors[12] = getters.storedBatchHash.selector;
         selectors[13] = getters.getL2BootloaderBytecodeHash.selector;
         selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = getters.getVerifierParams.selector;
-        selectors[16] = getters.isDiamondStorageFrozen.selector;
-        selectors[17] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = getters.isEthWithdrawalFinalized.selector;
-        selectors[19] = getters.facets.selector;
-        selectors[20] = getters.facetFunctionSelectors.selector;
-        selectors[21] = getters.facetAddresses.selector;
-        selectors[22] = getters.facetAddress.selector;
-        selectors[23] = getters.isFunctionFreezable.selector;
-        selectors[24] = getters.isFacetFreezable.selector;
-        selectors[25] = getters.getTotalBatchesCommitted.selector;
-        selectors[26] = getters.getTotalBatchesVerified.selector;
-        selectors[27] = getters.storedBlockHash.selector;
-        selectors[28] = getters.isPriorityQueueActive.selector;
+        selectors[15] = getters.getL2EvmEmulatorBytecodeHash.selector;
+        selectors[16] = getters.getVerifierParams.selector;
+        selectors[17] = getters.isDiamondStorageFrozen.selector;
+        selectors[18] = getters.getPriorityTxMaxGasLimit.selector;
+        selectors[19] = getters.isEthWithdrawalFinalized.selector;
+        selectors[20] = getters.facets.selector;
+        selectors[21] = getters.facetFunctionSelectors.selector;
+        selectors[22] = getters.facetAddresses.selector;
+        selectors[23] = getters.facetAddress.selector;
+        selectors[24] = getters.isFunctionFreezable.selector;
+        selectors[25] = getters.isFacetFreezable.selector;
+        selectors[26] = getters.getTotalBatchesCommitted.selector;
+        selectors[27] = getters.getTotalBatchesVerified.selector;
+        selectors[28] = getters.storedBlockHash.selector;
+        selectors[29] = getters.isPriorityQueueActive.selector;
         return selectors;
     }
 
@@ -189,8 +191,7 @@ contract ExecutorTest is Test {
             timestamp: 0,
             commitment: bytes32("")
         });
-
-        TestnetVerifier testnetVerifier = new TestnetVerifier();
+        TestnetVerifier testnetVerifier = new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW
@@ -210,6 +211,7 @@ contract ExecutorTest is Test {
             }),
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
+            l2EvmEmulatorBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams(),
             blobVersionedHashRetriever: blobVersionedHashRetriever

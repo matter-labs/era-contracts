@@ -47,6 +47,9 @@ interface IAdmin is IZKChainBase {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Allow EVM emulation on chain
+    function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
+
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
@@ -131,6 +134,9 @@ interface IAdmin is IZKChainBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @notice The EVM emulator has been enabled
+    event EnableEvmEmulator();
 
     /// @notice New pair of DA validators set
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
