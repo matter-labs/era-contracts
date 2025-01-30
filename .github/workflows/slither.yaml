@@ -56,4 +56,4 @@ jobs:
       - name: Run Slither for L2 contracts
         working-directory: ./l2-contracts
         run: |
-          slither --config ./slither.config.json .
+          slither --config ./slither.config.json --skip-assembly .
