@@ -54,12 +54,8 @@ contract BaseUpgradeUtils is Test, ZKChainBase {
         return s.bridgehub;
     }
 
-    function getStateTransitionManager() public view returns (address) {
-        return s.stateTransitionManager;
-    }
-
     function getSharedBridge() public view returns (address) {
-        return s.baseTokenBridge;
+        return s.__DEPRECATED_baseTokenBridge;
     }
 
     // add this to be excluded from coverage report
