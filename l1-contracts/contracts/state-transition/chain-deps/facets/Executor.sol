@@ -83,6 +83,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // // Check the timestamp of the new batch
         // _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
         L1DAValidatorOutput memory daOutput;
+        daOutput.stateDiffHash = EMPTY_STRING_KECCAK;
         daOutput.blobsOpeningCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         daOutput.blobsLinearHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         ///
