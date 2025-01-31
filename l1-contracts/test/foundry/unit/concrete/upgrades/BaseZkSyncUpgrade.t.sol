@@ -7,7 +7,7 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncU
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, L2BytecodeHashMismatch, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, TooManyFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -184,10 +184,9 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
     ) public {
         vm.assume(factoryDepsLength != l2ProtocolUpgradeTxFDLength);
 
-        proposedUpgrade.factoryDeps = new bytes[](factoryDepsLength);
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](l2ProtocolUpgradeTxFDLength);
 
-        vm.expectRevert(abi.encodeWithSelector(UnexpectedNumberOfFactoryDeps.selector));
+        vm.expectRevert(abi.encodeWithSelector(TooManyFactoryDeps.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
@@ -195,7 +194,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
     function test_revertWhen_FactoryDepsCanBeAtMost32(uint8 maxNewFactoryDeps) public {
         vm.assume(maxNewFactoryDeps > MAX_NEW_FACTORY_DEPS);
 
-        proposedUpgrade.factoryDeps = new bytes[](maxNewFactoryDeps);
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](maxNewFactoryDeps);
 
         vm.expectRevert(abi.encodeWithSelector(TooManyFactoryDeps.selector));
@@ -207,15 +205,13 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = "11111111111111111111111111111111";
 
-        proposedUpgrade.factoryDeps = factoryDeps;
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](1);
 
         bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(factoryDeps[0]);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                L2BytecodeHashMismatch.selector,
-                bytecodeHash,
+                PreviousUpgradeNotFinalized.selector,
                 bytes32(proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps[0])
             )
         );
