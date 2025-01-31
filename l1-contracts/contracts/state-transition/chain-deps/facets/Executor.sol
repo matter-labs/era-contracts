@@ -57,13 +57,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
-            _chainId: s.chainId,
-            _batchNumber: uint256(_newBatch.batchNumber),
-            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
-            _operatorDAInput: _newBatch.operatorDAInput,
-            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        });
+        ///
+        /// DEBUG SUPPORT START
+        ///
+        // L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+        //     _chainId: s.chainId,
+        //     _batchNumber: uint256(_newBatch.batchNumber),
+        //     _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+        //     _operatorDAInput: _newBatch.operatorDAInput,
+        //     _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        // });
+        L1DAValidatorOutput memory daOutput;
+        ///
+        /// DEBUG SUPPORT END
+        ///
 
         if (_previousBatch.batchHash != logOutput.previousBatchHash) {
             revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
