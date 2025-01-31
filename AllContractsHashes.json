@@ -177,7 +177,7 @@
   },
   {
     "contractName": "system-contracts/L2GatewayUpgrade",
-    "zkBytecodeHash": "0x010003353ac7f5ef89ee0c223c349996e6e5f5fbdac0c98ea15fe8347ac49055",
+    "zkBytecodeHash": "0x010002b3a2c2897da45534dfea6917ab3256e896f14a9b86edd0fbd99ec03ff2",
     "zkBytecodePath": "/system-contracts/zkout/L2GatewayUpgrade.sol/L2GatewayUpgrade.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
