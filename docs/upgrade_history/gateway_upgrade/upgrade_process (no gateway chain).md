@@ -6,7 +6,7 @@ Gateway system introduces a lot of new contracts and so conducting so to provide
 
 ## Previous version
 
-The previous version can be found [here](https://github.com/matter-labs/era-contracts/tree/release-v25-protocol-defense).
+The previous version can be found [here](https://github.com/matter-labs/era-contracts/tree/main).
 
 The documentation for the previous version can be found [here](https://github.com/code-423n4/2024-03-zksync).
 
@@ -30,25 +30,23 @@ There are four roles that will be mentioned within this document:
 
 This stage involves everything that is done before the voting starts. At this stage, all the details of the upgrade must be fixed, including the chain id of the gateway.
 
-More precisely, the implementations for the contracts will have to be deployed. Also, all of the new contracts will have to be deployed along with their proxies, e.g. `CTMDeploymentTracker`, `L1AssetRouter`, etc.
-
-Also, at this stage the bytecodes all L2 contracts have to be fixed, this includes bytecode for the things like `L2DAValidators`, `GatewayCTMDeployer`, etc.
+More precisely, the implementations for the contracts will have to be deployed. Also, all of the new contracts will have to be deployed along with their proxies, e.g. `CTMDeploymentTracker`, `L1AssetRouter`, etc. Also, at this stage, the bytecodes of L2 contracts are considered fixed, i.e. they should not change.
 
 ### Ensuring Governance ownership
 
 Some of the new contracts (e.g. `CTMDeploymentTracker` ) have two sorts of admins: the admin of the their proxy as well the `owner` role inside the contract. Both should belong to governance (the former is indirectly controlled by governance via a `ProxyAdmin` contract).
 
-The governance needs to know that it will definitely retain the ownership of these contracts regardless of the actions of their deployer. This are multiple ways this is ensured:
+The governance needs to know that it will definitely retain the ownership of these contracts regardless of the actions of their deployer. There are multiple ways this is ensured:
 
 - For `TransparentUpgradaeableProxy` this is simple: we can just transfer the ownership in one step to the `ProxyAdmin` that is under control of the governance.
 - For contracts that are deployed as standalone contracts (not proxies), then if we possible we provide the address of the owner of in the constructor.
 - For proxies and for contracts for which transferring inside the constructor is not option, we would transfer the ownership to a `TransitionaryOwner` contract. This is a contract that is responsible for being a temporary owner until the voting ends and it can do only two things: accept ownership for a contract and atomically transfer it to the governance. This is a workaround we have to use since most of our contracts implement `Ownable2Step` and so it is not possible to transfer ownership in one go.
 
-PS: It may be possible that for more contracts, e.g. some of the proxies we could’ve avoided the `TransitionaryOwner` approach by e.g. providing the governance address inside of an initializer. But we anyway need the `TransitionaryOwner` for `ValidatorTimelock`, so we decided to use it in most places to keep the code simpler.
+PS: It may be possible that for more contracts, e.g. some of the proxies we could’ve avoided the `TransitionaryOwner` approach by e.g. providing the governance address inside of an initializer. But we anyway need the `TransitionaryOwner` for `ValidatorTimelock`, so we decided to use it in most places to keep the code simpler. Also, some contracts will use `Create2AndTransfer` contract that deploys a contract and immediately transfers ownership to the governance.
 
 ### L2SharedBridge and L2WETH migration
 
-In the current system (i.e. before the gateway upgrade), the trusted admin of the L1SharedBridge is responsible for [setting the correct L2SharedBridge address for chains](https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/l1-contracts/contracts/bridge/L1SharedBridge.sol#L249) (note that the links points to the old code and not the one in the scope of the contest). This is done with no additional validation. The system is generally designed to protect chains in case when a malicious admin tries to attack a chain. There are two measures to do that:
+In the current system (i.e. before the gateway upgrade), the trusted admin of the L1SharedBridge is responsible for [setting the correct L2SharedBridge address for chains](https://github.com/matter-labs/era-contracts/blob/aafee035db892689df3f7afe4b89fd6467a39313/l1-contracts/contracts/bridge/L1SharedBridge.sol#L249) (note that the links points to the old code). This is done with no additional validation. The system is generally designed to protect chains in case when a malicious admin tries to attack a chain. There are two measures to do that:
 
 - The general assumption is that the L2 shared bridge is set for a chain as soon as possible. It is a realistic assumption, since without it no bridging of any funds except for the base token is possible. So if at an early stage the admin would put a malicious l2 shared bridge for a chain, it would lose its trust from the community and the chain should be discarded.
 - Admin can not retroactively change L2 shared bridge for any chains. So once the correct L2 shared bridge is set, there is no way a bad admin can harm the chain.
@@ -92,26 +90,23 @@ This upgrade the different approach is used to ensure safe and riskless preparat
 
 The governance should sign all operations that will happen in all of the consecutive stages at this time. There will be no other voting. Unless stated otherwise, all the governance operations in this document are listed as dependencies for one another, i.e. must be executed in strictly sequential order.
 
-Note, that to support “Stage 3” it would also need to finalize all the details for Gateway, including its chain id, chain admin, etc.
-
 ## Stage 1. Publishing of the new protocol upgrade
 
 ### Txs by governance (in one multicall)
 
 1. The governance accepts ownership for all the contracts that used `TransitionaryOwner`.
 2. The governance publishes the new version by calling `function setNewVersionUpgrade`.
-3. The governance calls `setChainCreationParams` and sets temporary incorrect values there that use a contract that always reverts as the `genesisUpgrade`, ensuring that no new chains can be created until Stage 2.
-4. The governance should call the `GovernanceUpgradeTimer.startTimer()` to ensure that the timer for the upgrade starts.
+3. The governance sets the new `validatorTimelock`.
+4. The governance calls `setChainCreationParams` and sets the new chain creation params to ensure that the chain creation fails.
+5. The governance should call the `GovernanceUpgradeTimer.startTimer()` to ensure that the timer for the upgrade starts. It will give the ecosystem's chains a fixed amount of time to upgrade their chains before the old protocol version becomes invalid.
 
 ### Impact
 
 The chains will get the ability to upgrade to the new protocol version. They will be advised to do so before the deadline for upgrade runs out.
 
-Also, new chains wont be deployable during this stage due to step (3).
+Also, new chains wont be deployable during this stage due to step (4).
 
 Chains, whether upgraded or not, should work as usual as the new L2 bridging ecosystem is fully compatible with the old L1SharedBridge.
-
-Chains that upgrade need to carefully coordinate this upgrade on the server side, since validator timelock changes and also there is a need to keep track of the number of already existing priority ops that were not included into the priority tree.
 
 ## Chain Upgrade flow
 
@@ -154,7 +149,7 @@ So entire flow can be summarized by the following:
 ### Txs by governance (in one multicall)
 
 - call the `GovernanceUpgradeTimer` to check whether the deadline has passed as only after that the upgrade can be finalized.
-- set the protocol version deadline for the old version to 0, i.e. ensuring that all the contracts with the old version wont be able to commit any new batches.
+- set the protocol version deadline for the old version to 0, i.e. ensuring that all the chains with the old version wont be able to commit any new batches.
 - upgrade the old contracts to the new implementation.
 - set the correct new chain creation params, upgrade the old contracts to the new one
 
@@ -179,38 +174,12 @@ The exact way these functions will be executed is out of scope of this document.
 
 ### Impact
 
-The ecosystem has been fully transformed to the new version. However, the gateway chain is not yet ready.
-
-All the chains should start returning the address of the `L1AssetRouter` as the address of the L1SharedBridge in the API.
-
-## Stage 3. Deploying of Gateway
-
-### Txs by governance (sequentially, potentially different txs)
-
-1. Call `Bridgehub.createNewChain` with the data for gateway.
-2. It will have to register it via `bridgehub.registerSettlementLayer`
-3. It will have to do the L1→L2 transactions to register the CTM on Gateway as the valid CTM inside the L2Bridgehub as well as to set the CTM inside Gateway as the asset handler for the chains.
-
-Note, that steps (2) and (3) can be executed before this CTM has been ever deployed. These are expected to be deployed via [c](../../../l1-contracts/contracts/state-transition/chain-deps/GatewayCTMDeployer.sol) that itself should be deployed deployed via Create2Factory. So the address of the CTM can be precomputed.
-
-In case anyone will try to migrate their chain on top of gateway while CTM is not yet deployed, the migration will fail due to the calls to this CTM failing (standard Solidity checks for non-empty code size when doing high level calls).
-
-### Txs by anyone
-
-Anyone with funds on Gateway can deploy the `GatewayCTMDeployer` and it will deploy inside its constructor the CTM described from above.
-
-It can not be done as part of the governance transactions from above since it requires pre-publishing CTM-specific bytecodes.
+The ecosystem has been fully transformed to the new version.
 
 ## Security notes
 
 ### Importance of preventing new batches being committed with the old version
 
-The new `L1AssetRouter` is not compatible with chains that do not support the new protocol version as they do not have `L2AssetRouter` deployed. Doing bridging to such new chains will lead to funds being lost without recovery (since formally the L1->L2 transaction won't fail as it is just a call to an empty address).
+The new `L1AssetRouter` is not compatible with chains that do not support the new protocol version as they do not have `L2AssetRouter` deployed. Doing bridging to such chains will lead to funds being lost without recovery (since formally the L1->L2 transaction won't fail as it is just a call to an empty address).
 
 This is why it is crucial that on step (2) we revoke the ability for outdated chains to push new batches as those might've been spawned using the `L1AssetRouter`.
-
-### Impact of malicious ecosystem admin
-
-In theory, the ecosystem admin can front-run this deployment and set potentially bad values for the Gateway chain. It will just mean that the first transaction will fail. Due to sequential dependencies between txs, the rest won’t be executed and so the malicious chain wont be whitelisted as the settlement layer.
-
-While unlikely, in this case the Governance will have to re-do the voting for the gateway chain, including voting to remove the admin rights from the malicious admin.
