@@ -40,7 +40,7 @@ contract UpgradeTest is Test {
         // ecosystem.
         Call[] memory stage1Calls = generateUpgradeData.getStage1UpgradeCalls();
 
-        governanceMulticall(generateUpgradeData.getOwnerAddress(), stage1Calls);
+        governanceMulticall(generateUpgradeData.getProtocolUpgradeHandlerAddress(), stage1Calls);
 
         console.log("Stage1 is done, now all the chains have to upgrade to the new version");
 
@@ -62,7 +62,10 @@ contract UpgradeTest is Test {
         vm.warp(block.timestamp + generateUpgradeData.getInitialDelay());
 
         console.log("Starting stage2 of the upgrade!");
-        governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());
+        governanceMulticall(
+            generateUpgradeData.getProtocolUpgradeHandlerAddress(),
+            generateUpgradeData.getStage2UpgradeCalls()
+        );
 
         // TODO: here we should have tests that the bridging works for the previously deployed chains
         // and that it does not work for those that did not upgrade.
