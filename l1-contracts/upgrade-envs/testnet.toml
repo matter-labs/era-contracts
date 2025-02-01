@@ -1,11 +1,10 @@
 era_chain_id = 300
 testnet_verifier = true
-governance_upgrade_timer_initial_delay = 86400
+governance_upgrade_timer_initial_delay = 1209600
 
 [contracts]
 max_number_of_chains = 100
-governance_address = "0xe3a615778aeEC76df1B368948a1D1614497Db858"
-create2_factory_salt = "0x495dffcf82ef60e07d32d8b110a75dd63ce589ebc3fb31ac8b2547feea073558"
+create2_factory_salt = "0x4a5dffcf82ef60e07d32d8b110a75dd63ce589ebc3fb31ac8b2547feea073559"
 validator_timelock_execution_delay = 0
 genesis_root = "0xd8c9be7efb705e7dcf529c14fce7048ea99dea9eab6a6b4e5f8de1ebf4f2ebf2"
 genesis_rollup_leaf_index = 68
