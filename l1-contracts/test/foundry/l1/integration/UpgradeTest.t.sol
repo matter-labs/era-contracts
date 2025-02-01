@@ -10,11 +10,26 @@ import {EcosystemUpgrade} from "deploy-scripts/upgrade/EcosystemUpgrade.s.sol";
 import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 string constant ECOSYSTEM_INPUT = "/upgrade-envs/mainnet.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
 string constant CHAIN_INPUT = "/upgrade-envs/mainnet-era.toml";
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-era.toml";
+
+interface BridgehubLegacy {
+    function createNewChain(
+        uint256 _chainId,
+        address _stateTransitionManager,
+        address _baseToken,
+        // solhint-disable-next-line no-unused-vars
+        uint256 _salt,
+        address _admin,
+        bytes calldata _initData
+    ) external;
+}
 
 contract UpgradeTest is Test {
     EcosystemUpgrade generateUpgradeData;
@@ -23,6 +38,34 @@ contract UpgradeTest is Test {
     function setUp() public {
         generateUpgradeData = new EcosystemUpgrade();
         chainUpgrade = new ChainUpgrade();
+    }
+
+
+    // This is a function used to create a new chain.
+    // Between stage1 and stage2 calls new chain creation should not work.
+    function createNewChain(
+        uint256 chainId,
+        bool legacy
+    ) internal {
+        address ecosystemAdmin = generateUpgradeData.getEcosystemAdmin();
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+
+        address ctm = generateUpgradeData.getChainTypeManager();
+
+        if (legacy) {
+            BridgehubLegacy bh = BridgehubLegacy(generateUpgradeData.getBridgehub());
+            bytes memory diamondCutData = abi.encode(generateUpgradeData.getDummyDiamondCutData());
+            vm.expectRevert(abi.encodeWithSignature("NonEmptyCalldata()"));
+            vm.startBroadcast(ecosystemAdmin);
+            bh.createNewChain(chainId, ctm, ETH_TOKEN_ADDRESS, uint256(keccak256(abi.encodePacked(chainId))), ecosystemAdmin, diamondCutData);
+            vm.stopBroadcast();
+
+        } else {
+            Bridgehub bh = Bridgehub(generateUpgradeData.getBridgehub());
+            vm.startBroadcast(ecosystemAdmin);
+            bh.createNewChain(chainId, ctm, ethAssetId, uint256(keccak256(abi.encodePacked(chainId))), ecosystemAdmin, abi.encode(generateUpgradeData.getDiamondCutData(), generateUpgradeData.prepareForceDeploymentsData()), new bytes[](0));
+            vm.stopBroadcast();
+        }
     }
 
     function test_MainnetFork() public {
@@ -54,6 +97,12 @@ contract UpgradeTest is Test {
             generateUpgradeData.getChainUpgradeInfo()
         );
 
+        createNewChain(
+            101101,
+            true
+        );
+
+
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
@@ -65,6 +114,12 @@ contract UpgradeTest is Test {
         governanceMulticall(
             generateUpgradeData.getProtocolUpgradeHandlerAddress(),
             generateUpgradeData.getStage2UpgradeCalls()
+        );
+
+        // Checking that deploying a new chain works after the upgrade
+        createNewChain(
+            101101,
+            false
         );
 
         // TODO: here we should have tests that the bridging works for the previously deployed chains

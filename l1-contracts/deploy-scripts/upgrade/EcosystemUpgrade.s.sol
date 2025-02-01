@@ -79,6 +79,19 @@ interface IBridgehubLegacy {
     function stateTransitionManager(uint256 chainId) external returns (address);
 }
 
+interface StateTransitionManagerLegacy {
+    // Unlike the creation params for the new `ChainTypeManager`, it does not contain force deployments
+    // fata.
+    struct ChainCreationParams {
+        address genesisUpgrade;
+        bytes32 genesisBatchHash;
+        uint64 genesisIndexRepeatedStorageChanges;
+        bytes32 genesisBatchCommitment;
+        Diamond.DiamondCutData diamondCut;
+    }
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
+}
+
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -418,6 +431,14 @@ contract EcosystemUpgrade is Script {
         return 0x1900000000;
     }
 
+    function getDummyDiamondCutData() public returns (Diamond.DiamondCutData memory) {
+        return Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: hex""
+        });
+    }
+
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
         // Just retrieved it from the contract
         uint256 PREVIOUS_PROTOCOL_VERSION = getOldProtocolVersion();
@@ -439,6 +460,21 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
 
+        // Note, that we will also need to turn off the abilty to create new chains
+        // in the interim of the upgrade. 
+        Call memory setCreationParamsCall = Call({
+            target: config.contracts.stateTransitionManagerAddress,
+            data: abi.encodeCall(StateTransitionManagerLegacy.setChainCreationParams, (StateTransitionManagerLegacy.ChainCreationParams({
+                // These is a temporary dummy value to prevent deployment of new chains
+                genesisUpgrade: address(uint160(1)),
+                genesisBatchHash: config.contracts.genesisRoot,
+                genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+                genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+                diamondCut: getDummyDiamondCutData()
+            }))),
+            value: 0
+        });
+
         // The call that will start the timer till the end of the upgrade.
         Call memory timerCall = Call({
             target: addresses.upgradeTimer,
@@ -446,10 +482,11 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
 
-        calls = new Call[](3);
+        calls = new Call[](4);
         calls[0] = ctmCall;
         calls[1] = setValidatorTimelockCall;
-        calls[2] = timerCall;
+        calls[2] = setCreationParamsCall;
+        calls[3] = timerCall;
     }
 
     function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData) {
@@ -585,6 +622,18 @@ contract EcosystemUpgrade is Script {
 
     function getEcosystemAdmin() external returns (address) {
         return config.ecosystemAdminAddress;
+    }
+
+    function getBridgehub() external returns (address) {
+        return config.contracts.bridgehubProxyAddress;
+    } 
+
+    function getChainTypeManager() external returns (address) {
+        return config.contracts.stateTransitionManagerAddress;
+    }
+
+    function getDiamondCutData() external returns (bytes memory) {
+        return generatedData.diamondCutData;
     }
 
     function getStage1UpgradeCalls() public returns (Call[] memory calls) {
@@ -1719,7 +1768,7 @@ contract EcosystemUpgrade is Script {
         return Utils.deployViaCreate2(_bytecode, config.contracts.create2FactorySalt, addresses.create2Factory);
     }
 
-    function prepareForceDeploymentsData() internal view returns (bytes memory) {
+    function prepareForceDeploymentsData() public view returns (bytes memory) {
         require(config.protocolUpgradeHandlerProxyAddress != address(0), "protocol upgrade handler not set");
 
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
