@@ -264,6 +264,16 @@ contract EcosystemUpgrade is Script {
 
     CachedBytecodeHashes internal cachedBytecodeHashes;
 
+    // Just reads the input data for the script.
+    function testInitialize(string memory configPath, string memory outputPath) public {
+        string memory root = vm.projectRoot();
+        configPath = string.concat(root, configPath);
+        outputPath = string.concat(root, outputPath);
+        initializeConfig(configPath);
+
+        initializeOldData();
+    }
+
     function prepareEcosystemContracts(string memory configPath, string memory outputPath) public {
         string memory root = vm.projectRoot();
         configPath = string.concat(root, configPath);
@@ -340,7 +350,7 @@ contract EcosystemUpgrade is Script {
         config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
     }
 
-    function provideAcceptOwnershipCalls() public returns (Call[] memory calls) {
+    function provideAcceptOwnershipCalls() public view returns (Call[] memory calls) {
         console.log("Providing accept ownership calls");
 
         calls = new Call[](4);
@@ -366,7 +376,7 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function getProtocolUpgradeHandlerAddress() public returns (address) {
+    function getProtocolUpgradeHandlerAddress() public view returns (address) {
         return config.protocolUpgradeHandlerProxyAddress;
     }
 
@@ -413,25 +423,25 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function getNewProtocolVersion() public returns (uint256) {
+    function getNewProtocolVersion() public pure returns (uint256) {
         return 0x1a00000000;
     }
 
-    function getProtocolUpgradeNonce() public returns (uint256) {
+    function getProtocolUpgradeNonce() public pure returns (uint256) {
         return (getNewProtocolVersion() >> 32);
     }
 
-    function getOldProtocolDeadline() public returns (uint256) {
+    function getOldProtocolDeadline() public pure returns (uint256) {
         // Note, that it is this way by design, on stage2 it
         // will be set to 0
         return type(uint256).max;
     }
 
-    function getOldProtocolVersion() public returns (uint256) {
+    function getOldProtocolVersion() public pure returns (uint256) {
         return 0x1900000000;
     }
 
-    function getDummyDiamondCutData() public returns (Diamond.DiamondCutData memory) {
+    function getDummyDiamondCutData() public pure returns (Diamond.DiamondCutData memory) {
         return Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(0),
@@ -620,19 +630,19 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function getEcosystemAdmin() external returns (address) {
+    function getEcosystemAdmin() external view returns (address) {
         return config.ecosystemAdminAddress;
     }
 
-    function getBridgehub() external returns (address) {
+    function getBridgehub() external view returns (address) {
         return config.contracts.bridgehubProxyAddress;
     } 
 
-    function getChainTypeManager() external returns (address) {
+    function getChainTypeManager() external view returns (address) {
         return config.contracts.stateTransitionManagerAddress;
     }
 
-    function getDiamondCutData() external returns (bytes memory) {
+    function getDiamondCutData() external view returns (bytes memory) {
         return generatedData.diamondCutData;
     }
 
