@@ -14,6 +14,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
 
 string constant ECOSYSTEM_INPUT = "/upgrade-envs/mainnet.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
@@ -225,8 +226,6 @@ contract UpgradeTestScriptBased is UpgradeTestAbstract {
         return generateUpgradeData.getStage2UpgradeCalls();
     }
 
-    // --- The test method with the same logic as before -------------------------
-
     function test_MainnetForkScriptBased() public {
         _mainnetForkTestImpl();
     }
@@ -320,12 +319,22 @@ contract UpgradeTestFileBased is UpgradeTestAbstract {
     function _getStage2UpgradeCalls() internal override returns (Call[] memory) {
         string memory toml = vm.readFile(outputFile);
         return abi.decode(toml.readBytes("$.governance_stage2_calls"), (Call[]));
-
     }
-
-    // --- The test method with the same logic as before -------------------------
 
     function test_MainnetForkFileBased() public {
         _mainnetForkTestImpl();
+
+        // We should also double check that at least emergency upgrades work.
+        address puh = generateUpgradeData.getProtocolUpgradeHandlerAddress();
+        address emergencyUpgradeBoard = IProtocolUpgradeHandler(puh).emergencyUpgradeBoard();
+
+        IProtocolUpgradeHandler.Call[] memory calls = new IProtocolUpgradeHandler.Call[](1);
+        vm.startBroadcast(emergencyUpgradeBoard);
+        IProtocolUpgradeHandler(puh).executeEmergencyUpgrade(IProtocolUpgradeHandler.UpgradeProposal({
+            calls: calls,
+            executor: emergencyUpgradeBoard,
+            salt: bytes32(0)
+        }));
+        vm.stopBroadcast();
     }
 }
