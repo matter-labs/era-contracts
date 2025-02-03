@@ -107,6 +107,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // If we are settling on top of Gateway, we always relay the full stored batch info
         // to ensure that new batches can be always built on top of the previous ones.
         if (L1_CHAIN_ID != block.chainid) {
+            // slither-disable-next-line unused-return
             IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
             );
