@@ -6,6 +6,8 @@ import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {InteropBundle, InteropCall} from "../../common/Messaging.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 
 error InvalidMessage();
 contract AssetTrackerBase is IAssetTrackerBase {
@@ -34,8 +36,8 @@ contract AssetTrackerBase is IAssetTrackerBase {
     /// note we don't process L1 txs here, since we can do that when accepting the tx. 
     function processLogsAndMessages(L2Log[] calldata _logs, bytes[] calldata _messages, bytes32) external {
         uint256 msgCount = 0;
-        for (uint256 i = 0; i < _logs.length; i++) {
-            L2Log memory log = _logs[i];
+        for (uint256 logCount = 0; logCount < _logs.length; logCount++) {
+            L2Log memory log = _logs[logCount];
             if (log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR || log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                 continue;
             }
@@ -48,12 +50,11 @@ contract AssetTrackerBase is IAssetTrackerBase {
 
             // handle msg.value call separately
             InteropCall memory interopCall = interopBundle.calls[0];
-            for (uint256 i = 1; i < interopBundle.calls.length; i++) {
-                if (interopCall.data[0:4] != IAssetRouterBase.finalizeDeposit.selector) {
+            for (uint256 callCount = 1; callCount < interopBundle.calls.length; callCount++) {
+                if (bytes4(interopCall.data) != IAssetRouterBase.finalizeDeposit.selector) {
                     revert InvalidMessage();
                 }
-
-                (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = abi.decode(interopCall.data[4:], (uint256, bytes32, bytes));
+                (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(interopCall.data);
                 (, ,, uint256 amount,) = DataEncoding.decodeBridgeMintData(transferData);
                 if (isMinterChain[fromChainId][assetId]) {
                     chainBalance[fromChainId][assetId] -= amount;
@@ -67,5 +68,9 @@ contract AssetTrackerBase is IAssetTrackerBase {
             // kl todo add change minter role here
             msgCount++;
         }
+    }
+
+    function parseInteropCall(bytes calldata _callData) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData) {
+        (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
     }
 }

@@ -3,13 +3,15 @@
 pragma solidity ^0.8.24;
 
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
+import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 
 import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
 
-contract L1AssetTracker is IL1AssetTracker {
+contract L1AssetTracker is IL1AssetTracker, AssetTrackerBase {
 
     IL1AssetRouter public immutable L1_ASSET_ROUTER;
 
