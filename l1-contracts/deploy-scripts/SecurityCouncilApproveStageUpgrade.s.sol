@@ -13,11 +13,11 @@ contract SecurityCouncilApproveStageUpgrade is Script {
 
     function run() external {
         // Insert the address of the protocol upgrade handler here.
-        IProtocolUpgradeHandler protocolUpgradeHandler = IProtocolUpgradeHandler(address(0));
+        IProtocolUpgradeHandler protocolUpgradeHandler = IProtocolUpgradeHandler(vm.envAddress("PROTOCOL_UPGRADE_HANDLER"));
         // Insert the private key of the stage governance
-        Vm.Wallet memory wallet = vm.createWallet(uint256(0));
+        Vm.Wallet memory wallet = vm.createWallet(uint256(vm.envBytes32("PRIVATE_KEY")));
 
-        bytes32 upgradeId = bytes32(0);
+        bytes32 upgradeId = bytes32(vm.envBytes32("UGPRADE_ID"));
 
         Utils.securityCouncilApproveUpgrade(protocolUpgradeHandler, wallet, upgradeId);
     }
