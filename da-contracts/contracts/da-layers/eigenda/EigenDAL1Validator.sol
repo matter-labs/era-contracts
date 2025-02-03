@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
