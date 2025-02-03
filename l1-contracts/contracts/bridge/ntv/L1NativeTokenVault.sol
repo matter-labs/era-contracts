@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.24;
 
+import {console} from "forge-std/console.sol";
+
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
@@ -17,10 +19,11 @@ import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
-
+import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
 import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred, WrongCounterpart} from "../L1BridgeContractErrors.sol";
@@ -35,9 +38,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
+    IL1AssetTracker public l1AssetTracker;
+
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
+    // kl todo deprecate
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -83,6 +89,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }
 
+    function setL1AssetTracker(address _l1AssetTracker) external {
+        l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
+    }
+
     /// @notice Transfers tokens from shared bridge as part of the migration process.
     /// The shared bridge becomes the L1Nullifier contract.
     /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
@@ -118,7 +128,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
         uint256 nullifierChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
-        chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
+        // chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
         originChainId[assetId] = block.chainid;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
@@ -284,8 +294,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
         if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
-            chainBalance[_chainId][_assetId] += _amount;
-        }
+            l1AssetTracker.handleChainBalanceIncrease(_chainId, _assetId, _amount, _isNative);
+        }    
     }
 
     function _handleChainBalanceDecrease(
@@ -297,12 +307,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
         if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
-            // Check that the chain has sufficient balance
-            if (chainBalance[_chainId][_assetId] < _amount) {
-                revert InsufficientChainBalance();
-            }
-            chainBalance[_chainId][_assetId] -= _amount;
-        }
+            l1AssetTracker.handleChainBalanceDecrease(_chainId, _assetId, _amount, _isNative);
+        }    
     }
 
     /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.

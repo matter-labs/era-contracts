@@ -116,6 +116,8 @@ struct BridgehubDeployedAddresses {
     address messageRootProxy;
     address interopCenterImplementation;
     address interopCenterProxy;
+    address assetTrackerImplementation;
+    address assetTrackerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing

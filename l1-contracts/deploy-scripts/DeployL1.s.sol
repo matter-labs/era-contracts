@@ -59,6 +59,7 @@ import {ValidiumL1DAValidator} from "../contracts/state-transition/data-availabi
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
+import {L1AssetTracker} from "../contracts/bridge/asset-tracker/L1AssetTracker.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -122,6 +123,8 @@ contract DeployL1Script is Script, DeployUtils {
         deployL1NativeTokenVaultProxy();
         deployErc20BridgeImplementation();
         deployErc20BridgeProxy();
+        deployAssetTrackerImplementation();
+        deployAssetTrackerProxy();
         updateSharedBridge();
         deployCTMDeploymentTracker();
         setBridgehubParams();
@@ -465,11 +468,38 @@ contract DeployL1Script is Script, DeployUtils {
         addresses.bridges.erc20BridgeProxy = contractAddress;
     }
 
+    function deployAssetTrackerImplementation() internal {
+        address contractAddress = deployViaCreate2(
+            type(L1AssetTracker).creationCode,
+            abi.encode(
+                addresses.bridges.sharedBridgeProxy,
+                addresses.vaults.l1NativeTokenVaultProxy
+            )
+        );
+        console.log("AssetTrackerImplementation deployed at:", contractAddress);
+        addresses.bridgehub.assetTrackerImplementation = contractAddress;
+    }
+
+    function deployAssetTrackerProxy() internal {
+        bytes memory initCalldata = abi.encodeCall(L1AssetTracker.initialize, ());
+        address contractAddress = deployViaCreate2(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(addresses.bridgehub.assetTrackerImplementation, addresses.transparentProxyAdmin, initCalldata)
+        );
+        console.log("AssetTrackerProxy deployed at:", contractAddress);
+        addresses.bridgehub.assetTrackerProxy = contractAddress;
+    }
+
     function updateSharedBridge() internal {
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         vm.broadcast(msg.sender);
         sharedBridge.setL1Erc20Bridge(L1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
         console.log("SharedBridge updated with ERC20Bridge address");
+
+        vm.broadcast(msg.sender);
+        L1NativeTokenVault ntv = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        ntv.setL1AssetTracker(addresses.bridgehub.assetTrackerProxy);
+        console.log("L1NativeTokenVault updated with AssetTracker address");
     }
 
     function deployBridgedStandardERC20Implementation() internal {

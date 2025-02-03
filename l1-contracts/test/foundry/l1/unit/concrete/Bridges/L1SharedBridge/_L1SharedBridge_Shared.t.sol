@@ -19,6 +19,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
+import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -74,6 +75,7 @@ contract L1AssetRouterTest is Test {
     address l1WethAddress;
     address l2SharedBridge;
     address l1NullifierAddress;
+    address l1AssetTrackerAddress;
     TestnetERC20Token token;
     bytes32 tokenAssetId;
     uint256 eraPostUpgradeFirstBatch;
@@ -123,6 +125,7 @@ contract L1AssetRouterTest is Test {
         l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
         l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
         l2LegacySharedBridgeAddr = makeAddr("l2LegacySharedBridge");
+        l1AssetTrackerAddress = makeAddr("l1AssetTracker");
         merkleProof = new bytes32[](1);
         eraPostUpgradeFirstBatch = 1;
 
@@ -174,7 +177,8 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
-
+        nativeTokenVault.setL1AssetTracker(l1AssetTrackerAddress);
+        
         vm.prank(owner);
         l1Nullifier.setL1AssetRouter(address(sharedBridge));
         vm.prank(owner);
@@ -213,6 +217,11 @@ contract L1AssetRouterTest is Test {
             interopCenterAddress,
             abi.encodeWithSelector(IInteropCenter.requestL2TransactionDirect.selector),
             abi.encode(txHash)
+        );
+        vm.mockCall(
+            l1AssetTrackerAddress,
+            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncrease.selector),
+            abi.encode()
         );
 
         token.mint(address(nativeTokenVault), amount);
