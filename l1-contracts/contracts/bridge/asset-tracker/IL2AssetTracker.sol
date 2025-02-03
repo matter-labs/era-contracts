@@ -4,6 +4,4 @@ pragma solidity ^0.8.21;
 
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
-interface IL2AssetTracker is IAssetTrackerBase {
-
-}
+interface IL2AssetTracker is IAssetTrackerBase {}

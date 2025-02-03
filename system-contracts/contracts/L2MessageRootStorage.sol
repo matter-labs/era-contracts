@@ -19,11 +19,7 @@ contract L2MessageRootStorage {
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
     // mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
 
-    function addMessageRoot(
-        uint256 chainId,
-        uint256 batchNumber,
-        bytes32 msgRoot
-    ) external {
+    function addMessageRoot(uint256 chainId, uint256 batchNumber, bytes32 msgRoot) external {
         // todo add access control, onlyBootloader
         msgRoots[chainId][batchNumber] = msgRoot;
         // make sure we cannot have duplicates here.

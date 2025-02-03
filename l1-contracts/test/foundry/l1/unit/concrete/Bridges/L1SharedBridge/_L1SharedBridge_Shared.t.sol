@@ -178,7 +178,7 @@ contract L1AssetRouterTest is Test {
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
         nativeTokenVault.setL1AssetTracker(l1AssetTrackerAddress);
-        
+
         vm.prank(owner);
         l1Nullifier.setL1AssetRouter(address(sharedBridge));
         vm.prank(owner);

@@ -295,7 +295,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // since these chains can mint new instances of the token.
         if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
             l1AssetTracker.handleChainBalanceIncrease(_chainId, _assetId, _amount, _isNative);
-        }    
+        }
     }
 
     function _handleChainBalanceDecrease(
@@ -308,7 +308,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // since these chains can mint new instances of the token.
         if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
             l1AssetTracker.handleChainBalanceDecrease(_chainId, _assetId, _amount, _isNative);
-        }    
+        }
     }
 
     /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.

@@ -9,7 +9,6 @@ interface IAssetTrackerBase {
     //     uint256 _amount,
     //     bool _isNative
     // ) external;
-
     // function handleChainBalanceDecrease(
     //     uint256 _chainId,
     //     bytes32 _assetId,

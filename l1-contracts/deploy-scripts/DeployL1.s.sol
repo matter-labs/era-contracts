@@ -471,10 +471,7 @@ contract DeployL1Script is Script, DeployUtils {
     function deployAssetTrackerImplementation() internal {
         address contractAddress = deployViaCreate2(
             type(L1AssetTracker).creationCode,
-            abi.encode(
-                addresses.bridges.sharedBridgeProxy,
-                addresses.vaults.l1NativeTokenVaultProxy
-            )
+            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy)
         );
         console.log("AssetTrackerImplementation deployed at:", contractAddress);
         addresses.bridgehub.assetTrackerImplementation = contractAddress;
