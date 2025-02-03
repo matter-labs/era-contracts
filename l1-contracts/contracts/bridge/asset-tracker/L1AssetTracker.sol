@@ -15,11 +15,6 @@ contract L1AssetTracker is IL1AssetTracker {
 
     IL1NativeTokenVault public immutable L1_NATIVE_TOKEN_VAULT;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
-    /// This serves as a security measure until hyperbridging is implemented.
-    /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
-
     constructor(address _l1AssetRouter, address _l1NativeTokenVault) {
         L1_ASSET_ROUTER = IL1AssetRouter(_l1AssetRouter);
         L1_NATIVE_TOKEN_VAULT = IL1NativeTokenVault(_l1NativeTokenVault);
