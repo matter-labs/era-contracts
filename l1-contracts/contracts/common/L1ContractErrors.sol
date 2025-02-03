@@ -121,8 +121,12 @@ error InsufficientChainBalance();
 error InvalidCaller(address);
 // 0x4fbe5dba
 error InvalidDelay();
+// 
+error InvalidLogKey(uint256 expectedLogKey, uint256 logKey);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
+//
+error InvalidLogValue(bytes32 expectedValue, bytes32 providedValue);
 // 0xd8e9405c
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
 // 0x09bde339

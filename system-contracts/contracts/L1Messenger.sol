@@ -75,6 +75,10 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         return SHA256_ROUND_GAS_COST * ((_length + 8) / SHA256_ROUND_NUMBER_OF_BYTES + 1);
     }
 
+    function logTreeSides() internal view returns (bytes32[] memory logSides) {
+        return logsTree._sides;
+    }
+
     /// @notice Sends L2ToL1Log.
     /// @param _isService The `isService` flag.
     /// @param _key The `key` part of the L2Log.

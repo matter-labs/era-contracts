@@ -19,6 +19,10 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
+uint256 constant MAX_MSG_ROOTS_IN_BATCH = 100;
+uint256 constant LOGS_PER_MSG_ROOT = 3;
+uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max) + MAX_MSG_ROOTS_IN_BATCH * LOGS_PER_MSG_ROOT;
+
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
     bytes32 chainedPriorityTxsHash;

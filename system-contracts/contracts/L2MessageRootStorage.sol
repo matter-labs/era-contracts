@@ -8,19 +8,26 @@ import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Nullifer contract for L2->L2 txs.
+ * @notice MessageRootStorage contract for imported L2 message roots..
  * @dev
  */
 contract L2MessageRootStorage {
-    mapping(uint256 chainId => mapping(uint256 blockNumber => bytes32 msgRoot)) public msgRoots;
-    mapping(bytes32 msgRoot => uint256 blockNumber) public blockNumberFromMsgRoot;
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 msgRoot)) public msgRoots;
+    mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
     mapping(bytes32 msgRoot => uint256 chainId) public chainIdFromMsgRoot;
 
-    function addMessageRoot(uint256 chainId, uint256 blockNumber, bytes32 msgRoot) external {
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
+    // mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
+
+    function addMessageRoot(
+        uint256 chainId,
+        uint256 batchNumber,
+        bytes32 msgRoot
+    ) external {
         // todo add access control, onlyBootloader
-        msgRoots[chainId][blockNumber] = msgRoot;
+        msgRoots[chainId][batchNumber] = msgRoot;
         // make sure we cannot have duplicates here.
-        blockNumberFromMsgRoot[msgRoot] = blockNumber;
+        batchNumberFromMsgRoot[msgRoot] = batchNumber;
         chainIdFromMsgRoot[msgRoot] = chainId;
     }
 }

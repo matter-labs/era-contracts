@@ -55,6 +55,9 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev The incremental merkle tree storing the chain message roots.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
+    /// @notice The mapping from block number to the global message root.
+    mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
+
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
@@ -116,7 +119,9 @@ contract MessageRoot is IMessageRoot, Initializable {
         emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
-        emit NewGlobalMessageRoot(sharedTree.root());
+        bytes32 sharedTreeRoot = sharedTree.root();
+        emit NewGlobalMessageRoot(sharedTreeRoot);
+        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     /// @dev Gets the aggregated root of all chains.
@@ -141,7 +146,9 @@ contract MessageRoot is IMessageRoot, Initializable {
         }
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
-        emit NewGlobalMessageRoot(sharedTree.root());
+        bytes32 newRoot = sharedTree.root();
+        emit NewGlobalMessageRoot(newRoot);
+        historicalRoot[block.number] = newRoot;
     }
 
     function _initialize() internal {
