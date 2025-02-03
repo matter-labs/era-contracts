@@ -22,7 +22,7 @@ import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1T
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
-/// @dev The version that is used for the `Executor` calldata used for relaying the 
+/// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
 uint8 constant RELAYED_EXECUTOR_VERSION = 0;
 
@@ -104,10 +104,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             commitment: commitment
         });
 
-        // If we are settling on top of Gateway, we always relay the full stored batch info 
+        // If we are settling on top of Gateway, we always relay the full stored batch info
         // to ensure that new batches can be always built on top of the previous ones.
         if (L1_CHAIN_ID != block.chainid) {
-            IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
+            IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(
+                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
+            );
         }
     }
 
