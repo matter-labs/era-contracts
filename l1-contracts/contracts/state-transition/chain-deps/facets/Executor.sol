@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IL1Messenger} from "../../../common/interfaces/IL1Messenger.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
@@ -20,6 +21,10 @@ import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1T
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
+
+/// @dev The version that is used for the `Executor` calldata used for relaying the 
+/// stored batch info.
+uint8 constant RELAYED_EXECUTOR_VERSION = 0;
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -47,7 +52,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal returns (StoredBatchInfo memory) {
+    ) internal returns (StoredBatchInfo memory storedBatchInfo) {
         // only commit next batch
         if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
@@ -88,17 +93,22 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             daOutput.blobsLinearHashes
         );
 
-        return
-            StoredBatchInfo({
-                batchNumber: _newBatch.batchNumber,
-                batchHash: _newBatch.newStateRoot,
-                indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
-                numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
-                priorityOperationsHash: _newBatch.priorityOperationsHash,
-                l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
-                timestamp: _newBatch.timestamp,
-                commitment: commitment
-            });
+        storedBatchInfo = StoredBatchInfo({
+            batchNumber: _newBatch.batchNumber,
+            batchHash: _newBatch.newStateRoot,
+            indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
+            priorityOperationsHash: _newBatch.priorityOperationsHash,
+            l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
+            timestamp: _newBatch.timestamp,
+            commitment: commitment
+        });
+
+        // If we are settling on top of Gateway, we always relay the full stored batch info 
+        // to ensure that new batches can be always built on top of the previous ones.
+        if (L1_CHAIN_ID != block.chainid) {
+            IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
+        }
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
