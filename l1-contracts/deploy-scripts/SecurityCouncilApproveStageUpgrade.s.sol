@@ -13,7 +13,9 @@ contract SecurityCouncilApproveStageUpgrade is Script {
 
     function run() external {
         // Insert the address of the protocol upgrade handler here.
-        IProtocolUpgradeHandler protocolUpgradeHandler = IProtocolUpgradeHandler(vm.envAddress("PROTOCOL_UPGRADE_HANDLER"));
+        IProtocolUpgradeHandler protocolUpgradeHandler = IProtocolUpgradeHandler(
+            vm.envAddress("PROTOCOL_UPGRADE_HANDLER")
+        );
         // Insert the private key of the stage governance
         Vm.Wallet memory wallet = vm.createWallet(uint256(vm.envBytes32("PRIVATE_KEY")));
 

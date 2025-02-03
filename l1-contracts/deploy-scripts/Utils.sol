@@ -968,13 +968,13 @@ library Utils {
             _protocolUpgradeHandler.emergencyUpgradeBoard()
         );
         zkFoundation = ISafe(emergencyUpgradeBoard.ZK_FOUNDATION_SAFE());
-    
+
         bytes32 zkFoundationDigest = EIP712Utils.buildDigest(
             _emergencyUpgradeBoardDigest,
             keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, _upgradeId))
         );
         bytes32 safeDigest = ISafe(zkFoundation).getMessageHash(abi.encode(zkFoundationDigest));
-        
+
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
         fullSignatures = abi.encodePacked(r, s, v);
     }
