@@ -113,9 +113,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // - passThroughDataHash (and its full preimage)
             // - metadataHash (only the hash)
             // - auxiliaryOutputHash (only the hash)
-            // The source of the truth for the data from above can be found here: 
+            // The source of the truth for the data from above can be found here:
             // https://github.com/matter-labs/zksync-protocol/blob/c80fa4ee94fd0f7f05f7aea364291abb8b4d7351/crates/zkevm_circuits/src/scheduler/mod.rs#L1356-L1369
-            // 
+            //
             // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
