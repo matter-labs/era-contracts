@@ -8,7 +8,7 @@ import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol"
 import {Script} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-contract SecurityCouncilApproveStageUpgrade is Script {
+contract SecurityCouncilEmergencyStageUpgrade is Script {
     using stdToml for string;
 
     function run() external {
@@ -19,8 +19,8 @@ contract SecurityCouncilApproveStageUpgrade is Script {
         // Insert the private key of the stage governance
         Vm.Wallet memory wallet = vm.createWallet(uint256(vm.envBytes32("PRIVATE_KEY")));
 
-        bytes32 upgradeId = bytes32(vm.envBytes32("UPGRADE_ID"));
+        IProtocolUpgradeHandler.Call[] memory _calls = new IProtocolUpgradeHandler.Call[](0);
 
-        Utils.securityCouncilApproveUpgrade(protocolUpgradeHandler, wallet, upgradeId);
+        Utils.executeEmergencyProtocolUpgrade(protocolUpgradeHandler, wallet, _calls, bytes32(0));
     }
 }
