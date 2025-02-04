@@ -103,6 +103,7 @@ struct DataAvailabilityDeployedAddresses {
     address l1RollupDAValidator;
     address noDAValidiumL1DAValidator;
     address availL1DAValidator;
+    address eigenDAL1Validator;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -166,6 +167,7 @@ struct ContractsConfig {
     bytes32 bootloaderHash;
     bytes32 defaultAAHash;
     address availL1DAValidator;
+    address eigenDAL1Validator;
 }
 
 struct TokensConfig {
@@ -239,6 +241,9 @@ contract DeployUtils is Script {
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
+        }
+        if (vm.keyExistsToml(toml, "$.contracts.eigenda_l1_validator")) {
+            config.contracts.eigenDAL1Validator = toml.readAddress("$.contracts.eigenda_l1_validator");
         }
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
