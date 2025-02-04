@@ -470,7 +470,7 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
 
-        // Note, that we will also need to turn off the abilty to create new chains
+        // Note, that we will also need to turn off the ability to create new chains
         // in the interim of the upgrade. 
         Call memory setCreationParamsCall = Call({
             target: config.contracts.stateTransitionManagerAddress,
