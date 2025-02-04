@@ -86,7 +86,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(
+        (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) = _createBatchCommitment(
             _newBatch,
             daOutput.stateDiffHash,
             daOutput.blobsOpeningCommitments,
@@ -104,12 +104,23 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             commitment: commitment
         });
 
-        // If we are settling on top of Gateway, we always relay the full stored batch info
-        // to ensure that new batches can be always built on top of the previous ones.
         if (L1_CHAIN_ID != block.chainid) {
+            // If we are settling on top of Gateway, we always relay the data needed to construct
+            // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
+            // This data includes:
+            // - `StoredBatchInfo` that is needed to execute a block on top of the previous one.
+            // But also, we need to ensure that the components of the commitment of the batch are available:
+            // - passThroughDataHash (and its full preimage)
+            // - metadataHash (only the hash)
+            // - auxiliaryOutputHash (only the hash)
+            // The source of the truth for the data from above can be found here: 
+            // https://github.com/matter-labs/zksync-protocol/blob/c80fa4ee94fd0f7f05f7aea364291abb8b4d7351/crates/zkevm_circuits/src/scheduler/mod.rs#L1356-L1369
+            // 
+            // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
+            // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
             IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(
-                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
+                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
         }
     }
@@ -609,14 +620,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
-    ) internal view returns (bytes32) {
+    ) internal view returns (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
-        bytes32 metadataHash = keccak256(_batchMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(
+        metadataHash = keccak256(_batchMetaParameters());
+        auxiliaryOutputHash = keccak256(
             _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
         );
 
-        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+        commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
     function _batchPassThroughData(CommitBatchInfo memory _batch) internal pure returns (bytes memory) {
