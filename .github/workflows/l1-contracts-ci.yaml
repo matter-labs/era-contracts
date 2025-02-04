@@ -220,7 +220,7 @@ jobs:
         run: cargo run --bin zksync_verifier_contract_generator --release -- --input_path data/scheduler_key.json --l2_mode
 
       - name: Compare
-        run: diff tools/data/Verifier.sol l1-contracts/contracts/verifier/L2Verifier.sol
+        run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/L2Verifier.sol
 
   coverage:
     defaults:

@@ -141,15 +141,15 @@ library GatewayCTMDeployerHelper {
     ) internal returns (DeployedContracts memory) {
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
-                "TestnetVerifier",
-                "TestnetVerifier.sol",
+                "L2TestnetVerifier",
+                "L2TestnetVerifier.sol",
                 hex"",
                 innerConfig
             );
         } else {
             _deployedContracts.stateTransition.verifier = _deployInternal(
-                "Verifier",
-                "Verifier.sol",
+                "L2Verifier",
+                "L2Verifier.sol",
                 hex"",
                 innerConfig
             );
