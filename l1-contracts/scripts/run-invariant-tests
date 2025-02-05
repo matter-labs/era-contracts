@@ -1,0 +1,18 @@
+#!/bin/bash
+
+readonly FILE_TO_PREPROCESS="contracts/bridge/asset-router/L2AssetRouter.sol"
+export FOUNDRY_PROFILE="invariant_tests"
+
+sed -I '' 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' "$FILE_TO_PREPROCESS"
+
+if [[ -f "$HOME/.foundry/cache/where" && "$WHERE" != "$(cat "$HOME/.foundry/cache/where")" ]]; then
+  forge clean
+fi
+echo "$WHERE" > "$HOME/.foundry/cache/where"
+
+case "$WHERE" in
+  "L1") forge test --match-path 'test/foundry/invariant/AssetRouterTest.t.sol' --match-test invariant_TotalDepositsEqualTotalSupply ;;
+  "L2") forge test --zksync --match-path 'test/foundry/l2/*' --match-test invariant_TotalDepositsEqualTotalSupply ;;
+esac
+
+git restore "$FILE_TO_PREPROCESS"

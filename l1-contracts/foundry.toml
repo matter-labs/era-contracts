@@ -45,3 +45,14 @@ optimizer_runs = 200
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.7"
+
+[profile.invariant_tests]
+# verbosity = 5
+ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+optimizer = false
+[profile.invariant_tests.zksync]
+suppressed_warnings = ["txorigin"]
+[profile.invariant_tests.invariant]
+runs = 1
+depth = 100
+# fail_on_revert = true
