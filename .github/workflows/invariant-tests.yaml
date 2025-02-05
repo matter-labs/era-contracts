@@ -15,11 +15,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      
-      - name: Install foundryup-zksync
-        run: |
-          curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | CI="" bash
-      
+
       - name: Install foundry-zksync
-        run: |
-          foundryup-zksync --install nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
+        uses: dutterbutter/foundry-zksync-toolchain@bbc40c8ed7a22d2b16cf7349d2880f811bab3c7e
+        with:
+          version: nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
