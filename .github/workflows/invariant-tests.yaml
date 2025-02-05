@@ -31,6 +31,7 @@ jobs:
 
       - name: Build artifacts
         run: |
+          yarn
           yarn sc build:foundry # creates JSON files needed for `yarn l1 test:foundry`
           cd l1-contracts
           yarn test:zkfoundry # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/DeployUtils.s.sol`
