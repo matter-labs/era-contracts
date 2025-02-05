@@ -21,11 +21,17 @@ jobs:
         with:
           version: nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
 
+      - name: Restore yarn cache
+        uses: actions/setup-node@v4
+        with:
+          cache: yarn
+
       - name: Build artifacts
         run: |
           yarn
-          yarn l1 build:foundry
-          yarn l1 test:foundry # it creates `l1-contracts/script-out/diamond-selectors.toml`
+          yarn da build:foundry # creates JSON files needed for `yarn l1 test:foundry`
+          # yarn l1 build:foundry
+          yarn l1 test:foundry # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/DeployUtils.s.sol`
 
       - name: Run tests
         run: yarn l1 test:invariant

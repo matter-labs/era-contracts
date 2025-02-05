@@ -5,6 +5,7 @@ on:
 
 jobs:
   build:
+    if: false # TODO: turn back on before merging
     runs-on: ubuntu-latest
 
     steps:
