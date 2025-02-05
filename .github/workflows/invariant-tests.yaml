@@ -18,7 +18,7 @@ jobs:
       
       - name: Install foundryup-zksync
         run: |
-          curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+          curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/nightly-420660c5243e06af1f12febb1765a9abc9c77461/install-foundry-zksync | bash
       
       - name: Install foundry-zksync
         run: |
