@@ -45,12 +45,12 @@ contract L2GatewayL1Test is
     function initSystemContracts(
         SystemContractsArgs memory _args
     ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
-        // super.initSystemContracts(_args);
+        super.initSystemContracts(_args);
     }
 
     function deployL2Contracts(
         uint256 _l1ChainId
     ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
-        // super.deployL2Contracts(_l1ChainId);
+        super.deployL2Contracts(_l1ChainId);
     }
 }

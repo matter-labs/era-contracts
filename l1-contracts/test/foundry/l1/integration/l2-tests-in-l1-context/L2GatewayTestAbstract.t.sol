@@ -35,65 +35,65 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {ZKChainCommitment} from "contracts/common/Config.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
-    // function test_gatewayShouldFinalizeDeposit() public {
-    //     finalizeDeposit();
-    //     require(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)) == ctmAssetId, "ctmAssetId mismatch");
-    //     require(l2Bridgehub.ctmAssetIdFromChainId(mintChainId) == ctmAssetId, "ctmAssetIdFromChainId mismatch");
-    //     address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-    //     require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
-    // }
-    // function test_gatewayNonEmptyPriorityQueueMigration() public {
-    //     ZKChainCommitment memory commitment = abi.decode(exampleChainCommitment, (ZKChainCommitment));
-    //     // Some non-zero value which would be the case if a chain existed before the
-    //     // priority tree was added
-    //     commitment.priorityTree.startIndex = 101;
-    //     commitment.priorityTree.nextLeafIndex = 102;
-    //     finalizeDepositWithCustomCommitment(abi.encode(commitment));
-    //     address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-    //     require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
-    // }
-    // function test_forwardToL3OnGateway() public {
-    //     // todo fix this test
-    //     finalizeDeposit();
-    //     vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
-    //     l2Bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
-    // }
-    // function test_withdrawFromGateway() public {
-    //     // todo fix this test
-    //     finalizeDeposit();
-    //     address newAdmin = address(0x1);
-    //     bytes memory newDiamondCut = abi.encode();
-    //     BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
-    //         chainId: mintChainId,
-    //         ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
-    //         chainData: abi.encode(chainTypeManager.protocolVersion())
-    //     });
-    //     vm.prank(ownerWallet);
-    //     vm.mockCall(
-    //         address(L2_MESSENGER),
-    //         abi.encodeWithSelector(L2_MESSENGER.sendToL1.selector),
-    //         abi.encode(bytes(""))
-    //     );
-    //     l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
-    // }
-    // function finalizeDeposit() public {
-    //     finalizeDepositWithCustomCommitment(exampleChainCommitment);
-    // }
-    // function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
-    //     bytes memory chainData = chainCommitment;
-    //     bytes memory ctmData = abi.encode(
-    //         baseTokenAssetId,
-    //         ownerWallet,
-    //         chainTypeManager.protocolVersion(),
-    //         config.contracts.diamondCutData
-    //     );
-    //     BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
-    //         chainId: mintChainId,
-    //         baseTokenAssetId: baseTokenAssetId,
-    //         ctmData: ctmData,
-    //         chainData: chainData
-    //     });
-    //     vm.prank(aliasedL1AssetRouter);
-    //     l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
-    // }
+    function test_gatewayShouldFinalizeDeposit() public {
+        finalizeDeposit();
+        require(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)) == ctmAssetId, "ctmAssetId mismatch");
+        require(l2Bridgehub.ctmAssetIdFromChainId(mintChainId) == ctmAssetId, "ctmAssetIdFromChainId mismatch");
+        address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
+        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+    }
+    function test_gatewayNonEmptyPriorityQueueMigration() public {
+        ZKChainCommitment memory commitment = abi.decode(exampleChainCommitment, (ZKChainCommitment));
+        // Some non-zero value which would be the case if a chain existed before the
+        // priority tree was added
+        commitment.priorityTree.startIndex = 101;
+        commitment.priorityTree.nextLeafIndex = 102;
+        finalizeDepositWithCustomCommitment(abi.encode(commitment));
+        address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
+        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+    }
+    function test_forwardToL3OnGateway() public {
+        // todo fix this test
+        finalizeDeposit();
+        vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
+        l2Bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
+    }
+    function test_withdrawFromGateway() public {
+        // todo fix this test
+        finalizeDeposit();
+        address newAdmin = address(0x1);
+        bytes memory newDiamondCut = abi.encode();
+        BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
+            chainId: mintChainId,
+            ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
+            chainData: abi.encode(chainTypeManager.protocolVersion())
+        });
+        vm.prank(ownerWallet);
+        vm.mockCall(
+            address(L2_MESSENGER),
+            abi.encodeWithSelector(L2_MESSENGER.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
+    }
+    function finalizeDeposit() public {
+        finalizeDepositWithCustomCommitment(exampleChainCommitment);
+    }
+    function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
+        bytes memory chainData = chainCommitment;
+        bytes memory ctmData = abi.encode(
+            baseTokenAssetId,
+            ownerWallet,
+            chainTypeManager.protocolVersion(),
+            config.contracts.diamondCutData
+        );
+        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
+            chainId: mintChainId,
+            baseTokenAssetId: baseTokenAssetId,
+            ctmData: ctmData,
+            chainData: chainData
+        });
+        vm.prank(aliasedL1AssetRouter);
+        l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
+    }
 }
