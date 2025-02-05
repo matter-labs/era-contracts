@@ -1,0 +1,23 @@
+name: Invariant Tests
+
+on:
+  schedule:
+    - cron: "00 01 * * *"
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  l1-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install foundryup-zksync
+        run: |
+          curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
+      
+      - name: Install foundry-zksync
+          foundryup-zksync --install nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
