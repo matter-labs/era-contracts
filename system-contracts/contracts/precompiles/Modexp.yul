@@ -112,7 +112,7 @@ object "Modexp" {
             let gasToPay := MODEXP_GAS_COST() // TODO (?): make dynamic gas calculation
             let success := precompileCall(precompileParams, gasToPay)
             if iszero(success) {
-                return(0, 0)
+                revert(0, 0)
             }
 
             // To achieve homogeneity of the circuit, we always return the max supported bytes of the modulus (e.g. 256).
