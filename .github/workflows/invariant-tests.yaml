@@ -20,3 +20,6 @@ jobs:
         uses: dutterbutter/foundry-zksync-toolchain@bbc40c8ed7a22d2b16cf7349d2880f811bab3c7e
         with:
           version: nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
+
+      - name: Run tests
+        run: yarn l1 test:invariant
