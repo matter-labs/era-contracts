@@ -17,6 +17,8 @@ l1-contracts-foundry/lib
 # l2-contracts
 l2-contracts/cache-zk
 l2-contracts/node_modules
+l2-contracts/contracts/dev-contracts
+l2-contracts/test
 
 # system-contracts
 system-contracts/contracts/openzeppelin

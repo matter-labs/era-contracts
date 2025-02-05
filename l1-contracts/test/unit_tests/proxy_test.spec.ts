@@ -45,7 +45,7 @@ describe("Diamond proxy tests", function () {
     diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
 
     const adminFactory = await hardhat.ethers.getContractFactory("AdminFacet");
-    const adminContract = await adminFactory.deploy();
+    const adminContract = await adminFactory.deploy(await owner.getChainId(), ethers.constants.AddressZero);
     adminFacet = AdminFacetFactory.connect(adminContract.address, adminContract.signer);
 
     const gettersFacetFactory = await hardhat.ethers.getContractFactory("GettersFacet");
@@ -53,15 +53,18 @@ describe("Diamond proxy tests", function () {
     gettersFacet = GettersFacetFactory.connect(gettersFacetContract.address, gettersFacetContract.signer);
 
     const mailboxFacetFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
-    const mailboxFacetContract = await mailboxFacetFactory.deploy(chainId);
+    const mailboxFacetContract = await mailboxFacetFactory.deploy(chainId, await owner.getChainId());
     mailboxFacet = MailboxFacetFactory.connect(mailboxFacetContract.address, mailboxFacetContract.signer);
 
     const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
-    const executorContract = await executorFactory.deploy();
+    const executorContract = await executorFactory.deploy(await owner.getChainId());
     executorFacet = ExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
 
     const diamondProxyTestFactory = await hardhat.ethers.getContractFactory("DiamondProxyTest");
     const diamondProxyTestContract = await diamondProxyTestFactory.deploy();
+
+    const dummyBridgehubFactory = await hardhat.ethers.getContractFactory("DummyBridgehub");
+    const dummyBridgehub = await dummyBridgehubFactory.deploy();
 
     diamondProxyTest = DiamondProxyTestFactory.connect(
       diamondProxyTestContract.address,
@@ -84,12 +87,12 @@ describe("Diamond proxy tests", function () {
     const diamondInitCalldata = diamondInit.interface.encodeFunctionData("initialize", [
       {
         chainId,
-        bridgehub: "0x0000000000000000000000000000000000000001",
-        stateTransitionManager: await owner.getAddress(),
+        bridgehub: dummyBridgehub.address,
+        chainTypeManager: await owner.getAddress(),
         protocolVersion: 0,
         admin: governorAddress,
         validatorTimelock: governorAddress,
-        baseToken: "0x0000000000000000000000000000000000000001",
+        baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000000001",
         baseTokenBridge: "0x0000000000000000000000000000000000000001",
         storedBatchZero: "0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21",
         verifier: "0x0000000000000000000000000000000000000001",

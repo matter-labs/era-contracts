@@ -49,8 +49,8 @@ describe("ConsensusRegistry", function () {
     // Prepare the node list.
     const numNodes = 10;
     for (let i = 0; i < numNodes; i++) {
-      const node = makeRandomNode(provider);
-      const nodeEntry = makeRandomNodeEntry(node, i);
+      const node = makeRandomNode();
+      const nodeEntry = makeRandomNodeEntry(node, i + 1);
       nodes.push(node);
       nodeEntries.push(nodeEntry);
     }
@@ -73,11 +73,14 @@ describe("ConsensusRegistry", function () {
       await (
         await registry.add(
           nodeEntries[i].ownerAddr,
+          true,
           nodeEntries[i].validatorWeight,
           nodeEntries[i].validatorPubKey,
           nodeEntries[i].validatorPoP,
+          true,
           nodeEntries[i].attesterWeight,
-          nodeEntries[i].attesterPubKey
+          nodeEntries[i].attesterPubKey,
+          { gasLimit }
         )
       ).wait();
     }
@@ -130,9 +133,11 @@ describe("ConsensusRegistry", function () {
         .connect(nonOwner)
         .add(
           ethers.Wallet.createRandom().address,
+          true,
           0,
           { a: new Uint8Array(32), b: new Uint8Array(32), c: new Uint8Array(32) },
           { a: new Uint8Array(32), b: new Uint8Array(16) },
+          true,
           0,
           { tag: new Uint8Array(1), x: new Uint8Array(32) },
           { gasLimit }
@@ -140,20 +145,36 @@ describe("ConsensusRegistry", function () {
     ).to.be.reverted;
   });
 
-  it("Should allow owner to deactivate", async function () {
+  it("Should allow owner to deactivate attester", async function () {
+    const nodeOwner = nodeEntries[0].ownerAddr;
+    expect((await registry.nodes(nodeOwner)).attesterLatest.active).to.equal(true);
+
+    await (await registry.connect(owner).deactivateAttester(nodeOwner, { gasLimit })).wait();
+    expect((await registry.nodes(nodeOwner)).attesterLatest.active).to.equal(false);
+
+    // Restore state.
+    await (await registry.connect(owner).activateAttester(nodeOwner, { gasLimit })).wait();
+  });
+
+  it("Should allow owner to deactivate validator", async function () {
     const nodeOwner = nodeEntries[0].ownerAddr;
     expect((await registry.nodes(nodeOwner)).validatorLatest.active).to.equal(true);
 
-    await (await registry.connect(owner).deactivate(nodeOwner, { gasLimit })).wait();
+    await (await registry.connect(owner).deactivateValidator(nodeOwner, { gasLimit })).wait();
     expect((await registry.nodes(nodeOwner)).validatorLatest.active).to.equal(false);
 
     // Restore state.
-    await (await registry.connect(owner).activate(nodeOwner, { gasLimit })).wait();
+    await (await registry.connect(owner).activateValidator(nodeOwner, { gasLimit })).wait();
   });
 
-  it("Should not allow nonOwner, nonNodeOwner to deactivate", async function () {
+  it("Should not allow nonOwner, nonNodeOwner to deactivate attester", async function () {
     const nodeOwner = nodeEntries[0].ownerAddr;
-    await expect(registry.connect(nonOwner).deactivate(nodeOwner, { gasLimit })).to.be.reverted;
+    await expect(registry.connect(nonOwner).deactivateAttester(nodeOwner, { gasLimit })).to.be.reverted;
+  });
+
+  it("Should not allow nonOwner, nonNodeOwner to deactivate validator", async function () {
+    const nodeOwner = nodeEntries[0].ownerAddr;
+    await expect(registry.connect(nonOwner).deactivateValidator(nodeOwner, { gasLimit })).to.be.reverted;
   });
 
   it("Should change validator weight", async function () {
@@ -209,13 +230,15 @@ describe("ConsensusRegistry", function () {
   });
 
   it("Should not allow to add a node with a validator public key which already exist", async function () {
-    const newEntry = makeRandomNodeEntry(makeRandomNode(), 0);
+    const newEntry = makeRandomNodeEntry(makeRandomNode(), 1);
     await expect(
       registry.add(
         newEntry.ownerAddr,
+        true,
         newEntry.validatorWeight,
         nodeEntries[0].validatorPubKey,
         newEntry.validatorPoP,
+        true,
         newEntry.attesterWeight,
         newEntry.attesterPubKey,
         { gasLimit }
@@ -224,13 +247,15 @@ describe("ConsensusRegistry", function () {
   });
 
   it("Should not allow to add a node with an attester public key which already exist", async function () {
-    const newEntry = makeRandomNodeEntry(makeRandomNode(), 0);
+    const newEntry = makeRandomNodeEntry(makeRandomNode(), 1);
     await expect(
       registry.add(
         newEntry.ownerAddr,
+        true,
         newEntry.validatorWeight,
         newEntry.validatorPubKey,
         newEntry.validatorPoP,
+        true,
         newEntry.attesterWeight,
         nodeEntries[0].attesterPubKey,
         { gasLimit }
@@ -284,7 +309,8 @@ describe("ConsensusRegistry", function () {
     const entry = nodeEntries[idx];
 
     // Deactivate attribute.
-    await (await registry.deactivate(entry.ownerAddr, { gasLimit })).wait();
+    await (await registry.deactivateAttester(entry.ownerAddr, { gasLimit })).wait();
+    await (await registry.deactivateValidator(entry.ownerAddr, { gasLimit })).wait();
 
     // Verify no change.
     expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length);
@@ -301,7 +327,8 @@ describe("ConsensusRegistry", function () {
     expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length - 1);
 
     // Restore state.
-    await (await registry.activate(entry.ownerAddr, { gasLimit })).wait();
+    await (await registry.activateAttester(entry.ownerAddr, { gasLimit })).wait();
+    await (await registry.activateValidator(entry.ownerAddr, { gasLimit })).wait();
     await (await registry.commitAttesterCommittee({ gasLimit })).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
@@ -332,9 +359,11 @@ describe("ConsensusRegistry", function () {
     await (
       await registry.add(
         entry.ownerAddr,
+        true,
         entry.validatorWeight,
         entry.validatorPubKey,
         entry.validatorPoP,
+        true,
         entry.attesterWeight,
         entry.attesterPubKey
       )
@@ -426,9 +455,11 @@ describe("ConsensusRegistry", function () {
     await (
       await registry.add(
         entry.ownerAddr,
+        true,
         entry.validatorWeight,
         entry.validatorPubKey,
         entry.validatorPoP,
+        true,
         entry.attesterWeight,
         entry.attesterPubKey
       )

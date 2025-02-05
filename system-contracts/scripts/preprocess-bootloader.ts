@@ -13,7 +13,8 @@ const preprocess = require("preprocess");
 const SYSTEM_PARAMS = require("../../SystemConfig.json");
 /* eslint-enable@typescript-eslint/no-var-requires */
 
-const OUTPUT_DIR = "bootloader/build";
+const OUTPUT_DIR_1 = "contracts-preprocessed/bootloader";
+const OUTPUT_DIR_2 = "bootloader/build";
 
 const PREPROCCESING_MODES = ["proved_batch", "playground_batch"];
 
@@ -62,7 +63,7 @@ function getSystemContextCodeHash() {
 // Maybe in the future some of these params will be passed
 // in a JSON file. For now, a simple object is ok here.
 const params = {
-  MARK_BATCH_AS_REPUBLISHED_SELECTOR: getSelector("KnownCodesStorage", "markFactoryDeps"),
+  MARK_FACTORY_DEPS_SELECTOR: getSelector("KnownCodesStorage", "markFactoryDeps"),
   VALIDATE_TX_SELECTOR: getSelector("IAccount", "validateTransaction"),
   EXECUTE_TX_SELECTOR: getSelector("DefaultAccount", "executeTransaction"),
   RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector("ContractDeployer", "extendedAccountVersion"),
@@ -224,15 +225,32 @@ async function main() {
   });
   const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: "proved_batch" });
 
-  if (!existsSync(OUTPUT_DIR)) {
-    mkdirSync(OUTPUT_DIR);
+  if (!existsSync(OUTPUT_DIR_1)) {
+    mkdirSync(OUTPUT_DIR_1);
   }
 
-  writeFileSync(`${OUTPUT_DIR}/bootloader_test.yul`, provedBootloaderWithTests);
-  writeFileSync(`${OUTPUT_DIR}/proved_batch.yul`, provedBatchBootloader);
-  writeFileSync(`${OUTPUT_DIR}/playground_batch.yul`, playgroundBatchBootloader);
-  writeFileSync(`${OUTPUT_DIR}/gas_test.yul`, gasTestBootloader);
-  writeFileSync(`${OUTPUT_DIR}/fee_estimate.yul`, feeEstimationBootloader);
+  if (!existsSync(OUTPUT_DIR_2)) {
+    mkdirSync(OUTPUT_DIR_2);
+  }
+
+  const transferTest = readFileSync("bootloader/tests/transfer_test.yul").toString();
+  const dummy = readFileSync("bootloader/tests/dummy.yul").toString();
+
+  writeFileSync(`${OUTPUT_DIR_1}/bootloader_test.yul`, provedBootloaderWithTests);
+  writeFileSync(`${OUTPUT_DIR_1}/proved_batch.yul`, provedBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/playground_batch.yul`, playgroundBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/gas_test.yul`, gasTestBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/fee_estimate.yul`, feeEstimationBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/dummy.yul`, dummy);
+  writeFileSync(`${OUTPUT_DIR_1}/transfer_test.yul`, transferTest);
+
+  writeFileSync(`${OUTPUT_DIR_2}/bootloader_test.yul`, provedBootloaderWithTests);
+  writeFileSync(`${OUTPUT_DIR_2}/proved_batch.yul`, provedBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/playground_batch.yul`, playgroundBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/gas_test.yul`, gasTestBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/fee_estimate.yul`, feeEstimationBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/dummy.yul`, dummy);
+  writeFileSync(`${OUTPUT_DIR_2}/transfer_test.yul`, transferTest);
 
   console.log("Bootloader preprocessing done!");
 }

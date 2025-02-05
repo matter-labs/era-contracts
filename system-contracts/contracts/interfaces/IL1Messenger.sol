@@ -46,7 +46,7 @@ interface IL1Messenger {
 
     event BytecodeL1PublicationRequested(bytes32 _bytecodeHash);
 
-    function sendToL1(bytes memory _message) external returns (bytes32);
+    function sendToL1(bytes calldata _message) external returns (bytes32);
 
     function sendL2ToL1Log(bool _isService, bytes32 _key, bytes32 _value) external returns (uint256 logIdInMerkleTree);
 
