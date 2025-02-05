@@ -24,14 +24,16 @@ jobs:
       - name: Show forge version
         run: forge --version
 
-      # - name: Restore yarn cache
-      #   uses: actions/setup-node@v4
-      #   with:
-      #     cache: yarn
+      - name: Cache yarn artifacts
+        uses: actions/setup-node@v4
+        with:
+          cache: yarn
+
+      - name: Install yarn artifacts
+        run: yarn
 
       - name: Build artifacts
         run: |
-          yarn
           yarn sc build:foundry # creates JSON files needed for `yarn l1 test:foundry`
           cd l1-contracts
           yarn test:zkfoundry # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/DeployUtils.s.sol`
