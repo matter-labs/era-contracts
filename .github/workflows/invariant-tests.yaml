@@ -20,4 +20,5 @@ jobs:
           curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
       
       - name: Install foundry-zksync
+        run: |
           foundryup-zksync --install nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
