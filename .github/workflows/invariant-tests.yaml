@@ -21,5 +21,10 @@ jobs:
         with:
           version: nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
 
+      - name: Build artifacts
+        run: |
+          yarn
+          yarn l1 build:foundry
+
       - name: Run tests
         run: yarn l1 test:invariant
