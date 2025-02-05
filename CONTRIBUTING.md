@@ -41,5 +41,6 @@ and suggestions here too. Some resources to help:
 
 Be polite and respectful.
 
-### Thank you!
+### Thank you
+Thank you.
 
