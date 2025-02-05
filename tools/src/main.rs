@@ -161,7 +161,7 @@ fn insert_residue_elements_and_commitments(
         template.replace("{{residue_g2_elements}}", &residue_g2_elements);
 
     let modexp_function = get_modexp_function(l2_mode); 
-    let verifier_contract_template = verifier_contract_template.replace("{{modexp_function}}", &modexp_function);
+    let verifier_contract_template = verifier_contract_template.replace("{{modexp_function}}", &modexp_function).replace("contract Verifier", "contract L2Verifier");
 
 
     Ok(reg.render_template(
