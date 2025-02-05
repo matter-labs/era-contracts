@@ -73,7 +73,7 @@ object "EcMul" {
 
             switch and(success, internalSuccess)
             case 0 {
-                return(0, 0)
+                revert(0, 0)
             }
             default {
                 return(32, 64)

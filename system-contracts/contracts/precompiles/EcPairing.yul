@@ -16,7 +16,7 @@ object "EcPairing" {
             }
 
             /// @dev The additional gas cost of processing ecpairing circuit precompile.
-            /// @dev Added per pair. 
+            /// @dev Added per pair.
             function ECPAIRING_PAIR_GAS_COST() -> ret {
                 ret := 80000
             }
@@ -90,18 +90,22 @@ object "EcPairing" {
                 0,              // input offset in words
                 mul(6, pairs),  // input length in words multiples of (p_x, p_x, q_x_a, q_x_b, q_y_a, q_y_b)
                 0,              // output offset in words
-                1,              // output length in words (pairing check boolean)
+                2,              // output length in words with success (pairing check boolean)
                 pairs           // number of pairs
             )
             let gasToPay := ecpairingGasCost(pairs)
 
             let success := precompileCall(precompileParams, gasToPay)
-            if iszero(success) {
-                return(0, 0)
+            let internalSuccess := mload(0)
+
+            switch and(success, internalSuccess)
+            case 0 {
+                revert(0, 0)
+            }
+            default {
+                return(32, 64)
             }
 
-            return(0, 64)
-            
         }
     }
 }
