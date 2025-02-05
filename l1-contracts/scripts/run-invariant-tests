@@ -3,11 +3,7 @@
 readonly FILE_TO_PREPROCESS="contracts/bridge/asset-router/L2AssetRouter.sol"
 export FOUNDRY_PROFILE="invariant_tests"
 
-if [[ -z "$CI" ]]; then
-  sed -I '' 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' "$FILE_TO_PREPROCESS"
-else
-  sed       's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' "$FILE_TO_PREPROCESS"
-fi
+sed -i '' 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' "$FILE_TO_PREPROCESS"
 
 if [[ -f "$HOME/.foundry/cache/where" && "$WHERE" != "$(cat "$HOME/.foundry/cache/where")" ]]; then
   forge clean
