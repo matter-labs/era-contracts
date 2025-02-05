@@ -1,0 +1,41 @@
+name: Invariant Tests
+
+on:
+  schedule:
+    - cron: "00 01 * * *"
+  workflow_dispatch:
+  pull_request: # TODO: remove this trigger before merging because for some time the workflow should run only on schedule until the invariant tests are stable enough to be run on every pull request
+
+permissions: read-all
+
+jobs:
+  l1-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        uses: dutterbutter/foundry-zksync-toolchain@5b0459c3701903f1913b8b2558a22bf49138e495 # v1.0.0
+        with:
+          version: nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
+
+      - name: Show forge version
+        run: forge --version
+
+      # - name: Restore yarn cache
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     cache: yarn
+
+      - name: Build artifacts
+        run: |
+          yarn sc build:foundry # creates JSON files needed for `yarn l1 test:foundry`
+          cd l1-contracts
+          yarn test:zkfoundry # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/DeployUtils.s.sol`
+
+      - name: Run tests
+        run: |
+          cd l1-contracts
+          yarn test:invariant
