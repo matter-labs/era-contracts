@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: "00 01 * * *"
   workflow_dispatch:
+  pull_request: # TODO: remove this trigger before merging because for some time the workflow should run only on schedule until the invariant tests are stable enough to be run on every pull request
 
 permissions: read-all
 
