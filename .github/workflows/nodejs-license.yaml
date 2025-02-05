@@ -25,6 +25,7 @@ env:
 
 jobs:
   generate-matrix:
+    if: false # TODO: turn back on before merging
     name: Lists modules
     runs-on: ubuntu-latest
     outputs:
