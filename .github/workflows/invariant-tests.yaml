@@ -24,17 +24,26 @@ jobs:
       - name: Show forge version
         run: forge --version
 
-      - name: Cache yarn artifacts
+      - name: Cache yarn packages
         uses: actions/setup-node@v4
         with:
           cache: yarn
 
-      - name: Install yarn artifacts
+      - name: Install yarn packages
         run: yarn
+
+      - name: Cache artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            l1-contracts/out
+            l1-contracts/zkout
+            system-contracts/contracts-preprocessed
+            system-contracts/zkout
 
       - name: Build artifacts
         run: |
-          yarn sc build:foundry # creates JSON files needed for `yarn l1 test:foundry`
+          yarn sc build:foundry # creates JSON files needed for `yarn l1 test:zkfoundry`
           cd l1-contracts
           yarn test:zkfoundry # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/DeployUtils.s.sol`
 
