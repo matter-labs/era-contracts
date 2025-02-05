@@ -1720,14 +1720,6 @@
     "zkBytecodePath": null
   },
   {
-    "contractName": "l1-contracts/L1AssetRouterActorHandler",
-    "evmBytecodeHash": "0x8bdca397afdebb39b61e8becd2fe7cb7b0ab7d668ffacb16759d9a450da83a66",
-    "evmBytecodePath": "/l1-contracts/out/L1AssetRouterActorHandler.sol/L1AssetRouterActorHandler.json",
-    "evmDeployedBytecodeHash": "0xbbd794e3e9c81ab4eac4298c9fcd51745f4deaa1710c8ba5f777a5a0766ee797",
-    "zkBytecodeHash": null,
-    "zkBytecodePath": null
-  },
-  {
     "contractName": "l1-contracts/MockERC20",
     "evmBytecodeHash": "0x4979cc2df2ac7d0cfe5400ea0fc00c1cce56248c3e87764eed7a1a3b260f1f93",
     "evmBytecodePath": "/l1-contracts/out/MockERC20.sol/MockERC20.json",
@@ -1930,7 +1922,7 @@
   {
     "contractName": "bootloader_test.yul",
     "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/contracts-preprocessed/bootloader/bootloader_test.yul.json",
-    "zkBytecodeHash": "0x010003cb3dab59cd3cf6a76d88dbc917147df803dda0683dbda9ee310e0bdc75",
+    "zkBytecodeHash": "0x010003b94173a142d77416c887899912035f42cd6adda92cae7b48bc56366166",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
