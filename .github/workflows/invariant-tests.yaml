@@ -35,7 +35,7 @@ jobs:
       - name: Cache artifacts
         uses: actions/cache@v4
         with:
-          key: ${{ hashFiles('l1-contracts/out/*', 'l1-contracts/zkout/*', 'system-contracts/contracts-preprocessed/*', 'system-contracts/zkout/*') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('l1-contracts/out/*', 'l1-contracts/zkout/*', 'system-contracts/contracts-preprocessed/*', 'system-contracts/zkout/*') }}
           path: |
             l1-contracts/out
             l1-contracts/zkout
