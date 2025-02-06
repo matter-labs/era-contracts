@@ -26,7 +26,7 @@ contract AssetRouterTest is Test, SharedL2ContractL1DeployerUtils, SharedL2Contr
     ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.deployL2Contracts(_l1ChainId);
 
-        h = new L1AssetRouterActorHandler(l1AssetRouter);
+        h = new L1AssetRouterActorHandler();
         address ts = makeAddr("targetSender");
         deal(ts, 10_000 ether);
         targetContract(address(h));
