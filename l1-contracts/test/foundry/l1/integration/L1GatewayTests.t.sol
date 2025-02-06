@@ -66,7 +66,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         }
     }
 
-    /*
     function prepare() public {
         _generateUserAddresses();
 
@@ -314,7 +313,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
-    */
 
     // add this to be excluded from coverage report
     function test() internal override {}
