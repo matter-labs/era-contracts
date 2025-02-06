@@ -216,3 +216,9 @@ struct LeafInclusionProof {
     bytes32 leaf;
     bytes32[] proof;
 }
+
+struct MessageRoot {
+    uint256 chainId;
+    uint256 batchNumber;
+    bytes32 messageRootHash;
+}

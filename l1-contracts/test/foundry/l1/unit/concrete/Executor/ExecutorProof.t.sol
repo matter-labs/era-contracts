@@ -33,7 +33,7 @@ contract TestExecutorFacet is ExecutorFacet {
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) external view returns (LogProcessingOutput memory logOutput) {
+    ) external returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 

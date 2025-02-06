@@ -63,7 +63,7 @@
     "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "clean": "yarn clean:bootloader && yarn clean:system-contracts",
     "clean:bootloader": "rm -rf ./bootloader/build ./bootloader/tests/artifacts",
-    "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean",
+    "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean && forge clean",
     "compile-yul": "ts-node scripts/compile-yul.ts",
     "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",

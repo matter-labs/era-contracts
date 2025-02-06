@@ -35,7 +35,7 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     event Preimage(bytes32 one, bytes32 two);
 
-    event NewGlobalMessageRoot(bytes32 root);
+    event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, bytes32 indexed root);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
@@ -120,8 +120,17 @@ contract MessageRoot is IMessageRoot, Initializable {
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
         bytes32 sharedTreeRoot = sharedTree.root();
-        emit NewGlobalMessageRoot(sharedTreeRoot);
+        emit NewMessageRoot(block.chainid, block.number, sharedTreeRoot);
         historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    /// @dev emit a new message root when committing a new batch
+    function emitMessageRoot(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes32 _chainBatchRoot
+    ) external onlyChain(_chainId) {    
+        emit NewMessageRoot(_chainId, _batchNumber, _chainBatchRoot);
     }
 
     /// @dev Gets the aggregated root of all chains.
@@ -147,7 +156,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
         bytes32 newRoot = sharedTree.root();
-        emit NewGlobalMessageRoot(newRoot);
+        emit NewMessageRoot(block.chainid, block.number, newRoot);
         historicalRoot[block.number] = newRoot;
     }
 

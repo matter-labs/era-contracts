@@ -169,3 +169,5 @@ struct ZKChainCommitment {
 address constant INSERT_MSG_ADDRESS_ON_DESTINATION = address(
     uint160(uint256(keccak256("INSERT_MSG_ADDRESS_ON_DESTINATION")) - 1)
 );
+
+uint256 constant MAX_MSG_ROOTS_IN_BATCH = 100;

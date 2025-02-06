@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.24;
-
-import {console} from "forge-std/console.sol";
-
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
