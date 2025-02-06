@@ -39,25 +39,32 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         finalizeDeposit();
         require(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)) == ctmAssetId, "ctmAssetId mismatch");
         require(l2Bridgehub.ctmAssetIdFromChainId(mintChainId) == ctmAssetId, "ctmAssetIdFromChainId mismatch");
+
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
         require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
+
     function test_gatewayNonEmptyPriorityQueueMigration() public {
         ZKChainCommitment memory commitment = abi.decode(exampleChainCommitment, (ZKChainCommitment));
+
         // Some non-zero value which would be the case if a chain existed before the
         // priority tree was added
         commitment.priorityTree.startIndex = 101;
         commitment.priorityTree.nextLeafIndex = 102;
+
         finalizeDepositWithCustomCommitment(abi.encode(commitment));
+
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
         require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
+
     function test_forwardToL3OnGateway() public {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         l2Bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
     }
+
     function test_withdrawFromGateway() public {
         // todo fix this test
         finalizeDeposit();
@@ -76,9 +83,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         );
         l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
     }
+
     function finalizeDeposit() public {
         finalizeDepositWithCustomCommitment(exampleChainCommitment);
     }
+
     function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
         bytes memory chainData = chainCommitment;
         bytes memory ctmData = abi.encode(
