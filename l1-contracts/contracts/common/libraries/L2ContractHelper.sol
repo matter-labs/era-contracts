@@ -184,7 +184,7 @@ library L2ContractHelper {
         for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
             bytes32 hashedBytecode = hashL2Bytecode(_factoryDeps[i]);
 
-            // Store the resulting hash sequentially in bytes.
+            // Store the resulting hash sequentially in words.
             assembly {
                 mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
             }

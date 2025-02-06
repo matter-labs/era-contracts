@@ -122,7 +122,7 @@ abstract contract NativeTokenVault is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
+    /// @notice Used when the chain receives a transfer from another chain's Asset Router and correspondingly mints the asset.
     /// @param _chainId The chainId that the message is from.
     /// @param _assetId The assetId of the asset being bridged.
     /// @param _data The abi.encoded transfer data.

@@ -22,7 +22,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-/// @title State Transition Manager contract
+/// @title Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
