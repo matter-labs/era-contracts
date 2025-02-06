@@ -9,7 +9,11 @@ const SOLIDITY_SOURCE_CODE_PATHS = ["system-contracts/", "l2-contracts/", "l1-co
 const YUL_SOURCE_CODE_PATHS = ["system-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
-const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test"];
+const SKIPPED_FOLDERS = [
+  "l1-contracts/deploy-scripts",
+  "l1-contracts/test",
+  "system-contracts/bootloader/tests/bootloader",
+];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
