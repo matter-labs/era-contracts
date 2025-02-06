@@ -1,0 +1,28 @@
+era_chain_id = 324
+testnet_verifier = false
+governance_upgrade_timer_initial_delay = 1058400
+
+[contracts]
+max_number_of_chains = 100
+create2_factory_salt = "0xde6b9c610417de5c775c1601c947f482e4f4e30c0f7b848c6d2b0554d76f607e"
+validator_timelock_execution_delay = 0
+genesis_root = "0x7cc160319ad566c71679b0391d3ebd736a2757f9c1fe40f34ac42c82d79ffe6e"
+genesis_rollup_leaf_index = 68
+genesis_batch_commitment = "0x248eeb165b8e69d8c5e1b8441e9c6f7a98804115cd2e1c365df1723c495e4853"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x010008e5b883de8897598e83d383e332b87d09164363816c15f22353c3cd910d"
+default_aa_hash = "0x0100052307b3b66ef67935255483d39b3c8dcdb47fdf94dddca11ebe8271afe6"
+bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
+transparent_proxy_admin = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"
+
+[tokens]
+token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
