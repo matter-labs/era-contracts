@@ -6,7 +6,7 @@ import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
 contract L1AssetRouterActorHandler is Test {
     address l1Token;
@@ -50,12 +50,19 @@ contract L1AssetRouterActorHandler is Test {
     }
 
     function withdraw(uint256 _amount, address _receiver) public {
-        _amount = bound(_amount, 0, 1e30);
-
         address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(l1Token);
+
+        // this limits the variety of scenarios but otherwise there're many reverts 
+        // when it tries to withdraw more than it has
+        _amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
+
         uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _receiver, l2Token);
+
+        if (_amount == 0) {
+            return;
+        }
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(assetId, data);
 
