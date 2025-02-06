@@ -3,8 +3,10 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+
 
 contract L1AssetRouterActorHandler is Test {
     address l1Token;
@@ -51,7 +53,11 @@ contract L1AssetRouterActorHandler is Test {
         _amount = bound(_amount, 0, 1e30);
 
         address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(l1Token);
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(_receiver, l2Token, _amount);
+        uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
+        bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _receiver, l2Token);
+
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(assetId, data);
 
         totalDeposits -= _amount;
     }
