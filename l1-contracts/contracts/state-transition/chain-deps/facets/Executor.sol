@@ -188,7 +188,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
             processedLogs = _setBit(processedLogs, uint8(logKey));
 
-
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
@@ -270,7 +269,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     revert InvalidLogKey(logKey.uncheckedAdd(2), viaIR.logKey3);
                 }
                 if (uint256(logValue) != block.chainid) {
-                    s.dependencyMessageRoots[_newBatch.batchNumber][savedMsgRootIndex] = MessageRoot({chainId: uint256(logValue), batchNumber: uint256(viaIR.logValue2), messageRootHash: viaIR.logValue3});
+                    s.dependencyMessageRoots[_newBatch.batchNumber][savedMsgRootIndex] = MessageRoot({
+                        chainId: uint256(logValue),
+                        batchNumber: uint256(viaIR.logValue2),
+                        messageRootHash: viaIR.logValue3
+                    });
                     savedMsgRootIndex = savedMsgRootIndex.uncheckedAdd(1);
                 } else {
                     IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();

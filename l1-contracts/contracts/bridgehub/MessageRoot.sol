@@ -129,7 +129,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {    
+    ) external onlyChain(_chainId) {
         emit NewMessageRoot(_chainId, _batchNumber, _chainBatchRoot);
     }
 

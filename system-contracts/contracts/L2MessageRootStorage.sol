@@ -16,8 +16,6 @@ contract L2MessageRootStorage {
     mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
     mapping(bytes32 msgRoot => uint256 chainId) public chainIdFromMsgRoot;
 
-    
-
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
     // mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
 

@@ -127,7 +127,7 @@ error InvalidLogKey(uint256 expectedLogKey, uint256 logKey);
 error InvalidLogSender(address sender, uint256 logKey);
 //
 error InvalidLogValue(bytes32 expectedValue, bytes32 providedValue);
-// 
+//
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0xd8e9405c
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
