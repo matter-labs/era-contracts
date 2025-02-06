@@ -47,6 +47,7 @@ enable_eravm_extensions = true
 zksolc = "1.5.7"
 
 [profile.invariant_tests]
+test = "test"
 # verbosity = 5
 ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
 optimizer = false

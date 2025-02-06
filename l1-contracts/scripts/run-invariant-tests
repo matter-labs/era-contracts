@@ -16,7 +16,7 @@ fi
 echo "$WHERE" > "$HOME/.foundry/cache/where"
 
 case "$WHERE" in
-  "L1") forge test --match-path 'test/foundry/invariant/AssetRouterTest.t.sol' --match-test invariant_TotalDepositsEqualTotalSupply ;;
+  "L1") forge test --match-path 'test/invariant/AssetRouterTest.t.sol' --match-test invariant_TotalDepositsEqualTotalSupply ;;
   "L2") forge test --zksync --match-path 'test/foundry/l2/*' --match-test invariant_TotalDepositsEqualTotalSupply ;;
 esac
 

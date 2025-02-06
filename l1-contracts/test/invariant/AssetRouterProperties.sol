@@ -9,9 +9,9 @@ import {L1AssetRouterActorHandler} from "./handlers/L1AssetRouterActorHandler.so
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {SharedL2ContractDeployer} from "../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+
+import {SharedL2ContractDeployer} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
 abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
     L1AssetRouterActorHandler internal h;

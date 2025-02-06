@@ -8,9 +8,9 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
 import {L1AssetRouterActorHandler} from "./handlers/L1AssetRouterActorHandler.sol";
 import {AssetRouterProperties} from "./AssetRouterProperties.sol";
-import {SharedL2ContractL1DeployerUtils} from "../l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
-import {SharedL2ContractDeployer} from "../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
-import {SystemContractsArgs} from "../l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
+import {SharedL2ContractL1DeployerUtils} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
+import {SharedL2ContractDeployer} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+import {SystemContractsArgs} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
 
 contract AssetRouterTest is Test, SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer, AssetRouterProperties {
     function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
