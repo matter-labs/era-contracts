@@ -11,4 +11,6 @@ remappings = [
 
 [profile.default.zksync] 
 enable_eravm_extensions = true
-zksolc = "1.5.0"
+zksolc = "1.5.9"
+optimization = "0"
+suppressed_errors = ["assemblycreate", "sendtransfer"]

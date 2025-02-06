@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
 import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol";
@@ -158,15 +158,15 @@ contract DefaultAccount is IAccount {
         if (to == (address((L2_INTEROP_HANDLER)))) {
             (, bytes memory executionBundle) = abi.decode(_transaction.data, (bytes, bytes));
             (, bytes memory executionProof) = abi.decode(_transaction.signature, (bytes, bytes));
-            // MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
-            MessageInclusionProof memory executionInclusionProof = MessageInclusionProof(
-                0,
-                0,
-                0,
-                L2Message(0, address(0), new bytes(0)),
-                new bytes32[](0)
-            );
-            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof);
+            MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
+            // MessageInclusionProof memory executionInclusionProof = MessageInclusionProof(
+            //     0,
+            //     0,
+            //     0,
+            //     L2Message(0, address(0), new bytes(0)),
+            //     new bytes32[](0)
+            // );
+            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof, false);
             return;
         }
 
@@ -248,16 +248,16 @@ contract DefaultAccount is IAccount {
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
         if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
             (bytes memory paymasterBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
-            // (bytes memory paymasterProof, ) = abi.decode(_transaction.signature, (bytes, bytes));
-            // MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
-            MessageInclusionProof memory paymasterInclusionProof = MessageInclusionProof(
-                0,
-                0,
-                0,
-                L2Message(0, address(0), new bytes(0)),
-                new bytes32[](0)
-            );
-            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof);
+            (bytes memory paymasterProof, ) = abi.decode(_transaction.signature, (bytes, bytes));
+            MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
+            // MessageInclusionProof memory paymasterInclusionProof = MessageInclusionProof(
+            //     0,
+            //     0,
+            //     0,
+            //     L2Message(0, address(0), new bytes(0)),
+            //     new bytes32[](0)
+            // );
+            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof, true);
         }
         bool success = _transaction.payToTheBootloader();
         if (!success) {

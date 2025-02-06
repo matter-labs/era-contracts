@@ -121,6 +121,10 @@ object "Bootloader" {
                 ret := {{MAX_TRANSACTIONS_IN_BATCH}}
             }
 
+            function MAX_MSG_ROOTS_IN_BATCH() -> ret {
+                ret := 100
+            }
+
             /// @dev The slot from which the scratch space starts.
             /// Scratch space is used for various temporary values
             function SCRATCH_SPACE_BEGIN_SLOT() -> ret {
@@ -302,12 +306,13 @@ object "Bootloader" {
 
             function MESSAGE_ROOT_SLOT_SIZE() -> ret {
                 // We will have to increase this to add merkle proofs. 
-                ret := 3
+                ret := 100
+
             }
 
             function MESSAGE_ROOT_SLOTS() -> ret {
                 // Is it a problem if we have
-                ret := mul(add(MAX_TRANSACTIONS_IN_BATCH(), 1), MESSAGE_ROOT_SLOT_SIZE())
+                ret := mul(add(MAX_MSG_ROOTS_IN_BATCH(), 1), MESSAGE_ROOT_SLOT_SIZE())
             }
 
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -2987,9 +2992,10 @@ object "Bootloader" {
                     }
                     debugLog("Tried to set messageRoot: ", 2)
 
-                    sendToL1Native(true, messageRootLogKey(i), msgRoot)
-                    sendToL1Native(true, add(messageRootLogKey(i), 1), chainId)
-                    sendToL1Native(true, add(messageRootLogKey(i), 2), blockNumber)
+                    // kl todo don't send to L1 here, as the msgRoots can be linked. Do it at the end, by calling the MSGRootStorage for the final roots. 
+                    sendToL1Native(true, messageRootLogKey(i), chainId)
+                    sendToL1Native(true, add(messageRootLogKey(i), 1), blockNumber)
+                    sendToL1Native(true, add(messageRootLogKey(i), 2), msgRoot)
                 }
             }
 

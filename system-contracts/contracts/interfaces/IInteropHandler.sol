@@ -23,5 +23,5 @@ struct InteropBundle {
 
 interface IInteropHandler {
     function setInteropAccountBytecode() external;
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
+    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) external;
 }
