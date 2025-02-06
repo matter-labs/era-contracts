@@ -31,5 +31,7 @@ contract AssetRouterTest is Test, SharedL2ContractL1DeployerUtils, SharedL2Contr
         deal(ts, 10_000 ether);
         targetContract(address(h));
         targetSender(ts);
+        // deposit a unit of token to deploy the L2 token
+        h.finalizeDeposit(1, address(1), 1);
     }
 }
