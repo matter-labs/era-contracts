@@ -100,7 +100,7 @@ abstract contract L1GatewayBase {
             return ("", false);
         }
 
-        // This case covers non-standard tokens
+        // This case covers non-standard tokens, such as Maker (MKR), that return `bytes32` instead of `string`
         if (returnData.length < 64) {
             return ("", false);
         }
