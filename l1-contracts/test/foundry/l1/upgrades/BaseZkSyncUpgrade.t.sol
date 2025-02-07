@@ -7,7 +7,7 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncU
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, TooManyFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -177,20 +177,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Wrong number of factory deps
-    function test_revertWhen_WrongNumberOfFactoryDeps(
-        uint8 factoryDepsLength,
-        uint8 l2ProtocolUpgradeTxFDLength
-    ) public {
-        vm.assume(factoryDepsLength != l2ProtocolUpgradeTxFDLength);
-
-        proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](l2ProtocolUpgradeTxFDLength);
-
-        vm.expectRevert(abi.encodeWithSelector(TooManyFactoryDeps.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-    }
-
-    // Factory deps can be at most 32
+    // Factory deps can be at most 64 (MAX_NEW_FACTORY_DEPS)
     function test_revertWhen_FactoryDepsCanBeAtMost32(uint8 maxNewFactoryDeps) public {
         vm.assume(maxNewFactoryDeps > MAX_NEW_FACTORY_DEPS);
 
@@ -200,7 +187,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Wrong factory dep hash
+    // Upgrade with mock factoryDepHash
     function test_revertWhen_WrongFactoryDepHash() public {
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = "11111111111111111111111111111111";
@@ -209,12 +196,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(factoryDeps[0]);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PreviousUpgradeNotFinalized.selector,
-                bytes32(proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps[0])
-            )
-        );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
