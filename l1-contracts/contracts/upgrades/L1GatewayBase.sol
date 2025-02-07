@@ -47,14 +47,20 @@ abstract contract L1GatewayBase {
             baseTokenName = string("Ether");
             baseTokenSymbol = string("ETH");
         } else {
-            (string memory stringResult, bool success) = _safeCallTokenMetadata(_baseTokenAddress, abi.encodeCall(IERC20Metadata.name, ()));    
+            (string memory stringResult, bool success) = _safeCallTokenMetadata(
+                _baseTokenAddress,
+                abi.encodeCall(IERC20Metadata.name, ())
+            );
             if (success) {
                 baseTokenName = stringResult;
             } else {
                 baseTokenName = string("Base Token");
             }
 
-            (stringResult, success) = _safeCallTokenMetadata(_baseTokenAddress, abi.encodeCall(IERC20Metadata.symbol, ()));
+            (stringResult, success) = _safeCallTokenMetadata(
+                _baseTokenAddress,
+                abi.encodeCall(IERC20Metadata.symbol, ())
+            );
             if (success) {
                 baseTokenSymbol = stringResult;
             } else {
@@ -75,25 +81,25 @@ abstract contract L1GatewayBase {
         return abi.encode(additionalForceDeploymentsData);
     }
 
-    /// @notice Calls a token's metadata method. 
+    /// @notice Calls a token's metadata method.
     /// @dev For the sake of simplicitly, we expect that either of the
     /// following is true:
     /// 1. The token does not support metadata methods
     /// 2. The token supports it and returns a `bytes32` string there.
     /// 3. The token supports it and returns a correct `string` as a returndata.
-    /// 
-    /// For all other cases, this function will panic and so such chains would not be 
+    ///
+    /// For all other cases, this function will panic and so such chains would not be
     /// deployable.
     function _safeCallTokenMetadata(address _token, bytes memory data) internal view returns (string memory, bool) {
         // We are not afraid if token returns large calldata, since it affects
         // only the deployment of the chain that uses such a malicious token.
         (bool callSuccess, bytes memory returnData) = _token.staticcall(data);
 
-        // The failed call most likely means that this method is not supported. 
-        if(!callSuccess) {
+        // The failed call most likely means that this method is not supported.
+        if (!callSuccess) {
             return ("", false);
         }
-        
+
         // This case covers non-standard tokens
         if (returnData.length < 64) {
             return ("", false);
