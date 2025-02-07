@@ -82,7 +82,7 @@ abstract contract L1GatewayBase {
     }
 
     /// @notice Calls a token's metadata method.
-    /// @dev For the sake of simplicitly, we expect that either of the
+    /// @dev For the sake of simplicity, we expect that either of the
     /// following is true:
     /// 1. The token does not support metadata methods
     /// 2. The token supports it and returns a `bytes32` string there.
