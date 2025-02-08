@@ -329,8 +329,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         //     revert ReconstructionMismatch(PubdataField.LogsHash, inputLogsRootHash, localLogsRootHash);
         // }
 
-        bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
-        bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
+        bytes32 messageRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
+        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, messageRootHash));
 
         if (inputLogsRootHash != localLogsRootHash) {
             //     revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputLogsRootHash);
@@ -350,7 +350,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         }
 
         /// Native (VM) L2 to L1 log
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), chainBatchRootHash);
         SystemContractHelper.toL1(
             true,
             bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)),
