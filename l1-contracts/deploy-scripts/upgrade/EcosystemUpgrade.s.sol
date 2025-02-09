@@ -79,6 +79,19 @@ interface IBridgehubLegacy {
     function stateTransitionManager(uint256 chainId) external returns (address);
 }
 
+interface StateTransitionManagerLegacy {
+    // Unlike the creation params for the new `ChainTypeManager`, it does not contain force deployments
+    // fata.
+    struct ChainCreationParams {
+        address genesisUpgrade;
+        bytes32 genesisBatchHash;
+        uint64 genesisIndexRepeatedStorageChanges;
+        bytes32 genesisBatchCommitment;
+        Diamond.DiamondCutData diamondCut;
+    }
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
+}
+
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -181,7 +194,7 @@ contract EcosystemUpgrade is Script {
         uint256 l1ChainId;
         address deployerAddress;
         uint256 eraChainId;
-        address ownerAddress;
+        address protocolUpgradeHandlerProxyAddress;
         // This is the address of the ecosystem admin.
         // Note, that it is not the owner, but rather the address that is responsible
         // for facilitating partially trusted, but not critical tasks.
@@ -250,6 +263,16 @@ contract EcosystemUpgrade is Script {
     }
 
     CachedBytecodeHashes internal cachedBytecodeHashes;
+
+    // Just reads the input data for the script.
+    function testInitialize(string memory configPath, string memory outputPath) public {
+        string memory root = vm.projectRoot();
+        configPath = string.concat(root, configPath);
+        outputPath = string.concat(root, outputPath);
+        initializeConfig(configPath);
+
+        initializeOldData();
+    }
 
     function prepareEcosystemContracts(string memory configPath, string memory outputPath) public {
         string memory root = vm.projectRoot();
@@ -327,7 +350,7 @@ contract EcosystemUpgrade is Script {
         config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
     }
 
-    function provideAcceptOwnershipCalls() public returns (Call[] memory calls) {
+    function provideAcceptOwnershipCalls() public view returns (Call[] memory calls) {
         console.log("Providing accept ownership calls");
 
         calls = new Call[](4);
@@ -353,8 +376,8 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function getOwnerAddress() public returns (address) {
-        return config.ownerAddress;
+    function getProtocolUpgradeHandlerAddress() public view returns (address) {
+        return config.protocolUpgradeHandlerProxyAddress;
     }
 
     function _getFacetCutsForDeletion() internal returns (Diamond.FacetCut[] memory facetCuts) {
@@ -400,22 +423,31 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function getNewProtocolVersion() public returns (uint256) {
+    function getNewProtocolVersion() public pure returns (uint256) {
         return 0x1a00000000;
     }
 
-    function getProtocolUpgradeNonce() public returns (uint256) {
+    function getProtocolUpgradeNonce() public pure returns (uint256) {
         return (getNewProtocolVersion() >> 32);
     }
 
-    function getOldProtocolDeadline() public returns (uint256) {
+    function getOldProtocolDeadline() public pure returns (uint256) {
         // Note, that it is this way by design, on stage2 it
         // will be set to 0
         return type(uint256).max;
     }
 
-    function getOldProtocolVersion() public returns (uint256) {
+    function getOldProtocolVersion() public pure returns (uint256) {
         return 0x1900000000;
+    }
+
+    function getDummyDiamondCutData() public pure returns (Diamond.DiamondCutData memory) {
+        return
+            Diamond.DiamondCutData({
+                facetCuts: new Diamond.FacetCut[](0),
+                initAddress: address(0),
+                initCalldata: hex""
+            });
     }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
@@ -439,6 +471,26 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
 
+        // Note, that we will also need to turn off the ability to create new chains
+        // in the interim of the upgrade.
+        Call memory setCreationParamsCall = Call({
+            target: config.contracts.stateTransitionManagerAddress,
+            data: abi.encodeCall(
+                StateTransitionManagerLegacy.setChainCreationParams,
+                (
+                    StateTransitionManagerLegacy.ChainCreationParams({
+                        // These is a temporary dummy value to prevent deployment of new chains
+                        genesisUpgrade: address(uint160(1)),
+                        genesisBatchHash: config.contracts.genesisRoot,
+                        genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+                        genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+                        diamondCut: getDummyDiamondCutData()
+                    })
+                )
+            ),
+            value: 0
+        });
+
         // The call that will start the timer till the end of the upgrade.
         Call memory timerCall = Call({
             target: addresses.upgradeTimer,
@@ -446,10 +498,11 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
 
-        calls = new Call[](3);
+        calls = new Call[](4);
         calls[0] = ctmCall;
         calls[1] = setValidatorTimelockCall;
-        calls[2] = timerCall;
+        calls[2] = setCreationParamsCall;
+        calls[3] = timerCall;
     }
 
     function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData) {
@@ -583,8 +636,20 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function getEcosystemAdmin() external returns (address) {
+    function getEcosystemAdmin() external view returns (address) {
         return config.ecosystemAdminAddress;
+    }
+
+    function getBridgehub() external view returns (address) {
+        return config.contracts.bridgehubProxyAddress;
+    }
+
+    function getChainTypeManager() external view returns (address) {
+        return config.contracts.stateTransitionManagerAddress;
+    }
+
+    function getDiamondCutData() external view returns (bytes memory) {
+        return generatedData.diamondCutData;
     }
 
     function getStage1UpgradeCalls() public returns (Call[] memory calls) {
@@ -740,7 +805,9 @@ contract EcosystemUpgrade is Script {
 
         config.contracts.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        config.ownerAddress = Bridgehub(config.contracts.bridgehubProxyAddress).owner();
+        config.protocolUpgradeHandlerProxyAddress = toml.readAddress(
+            "$.contracts.protocol_upgrade_handler_proxy_address"
+        );
         config.contracts.stateTransitionManagerAddress = IBridgehubLegacy(config.contracts.bridgehubProxyAddress)
             .stateTransitionManager(config.eraChainId);
         config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
@@ -772,7 +839,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function initializeExpectedL2Addresses() internal {
-        address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
+        address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.protocolUpgradeHandlerProxyAddress);
 
         addresses.expectedL2Addresses = ExpectedL2Addresses({
             expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
@@ -971,13 +1038,13 @@ contract EcosystemUpgrade is Script {
     function deployBridgehubImplementation() internal {
         bytes memory bridgeHubBytecode = abi.encodePacked(
             type(Bridgehub).creationCode,
-            abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains)
+            abi.encode(config.l1ChainId, config.protocolUpgradeHandlerProxyAddress, config.contracts.maxNumberOfChains)
         );
         address bridgehubImplementation = deployViaCreate2(bridgeHubBytecode);
         notifyAboutDeployment(
             bridgehubImplementation,
             "Bridgehub",
-            abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains),
+            abi.encode(config.l1ChainId, config.protocolUpgradeHandlerProxyAddress, config.contracts.maxNumberOfChains),
             "Bridgehub Implementation"
         );
         addresses.bridgehub.bridgehubImplementation = bridgehubImplementation;
@@ -1246,7 +1313,7 @@ contract EcosystemUpgrade is Script {
             abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
         );
 
-        address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
+        address beacon = create2WithDeterministicOwner(initCode, config.protocolUpgradeHandlerProxyAddress);
         notifyAboutDeployment(
             beacon,
             "UpgradeableBeacon",
@@ -1282,7 +1349,7 @@ contract EcosystemUpgrade is Script {
     function deployL1NativeTokenVaultProxy() internal {
         bytes memory initCalldata = abi.encodeCall(
             L1NativeTokenVault.initialize,
-            (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+            (config.protocolUpgradeHandlerProxyAddress, addresses.bridges.bridgedTokenBeacon)
         );
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
@@ -1317,12 +1384,16 @@ contract EcosystemUpgrade is Script {
     function deployTransitionaryOwner() internal {
         bytes memory bytecode = abi.encodePacked(
             type(TransitionaryOwner).creationCode,
-            abi.encode(config.ownerAddress)
+            abi.encode(config.protocolUpgradeHandlerProxyAddress)
         );
 
         addresses.transitionaryOwner = deployViaCreate2(bytecode);
 
-        notifyAboutDeployment(addresses.transitionaryOwner, "TransitionaryOwner", abi.encode(config.ownerAddress));
+        notifyAboutDeployment(
+            addresses.transitionaryOwner,
+            "TransitionaryOwner",
+            abi.encode(config.protocolUpgradeHandlerProxyAddress)
+        );
     }
 
     function getInitialDelay() external view returns (uint256) {
@@ -1340,14 +1411,24 @@ contract EcosystemUpgrade is Script {
 
         bytes memory bytecode = abi.encodePacked(
             type(GovernanceUpgradeTimer).creationCode,
-            abi.encode(INITIAL_DELAY, MAX_ADDITIONAL_DELAY, config.ownerAddress, config.ecosystemAdminAddress)
+            abi.encode(
+                INITIAL_DELAY,
+                MAX_ADDITIONAL_DELAY,
+                config.protocolUpgradeHandlerProxyAddress,
+                config.ecosystemAdminAddress
+            )
         );
 
         addresses.upgradeTimer = deployViaCreate2(bytecode);
         notifyAboutDeployment(
             addresses.upgradeTimer,
             "GovernanceUpgradeTimer",
-            abi.encode(INITIAL_DELAY, MAX_ADDITIONAL_DELAY, config.ownerAddress, config.ecosystemAdminAddress)
+            abi.encode(
+                INITIAL_DELAY,
+                MAX_ADDITIONAL_DELAY,
+                config.protocolUpgradeHandlerProxyAddress,
+                config.ecosystemAdminAddress
+            )
         );
     }
 
@@ -1357,14 +1438,14 @@ contract EcosystemUpgrade is Script {
             // We set a temoprary admin there. This is needed for easier/quicker setting of
             // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the
             // decentralized upgrade voting starts.
-            abi.encode(config.ownerAddress, msg.sender)
+            abi.encode(config.protocolUpgradeHandlerProxyAddress, msg.sender)
         );
 
         addresses.l2WrappedBaseTokenStore = deployViaCreate2(bytecode);
         notifyAboutDeployment(
             addresses.l2WrappedBaseTokenStore,
             "L2WrappedBaseTokenStore",
-            abi.encode(config.ownerAddress, msg.sender)
+            abi.encode(config.protocolUpgradeHandlerProxyAddress, msg.sender)
         );
     }
 
@@ -1690,7 +1771,11 @@ contract EcosystemUpgrade is Script {
         vm.serializeBytes("root", "governance_stage2_calls", abi.encode(getStage2UpgradeCalls()));
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", abi.encode(getChainUpgradeInfo()));
 
-        string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
+        string memory toml = vm.serializeAddress(
+            "root",
+            "protocol_upgrade_handler_proxy_address",
+            config.protocolUpgradeHandlerProxyAddress
+        );
 
         vm.writeToml(toml, outputPath);
     }
@@ -1699,8 +1784,8 @@ contract EcosystemUpgrade is Script {
         return Utils.deployViaCreate2(_bytecode, config.contracts.create2FactorySalt, addresses.create2Factory);
     }
 
-    function prepareForceDeploymentsData() internal view returns (bytes memory) {
-        require(config.ownerAddress != address(0), "owner not set");
+    function prepareForceDeploymentsData() public view returns (bytes memory) {
+        require(config.protocolUpgradeHandlerProxyAddress != address(0), "protocol upgrade handler not set");
 
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
@@ -1709,7 +1794,7 @@ contract EcosystemUpgrade is Script {
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readBeaconProxyBytecode()
             ),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
+            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.protocolUpgradeHandlerProxyAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
             l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
