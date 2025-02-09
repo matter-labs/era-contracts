@@ -11,11 +11,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 // Note that the `ProtocolUpgradeHandler` uses `OpenZeppeling v5`.
 interface ProxyAdminV5 {
-    function upgradeAndCall(
-        address proxy,
-        address implementation,
-        bytes memory data
-    ) external;
+    function upgradeAndCall(address proxy, address implementation, bytes memory data) external;
 }
 
 contract AppendProtocolUpgradeHandlerUpgrade is Script {
@@ -23,7 +19,13 @@ contract AppendProtocolUpgradeHandlerUpgrade is Script {
 
     function getProxyAdmin(address _proxyAddr) internal view returns (address proxyAdmin) {
         // the constant is the proxy admin storage slot
-        proxyAdmin = address(uint160(uint256(vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103)))));
+        proxyAdmin = address(
+            uint160(
+                uint256(
+                    vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103))
+                )
+            )
+        );
     }
 
     function run() public {
@@ -54,9 +56,7 @@ contract AppendProtocolUpgradeHandlerUpgrade is Script {
             protocolUpgradeHandlerImplAddress
         );
 
-        console.logBytes(
-            abi.encode(newCalls)
-        );
+        console.logBytes(abi.encode(newCalls));
     }
 
     function generateProtocolUpgradeHandlerUpgradeCall(
@@ -69,11 +69,7 @@ contract AppendProtocolUpgradeHandlerUpgrade is Script {
                 target: transparentProxyAdmin,
                 data: abi.encodeCall(
                     ProxyAdminV5.upgradeAndCall,
-                    (
-                        protocolUpgradeHandlerProxyAddress,
-                        protocolUpgradeHandlerImplAddress,
-                        hex""
-                    )
+                    (protocolUpgradeHandlerProxyAddress, protocolUpgradeHandlerImplAddress, hex"")
                 ),
                 value: 0
             });

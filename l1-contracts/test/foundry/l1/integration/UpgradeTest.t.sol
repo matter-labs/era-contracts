@@ -59,8 +59,7 @@ abstract contract UpgradeTestAbstract is Test {
 
     function _prepareEcosystemContracts() internal virtual;
 
-    function _prepareChain(
-    ) internal virtual;
+    function _prepareChain() internal virtual;
 
     function _upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory chainUpgradeInfo) internal virtual;
 
@@ -138,10 +137,7 @@ abstract contract UpgradeTestAbstract is Test {
 
         console.log("Starting stage2 of the upgrade!");
         // Execute stage2 calls.
-        _governanceMulticall(
-            _getProtocolUpgradeHandlerAddress(),
-            _getStage2UpgradeCalls()
-        );
+        _governanceMulticall(_getProtocolUpgradeHandlerAddress(), _getStage2UpgradeCalls());
 
         // After stage2, deploying a new chain should work.
         _createNewChain(101101, false);
@@ -215,10 +211,18 @@ contract UpgradeTestScriptBased is UpgradeTestAbstract {
     }
 
     function _prepareChain() internal override {
-        chainUpgrade.prepareChain(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT, vm.envString("CHAIN_INPUT"), CHAIN_OUTPUT);
+        chainUpgrade.prepareChain(
+            vm.envString("ECOSYSTEM_INPUT"),
+            ECOSYSTEM_OUTPUT,
+            vm.envString("CHAIN_INPUT"),
+            CHAIN_OUTPUT
+        );
     }
 
-    function _upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory chainUpgradeInfo) internal override {
+    function _upgradeChain(
+        uint256 oldProtocolVersion,
+        Diamond.DiamondCutData memory chainUpgradeInfo
+    ) internal override {
         chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
     }
 
@@ -302,17 +306,23 @@ contract UpgradeTestFileBased is UpgradeTestAbstract {
 
     // --- Implementation of virtual functions for preparing upgrades --------
 
-    function _prepareEcosystemContracts(
-    ) internal override {
+    function _prepareEcosystemContracts() internal override {
         generateUpgradeData.testInitialize(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT);
     }
 
-    function _prepareChain(
-    ) internal override {
-        chainUpgrade.prepareChain(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT, vm.envString("CHAIN_INPUT"), CHAIN_OUTPUT);
+    function _prepareChain() internal override {
+        chainUpgrade.prepareChain(
+            vm.envString("ECOSYSTEM_INPUT"),
+            ECOSYSTEM_OUTPUT,
+            vm.envString("CHAIN_INPUT"),
+            CHAIN_OUTPUT
+        );
     }
 
-    function _upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory chainUpgradeInfo) internal override {
+    function _upgradeChain(
+        uint256 oldProtocolVersion,
+        Diamond.DiamondCutData memory chainUpgradeInfo
+    ) internal override {
         chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
     }
 
@@ -330,11 +340,9 @@ contract UpgradeTestFileBased is UpgradeTestAbstract {
 
         IProtocolUpgradeHandler.Call[] memory calls = new IProtocolUpgradeHandler.Call[](1);
         vm.startBroadcast(emergencyUpgradeBoard);
-        IProtocolUpgradeHandler(puh).executeEmergencyUpgrade(IProtocolUpgradeHandler.UpgradeProposal({
-            calls: calls,
-            executor: emergencyUpgradeBoard,
-            salt: bytes32(0)
-        }));
+        IProtocolUpgradeHandler(puh).executeEmergencyUpgrade(
+            IProtocolUpgradeHandler.UpgradeProposal({calls: calls, executor: emergencyUpgradeBoard, salt: bytes32(0)})
+        );
         vm.stopBroadcast();
     }
 }

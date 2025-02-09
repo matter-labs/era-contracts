@@ -442,11 +442,12 @@ contract EcosystemUpgrade is Script {
     }
 
     function getDummyDiamondCutData() public pure returns (Diamond.DiamondCutData memory) {
-        return Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(0),
-            initCalldata: hex""
-        });
+        return
+            Diamond.DiamondCutData({
+                facetCuts: new Diamond.FacetCut[](0),
+                initAddress: address(0),
+                initCalldata: hex""
+            });
     }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
@@ -471,17 +472,22 @@ contract EcosystemUpgrade is Script {
         });
 
         // Note, that we will also need to turn off the ability to create new chains
-        // in the interim of the upgrade. 
+        // in the interim of the upgrade.
         Call memory setCreationParamsCall = Call({
             target: config.contracts.stateTransitionManagerAddress,
-            data: abi.encodeCall(StateTransitionManagerLegacy.setChainCreationParams, (StateTransitionManagerLegacy.ChainCreationParams({
-                // These is a temporary dummy value to prevent deployment of new chains
-                genesisUpgrade: address(uint160(1)),
-                genesisBatchHash: config.contracts.genesisRoot,
-                genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
-                genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-                diamondCut: getDummyDiamondCutData()
-            }))),
+            data: abi.encodeCall(
+                StateTransitionManagerLegacy.setChainCreationParams,
+                (
+                    StateTransitionManagerLegacy.ChainCreationParams({
+                        // These is a temporary dummy value to prevent deployment of new chains
+                        genesisUpgrade: address(uint160(1)),
+                        genesisBatchHash: config.contracts.genesisRoot,
+                        genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+                        genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+                        diamondCut: getDummyDiamondCutData()
+                    })
+                )
+            ),
             value: 0
         });
 
@@ -636,7 +642,7 @@ contract EcosystemUpgrade is Script {
 
     function getBridgehub() external view returns (address) {
         return config.contracts.bridgehubProxyAddress;
-    } 
+    }
 
     function getChainTypeManager() external view returns (address) {
         return config.contracts.stateTransitionManagerAddress;
