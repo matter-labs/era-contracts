@@ -139,18 +139,24 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
+        address verifierFflonk = _deployInternal("VerifierFflonk", "VerifierFflonk.sol", hex"", innerConfig);
+
+        address verifierPlonk = _deployInternal("VerifierPlonk", "VerifierPlonk.sol", hex"", innerConfig);
+
+        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
+
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
                 "TestnetVerifier",
                 "TestnetVerifier.sol",
-                hex"",
+                constructorParams,
                 innerConfig
             );
         } else {
             _deployedContracts.stateTransition.verifier = _deployInternal(
-                "Verifier",
-                "Verifier.sol",
-                hex"",
+                "DualVerifier",
+                "DualVerifier.sol",
+                constructorParams,
                 innerConfig
             );
         }
@@ -315,7 +321,7 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
         // Include both verifiers since we cannot determine which one will be used
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Verifier.sol", "Verifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
