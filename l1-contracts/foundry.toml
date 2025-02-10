@@ -54,6 +54,6 @@ optimizer = false
 [profile.invariant_tests.zksync]
 suppressed_warnings = ["txorigin"]
 [profile.invariant_tests.invariant]
-runs = 1
-depth = 100
+runs = 10
+depth = 1000
 # fail_on_revert = true
