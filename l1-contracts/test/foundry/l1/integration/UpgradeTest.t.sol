@@ -49,7 +49,6 @@ abstract contract UpgradeTestAbstract is Test {
         chainUpgrade = new ChainUpgrade();
     }
 
-
     // --- Virtual functions for EcosystemUpgrade data -----------------------
 
     function _getEcosystemAdmin() internal view virtual returns (address);
