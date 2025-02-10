@@ -45,15 +45,18 @@ contract L1AssetRouterActorHandler is Test {
         // on the other hand we do want to test for "withdraw more than one has" cases
         // by bounding the amount for _some_ withdrawals we balance between having too many useless reverts
         // and testing too few cases
-        if (totalFunctionCalls % 4 != 0) {
-            _amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
+        uint256 amount;
+        if (totalFunctionCalls % 10 == 0) {
+            amount = _amount;
+        } else {
+            amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
         }
 
         uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
-        bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _receiver, l2Token);
+        bytes memory data = DataEncoding.encodeBridgeBurnData(amount, _receiver, l2Token);
 
-        if (_amount == 0) {
+        if (amount == 0) {
             return;
         }
 
