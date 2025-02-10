@@ -30,8 +30,8 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
-import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {Verifier} from "contracts/state-transition/verifiers/Verifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
