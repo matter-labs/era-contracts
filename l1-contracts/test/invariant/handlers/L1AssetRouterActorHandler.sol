@@ -14,6 +14,7 @@ contract L1AssetRouterActorHandler is Test {
     // ghost variables
     // https://book.getfoundry.sh/forge/invariant-testing#handler-ghost-variables
     uint256 public totalDeposits;
+    uint256 public totalFunctionCalls;
     // constants
     // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L64-L68
     address internal constant L1_TOKEN_ADDRESS = 0x1111100000000000000000000000000000011111;
@@ -34,14 +35,19 @@ contract L1AssetRouterActorHandler is Test {
         });
 
         totalDeposits += _amount;
+        totalFunctionCalls++;
     }
 
     function withdraw(uint256 _amount, address _receiver) public {
         address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
-        // this limits the variety of scenarios but otherwise there're many reverts 
-        // when it tries to withdraw more than it has
-        _amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
+        // without bounding the amount the handler usually tries to withdraw more than it has causing reverts
+        // on the other hand we do want to test for "withdraw more than one has" cases
+        // by bounding the amount for _some_ withdrawals we balance between having too many useless reverts
+        // and testing too few cases
+        if (totalFunctionCalls % 4 != 0) {
+            _amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
+        }
 
         uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
@@ -54,6 +60,7 @@ contract L1AssetRouterActorHandler is Test {
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(assetId, data);
 
         totalDeposits -= _amount;
+        totalFunctionCalls++;
     }
 
     // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
