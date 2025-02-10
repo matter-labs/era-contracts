@@ -30,7 +30,9 @@ contract AssetRouterTest is Test, SharedL2ContractL1DeployerUtils, SharedL2Contr
 
         userActorHandlers.push(new UserActorHandler());
         l1AssetRouterActorHandler = new L1AssetRouterActorHandler(userActorHandlers);
-        targetContract(address(userActorHandlers[0]));
+        for (uint256 i; i < userActorHandlers.length; i++) {
+            targetContract(address(userActorHandlers[i]));
+        }
         targetContract(address(l1AssetRouterActorHandler));
 
         address ts = makeAddr("targetSender");
