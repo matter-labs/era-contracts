@@ -36,4 +36,14 @@ abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
 
         assertEq(totalDepositAmount, totalSupply);
     }
+
+    function invariant_L1AssetRouterActorHandlerHasZeroBalance() public {
+        address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+
+        if (l2TokenAddress.code.length == 0) {
+            return; // TODO: is it fine to return early here?
+        }
+
+        assertEq(BridgedStandardERC20(l2TokenAddress).balanceOf(address(l1AssetRouterActorHandler)), 0);
+    }
 }
