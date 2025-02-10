@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {Test} from "forge-std/Test.sol";
+
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+
+import {Constants} from "./Constants.sol";
+
+contract UserActorHandler is Test, Constants {
+    // ghost variables
+    // https://book.getfoundry.sh/forge/invariant-testing#handler-ghost-variables
+    uint256 public totalWithdrawalAmount;
+    uint256 public totalFunctionCalls;
+
+    function withdraw(uint256 _amount, address _receiver) public {
+        address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+
+        // without bounding the amount the handler usually tries to withdraw more than it has causing reverts
+        // on the other hand we do want to test for "withdraw more than one has" cases
+        // by bounding the amount for _some_ withdrawals we balance between having too many useless reverts
+        // and testing too few cases
+        uint256 amount;
+        if (totalFunctionCalls % 10 == 0) {
+            amount = _amount;
+        } else {
+            amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
+        }
+        // too many reverts (around 50%) without this condition
+        if (amount == 0) {
+            return;
+        }
+
+        uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
+        bytes memory data = DataEncoding.encodeBridgeBurnData(amount, _receiver, l2Token);
+
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(assetId, data);
+
+        totalWithdrawalAmount += amount;
+        totalFunctionCalls++;
+    }
+}

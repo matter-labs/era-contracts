@@ -7,6 +7,8 @@ import {Test} from "forge-std/Test.sol";
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
 import {L1AssetRouterActorHandler} from "./handlers/L1AssetRouterActorHandler.sol";
+import {UserActorHandler} from "./handlers/UserActorHandler.sol";
+
 import {AssetRouterProperties} from "./AssetRouterProperties.sol";
 import {SharedL2ContractL1DeployerUtils} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
 import {SharedL2ContractDeployer} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
@@ -26,10 +28,17 @@ contract AssetRouterTest is Test, SharedL2ContractL1DeployerUtils, SharedL2Contr
     ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.deployL2Contracts(_l1ChainId);
 
-        h = new L1AssetRouterActorHandler();
+        userActorHandlers.push(new UserActorHandler());
+        l1AssetRouterActorHandler = new L1AssetRouterActorHandler(userActorHandlers);
+        targetContract(address(userActorHandlers[0]));
+        targetContract(address(l1AssetRouterActorHandler));
+
         address ts = makeAddr("targetSender");
         deal(ts, 10_000 ether);
-        targetContract(address(h));
         targetSender(ts);
+
+        // bytes4[] memory fuzzSelectors = new bytes4[](1);
+        // fuzzSelectors[0] = L1AssetRouterActorHandler.finalizeDeposit.selector;
+        // targetSelector(FuzzSelector({addr: address(h), selectors: fuzzSelectors}));
     }
 }

@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 
 import {L1AssetRouterActorHandler} from "./handlers/L1AssetRouterActorHandler.sol";
+import {UserActorHandler} from "./handlers/UserActorHandler.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -13,8 +14,10 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.s
 
 import {SharedL2ContractDeployer} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
+// TODO: do we need SharedL2ContractDeployer here?
 abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
-    L1AssetRouterActorHandler internal h;
+    UserActorHandler[] public userActorHandlers;
+    L1AssetRouterActorHandler public l1AssetRouterActorHandler;
 
     function invariant_TotalDepositsEqualTotalSupply() public {
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
@@ -26,6 +29,11 @@ abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
             totalSupply = BridgedStandardERC20(l2TokenAddress).totalSupply();
         }
 
-        assertEq(h.totalDeposits(), totalSupply);
+        uint256 totalDepositAmount = l1AssetRouterActorHandler.totalDeposits();
+        for (uint256 i; i < userActorHandlers.length; i++) {
+            totalDepositAmount += userActorHandlers[i].totalWithdrawalAmount();
+        }
+
+        assertEq(totalDepositAmount, totalSupply);
     }
 }
