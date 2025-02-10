@@ -17,8 +17,15 @@ abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
     L1AssetRouterActorHandler internal h;
 
     function invariant_TotalDepositsEqualTotalSupply() public {
-        address _l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-        uint256 _totalSupply = BridgedStandardERC20(_l2TokenAddress).totalSupply();
-        assertEq(h.totalDeposits(), _totalSupply);
+        address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+
+        uint256 totalSupply;
+        if (l2TokenAddress.code.length == 0) {
+            totalSupply = 0;
+        } else {
+            totalSupply = BridgedStandardERC20(l2TokenAddress).totalSupply();
+        }
+
+        assertEq(h.totalDeposits(), totalSupply);
     }
 }
