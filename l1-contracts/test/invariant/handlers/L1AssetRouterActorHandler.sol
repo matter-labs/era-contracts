@@ -19,13 +19,15 @@ contract L1AssetRouterActorHandler is Test, Constants {
     // ghost variables
     // https://book.getfoundry.sh/forge/invariant-testing#handler-ghost-variables
     uint256 public totalDeposits;
+    // constants
+    uint256 internal constant AMOUNT_UPPER_BOUND = 1e12 * 1e18;
 
     constructor(UserActorHandler[] memory _receivers) {
         receivers = _receivers;
     }
 
     function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
-        _amount = bound(_amount, 0, 1e30);
+        _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         // hopefully the `bound` function excludes the upper value
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length);
 
@@ -45,19 +47,20 @@ contract L1AssetRouterActorHandler is Test, Constants {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
         // hopefully the `bound` function excludes the upper value
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length);
-        bytes memory data = DataEncoding.encodeBridgeMintData(
-            _sender,
-            address(receivers[receiverIndex]),
-            L1_TOKEN_ADDRESS,
-            _amount,
-            encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
-        );
+        uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
+        bytes memory data = DataEncoding.encodeBridgeMintData({
+            _originalCaller: _sender,
+            _remoteReceiver: address(receivers[receiverIndex]),
+            _originToken: L1_TOKEN_ADDRESS,
+            _amount: amount,
+            _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+        });
 
         // the 1st parameter is unused by `L2AssetRouter`
         // https://github.com/matter-labs/era-contracts/blob/ac11ba99e3f2c3365a162f587b17e35b92dc4f24/l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol#L132
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit(0, assetId, data);
 
-        totalDeposits += _amount;
+        totalDeposits += amount;
     }
 
     // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
