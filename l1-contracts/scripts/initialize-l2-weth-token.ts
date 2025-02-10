@@ -16,7 +16,7 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l1-contracts/artifacts-zk/");
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "contracts/bridge/");
 const openzeppelinTransparentProxyArtifactsPath = path.join(
   contractArtifactsPath,

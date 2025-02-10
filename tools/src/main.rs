@@ -115,6 +115,10 @@ struct Opt {
     /// Output path to verifier contract file.
     #[structopt(short = "o", long = "output_path", default_value = "data/Verifier.sol")]
     output_path: String,
+
+    /// The Verifier is to be compiled for an L2 network, where modexp precompile is not available.
+    #[structopt(short = "l2", long = "l2_mode")]
+    l2_mode: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -135,7 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let vk_hash = hex::encode(calculate_verification_key_hash(verification_key).to_fixed_bytes());
 
     let verifier_contract_template =
-        insert_residue_elements_and_commitments(&verifier_contract_template, &vk, &vk_hash)?;
+        insert_residue_elements_and_commitments(&verifier_contract_template, &vk, &vk_hash, opt.l2_mode)?;
 
     let mut file = File::create(opt.output_path)?;
 
@@ -147,6 +151,7 @@ fn insert_residue_elements_and_commitments(
     template: &str,
     vk: &HashMap<String, Value>,
     vk_hash: &str,
+    l2_mode: bool,
 ) -> Result<String, Box<dyn Error>> {
     let reg = Handlebars::new();
     let residue_g2_elements = generate_residue_g2_elements(vk);
@@ -155,11 +160,16 @@ fn insert_residue_elements_and_commitments(
     let verifier_contract_template =
         template.replace("{{residue_g2_elements}}", &residue_g2_elements);
 
+    let modexp_function = get_modexp_function(l2_mode); 
+    let verifier_contract_template = verifier_contract_template.replace("{{modexp_function}}", &modexp_function);
+
+
     Ok(reg.render_template(
         &verifier_contract_template,
         &json!({"residue_g2_elements": residue_g2_elements,
                         "commitments": commitments,
-                        "vk_hash": vk_hash}),
+                        "vk_hash": vk_hash,
+                        "modexp_function": modexp_function}),
     )?)
 }
 
@@ -334,3 +344,37 @@ fn generate_residue_g2_elements(vk: &HashMap<String, Value>) -> String {
 
     residue_g2_elements
 }
+
+
+fn get_modexp_function(l2_mode: bool) -> String {
+    if l2_mode {
+        r#"function modexp(value, power) -> res {
+                res := 1
+                for {
+
+                } gt(power, 0) {
+
+                } {
+                    if mod(power, 2) {
+                        res := mulmod(res, value, R_MOD)
+                    }
+                    value := mulmod(value, value, R_MOD)
+                    power := shr(1, power)
+                }
+            }"#.to_string()
+    } else {
+        r#"function modexp(value, power) -> res {
+                mstore(0x00, 0x20)
+                mstore(0x20, 0x20)
+                mstore(0x40, 0x20)
+                mstore(0x60, value)
+                mstore(0x80, power)
+                mstore(0xa0, R_MOD)
+                if iszero(staticcall(gas(), 5, 0, 0xc0, 0x00, 0x20)) {
+                    revertWithMessage(24, "modexp precompile failed")
+                }
+                res := mload(0x00)
+            }"#.to_string()
+    }
+}
+
