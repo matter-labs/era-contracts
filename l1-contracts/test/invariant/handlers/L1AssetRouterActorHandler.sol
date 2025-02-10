@@ -51,14 +51,14 @@ contract L1AssetRouterActorHandler is Test {
         } else {
             amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
         }
+        // too many reverts (around 50%) without this condition
+        if (amount == 0) {
+            return;
+        }
 
         uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
         bytes memory data = DataEncoding.encodeBridgeBurnData(amount, _receiver, l2Token);
-
-        if (amount == 0) {
-            return;
-        }
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(assetId, data);
 
