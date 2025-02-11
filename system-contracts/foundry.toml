@@ -9,8 +9,8 @@ remappings = [
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 
-[profile.default.zksync] 
+[profile.default.zksync]
 enable_eravm_extensions = true
-zksolc = "1.5.9"
+zksolc = "1.5.11"
 optimization = "0"
-suppressed_errors = ["assemblycreate", "sendtransfer"]
+suppressed_errors = ["sendtransfer"]
