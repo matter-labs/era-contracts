@@ -45,7 +45,7 @@ contract InteropHandler is IInteropHandler {
     event TxIsIncluded(bool isIncluded);
 
     /// @notice The balances of the users.
-    mapping(bytes32 txHash => bool alreadyExecuted) internal alreadyExecuted;
+    mapping(bytes32 txHash => bool alreadyExecuted) public alreadyExecuted;
 
     function markAsExecuted(bytes32 txHash) external {
         // if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
@@ -73,7 +73,9 @@ contract InteropHandler is IInteropHandler {
             // revert MessageNotIncluded();
         }
         emit TxIsIncluded(isIncluded);
-        // kl todo store nullifier here
+        // kl todo check not executed. Rework hashing to contain all data. 
+        bytes32 bundleHash = keccak256(_bundle);
+        alreadyExecuted[bundleHash] = true;
 
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
         InteropCall memory baseTokenCall = interopBundle.calls[0];
