@@ -191,31 +191,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
         return _bridgehubDeposit(_chainId, _originalCaller, _value, _data, L2_NATIVE_TOKEN_VAULT_ADDR);
-        // return
-        //     L2TransactionRequestTwoBridgesInner({
-        //         magicValue: TWO_BRIDGES_MAGIC_VALUE,
-        //         l2Contract: L2_ASSET_ROUTER_ADDR,
-        //         l2Calldata: abi.encodeCall(
-        //             IAssetRouterBase.finalizeDeposit,
-        //             (
-        //                 _chainId,
-        //                 BASE_TOKEN_ASSET_ID,
-        //                 DataEncoding.encodeBridgeMintData({
-        //                     _originalCaller: _originalCaller,
-        //                     _l2Receiver: address(1),
-        //                     _l1Token: address(2),
-        //                     _amount: 12345321,
-        //                     _erc20Metadata: new bytes(0)
-        //                 })
-        //             )
-        //         ),
-        //         factoryDeps: new bytes[](0),
-        //         txDataHash: bytes32(0)
-        //     });
     }
 
     function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyInteropCenter {
-        // revert L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
+        // revert L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented(); // kl todo. figure out failed txs. Maybe the current L2->L1 i.e. reexecution model is enough.
     }
 
     function _setAssetHandlerAddressOnCounterpart(

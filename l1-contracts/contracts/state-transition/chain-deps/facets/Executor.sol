@@ -147,6 +147,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 logKey3;
         address logSender3;
         bytes32 logValue3;
+        uint256 logKey4;
+        address logSender4;
+        bytes32 logValue4;
     }
 
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
@@ -253,6 +256,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 (viaIR.logKey3, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
                 // slither-disable-next-line unused-return
                 (viaIR.logValue3, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
+                i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE);
+                // slither-disable-next-line unused-return
+                (viaIR.logSender4, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logKey4, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logValue4, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
                 if (logSender != L2_BOOTLOADER_ADDRESS) {
                     revert InvalidLogSender(logSender, logKey);
                 }
@@ -262,24 +272,32 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (viaIR.logSender3 != L2_BOOTLOADER_ADDRESS) {
                     revert InvalidLogSender(viaIR.logSender3, viaIR.logKey3);
                 }
+                if (viaIR.logSender4 != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(viaIR.logSender4, viaIR.logKey4);
+                }
                 if (viaIR.logKey2 != logKey.uncheckedAdd(1)) {
                     revert InvalidLogKey(logKey.uncheckedAdd(1), viaIR.logKey2);
                 }
                 if (viaIR.logKey3 != logKey.uncheckedAdd(2)) {
                     revert InvalidLogKey(logKey.uncheckedAdd(2), viaIR.logKey3);
                 }
+                if (viaIR.logKey4 != logKey.uncheckedAdd(3)) {
+                    revert InvalidLogKey(logKey.uncheckedAdd(3), viaIR.logKey4);
+                }
                 if (uint256(logValue) != block.chainid) {
+                    bytes32[] memory sides = new bytes32[](1);
+                    sides[0] = viaIR.logValue4;
                     s.dependencyMessageRoots[_newBatch.batchNumber][savedMsgRootIndex] = MessageRoot({
                         chainId: uint256(logValue),
                         batchNumber: uint256(viaIR.logValue2),
-                        messageRootHash: viaIR.logValue3
+                        sides: sides
                     });
                     savedMsgRootIndex = savedMsgRootIndex.uncheckedAdd(1);
                 } else {
                     IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
                     bytes32 historicalRoot = messageRootContract.historicalRoot(uint256(viaIR.logValue2));
-                    if (viaIR.logValue3 != historicalRoot) {
-                        revert InvalidLogValue(viaIR.logValue3, historicalRoot);
+                    if (viaIR.logValue4 != historicalRoot) {
+                        revert InvalidLogValue(viaIR.logValue4, historicalRoot);
                     }
                 }
             } else if (logKey > MAX_LOG_KEY) {
@@ -520,8 +538,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
             IGetters zkchain = IGetters(IBridgehub(s.bridgehub).getZKChain(msgRoot.chainId));
             bytes32 correctMsgRoot = zkchain.l2LogsRootHash(msgRoot.batchNumber);
-            if (msgRoot.messageRootHash != correctMsgRoot) {
-                revert InvalidMessageRoot(correctMsgRoot, msgRoot.messageRootHash);
+            if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctMsgRoot) {
+                revert InvalidMessageRoot(correctMsgRoot, msgRoot.sides[0]);
             }
         }
     }

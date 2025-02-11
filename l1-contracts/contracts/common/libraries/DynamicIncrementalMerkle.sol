@@ -212,6 +212,7 @@ library DynamicIncrementalMerkle {
     }
 
     function rootMemory(Bytes32PushTree memory self) internal view returns (bytes32) {
+        // note the last element of the sides array is the root, and is not really a side.
         return self._sides[self._sidesLengthMemory - 1];
     }
 

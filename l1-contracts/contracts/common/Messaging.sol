@@ -220,5 +220,7 @@ struct LeafInclusionProof {
 struct MessageRoot {
     uint256 chainId;
     uint256 batchNumber;
-    bytes32 messageRootHash;
+    // We double overloading this. The sides normally contain the root, as well as the sides. So the length is at least 2.
+    // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
+    bytes32[] sides;
 }

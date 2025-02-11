@@ -2955,22 +2955,29 @@ object "Bootloader" {
                 for {let i := 0} true {i := add(i, 1)} {
                     debugLog("Setting message roots 2", i)
                     debugLog("slot", add(msgRootSlot, mul(i, msgRootSlotSize)))
-                    let chainId  := mload(mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)) 
-                    let blockNumber := mload(mul(add(msgRootSlot, add(mul(i, msgRootSlotSize), 1)), 32))
-                    let msgRoot := mload(mul(add(msgRootSlot, add(mul(i, msgRootSlotSize), 2)), 32))
+                    let messageRootStartSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
+                    let chainId  := mload(messageRootStartSlot) 
+                    let blockNumber := mload(add(messageRootStartSlot, 32))
+                    let sidesLength := mload(add(messageRootStartSlot, 64))
 
                     debugLog("Setting message roots 3", chainId)
                     debugLog("Setting message roots 4", blockNumber)
-                    debugLog("Setting message roots 5", msgRoot)
+                    debugLog("Setting message roots 5", sidesLength)
 
-                    if iszero(msgRoot) {
+                    if iszero(sidesLength) {
                         break
                     }
 
                     mstore(0, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
                     mstore(4, chainId)
                     mstore(36, blockNumber)
-                    mstore(68, msgRoot)
+                    mstore(68, 96)
+                    mstore(100, sidesLength)
+                    for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
+                        debugLog("Setting message roots 6", j)
+                        debugLog("Setting message roots 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(132, mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                    }
                     // todo add merkle proof
 
                     debugLog("Tried to set messageRoot: ", 0)
@@ -2980,7 +2987,7 @@ object "Bootloader" {
                         L2_MESSAGE_ROOT_STORAGE(),
                         0,
                         0,
-                        100,
+                        add(132, mul(sidesLength, 32)),
                         0,
                         0
                     )
@@ -2992,11 +2999,35 @@ object "Bootloader" {
                     }
                     debugLog("Tried to set messageRoot: ", 2)
 
-                    // kl todo don't send to L1 here, as the msgRoots can be linked. Do it at the end, by calling the MSGRootStorage for the final roots. 
-                    sendToL1Native(true, messageRootLogKey(i), chainId)
-                    sendToL1Native(true, add(messageRootLogKey(i), 1), blockNumber)
-                    sendToL1Native(true, add(messageRootLogKey(i), 2), msgRoot)
+                    // for single messageRoots that are not really sides, we send them to L1 here.
+                    if lt(sidesLength, 2) {
+                        sendToL1Native(true, messageRootLogKey(i), chainId)
+                        sendToL1Native(true, add(messageRootLogKey(i), 1), blockNumber)
+                        sendToL1Native(true, add(messageRootLogKey(i), 2), sidesLength)
+                        sendToL1Native(true, add(messageRootLogKey(i), 3), mload(add(messageRootStartSlot, 96)))
+                    }
                 }
+
+                // kl todo clear pendingMessageRootIds
+                mstore(0, {{RIGHT_PADDED_CLEAR_PENDING_MESSAGE_ROOT_IDS_SELECTOR}}) 
+
+                debugLog("Tried to clear pending messageRootIds: ", 0)
+
+                let success := call(
+                    gas(),
+                    L2_MESSAGE_ROOT_STORAGE(),
+                    0,
+                    0,
+                    4,
+                    0,
+                    0
+                )
+                debugLog("Tried to clear pending messageRootIds: ", 1)
+                if iszero(success) {
+                    debugLog("Failed to clear pending messageRootIds: ", 1)
+                    // revertWithReason(FAILED_TO_SET_L2_BLOCK(), 1)
+                }
+                debugLog("Tried to clear pending messageRootIds: ", 2)
             }
 
             /// @notice Appends the transaction hash to the current L2 block.
