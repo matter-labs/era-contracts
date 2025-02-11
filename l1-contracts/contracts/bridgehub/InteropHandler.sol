@@ -70,7 +70,7 @@ contract InteropHandler is IInteropHandler {
             _proof.proof
         );
         if (!isIncluded) {
-            revert MessageNotIncluded();
+            // revert MessageNotIncluded();
         }
         emit TxIsIncluded(isIncluded);
         // kl todo store nullifier here
