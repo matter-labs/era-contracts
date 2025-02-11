@@ -18,7 +18,6 @@ uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE
 /// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`
 bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
-// TODO: change constant to the real root hash of empty Merkle tree (SMA-184)
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
 /// @dev Denotes the type of the ZKsync transaction that came from L1.
@@ -73,7 +72,7 @@ uint256 constant L1_TX_DELTA_FACTORY_DEPS_L2_GAS = 2473;
 uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = 64;
 
 /// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
-uint256 constant MAX_NEW_FACTORY_DEPS = 32;
+uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
@@ -102,9 +101,63 @@ uint256 constant MEMORY_OVERHEAD_GAS = 10;
 /// @dev The maximum gas limit for a priority transaction in L2.
 uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 
+/// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 
+/// @dev the value returned in bridgehubDeposit in the TwoBridges function.
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
+
+/// @dev the maximum number of supported chains, this is an arbitrary limit.
+/// @dev Note, that in case of a malicious Bridgehub admin, the total number of chains
+/// can be up to 2 times higher. This may be possible, in case the old ChainTypeManager
+/// had `100` chains and these were migrated to the Bridgehub only after `MAX_NUMBER_OF_ZK_CHAINS`
+/// were added to the bridgehub via creation of new chains.
+uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
+
+/// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
+address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
+
+/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
+uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
+
+/// @dev The virtual address of the L1 settlement layer.
+address constant L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS = address(
+    uint160(uint256(keccak256("L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS")) - 1)
+);
+
+struct PriorityTreeCommitment {
+    uint256 nextLeafIndex;
+    uint256 startIndex;
+    uint256 unprocessedIndex;
+    bytes32[] sides;
+}
+
+// Info that allows to restore a chain.
+struct ZKChainCommitment {
+    /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
+    /// (batch 0 is genesis)
+    uint256 totalBatchesExecuted;
+    /// @notice Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch
+    uint256 totalBatchesVerified;
+    /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
+    /// batch
+    uint256 totalBatchesCommitted;
+    /// @notice The hash of the L2 system contracts ugpgrade transaction.
+    /// @dev It is non zero if the migration happens while the upgrade is not yet finalized.
+    bytes32 l2SystemContractsUpgradeTxHash;
+    /// @notice The batch when the system contracts upgrade transaction was executed.
+    /// @dev It is non-zero if the migration happens while the batch where the upgrade tx was present
+    /// has not been finalized (executed) yet.
+    uint256 l2SystemContractsUpgradeBatchNumber;
+    /// @notice The hashes of the batches that are needed to keep the blockchain working.
+    /// @dev The length of the array is equal to the `totalBatchesCommitted - totalBatchesExecuted + 1`, i.e. we need
+    /// to store all the unexecuted batches' hashes + 1 latest executed one.
+    bytes32[] batchHashes;
+    /// @notice Commitment to the priority merkle tree.
+    PriorityTreeCommitment priorityTree;
+    /// @notice Whether a chain is a permanent rollup.
+    bool isPermanentRollup;
+}
