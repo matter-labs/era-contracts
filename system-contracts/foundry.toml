@@ -5,10 +5,11 @@ libs = ["lib"]
 cache_path = "cache-forge"
 evm_version = "paris"
 remappings = [
-    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
+    "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 
 [profile.default.zksync]
-zksolc = "1.5.0"
+zksolc = "1.5.7"
 enable_eravm_extensions = true
+suppressed_errors = ["sendtransfer"]
