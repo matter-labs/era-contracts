@@ -28,8 +28,9 @@ contract L1AssetRouterActorHandler is Test, Constants {
 
     function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
         _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
-        // hopefully the `bound` function excludes the upper value
-        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length);
+        // unfortunately, `bound` includes the upper bound thus the ternary operator
+        // https://book.getfoundry.sh/reference/forge-std/bound
+        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length == 0 ? 0 : receivers.length - 1);
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
             _l1Sender: _sender,
