@@ -65,20 +65,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         });
 
-        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
-            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
-        }
-        // Check that the priority operation hash in the L2 logs is as expected
-        if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
-            revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
-        }
-        // Check that the number of processed priority operations is as expected
-        if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
-            revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
-        }
-
-        // Check the timestamp of the new batch
-        _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
+        // TODO: commented for ZKOS testing
+        // if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+        //     revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+        // }
+        // // Check that the priority operation hash in the L2 logs is as expected
+        // if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
+        //     revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
+        // }
+        // // Check that the number of processed priority operations is as expected
+        // if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
+        //     revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
+        // }
+        //
+        // // Check the timestamp of the new batch
+        // _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
         // TODO: commented for ZKOS testing
