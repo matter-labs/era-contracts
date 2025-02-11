@@ -84,7 +84,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 29;
       txData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(txData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(txData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 
@@ -130,7 +133,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 0;
       EIP1559TxData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(EIP1559TxData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(EIP1559TxData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 
@@ -176,7 +182,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 100;
       EIP2930TxData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(EIP2930TxData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(EIP2930TxData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 });

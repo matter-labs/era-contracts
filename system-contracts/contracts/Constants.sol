@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
@@ -15,7 +15,7 @@ import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 
-/// @dev All the system contracts introduced by zkSync have their addresses
+/// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
@@ -35,7 +35,7 @@ address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 address constant ECPAIRING_SYSTEM_CONTRACT = address(0x08);
 
 
-/// @dev The number of ergs that need to be spent for a single byte of pubdata regardless of the pubdata price.
+/// @dev The number of gas that need to be spent for a single byte of pubdata regardless of the pubdata price.
 /// This variable is used to ensure the following:
 /// - That the long-term storage of the operator is compensated properly.
 /// - That it is not possible that the pubdata counter grows too high without spending proportional amount of computation.

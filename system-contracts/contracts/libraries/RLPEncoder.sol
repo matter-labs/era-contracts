@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 /**
  * @author Matter Labs
@@ -100,7 +100,7 @@ library RLPEncoder {
                 hbs += 2;
             }
             if (_number > type(uint8).max) {
-                hbs += 1;
+                ++hbs;
             }
         }
     }

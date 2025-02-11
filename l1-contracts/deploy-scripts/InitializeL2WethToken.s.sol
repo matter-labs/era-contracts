@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 // solhint-disable no-console
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "./Utils.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
@@ -14,6 +14,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address deployerAddress;
         address create2FactoryAddr;
@@ -31,7 +32,7 @@ contract InitializeL2WethTokenScript is Script {
         uint256 gasMultiplier;
     }
 
-    Config config;
+    Config internal config;
 
     function run() public {
         initializeConfig();

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS} from "./Constants.sol";
+import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -13,17 +14,19 @@ import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PREC
  * @dev Code hash is not strictly a hash, it's a structure where the first byte denotes the version of the hash,
  * the second byte denotes whether the contract is constructed, and the next two bytes denote the length in 32-byte words.
  * And then the next 28 bytes are the truncated hash.
- * @dev In this version of zkSync, the first byte of the hash MUST be 1.
+ * @dev In this version of ZKsync, the first byte of the hash MUST be 1.
  * @dev The length of each bytecode MUST be odd.  It's internal code format requirements, due to padding of SHA256 function.
  * @dev It is also assumed that all the bytecode hashes are *known*, i.e. the full bytecodes
  * were published on L1 as calldata. This contract trusts the ContractDeployer and the KnownCodesStorage
  * system contracts to enforce the invariants mentioned above.
  */
 contract AccountCodeStorage is IAccountCodeStorage {
-    bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
+    bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     modifier onlyDeployer() {
-        require(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT), "Callable only by the deployer system contract");
+        if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -34,7 +37,9 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// but checks whether the bytecode hash corresponds to the constructing smart contract.
     function storeAccountConstructingCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
-        require(Utils.isContractConstructing(_hash), "Code hash is not for a contract on constructor");
+        if (!Utils.isContractConstructing(_hash)) {
+            revert InvalidCodeHash(CodeHashReason.NotContractOnConstructor);
+        }
         _storeCodeHash(_address, _hash);
     }
 
@@ -45,7 +50,9 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// but checks whether the bytecode hash corresponds to the constructed smart contract.
     function storeAccountConstructedCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
-        require(Utils.isContractConstructed(_hash), "Code hash is not for a constructed contract");
+        if (!Utils.isContractConstructed(_hash)) {
+            revert InvalidCodeHash(CodeHashReason.NotConstructedContract);
+        }
         _storeCodeHash(_address, _hash);
     }
 
@@ -54,7 +61,9 @@ contract AccountCodeStorage is IAccountCodeStorage {
     function markAccountCodeHashAsConstructed(address _address) external override onlyDeployer {
         bytes32 codeHash = getRawCodeHash(_address);
 
-        require(Utils.isContractConstructing(codeHash), "Code hash is not for a contract on constructor");
+        if (!Utils.isContractConstructing(codeHash)) {
+            revert InvalidCodeHash(CodeHashReason.NotContractOnConstructor);
+        }
 
         // Get the bytecode hash with "isConstructor" flag equal to false
         bytes32 constructedBytecodeHash = Utils.constructedBytecodeHash(codeHash);
