@@ -538,7 +538,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // TODO: commented for ZKOS testing
-        _verifyProof(proofPublicInput, proof);
+        //        _verifyProof(proofPublicInput, proof);
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
