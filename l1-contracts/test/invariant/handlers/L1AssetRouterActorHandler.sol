@@ -19,18 +19,19 @@ contract L1AssetRouterActorHandler is Test, Constants {
     // ghost variables
     // https://book.getfoundry.sh/forge/invariant-testing#handler-ghost-variables
     uint256 public totalDeposits;
-    // constants
-    uint256 internal constant AMOUNT_UPPER_BOUND = 1e12 * 1e18;
+
+    error ReceiversArrayIsEmpty();
 
     constructor(UserActorHandler[] memory _receivers) {
+        if (_receivers.length == 0) {
+            revert ReceiversArrayIsEmpty();
+        }
         receivers = _receivers;
     }
 
     function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
         _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
-        // unfortunately, `bound` includes the upper bound thus the ternary operator
-        // https://book.getfoundry.sh/reference/forge-std/bound
-        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length == 0 ? 0 : receivers.length - 1);
+        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
             _l1Sender: _sender,
@@ -46,9 +47,7 @@ contract L1AssetRouterActorHandler is Test, Constants {
     function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex) public {
         uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
-        // unfortunately, `bound` includes the upper bound thus the ternary operator
-        // https://book.getfoundry.sh/reference/forge-std/bound
-        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length == 0 ? 0 : receivers.length - 1);
+        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         bytes memory data = DataEncoding.encodeBridgeMintData({
             _originalCaller: _sender,

@@ -22,6 +22,7 @@ contract UserActorHandler is Test, Constants {
     function withdraw(uint256 _amount, address _receiver) public {
         address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
+        // TODO: investigate _why_ `l1TokenAddress` is `0` in so many cases
         // using `L2NativeTokenVault` instead of `IL2NativeTokenVault` becuase the latter doesn't have `L2_LEGACY_SHARED_BRIDGE`
         if (L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_LEGACY_SHARED_BRIDGE().l1TokenAddress(l2Token) == address(0)) {
             return;
