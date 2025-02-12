@@ -14,7 +14,6 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.s
 
 import {SharedL2ContractDeployer} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
-// TODO: do we need SharedL2ContractDeployer here?
 abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
     UserActorHandler[] public userActorHandlers;
     L1AssetRouterActorHandler public l1AssetRouterActorHandler;
@@ -43,7 +42,7 @@ abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
         if (l2TokenAddress.code.length == 0) {
-            return; // TODO: is it fine to return early here?
+            return;
         }
 
         assertEq(
