@@ -24,6 +24,7 @@ jobs:
           fi
 
   test:
+    needs: define-matrix
     strategy:
       matrix:
         branch: ${{ fromJSON(needs.define-matrix.outputs.branches) }}
