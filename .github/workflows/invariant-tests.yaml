@@ -9,26 +9,61 @@ on:
 permissions: read-all
 
 jobs:
-  l1-context:
+  define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.branches.outputs.branches }}
+    steps:
+      - name: Define branches
+        id: branches
+        run: |
+          if [[ ${{ github.event_name }} == "schedule" ]]; then
+            echo 'branches=["main", "dev"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "branches=[\"$GITHUB_REF\"]" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    strategy:
+      matrix:
+        branch: ${{ fromJSON(needs.define-matrix.outputs.branches) }}
+        command: ['test:invariant:l1-context', 'test:invariant:l2-context']
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
-        uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ matrix.branch }}
+
+      - name: Install foundry-zksync
+        uses: dutterbutter/foundry-zksync-toolchain@5b0459c3701903f1913b8b2558a22bf49138e495 # v1.0.0
+        with:
+          version: nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
+
+      - name: Show forge version
+        shell: bash
+        run: forge --version
+
+      - name: Cache yarn packages
+        uses: actions/setup-node@v4
+        with:
+          cache: yarn
+
+      - name: Install yarn packages
+        shell: bash
+        run: yarn
+
+      - name: Build artifacts
+        shell: bash
+        run: |
+          # creates JSON files needed for `yarn l1 test:zkfoundry`
+          yarn sc build:foundry
+          cd l1-contracts
+          # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/DeployUtils.s.sol`
+          yarn test:zkfoundry
 
       - name: Run tests
         run: |
           cd l1-contracts
           # TODO: uncomment this before merging: export FOUNDRY_PROFILE=invariant_tests_l1context_ci
-          yarn test:invariant:l1-context
-  
-  l2-context:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install dependencies
-        uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
-
-      - name: Run tests
-        run: |
-          cd l1-contracts
-          # TODO: uncomment this before merging: export FOUNDRY_PROFILE=invariant_tests_l2context_ci
-          yarn test:invariant:l2-context
+          yarn ${{ matrix.command }}
