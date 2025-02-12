@@ -17,6 +17,7 @@ import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
+import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -101,8 +102,8 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
 address constant CODE_ORACLE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x12);
 
 address constant EVM_GAS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x13);
-
 address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14);
+IEvmHashesStorage constant EVM_HASHES_STORAGE = IEvmHashesStorage(address(SYSTEM_CONTRACTS_OFFSET + 0x15));
 
 ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
 address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);

@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE} from "./Constants.sol";
 import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
 
 /**
@@ -116,7 +116,7 @@ contract AccountCodeStorage is IAccountCodeStorage {
         else if (Utils.isContractConstructing(codeHash)) {
             codeHash = EMPTY_STRING_KECCAK;
         } else if (Utils.isCodeHashEVM(codeHash)) {
-            codeHash = DEPLOYER_SYSTEM_CONTRACT.evmCodeHash(account);
+            codeHash = EVM_HASHES_STORAGE.getEvmCodeHash(codeHash);
         }
 
         return codeHash;

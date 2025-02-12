@@ -22,6 +22,10 @@ function EVM_GAS_MANAGER_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008013
 }
 
+function EVM_HASHES_STORAGE_CONTRACT() -> addr {   
+    addr :=  0x0000000000000000000000000000000000008015
+}
+
 function MSG_VALUE_SYSTEM_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008009
 }
@@ -342,11 +346,11 @@ function getRawCodeHash(addr) -> hash {
     hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 
-function getEvmExtcodehash(addr) -> evmCodeHash {
-    // function evmCodeHash(address _address)
-    mstore(0, 0x54A3314700000000000000000000000000000000000000000000000000000000)
-    mstore(4, addr)
-    evmCodeHash := fetchFromSystemContract(DEPLOYER_SYSTEM_CONTRACT(), 36)
+function getEvmExtcodehash(versionedBytecodeHash) -> evmCodeHash {
+    // function getEvmCodeHash(bytes32 versionedBytecodeHash) external view returns(bytes32)
+    mstore(0, 0x5F8F27B000000000000000000000000000000000000000000000000000000000)
+    mstore(4, versionedBytecodeHash)
+    evmCodeHash := fetchFromSystemContract(EVM_HASHES_STORAGE_CONTRACT(), 36)
 }
 
 function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {

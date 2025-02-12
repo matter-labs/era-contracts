@@ -582,7 +582,7 @@ for { } true { } {
         }
         default {
             // Get precalculated keccak of EVM code
-            stackHead := getEvmExtcodehash(addr)
+            stackHead := getEvmExtcodehash(rawCodeHash)
         }
         
         ip := add(ip, 1)
