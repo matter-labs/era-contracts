@@ -9,10 +9,11 @@ import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The storage of this contract serves as a mapping for the EVM code hashes (keccak) corresponding to versioned bytecode hashes.
+ * @notice The storage of this contract serves as a mapping for the EVM code hashes (keccak256) corresponding to versioned bytecode hashes.
  */
 contract EvmHashesStorage is IEvmHashesStorage, SystemContractBase {
     /// @notice Stores the EVM code hash of the contract
+    /// @dev No checks are made for the correctness of the data, this is the responsibility of the caller
     /// @param versionedBytecodeHash The versioned bytecode hash
     /// @param evmBytecodeHash The keccak of bytecode
     function storeEvmCodeHash(
