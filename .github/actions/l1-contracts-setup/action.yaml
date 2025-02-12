@@ -1,6 +1,6 @@
-name: Install dependencies and build l1-contracts
+name: Install l1-contract dependencies
 runs:
-  using: "composite"
+  using: composite
   steps:
     - uses: actions/checkout@v4
       with:

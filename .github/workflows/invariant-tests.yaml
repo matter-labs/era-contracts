@@ -12,7 +12,7 @@ jobs:
   l1-context:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies and build
+      - name: Install dependencies
         uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
 
       - name: Run tests
@@ -23,7 +23,7 @@ jobs:
   l2-context:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies and build
+      - name: Install dependencies
         uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
 
       - name: Run tests
