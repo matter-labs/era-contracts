@@ -11,12 +11,20 @@ import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {AssetRouter_ActorHandler_Deployer} from "../deployers/AssetRouter_ActorHandler_Deployer.sol";
 import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
 
-import {SharedL2ContractL1DeployerUtils, SystemContractsArgs} from
-    "../../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
+import {
+    SharedL2ContractL1DeployerUtils,
+    SystemContractsArgs
+} from "../../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
 import {SharedL2ContractDeployer} from
     "../../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
-contract AssetRouterTest is Test, SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer, AssetRouterProperties, AssetRouter_ActorHandler_Deployer {
+contract AssetRouterTest is
+    Test,
+    SharedL2ContractL1DeployerUtils,
+    SharedL2ContractDeployer,
+    AssetRouterProperties,
+    AssetRouter_ActorHandler_Deployer
+{
     function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
 
     function initSystemContracts(SystemContractsArgs memory _args)

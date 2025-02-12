@@ -20,7 +20,13 @@ import {SharedL2ContractL1DeployerUtils} from
 import {SharedL2ContractDeployer} from
     "../../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
-contract AssetRouterTest is Test, SharedL2ContractL2DeployerUtils, SharedL2ContractDeployer, AssetRouterProperties, AssetRouter_ActorHandler_Deployer {
+contract AssetRouterTest is
+    Test,
+    SharedL2ContractL2DeployerUtils,
+    SharedL2ContractDeployer,
+    AssetRouterProperties,
+    AssetRouter_ActorHandler_Deployer
+{
     function test() internal virtual override(DeployUtils, SharedL2ContractL2DeployerUtils) {}
 
     function initSystemContracts(SystemContractsArgs memory _args)
