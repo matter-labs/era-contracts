@@ -30,12 +30,12 @@ contract L2MessageVerification is MessageVerification {
                 revert MessageRootMissing(_chainId, _batchNumber, proofVerificationResult.batchSettlementRoot);
             }
             if (correctBatchRoot != proofVerificationResult.batchSettlementRoot) {
-                // revert MessageRootMismatch(
-                //     _chainId,
-                //     _batchNumber,
-                //     correctBatchRoot,
-                //     proofVerificationResult.batchSettlementRoot
-                // );
+                revert MessageRootMismatch(
+                    _chainId,
+                    _batchNumber,
+                    correctBatchRoot,
+                    proofVerificationResult.batchSettlementRoot
+                );
             }
             return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
