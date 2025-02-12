@@ -460,8 +460,6 @@ library SystemContractHelper {
         bytes32 previoushHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
 
         // Just in case, double checking that the previous bytecode is known.
-        // It may be needed since `previoushHash` could be non-zero and unknown if it is
-        // equal to keccak(""). It is the case for used default accounts.
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(previoushHash) == 0) {
             revert PreviousBytecodeUnknown();
         }
