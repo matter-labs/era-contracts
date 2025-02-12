@@ -14,10 +14,8 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {Constants} from "./Constants.sol";
 
 contract UserActorHandler is Test, Constants {
-    // ghost variables
-    // https://book.getfoundry.sh/forge/invariant-testing#handler-ghost-variables
-    uint256 public totalWithdrawalAmount;
-    uint256 public totalFunctionCalls;
+    uint256 public ghost_totalWithdrawalAmount;
+    uint256 public ghost_totalFunctionCalls;
 
     function withdraw(uint256 _amount, address _receiver) public {
         address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
@@ -33,7 +31,7 @@ contract UserActorHandler is Test, Constants {
         // by bounding the amount for _some_ withdrawals we balance between having too many useless reverts
         // and testing too few cases
         uint256 amount;
-        if (totalFunctionCalls % 10 == 0) {
+        if (ghost_totalFunctionCalls % 10 == 0) {
             amount = _amount;
         } else {
             amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
@@ -49,7 +47,7 @@ contract UserActorHandler is Test, Constants {
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(assetId, data);
 
-        totalWithdrawalAmount += amount;
-        totalFunctionCalls++;
+        ghost_totalWithdrawalAmount += amount;
+        ghost_totalFunctionCalls++;
     }
 }

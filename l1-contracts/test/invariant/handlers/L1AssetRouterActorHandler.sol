@@ -16,9 +16,8 @@ import {UserActorHandler} from "./UserActorHandler.sol";
 // forge 0.0.2 (27360d4 2024-12-02T00:28:35.872943000Z)
 contract L1AssetRouterActorHandler is Test, Constants {
     UserActorHandler[] public receivers;
-    // ghost variables
-    // https://book.getfoundry.sh/forge/invariant-testing#handler-ghost-variables
-    uint256 public totalDeposits;
+
+    uint256 public ghost_totalDeposits;
 
     error ReceiversArrayIsEmpty();
 
@@ -41,7 +40,7 @@ contract L1AssetRouterActorHandler is Test, Constants {
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
-        totalDeposits += _amount;
+        ghost_totalDeposits += _amount;
     }
 
     function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex) public {
@@ -61,7 +60,7 @@ contract L1AssetRouterActorHandler is Test, Constants {
         // https://github.com/matter-labs/era-contracts/blob/ac11ba99e3f2c3365a162f587b17e35b92dc4f24/l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol#L132
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit(0, assetId, data);
 
-        totalDeposits += amount;
+        ghost_totalDeposits += amount;
     }
 
     // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
