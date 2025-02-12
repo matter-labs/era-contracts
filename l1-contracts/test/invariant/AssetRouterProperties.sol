@@ -34,7 +34,7 @@ abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
             totalDepositAmount += userActorHandlers[i].totalWithdrawalAmount();
         }
 
-        assertEq(totalDepositAmount, totalSupply);
+        assertEq(totalDepositAmount, totalSupply, "total deposit amount must be equal to total supply of all bridged tokens");
     }
 
     function invariant_L1AssetRouterActorHandlerHasZeroBalance() public {
@@ -44,6 +44,6 @@ abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
             return; // TODO: is it fine to return early here?
         }
 
-        assertEq(BridgedStandardERC20(l2TokenAddress).balanceOf(address(l1AssetRouterActorHandler)), 0);
+        assertEq(BridgedStandardERC20(l2TokenAddress).balanceOf(address(l1AssetRouterActorHandler)), 0, "L1AssetRouter must own zero bridged tokens");
     }
 }
