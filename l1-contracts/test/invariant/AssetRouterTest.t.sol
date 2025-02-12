@@ -44,9 +44,5 @@ contract AssetRouterTest is Test, SharedL2ContractL1DeployerUtils, SharedL2Contr
         address ts = makeAddr("targetSender");
         deal(ts, 10_000 ether);
         targetSender(ts);
-
-        // bytes4[] memory fuzzSelectors = new bytes4[](1);
-        // fuzzSelectors[0] = L1AssetRouterActorHandler.finalizeDeposit.selector;
-        // targetSelector(FuzzSelector({addr: address(h), selectors: fuzzSelectors}));
     }
 }

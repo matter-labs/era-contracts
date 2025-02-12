@@ -32,21 +32,6 @@ jobs:
       - name: Install yarn packages
         run: yarn
 
-      # - name: Cache artifacts
-      #   uses: actions/cache@v4
-      #   with:
-      #     key: ${{ runner.os }}-build-${{ hashFiles('l1-contracts/out/*', 'l1-contracts/zkout/*', 'system-contracts/contracts-preprocessed/*', 'system-contracts/zkout/*') }}
-      #     path: |
-      #       l1-contracts/artifacts
-      #       l1-contracts/artifacts-zk
-      #       l1-contracts/cache
-      #       l1-contracts/cache-forge
-      #       l1-contracts/cache-zk
-      #       l1-contracts/out
-      #       l1-contracts/zkout
-      #       system-contracts/contracts-preprocessed
-      #       system-contracts/zkout
-
       - name: Build artifacts
         run: |
           # creates JSON files needed for `yarn l1 test:zkfoundry`
