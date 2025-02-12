@@ -9,12 +9,24 @@ on:
 permissions: read-all
 
 jobs:
-  l1-contracts:
+  l1-context:
     runs-on: ubuntu-latest
     steps:
-      - uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
+      - name: Install dependencies and build
+        uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
 
       - name: Run tests
         run: |
           cd l1-contracts
           yarn test:invariant:l1-context
+  
+  l2-context:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies and build
+        uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
+
+      - name: Run tests
+        run: |
+          cd l1-contracts
+          yarn test:invariant:l2-context

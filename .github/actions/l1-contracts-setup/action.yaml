@@ -1,4 +1,4 @@
-name: Setup l1-contracts
+name: Install dependencies and build l1-contracts
 runs:
   using: "composite"
   steps:
