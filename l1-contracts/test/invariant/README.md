@@ -43,6 +43,12 @@ Currently, we do preprocessing of the source code in order to deactivate access 
 
 Another option would be to write different tests for L1 and L2 contracts (e.g. Bridgehub which is deployed to both L1 and L2).
 
+Also, the [Cheatcode Override](https://docs.zksync.io/zksync-era/tooling/foundry/migration-guide/testing#cheatcode-override) feature might help. This is to be investiagated.
+
+### Directory structure
+
+The `l1-context` and `l2-context` directories contain tests that are run by `forge test` and `forge test --zksync` correspondingly. Note that tests for the L2 contracts are developed in the L1 context, ported to the L2 context and run in both contexts. This complication exists because the `--zksync` flag slows down both compilation and execution time by significant amount which inhibits fast iteration.
+
 ## References
 
 - [Invariant Testing](https://book.getfoundry.sh/forge/invariant-testing)
