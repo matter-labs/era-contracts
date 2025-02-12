@@ -12,7 +12,7 @@ jobs:
   l1-contracts:
     runs-on: ubuntu-latest
     steps:
-      - uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-test # TODO: replace with `main` before merging
+      - uses: matter-labs/era-contracts/.github/actions/l1-contracts-setup@nikita/invariant-tests # TODO: replace with `main` before merging
 
       - name: Run tests
         run: |
