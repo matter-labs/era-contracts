@@ -29,9 +29,9 @@ abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
             totalSupply = BridgedStandardERC20(l2TokenAddress).totalSupply();
         }
 
-        uint256 totalDepositAmount = l1AssetRouterActorHandler.totalDeposits();
+        uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits();
         for (uint256 i; i < userActorHandlers.length; i++) {
-            totalDepositAmount += userActorHandlers[i].totalWithdrawalAmount();
+            totalDepositAmount += userActorHandlers[i].ghost_totalWithdrawalAmount();
         }
 
         assertEq(
