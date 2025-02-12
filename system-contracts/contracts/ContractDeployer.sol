@@ -10,7 +10,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMBytecodeHash, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMBytecodeHash, EVMBytecodeHashUnknown, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -302,8 +302,19 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_deployment.newAddress);
             }
 
+            if (!_deployment.callConstructor) {
+                _ensureBytecodeIsKnown(_deployment.bytecodeHash);
+            }
+
             // It is not possible to change the AccountInfo for EVM contracts.
-            _constructEVMContract(_sender, _deployment.newAddress, _deployment.input);
+            // _versionedBytecodeHash will be ignored if _callConstructor is true
+            _constructEVMContract({
+                _sender: _sender,
+                _newAddress: _deployment.newAddress,
+                _versionedBytecodeHash: _deployment.bytecodeHash,
+                _input: _deployment.input,
+                _callConstructor: _deployment.callConstructor
+            });
         } else {
             _ensureBytecodeIsKnown(_deployment.bytecodeHash);
 
@@ -468,7 +479,14 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
 
         // We will store dummy constructing bytecode hash to trigger EVM emulator in constructor call
-        return _constructEVMContract(_sender, _newAddress, _input);
+        return
+            _constructEVMContract({
+                _sender: _sender,
+                _newAddress: _newAddress,
+                _versionedBytecodeHash: bytes32(0), // Ignored since we will call constructor
+                _input: _input,
+                _callConstructor: true
+            });
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -548,59 +566,75 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function _constructEVMContract(
         address _sender,
         address _newAddress,
-        bytes calldata _input
+        bytes32 _versionedBytecodeHash,
+        bytes calldata _input,
+        bool _callConstructor
     ) internal returns (uint256 constructorReturnEvmGas) {
         uint256 value = msg.value;
-        // 1. Transfer the balance to the new address on the constructor call.
-        if (value > 0) {
-            BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _newAddress, value);
-        }
-
-        // 2. Set the constructed code hash on the account
-        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructingCodeHash(
-            _newAddress,
-            // Dummy EVM bytecode hash just to call emulator.
-            // The second byte is `0x01` to indicate that it is being constructed.
-            bytes32(0x0201000000000000000000000000000000000000000000000000000000000000)
-        );
-
-        // 3. Call the constructor on behalf of the account
-        if (value > 0) {
-            // Safe to cast value, because `msg.value` <= `uint128.max` due to `MessageValueSimulator` invariant
-            SystemContractHelper.setValueForNextFarCall(uint128(value));
-        }
-
-        bytes memory paddedBytecode = EfficientCall.mimicCall({
-            _gas: gasleft(), // note: native gas, not EVM gas
-            _address: _newAddress,
-            _data: _input,
-            _whoToMimic: _sender,
-            _isConstructor: true,
-            _isSystem: false
-        });
-
-        uint256 evmBytecodeLen;
-        // Returned data bytes have structure: paddedBytecode.evmBytecodeLen.constructorReturnEvmGas
-        assembly {
-            let dataLen := mload(paddedBytecode)
-            evmBytecodeLen := mload(add(paddedBytecode, sub(dataLen, 0x20)))
-            constructorReturnEvmGas := mload(add(paddedBytecode, dataLen))
-            mstore(paddedBytecode, sub(dataLen, 0x40)) // shrink paddedBytecode
-        }
-
-        bytes32 versionedBytecodeHash = KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(evmBytecodeLen, paddedBytecode);
-        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, versionedBytecodeHash);
-
-        // Calculate keccak256 of the EVM bytecode if it hasn't been done before
-        if (EVM_HASHES_STORAGE.getEvmCodeHash(versionedBytecodeHash) == bytes32(0)) {
-            bytes32 evmBytecodeHash;
-            assembly {
-                evmBytecodeHash := keccak256(add(paddedBytecode, 0x20), evmBytecodeLen)
+        if (_callConstructor) {
+            // 1. Transfer the balance to the new address on the constructor call.
+            if (value > 0) {
+                BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _newAddress, value);
             }
 
-            EVM_HASHES_STORAGE.storeEvmCodeHash(versionedBytecodeHash, evmBytecodeHash);
+            // 2. Set the constructing code hash on the account
+            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructingCodeHash(
+                _newAddress,
+                // Dummy EVM bytecode hash just to call emulator.
+                // The second byte is `0x01` to indicate that it is being constructed.
+                bytes32(0x0201000000000000000000000000000000000000000000000000000000000000)
+            );
+
+            // 3. Call the constructor on behalf of the account
+            if (value > 0) {
+                // Safe to cast value, because `msg.value` <= `uint128.max` due to `MessageValueSimulator` invariant
+                SystemContractHelper.setValueForNextFarCall(uint128(value));
+            }
+
+            bytes memory paddedBytecode = EfficientCall.mimicCall({
+                _gas: gasleft(), // note: native gas, not EVM gas
+                _address: _newAddress,
+                _data: _input,
+                _whoToMimic: _sender,
+                _isConstructor: true,
+                _isSystem: false
+            });
+
+            uint256 evmBytecodeLen;
+            // Returned data bytes have structure: paddedBytecode.evmBytecodeLen.constructorReturnEvmGas
+            assembly {
+                let dataLen := mload(paddedBytecode)
+                evmBytecodeLen := mload(add(paddedBytecode, sub(dataLen, 0x20)))
+                constructorReturnEvmGas := mload(add(paddedBytecode, dataLen))
+                mstore(paddedBytecode, sub(dataLen, 0x40)) // shrink paddedBytecode
+            }
+
+            _versionedBytecodeHash = KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(evmBytecodeLen, paddedBytecode);
+            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, _versionedBytecodeHash);
+
+            // Calculate keccak256 of the EVM bytecode if it hasn't been done before
+            if (EVM_HASHES_STORAGE.getEvmCodeHash(_versionedBytecodeHash) == bytes32(0)) {
+                bytes32 evmBytecodeHash;
+                assembly {
+                    evmBytecodeHash := keccak256(add(paddedBytecode, 0x20), evmBytecodeLen)
+                }
+
+                EVM_HASHES_STORAGE.storeEvmCodeHash(_versionedBytecodeHash, evmBytecodeHash);
+            }
+        } else {
+            if (value != 0) {
+                revert NonEmptyMsgValue();
+            }
+
+            // Sanity check, EVM code hash should be present if versioned bytecode hash is known
+            if (EVM_HASHES_STORAGE.getEvmCodeHash(_versionedBytecodeHash) == bytes32(0)) {
+                revert EVMBytecodeHashUnknown();
+            }
+
+            // If we do not call the constructor, we need to set the constructed code hash.
+            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, _versionedBytecodeHash);
         }
 
-        emit ContractDeployed(_sender, versionedBytecodeHash, _newAddress);
+        emit ContractDeployed(_sender, _versionedBytecodeHash, _newAddress);
     }
 }

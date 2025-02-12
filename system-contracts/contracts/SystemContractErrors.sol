@@ -32,6 +32,8 @@ error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
 error EncodedLengthNotFourTimesSmallerThanOriginal();
 // 0x39bae0e6
 error EVMBytecodeHash();
+// 0x536a56c8
+error EVMBytecodeHashUnknown();
 // 0xb9e6e31f
 error EVMEmulationNotSupported();
 // 0xe95a1fbe

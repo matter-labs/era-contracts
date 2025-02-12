@@ -89,9 +89,9 @@ contract EvmPredeploysManager {
 
         ForceDeployment[] memory deployments = new ForceDeployment[](1);
         deployments[0] = ForceDeployment({
-            bytecodeHash: bytes32(0x0200000000000000000000000000000000000000000000000000000000000000), // BytecodeHash is ignored for EVM deploys
+            bytecodeHash: bytes32(0x0200000000000000000000000000000000000000000000000000000000000000), // BytecodeHash is ignored for EVM deploys with constructor call
             newAddress: contractAddress,
-            callConstructor: true, // it is ignored
+            callConstructor: true,
             value: 0,
             input: constructorInput
         });
