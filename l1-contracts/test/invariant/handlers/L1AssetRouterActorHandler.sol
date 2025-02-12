@@ -9,12 +9,18 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
-import {Constants} from "./Constants.sol";
+import {
+    L1_TOKEN_ADDRESS,
+    TOKEN_DEFAULT_NAME,
+    TOKEN_DEFAULT_SYMBOL,
+    TOKEN_DEFAULT_DECIMALS,
+    AMOUNT_UPPER_BOUND
+} from "../common/Constants.sol";
 import {UserActorHandler} from "./UserActorHandler.sol";
 
 // no cheatcodes here because they won't work with `--zksync`
 // forge 0.0.2 (27360d4 2024-12-02T00:28:35.872943000Z)
-contract L1AssetRouterActorHandler is Test, Constants {
+contract L1AssetRouterActorHandler is Test {
     UserActorHandler[] public receivers;
 
     uint256 public ghost_totalDeposits;

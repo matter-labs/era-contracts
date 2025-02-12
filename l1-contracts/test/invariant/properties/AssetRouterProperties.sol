@@ -4,17 +4,16 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L1AssetRouterActorHandler} from "./handlers/L1AssetRouterActorHandler.sol";
-import {UserActorHandler} from "./handlers/UserActorHandler.sol";
+import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
+import {UserActorHandler} from "../handlers/UserActorHandler.sol";
+import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-import {SharedL2ContractDeployer} from "../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
-
-abstract contract AssetRouterProperties is Test, SharedL2ContractDeployer {
+abstract contract AssetRouterProperties is Test {
     UserActorHandler[] public userActorHandlers;
     L1AssetRouterActorHandler public l1AssetRouterActorHandler;
 

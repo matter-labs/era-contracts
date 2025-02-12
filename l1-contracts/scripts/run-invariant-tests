@@ -12,7 +12,7 @@ mv "$TEMP" "$FILE_TO_PREPROCESS"
 case "$WHERE" in
   "L1")
     FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests_l1context}" \
-      forge test --match-path 'test/invariant/AssetRouterTest.t.sol' ;;
+      forge test --match-path 'test/invariant/l1-context/*' ;;
   "L2")
     FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests_l2context}" \
       forge test --match-path 'test/invariant/l2-context/*' --zksync ;;

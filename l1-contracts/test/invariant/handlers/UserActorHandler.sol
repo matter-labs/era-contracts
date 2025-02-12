@@ -11,9 +11,9 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 
-import {Constants} from "./Constants.sol";
+import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
 
-contract UserActorHandler is Test, Constants {
+contract UserActorHandler is Test {
     uint256 public ghost_totalWithdrawalAmount;
     uint256 public ghost_totalFunctionCalls;
 
