@@ -3,7 +3,7 @@
 set -e -o pipefail
 
 readonly FILE_TO_PREPROCESS="contracts/bridge/asset-router/L2AssetRouter.sol"
-export FOUNDRY_PROFILE="invariant_tests"
+export FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests}"
 
 # two-step instead one-step because MacOS sed uses -I but GNU sed uses -i
 readonly TEMP="$(mktemp)"
@@ -17,7 +17,12 @@ echo "$WHERE" > "$HOME/.foundry/cache/where"
 
 case "$WHERE" in
   "L1") forge test --match-path 'test/invariant/AssetRouterTest.t.sol' ;;
-  "L2") forge test --zksync --match-path 'test/foundry/l2/*' --match-test invariant_TotalDepositsEqualTotalSupply ;;
+  "L2") forge test --match-path 'test/invariant/AssetRouterTest.t.sol' --zksync ;;
+  *) 
+    echo "error: WHERE environment variable must be set to either 'L1' or 'L2'" >&2
+    git restore "$FILE_TO_PREPROCESS"
+    exit 1
+    ;;
 esac
 
 git restore "$FILE_TO_PREPROCESS"
