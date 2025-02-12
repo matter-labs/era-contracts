@@ -161,8 +161,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE` opcode.
+    /// @dev Note: this method may be callable only in system mode.
     /// @param _initCode The init code for the contract.
-    /// Note: this method may be callable only in system mode.
     /// @return The amount of EVM gas used.
     /// @return The address of created contract.
     function createEVM(bytes calldata _initCode) external payable override onlySystemCall returns (uint256, address) {
@@ -184,9 +184,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE2` opcode.
+    /// @dev Note: this method may be callable only in system mode.
     /// @param _salt The CREATE2 salt.
     /// @param _initCode The init code for the contract.
-    /// Note: this method may be callable only in system mode.
     /// @return The amount of EVM gas used.
     /// @return The address of created contract.
     function create2EVM(
@@ -203,10 +203,11 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         return (evmGasUsed, newAddress);
     }
 
-    /// @notice Method used by EVM emulator to check if contract can be deployed.
+    /// @notice Method used by EVM emulator to check if contract can be deployed and calculate the corresponding address.
+    /// @dev Note: this method may be callable only by the EVM emulator.
     /// @param _salt The CREATE2 salt.
     /// @param _evmBytecodeHash The keccak of EVM code to be deployed (initCode).
-    /// Note: this method may be callable only by the EVM emulator.
+    /// @return newAddress The address of the contract to be deployed.
     function precreateEvmAccountFromEmulator(
         bytes32 _salt,
         bytes32 _evmBytecodeHash
@@ -433,6 +434,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _aaVersion The version of the account abstraction protocol to use.
     /// @param _input The constructor calldata.
+    /// @param _callConstructor Whether to run the constructor or not.
     function _performDeployOnAddress(
         bytes32 _bytecodeHash,
         address _newAddress,
@@ -463,6 +465,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _aaVersion The version of the account abstraction protocol to use.
     /// @param _input The constructor calldata.
+    /// @return constructorReturnEvmGas The EVM gas left after constructor execution.
     function _performDeployOnAddressEVM(
         address _sender,
         address _newAddress,
@@ -510,8 +513,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// This function must revert in case the deployment fails.
     /// @param _sender The msg.sender to be used in the constructor
     /// @param _newAddress The address of the deployed contract
+    /// @param _bytecodeHash The correctly formatted versioned hash of the bytecode.
     /// @param _input The constructor calldata
     /// @param _isSystem Whether the call should be a system call (could be possibly required in the future).
+    /// @param _callConstructor Whether to run the constructor or not.
     function _constructContract(
         address _sender,
         address _newAddress,
@@ -562,7 +567,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// This function must revert in case the deployment fails.
     /// @param _sender The msg.sender to be used in the constructor.
     /// @param _newAddress The address of the deployed contract.
+    /// @param _versionedBytecodeHash The correctly formatted versioned hash of the bytecode (ignored if `_callConstructor` is true).
     /// @param _input The constructor calldata.
+    /// @param _callConstructor Whether to run the constructor or not.
+    /// @return constructorReturnEvmGas The EVM gas left after constructor execution.
     function _constructEVMContract(
         address _sender,
         address _newAddress,
