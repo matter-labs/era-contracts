@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SERVICE_CALL_PSEUDO_CALLER, EVM_PREDEPLOYS_MANAGER} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SERVICE_CALL_PSEUDO_CALLER, EVM_PREDEPLOYS_MANAGER, EVM_HASHES_STORAGE} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -22,9 +22,6 @@ import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, E
  * do not need to be published anymore.
  */
 contract ContractDeployer is IContractDeployer, SystemContractBase {
-    /// @dev Prefix for EVM contracts hashes storage slots.
-    uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
-
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
@@ -37,11 +34,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             revert Unauthorized(msg.sender);
         }
         _;
-    }
-
-    /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
-    function evmCodeHash(address _address) external view returns (bytes32 _hash) {
-        _hash = _getEvmCodeHash(_address);
     }
 
     /// @notice Returns information about a certain account.
@@ -599,25 +591,16 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         bytes32 versionedBytecodeHash = KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(evmBytecodeLen, paddedBytecode);
         ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, versionedBytecodeHash);
 
-        bytes32 evmBytecodeHash;
-        assembly {
-            evmBytecodeHash := keccak256(add(paddedBytecode, 0x20), evmBytecodeLen)
-        }
+        // Calculate keccak256 of the EVM bytecode if it hasn't been done before
+        if (EVM_HASHES_STORAGE.getEvmCodeHash(versionedBytecodeHash) == bytes32(0)) {
+            bytes32 evmBytecodeHash;
+            assembly {
+                evmBytecodeHash := keccak256(add(paddedBytecode, 0x20), evmBytecodeLen)
+            }
 
-        _setEvmCodeHash(_newAddress, evmBytecodeHash);
+            EVM_HASHES_STORAGE.storeEvmCodeHash(versionedBytecodeHash, evmBytecodeHash);
+        }
 
         emit ContractDeployed(_sender, versionedBytecodeHash, _newAddress);
-    }
-
-    function _setEvmCodeHash(address _address, bytes32 _hash) internal {
-        assembly {
-            sstore(or(EVM_HASHES_PREFIX, _address), _hash)
-        }
-    }
-
-    function _getEvmCodeHash(address _address) internal view returns (bytes32 _hash) {
-        assembly {
-            _hash := sload(or(EVM_HASHES_PREFIX, _address))
-        }
     }
 }

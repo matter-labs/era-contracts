@@ -126,9 +126,6 @@ interface IContractDeployer {
         bytes calldata _initCode
     ) external payable returns (uint256 evmGasUsed, address newAddress);
 
-    /// @notice Returns keccak of EVM bytecode at address if it is an EVM contract. Returns bytes32(0) if it isn't a EVM contract.
-    function evmCodeHash(address) external view returns (bytes32);
-
     /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
     function setAllowedBytecodeTypesToDeploy(AllowedBytecodeTypes newAllowedBytecodeTypes) external;

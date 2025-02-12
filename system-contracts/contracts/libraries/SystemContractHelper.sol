@@ -457,10 +457,7 @@ library SystemContractHelper {
             revert SloadContractBytecodeUnknown();
         }
 
-        bytes32 previoushHash;
-        assembly {
-            previoushHash := extcodehash(_addr)
-        }
+        bytes32 previoushHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
 
         // Just in case, double checking that the previous bytecode is known.
         // It may be needed since `previoushHash` could be non-zero and unknown if it is
