@@ -11,13 +11,19 @@ cd era-contracts
 And run the tests:
 
 ```shell
-yarn l1 test:invariant
+yarn l1 test:invariant:l1-context
+```
+
+Or run the tests in the L2 context:
+
+```shell
+yarn l1 test:invariant:l2-context
 ```
 
 Also, if you want to debug reverts:
 
 ```shell
-FOUNDRY_INVARIANT_FAIL_ON_REVERT=true FOUNDRY_VERBOSITY=5 yarn l1 test:invariant
+FOUNDRY_INVARIANT_FAIL_ON_REVERT=true FOUNDRY_VERBOSITY=5 yarn l1 test:invariant:l1-context
 ```
 
 ## Design decisions

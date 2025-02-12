@@ -43,4 +43,4 @@ jobs:
       - name: Run tests
         run: |
           cd l1-contracts
-          yarn test:invariant
+          yarn test:invariant:l1-context

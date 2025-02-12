@@ -46,12 +46,22 @@ optimizer_runs = 200
 enable_eravm_extensions = true
 zksolc = "1.5.7"
 
-[profile.invariant_tests]
+[profile.invariant_tests_l1context]
 test = "test"
 ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
 optimizer = false
-[profile.invariant_tests.zksync]
+[profile.invariant_tests_l1context.zksync]
 suppressed_warnings = ["txorigin"]
-[profile.invariant_tests.invariant]
+[profile.invariant_tests_l1context.invariant]
 runs = 10
 depth = 1000
+
+[profile.invariant_tests_l2context]
+test = "test"
+ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+optimizer = false
+[profile.invariant_tests_l2context.zksync]
+suppressed_warnings = ["txorigin"]
+[profile.invariant_tests_l2context.invariant]
+runs = 1
+depth = 100

@@ -3,21 +3,19 @@
 set -e -o pipefail
 
 readonly FILE_TO_PREPROCESS="contracts/bridge/asset-router/L2AssetRouter.sol"
-export FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests}"
 
 # two-step instead one-step because MacOS sed uses -I but GNU sed uses -i
 readonly TEMP="$(mktemp)"
 sed 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' "$FILE_TO_PREPROCESS" > "$TEMP"
 mv "$TEMP" "$FILE_TO_PREPROCESS"
 
-if [[ -f "$HOME/.foundry/cache/where" && "$WHERE" != "$(cat "$HOME/.foundry/cache/where")" ]]; then
-  forge clean
-fi
-echo "$WHERE" > "$HOME/.foundry/cache/where"
-
 case "$WHERE" in
-  "L1") forge test --match-path 'test/invariant/AssetRouterTest.t.sol' ;;
-  "L2") forge test --match-path 'test/invariant/AssetRouterTest.t.sol' --zksync ;;
+  "L1")
+    FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests_l1context}" \
+      forge test --match-path 'test/invariant/AssetRouterTest.t.sol' ;;
+  "L2")
+    FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests_l2context}" \
+      forge test --match-path 'test/invariant/l2-context/*' --zksync ;;
   *) 
     echo "error: WHERE environment variable must be set to either 'L1' or 'L2'" >&2
     git restore "$FILE_TO_PREPROCESS"
