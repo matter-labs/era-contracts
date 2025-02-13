@@ -34,8 +34,6 @@ error FailedToChargeGas();
 error FailedToPayOperator();
 // 0x9e4a3c8a
 error HashIsNonZero(bytes32);
-// 0x86302004
-error HashMismatch(bytes32 expected, uint256 actual);
 // 0x4e23d035
 error IndexOutOfBounds();
 // 0x122e73e9
@@ -68,8 +66,6 @@ error NonceNotUsed(address account, uint256 nonce);
 error NonEmptyAccount();
 // 0x536ec84b
 error NonEmptyMsgValue();
-// 0xd018e08e
-error NonIncreasingTimestamp();
 // 0x50df6bc3
 error NotAllowedToDeployInKernelSpace();
 // 0x35278d12
