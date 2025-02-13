@@ -126,7 +126,7 @@ interface IMailbox is IZKChainBase {
 
     /// @dev Proves that a certain leaf was included as part of the log merkle tree.
     /// @dev Warning, this function returns true if a section of the proof with the 
-    /// @dev corresponding intermediate node hash is provided instead of the full merkle proof and leaf.
+    /// corresponding intermediate node hash is provided instead of the full merkle proof and a leaf.
     function proveL2LeafInclusion(
         uint256 _batchNumber,
         uint256 _batchRootMask,
