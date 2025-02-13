@@ -18,7 +18,7 @@ import {MalformedBytecode, BytecodeError} from "./errors/L2ContractErrors.sol";
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-interface IL2Messenger {
+interface IL1Messenger {
     /// @notice Sends an arbitrary length message to L1.
     /// @param _message The variable length message to be sent to L1.
     /// @return Returns the keccak256 hashed value of the message.
@@ -126,6 +126,8 @@ address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 
 uint256 constant L1_CHAIN_ID = 1;
 
+IL1Messenger constant L2_MESSENGER = IL1Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
+
 IBaseToken constant L2_BASE_TOKEN_ADDRESS = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
@@ -142,6 +144,13 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
 library L2ContractHelper {
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
+
+    /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
+    /// @param _message Data to be sent to L1.
+    /// @return keccak256 hash of the sent message.
+    function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
+        return L2_MESSENGER.sendToL1(_message);
+    }
 
     /// @notice Computes the create2 address for a Layer 2 contract.
     /// @param _sender The address of the contract creator.

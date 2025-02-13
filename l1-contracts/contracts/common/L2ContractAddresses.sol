@@ -27,7 +27,7 @@ address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFF
 address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-IL2Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
+IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = IL2ToL1Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
 /// @dev The address of the eth token system contract
 address constant L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0a);
@@ -74,7 +74,7 @@ address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-interface IL2Messenger {
+interface IL2ToL1Messenger {
     /// @notice Sends an arbitrary length message to L1.
     /// @param _message The variable length message to be sent to L1.
     /// @return Returns the keccak256 hashed value of the message.
