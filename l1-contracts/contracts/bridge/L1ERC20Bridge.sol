@@ -221,7 +221,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
                             ERA LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Transfers tokens from the depositor address to the asset router address.
+    /// @dev Transfers tokens from the depositor address to this contract and force approves those 
+    /// to the asset router address.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
