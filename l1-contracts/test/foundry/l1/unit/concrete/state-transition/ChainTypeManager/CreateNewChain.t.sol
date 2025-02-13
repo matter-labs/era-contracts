@@ -53,31 +53,27 @@ contract createNewChainTest is ChainTypeManagerTest {
         assertNotEq(newChainAddress, address(0));
     }
 
-    // function test_SuccessfulCreationOfNewChainAndReturnChainIds() public {
-    //     createNewChain(getDiamondCutData(diamondInit));
-    //     createNewChainWithId(getDiamondCutData(diamondInit), 10);
+    function test_SuccessfulCreationOfNewChainAndReturnChainId() public {
+        createNewChain(getDiamondCutData(diamondInit));
 
-    //     uint256[] memory chainIds = _getAllZKChainIDs();
-    //     assertEq(chainIds.length, 2);
-    //     assertEq(chainIds[0], chainId);
-    //     assertEq(chainIds[1], 10);
-    // }
+        uint256[] memory mockData = new uint256[](1);
+        mockData[0] = chainId;
 
-    // function test_SuccessfulCreationOfNewChainAndReturnChainAddresses() public {
-    //     createNewChain(getDiamondCutData(diamondInit));
-    //     createNewChainWithId(getDiamondCutData(diamondInit), 10);
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getAllZKChainChainIDs, ()), abi.encode(mockData));
+        uint256[] memory chainIds = _getAllZKChainIDs();
 
-    //     address[] memory zkchainAddresses = _getAllZKChains();
-    //     assertEq(zkchainAddresses.length, 2);
-    //     assertEq(zkchainAddresses[0], chainContractAddress.getZKChain(chainId));
-    //     assertEq(zkchainAddresses[1], chainContractAddress.getZKChain(10));
-    // }
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId);
+    }
 
-    // function test_RevertWhen_AlreadyDeployedZKChainAddressIsZero() public {
-    //     vm.expectRevert(ZeroAddress.selector);
+    function test_RevertWhen_AlreadyDeployedZKChainAddressIsZero() public {
+        vm.expectRevert(ZeroAddress.selector);
 
-    //     _registerAlreadyDeployedZKChain(chainId, address(0));
-    // }
+        _registerAlreadyDeployedZKChain(chainId, address(0));
+    }
+
+    ////// The following tests are very surface-level since we are heavily utilising vm.mockCall for creating new chains.
+    //     So, the following tests can be commented out when and if we decrease reliance on mockCalls (in _ChainTypeManager_Shared.t.sol) to create new chains.
 
     // function test_SuccessfulRegisterAlreadyDeployedZKChain() public {
     //     address randomZKChain = makeAddr("randomZKChain");
@@ -92,10 +88,10 @@ contract createNewChainTest is ChainTypeManagerTest {
 
     //     assertEq(chainIDs.length, MAX_NUMBER_OF_ZK_CHAINS);
 
-    //     // uint256[] memory chainIds = _getAllZKChainIDs(randomChainIDs);
-    //     // assertEq(chainIds.length, MAX_NUMBER_OF_ZK_CHAINS);
+    // uint256[] memory chainIds = _getAllZKChainIDs(randomChainIDs);
+    // assertEq(chainIds.length, MAX_NUMBER_OF_ZK_CHAINS);
 
-    //     // vm.expectRevert(ZKChainLimitReached.selector);
-    //     // _registerAlreadyDeployedZKChain(100, makeAddr("randomZKChain"));
-    // }
+    // vm.expectRevert(ZKChainLimitReached.selector);
+    // _registerAlreadyDeployedZKChain(100, makeAddr("randomZKChain"));
+    //}
 }

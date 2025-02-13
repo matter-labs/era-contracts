@@ -253,7 +253,6 @@ contract ChainTypeManagerTest is Test {
     }
 
     function _registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) internal {
-        vm.prank(governor); // governor is the owner of bridgehub contract, see 2nd param of 1st line of function deploy
         bridgehub.registerAlreadyDeployedZKChain(_chainId, _zkChain);
     }
 }
