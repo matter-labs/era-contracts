@@ -6,11 +6,9 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {console} from "forge-std/console.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-
 
 contract ProtocolVersion is ChainTypeManagerTest {
     function setUp() public {
@@ -31,7 +29,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
 
         vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
         vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
-        
+
         vm.startPrank(governor);
         chainContractAddress.setNewVersionUpgrade(
             getDiamondCutData(diamondInit),
@@ -59,16 +57,16 @@ contract ProtocolVersion is ChainTypeManagerTest {
     // protocolVersionIsActive
     function test_SuccessfulProtocolVersionIsActive() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
-        
+
         assertEq(chainContractAddress.protocolVersionIsActive(0), true);
 
         vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
         vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
-        
+
         vm.startPrank(governor);
         chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1);
         vm.stopPrank();
-        
+
         assertEq(chainContractAddress.protocolVersionIsActive(1), true);
     }
 
@@ -82,7 +80,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
         uint256 newDeadline = 1000;
 
         vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
-        
+
         vm.prank(governor);
         chainContractAddress.setProtocolVersionDeadline(0, newDeadline);
 
@@ -101,12 +99,12 @@ contract ProtocolVersion is ChainTypeManagerTest {
             isFreezable: true,
             selectors: facetCuts[2].selectors
         });
-        
+
         // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
         // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
         // So, we mock that behavior again.
         vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
-        
+
         vm.prank(governor); // In the ChainTypeManagerTest contract, governor is set as the owner of chainContractAddress
         chainContractAddress.executeUpgrade(chainId, getDiamondCutDataWithCustomFacets(address(0), customFacetCuts));
     }
@@ -125,7 +123,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
 
         vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
         vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
-        
+
         vm.startPrank(governor);
         chainContractAddress.setNewVersionUpgrade(
             getDiamondCutDataWithCustomFacets(address(0), customFacetCuts),
