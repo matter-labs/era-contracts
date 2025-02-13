@@ -15,6 +15,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 string constant ECOSYSTEM_INPUT = "/upgrade-envs/mainnet.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
@@ -40,6 +41,14 @@ interface BridgehubLegacy {
  * and another to read it from file.
  */
 abstract contract UpgradeTestAbstract is Test {
+    EcosystemUpgrade internal generateUpgradeData;
+    ChainUpgrade internal chainUpgrade;
+
+    function _setUp() internal {
+        generateUpgradeData = new EcosystemUpgrade();
+        chainUpgrade = new ChainUpgrade();
+    }
+
     // --- Virtual functions for EcosystemUpgrade data -----------------------
 
     function _getEcosystemAdmin() internal view virtual returns (address);
@@ -113,12 +122,42 @@ abstract contract UpgradeTestAbstract is Test {
         vm.stopBroadcast();
     }
 
+    function _forceMoveOwnership(address _contract, address _to, bool _twoStep) internal {
+        address owner = Ownable2StepUpgradeable(_contract).owner();
+        if (owner == _to) {
+            // It is already an owner, there is nothing to do.
+            return;
+        }
+
+        vm.broadcast(owner);
+        Ownable2StepUpgradeable(_contract).transferOwnership(_to);
+
+        if (_twoStep) {
+            vm.broadcast(_to);
+            Ownable2StepUpgradeable(_contract).acceptOwnership();
+        }
+    }
+
+    function _prepareEcosystemOwner() internal {
+        // This data is generated before the protocol upgrade handler has received the ownership for the contracts.
+        // Thus, we manually set it as its owner.
+        address newProtocolUpgradeHandler = generateUpgradeData.getProtocolUpgradeHandlerAddress();
+
+        _forceMoveOwnership(generateUpgradeData.getTransparentProxyAdmin(), newProtocolUpgradeHandler, false);
+        _forceMoveOwnership(generateUpgradeData.getBridgehub(), newProtocolUpgradeHandler, true);
+        _forceMoveOwnership(generateUpgradeData.getChainTypeManager(), newProtocolUpgradeHandler, true);
+        _forceMoveOwnership(generateUpgradeData.getL1LegacySharedBridge(), newProtocolUpgradeHandler, true);
+    }
+
     function _mainnetForkTestImpl() internal {
         console.log("Preparing ecosystem contracts");
         _prepareEcosystemContracts();
 
         console.log("Preparing chain for the upgrade");
         _prepareChain();
+
+        console.log("Setting up ownership");
+        _prepareEcosystemOwner();
 
         console.log("Starting stage1 of the upgrade!");
         Call[] memory stage1Calls = _getStage1UpgradeCalls();
@@ -150,12 +189,8 @@ abstract contract UpgradeTestAbstract is Test {
  * locally by instantiating EcosystemUpgrade and ChainUpgrade.
  */
 contract UpgradeTestScriptBased is UpgradeTestAbstract {
-    EcosystemUpgrade internal generateUpgradeData;
-    ChainUpgrade internal chainUpgrade;
-
     function setUp() public {
-        generateUpgradeData = new EcosystemUpgrade();
-        chainUpgrade = new ChainUpgrade();
+        _setUp();
     }
 
     // --- Implementation of virtual functions that forward to generateUpgradeData ---
@@ -242,14 +277,9 @@ contract UpgradeTestScriptBased is UpgradeTestAbstract {
 contract UpgradeTestFileBased is UpgradeTestAbstract {
     using stdToml for string;
 
-    // Here these structs are only used to reuse the logic for reading the input.
-    EcosystemUpgrade internal generateUpgradeData;
-    ChainUpgrade internal chainUpgrade;
-
     string internal outputFile;
     function setUp() public {
-        generateUpgradeData = new EcosystemUpgrade();
-        chainUpgrade = new ChainUpgrade();
+        _setUp();
         string memory root = vm.projectRoot();
         outputFile = string.concat(root, vm.envString("UPGRADE_OUTPUT"));
     }

@@ -380,6 +380,10 @@ contract EcosystemUpgrade is Script {
         return config.protocolUpgradeHandlerProxyAddress;
     }
 
+    function getTransparentProxyAdmin() public view returns (address) {
+        return config.contracts.transparentProxyAdmin;
+    }
+
     function _getFacetCutsForDeletion() internal returns (Diamond.FacetCut[] memory facetCuts) {
         IZKChain.Facet[] memory facets = IZKChain(config.contracts.eraDiamondProxy).facets();
 
@@ -646,6 +650,10 @@ contract EcosystemUpgrade is Script {
 
     function getChainTypeManager() external view returns (address) {
         return config.contracts.stateTransitionManagerAddress;
+    }
+
+    function getL1LegacySharedBridge() external view returns (address) {
+        return config.contracts.l1LegacySharedBridge;
     }
 
     function getDiamondCutData() external view returns (bytes memory) {
