@@ -165,7 +165,7 @@ struct BundleMetadata {
     address initiator;
     uint256 callCount;
     // Note the total value is provided by the user.
-    // This is because we cannot guarantee atomicity of xL2 txs (just the atimicity of calls on the destination chain)
+    // This is because we cannot guarantee atomicity of xL2 txs (just the atomicity of calls on the destination chain)
     // So contracts cannot send their own value, only stamp the value that belongs to the user.
     uint256 totalValue;
 }
