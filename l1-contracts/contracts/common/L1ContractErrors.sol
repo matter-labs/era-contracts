@@ -17,8 +17,6 @@ error CallNotAllowed(bytes call);
 error RemovingPermanentRestriction();
 // 0xfcb9b2e1
 error UnallowedImplementation(bytes32 implementationHash);
-// 0x1ff9d522
-error AddressAlreadyUsed(address addr);
 // 0x0dfb42bf
 error AddressAlreadySet(address addr);
 // 0x86bb51b8
@@ -360,8 +358,6 @@ error TokenNotLegacy();
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
-// 0x7acd7817
-error TokenIsNotLegacy();
 // 0xfade089a
 error LegacyEncodingUsedForNonL1Token();
 // 0xa51fa558

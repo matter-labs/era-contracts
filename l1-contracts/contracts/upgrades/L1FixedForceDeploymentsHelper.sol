@@ -14,10 +14,10 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 
-/// @title L1GatewayBase
+/// @title L1FixedForceDeploymentsHelper
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-abstract contract L1GatewayBase {
+abstract contract L1FixedForceDeploymentsHelper {
     using UnsafeBytes for bytes;
 
     /// @notice The function to retrieve the chain-specific upgrade data.

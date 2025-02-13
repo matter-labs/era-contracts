@@ -12,12 +12,12 @@ import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-/// @title L2GatewayUpgradeHelper
+/// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice A helper library for initializing and managing force-deployed contracts during either the L2 gateway upgrade or
 /// the genesis after the gateway protocol upgrade.
-library L2GatewayUpgradeHelper {
+library L2GenesisForceDeploymentsHelper {
     /// @notice Initializes force-deployed contracts required for the L2 genesis upgrade.
     /// @param _ctmDeployer Address of the CTM Deployer contract.
     /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
