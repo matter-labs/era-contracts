@@ -50,6 +50,7 @@ library L2ContractHelper {
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
     /// @dev Prefix used during derivation of account addresses using CREATE
+    /// @dev keccak256("zksyncCreate")
     bytes32 private constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
 
     /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
