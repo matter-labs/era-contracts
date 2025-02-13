@@ -33,7 +33,9 @@ abstract contract AssetRouterProperties is Test {
         }
 
         assertEq(
-            totalDepositAmount, totalSupply, "total deposit amount must be equal to total supply of all bridged tokens"
+            totalDepositAmount,
+            totalSupply,
+            "total deposit amount must be equal to total supply of all bridged tokens"
         );
     }
 

@@ -9,13 +9,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
-import {
-    L1_TOKEN_ADDRESS,
-    TOKEN_DEFAULT_NAME,
-    TOKEN_DEFAULT_SYMBOL,
-    TOKEN_DEFAULT_DECIMALS,
-    AMOUNT_UPPER_BOUND
-} from "../common/Constants.sol";
+import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
 import {UserActorHandler} from "./UserActorHandler.sol";
 
 // no cheatcodes here because they won't work with `--zksync`
@@ -74,11 +68,11 @@ contract L1AssetRouterActorHandler is Test {
     /// @param name The name of the token.
     /// @param symbol The symbol of the token.
     /// @param decimals The decimals of the token.
-    function encodeTokenData(string memory name, string memory symbol, uint8 decimals)
-        internal
-        pure
-        returns (bytes memory)
-    {
+    function encodeTokenData(
+        string memory name,
+        string memory symbol,
+        uint8 decimals
+    ) internal pure returns (bytes memory) {
         bytes memory encodedName = abi.encode(name);
         bytes memory encodedSymbol = abi.encode(symbol);
         bytes memory encodedDecimals = abi.encode(decimals);
