@@ -111,9 +111,12 @@ abstract contract NativeTokenVault is
     }
 
     /// @inheritdoc INativeTokenVault
-    function ensureTokenIsRegistered(address _nativeToken) public {
-        if (assetId[_nativeToken] == bytes32(0)) {
-            _registerToken(_nativeToken);
+    function ensureTokenIsRegistered(address _nativeToken) public returns (bytes32 tokenAssetId) {
+        bytes32 currentAssetId = assetId[_nativeToken];
+        if (currentAssetId == bytes32(0)) {
+            tokenAssetId = _registerToken(_nativeToken);
+        } else {
+            tokenAssetId = currentAssetId;
         }
     }
 
