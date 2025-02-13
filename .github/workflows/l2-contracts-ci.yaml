@@ -5,7 +5,6 @@ on:
 
 jobs:
   build:
-    if: false # TODO: turn back on before merging
     runs-on: ubuntu-latest
 
     steps:
@@ -57,7 +56,6 @@ jobs:
             system-contracts/zkout
 
   lint:
-    if: false # TODO: turn back on before merging
     runs-on: ubuntu-latest
 
     steps:

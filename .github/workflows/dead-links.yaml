@@ -4,7 +4,6 @@ on: pull_request
 
 jobs:
   check-dead-links:
-    if: false # TODO: turn back on before merging
     name: Check Dead Links in Markdown Files
     runs-on: ubuntu-latest
 

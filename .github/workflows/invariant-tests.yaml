@@ -4,7 +4,6 @@ on:
   schedule:
     - cron: "00 01 * * *"
   workflow_dispatch:
-  pull_request: # TODO: remove this trigger before merging because for some time the workflow should run only on schedule until the invariant tests are stable enough to be run on every pull request
 
 permissions: read-all
 
@@ -66,5 +65,4 @@ jobs:
       - name: Run tests
         run: |
           cd l1-contracts
-          # TODO: uncomment this before merging: export FOUNDRY_PROFILE=invariant_tests_l1context_ci
           yarn ${{ matrix.command }}

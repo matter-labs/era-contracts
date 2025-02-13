@@ -11,11 +11,27 @@ mv "$TEMP" "$FILE_TO_PREPROCESS"
 
 case "$WHERE" in
   "L1")
-    FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests_l1context}" \
-      forge test --match-path 'test/invariant/l1-context/*' ;;
+    if [[ -n "$FOUNDRY_PROFILE" ]]; then
+      :
+    elif [[ "$GITHUB_ACTIONS" == "true" ]]; then
+      export FOUNDRY_PROFILE="invariant_tests_l1context_ci"
+    else
+      export FOUNDRY_PROFILE="invariant_tests_l1context"
+    fi
+
+    forge test --match-path 'test/invariant/l1-context/*'
+    ;;
   "L2")
-    FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-invariant_tests_l2context}" \
-      forge test --match-path 'test/invariant/l2-context/*' --zksync ;;
+    if [[ -n "$FOUNDRY_PROFILE" ]]; then
+      :
+    elif [[ "$GITHUB_ACTIONS" == "true" ]]; then
+      export FOUNDRY_PROFILE="invariant_tests_l2context_ci"
+    else
+      export FOUNDRY_PROFILE="invariant_tests_l2context"
+    fi
+
+    forge test --match-path 'test/invariant/l2-context/*' --zksync
+    ;;
   *) 
     echo "error: WHERE environment variable must be set to either 'L1' or 'L2'" >&2
     git restore "$FILE_TO_PREPROCESS"
