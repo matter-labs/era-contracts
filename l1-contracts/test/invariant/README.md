@@ -5,9 +5,11 @@
 Install dependencies:
 
 1. Clone the repository with submodules:
+
     ```shell
     git clone --branch nikita/invariant-tests --recurse-submodules https://github.com/matter-labs/era-contracts
     ```
+
 1. Install Foundry ZKsync with version matching the [CI version](https://github.com/matter-labs/era-contracts/blob/eac11895e0ee700e474be828c9d7319ced9eeabe/.github/actions/l1-contracts-setup/action.yaml#L12).
 1. [Yarn and contract dependencies](https://github.com/matter-labs/era-contracts/blob/eac11895e0ee700e474be828c9d7319ced9eeabe/.github/actions/l1-contracts-setup/action.yaml#L23-L34).
 
