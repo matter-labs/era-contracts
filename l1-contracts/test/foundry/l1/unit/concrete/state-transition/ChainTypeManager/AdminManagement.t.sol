@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {console} from "forge-std/console.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-contract AdminManagement is StateTransitionManagerTest {
+contract AdminManagement is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }

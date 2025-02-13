@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Unauthorized, HashMismatch, ZeroAddress, ZKChainLimitedReached} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, HashMismatch, ZeroAddress, ZKChainLimitReached} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
@@ -53,7 +53,7 @@ contract createNewChainTest is ChainTypeManagerTest {
         createNewChain(getDiamondCutData(diamondInit));
         createNewChainWithId(getDiamondCutData(diamondInit), 10);
 
-        uint256[] memory chainIds = chainContractAddress.getAllHyperchainChainIDs();
+        uint256[] memory chainIds = _getAllZKChainIDs();
         assertEq(chainIds.length, 2);
         assertEq(chainIds[0], chainId);
         assertEq(chainIds[1], 10);
@@ -63,35 +63,35 @@ contract createNewChainTest is ChainTypeManagerTest {
         createNewChain(getDiamondCutData(diamondInit));
         createNewChainWithId(getDiamondCutData(diamondInit), 10);
 
-        address[] memory hyperchainAddresses = chainContractAddress.getAllHyperchains();
-        assertEq(hyperchainAddresses.length, 2);
-        assertEq(hyperchainAddresses[0], chainContractAddress.getHyperchain(chainId));
-        assertEq(hyperchainAddresses[1], chainContractAddress.getHyperchain(10));
+        address[] memory zkchainAddresses = _getAllZKChains();
+        assertEq(zkchainAddresses.length, 2);
+        assertEq(zkchainAddresses[0], chainContractAddress.getZKChain(chainId));
+        assertEq(zkchainAddresses[1], chainContractAddress.getZKChain(10));
     }
 
-    function test_RevertWhen_AlreadyDeployedHyperchainAddressIsZero() public {
+    function test_RevertWhen_AlreadyDeployedZKChainAddressIsZero() public {
         vm.expectRevert(ZeroAddress.selector);
 
-        chainContractAddress.registerAlreadyDeployedHyperchain(chainId, address(0));
+        _registerAlreadyDeployedZKChain(chainId, address(0));
     }
 
-    function test_SuccessfulRegisterAlreadyDeployedHyperchain() public {
-        address randomHyperchain = makeAddr("randomHyperchain");
+    function test_SuccessfulRegisterAlreadyDeployedZKChain() public {
+        address randomZKChain = makeAddr("randomZKChain");
 
-        chainContractAddress.registerAlreadyDeployedHyperchain(10, randomHyperchain);
+        _registerAlreadyDeployedZKChain(10, randomZKChain);
 
-        assertEq(chainContractAddress.getHyperchain(10), randomHyperchain);
+        assertEq(chainContractAddress.getZKChain(10), randomZKChain);
     }
 
-    function test_RevertWhen_HyperchainLimitReached() public {
-        for (uint256 i = 0; i < MAX_NUMBER_OF_HYPERCHAINS; i++) {
+    function test_RevertWhen_ZKChainLimitReached() public {
+        for (uint256 i = 0; i < MAX_NUMBER_OF_ZK_CHAINS; i++) {
             createNewChainWithId(getDiamondCutData(diamondInit), 10 + i);
         }
 
-        uint256[] memory chainIds = chainContractAddress.getAllHyperchainChainIDs();
-        assertEq(chainIds.length, MAX_NUMBER_OF_HYPERCHAINS);
+        uint256[] memory chainIds = _getAllZKChainIDs();
+        assertEq(chainIds.length, MAX_NUMBER_OF_ZK_CHAINS);
 
-        vm.expectRevert(HyperchainLimitReached.selector);
-        chainContractAddress.registerAlreadyDeployedHyperchain(100, makeAddr("randomHyperchain"));
+        vm.expectRevert(ZKChainLimitReached.selector);
+        _registerAlreadyDeployedZKChain(100, makeAddr("randomZKChain"));
     }
 }

@@ -2,12 +2,12 @@
 pragma solidity 0.8.24;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "contracts/common/L1ContractErrors.sol";
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-contract StateTransitionManagerInitializeTest is StateTransitionManagerTest {
+contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }
@@ -19,24 +19,24 @@ contract StateTransitionManagerInitializeTest is StateTransitionManagerTest {
         _;
     }
 
-    function _deployStmWithParams(ChainCreationParams memory params, bytes4 err) internal {
-        StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
+    function _deployCtmWithParams(ChainCreationParams memory params, bytes4 err) internal {
+        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
             chainCreationParams: params,
             protocolVersion: 0
         });
 
-        StateTransitionManager stm = new StateTransitionManager(address(bridgehub), MAX_NUMBER_OF_HYPERCHAINS);
+        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub));
 
         vm.expectRevert(err);
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
-            address(stm),
+            address(ctm),
             admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeData)
+            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeData)
         );
 
-        StateTransitionManager(address(transparentUpgradeableProxy));
+        ChainTypeManager(address(transparentUpgradeableProxy));
     }
 
     function test_RevertWhen_genesisUpgradeIsZero() public asBridgeHub {
@@ -45,10 +45,11 @@ contract StateTransitionManagerInitializeTest is StateTransitionManagerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit))
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: bytes("")
         });
 
-        _deployStmWithParams(chainCreationParams, GenesisUpgradeZero.selector);
+        _deployCtmWithParams(chainCreationParams, GenesisUpgradeZero.selector);
     }
 
     function test_RevertWhen_genesBatchHashIsZero() public asBridgeHub {
@@ -57,10 +58,11 @@ contract StateTransitionManagerInitializeTest is StateTransitionManagerTest {
             genesisBatchHash: bytes32(uint256(0)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit))
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: bytes("")
         });
 
-        _deployStmWithParams(chainCreationParams, GenesisBatchHashZero.selector);
+        _deployCtmWithParams(chainCreationParams, GenesisBatchHashZero.selector);
     }
 
     function test_RevertWhen_genesisIndexRepeatedStorageChangesIsZero() public asBridgeHub {
@@ -69,10 +71,11 @@ contract StateTransitionManagerInitializeTest is StateTransitionManagerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0,
             genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit))
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: bytes("")
         });
 
-        _deployStmWithParams(chainCreationParams, GenesisIndexStorageZero.selector);
+        _deployCtmWithParams(chainCreationParams, GenesisIndexStorageZero.selector);
     }
 
     function test_RevertWhen_genesisBatchCommitmentIsZero() public asBridgeHub {
@@ -81,9 +84,10 @@ contract StateTransitionManagerInitializeTest is StateTransitionManagerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0)),
-            diamondCut: getDiamondCutData(address(diamondInit))
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: bytes("")
         });
 
-        _deployStmWithParams(chainCreationParams, GenesisBatchCommitmentZero.selector);
+        _deployCtmWithParams(chainCreationParams, GenesisBatchCommitmentZero.selector);
     }
 }

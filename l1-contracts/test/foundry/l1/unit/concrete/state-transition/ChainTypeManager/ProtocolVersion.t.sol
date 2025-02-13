@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
-contract ProtocolVersion is StateTransitionManagerTest {
+contract ProtocolVersion is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }

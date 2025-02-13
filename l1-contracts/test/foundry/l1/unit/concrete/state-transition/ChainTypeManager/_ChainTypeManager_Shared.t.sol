@@ -50,10 +50,10 @@ contract ChainTypeManagerTest is Test {
     uint256 chainId = 112; // block.chain
     address internal testnetVerifier = address(new TestnetVerifier());
     bytes internal forceDeploymentsData = hex"";
-    
+
     uint256 eraChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
-    
+
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
@@ -201,7 +201,7 @@ contract ChainTypeManagerTest is Test {
                 _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)
             });
-        
+
         vm.startPrank(governor);
     }
 
@@ -209,14 +209,51 @@ contract ChainTypeManagerTest is Test {
         vm.stopPrank();
         vm.prank(address(bridgehub));
 
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
+            abi.encode(l1Nullifier)
+        );
+
+        vm.mockCall(
+            address(l1Nullifier),
+            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
+            abi.encode(l1Nullifier)
+        );
+
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encode(baseToken)
+        );
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
+
         chainContractAddress.createNewChain({
             _chainId: id,
-            _baseToken: baseToken,
-            _sharedBridge: sharedBridge,
+            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
             _admin: newChainAdmin,
-            _diamondCut: abi.encode(_diamondCut)
+            _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
+            _factoryDeps: new bytes[](0)
         });
 
         vm.startPrank(governor);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    // Functions that have been migrated from the erstwhile StateTransitionManager to Bridgehub
+    ////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _getAllZKChainIDs() internal view returns (uint256[] memory chainIDs) {
+        chainIDs = bridgehub.getAllZKChainChainIDs();
+    }
+
+    function _getAllZKChains() internal view returns (address[] memory chainAddresses) {
+        chainAddresses = bridgehub.getAllZKChains();
+    }
+
+    function _registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) internal {
+        vm.prank(governor); // governor is the owner of bridgehub contract, see 2nd param of 1st line of function deploy
+        bridgehub.registerAlreadyDeployedZKChain(_chainId, _zkChain);
     }
 }
