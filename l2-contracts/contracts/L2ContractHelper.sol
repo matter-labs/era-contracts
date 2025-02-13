@@ -126,8 +126,6 @@ address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 
 uint256 constant L1_CHAIN_ID = 1;
 
-IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
-
 IBaseToken constant L2_BASE_TOKEN_ADDRESS = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
@@ -144,13 +142,6 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
 library L2ContractHelper {
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
-
-    /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
-    /// @param _message Data to be sent to L1.
-    /// @return keccak256 hash of the sent message.
-    function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
-        return L2_MESSENGER.sendToL1(_message);
-    }
 
     /// @notice Computes the create2 address for a Layer 2 contract.
     /// @param _sender The address of the contract creator.
