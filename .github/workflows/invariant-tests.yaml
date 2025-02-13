@@ -27,7 +27,7 @@ jobs:
     strategy:
       matrix:
         branch: ${{ fromJSON(needs.define-matrix.outputs.branches) }}
-        command: ['test:invariant:l1-context', 'test:invariant:l2-context']
+        command: ["test:invariant:l1-context", "test:invariant:l2-context"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
