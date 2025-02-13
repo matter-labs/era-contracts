@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
-contract StateTransitionManagerSetters is StateTransitionManagerTest {
+contract ChainTypeManagerSetters is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }
