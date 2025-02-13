@@ -6,6 +6,10 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+
+import {console} from "forge-std/console.sol";
+
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
     function setUp() public {
         deploy();
@@ -13,12 +17,17 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
     // setPriorityTxMaxGasLimit
     function test_SuccessfulSetPriorityTxMaxGasLimit() public {
-        createNewChain(getDiamondCutData(diamondInit));
-
-        address chainAddress = chainContractAddress.getHyperchain(chainId);
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
         GettersFacet gettersFacet = GettersFacet(chainAddress);
 
         uint256 newMaxGasLimit = 1000;
+
+        // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
+        // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
+        // So, we mock that behavior again.
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+
+        vm.prank(governor); // In the ChainTypeManagerTest contract, governor is set as the owner of chainContractAddress
         chainContractAddress.setPriorityTxMaxGasLimit(chainId, newMaxGasLimit);
 
         uint256 maxGasLimit = gettersFacet.getPriorityTxMaxGasLimit();
@@ -28,13 +37,15 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
     // setTokenMultiplier
     function test_SuccessfulSetTokenMultiplier() public {
-        createNewChain(getDiamondCutData(diamondInit));
-
-        address chainAddress = chainContractAddress.getHyperchain(chainId);
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
         GettersFacet gettersFacet = GettersFacet(chainAddress);
 
         uint128 newNominator = 1;
         uint128 newDenominator = 1000;
+
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+
+        vm.prank(governor);
         chainContractAddress.setTokenMultiplier(chainId, newNominator, newDenominator);
 
         uint128 nominator = gettersFacet.baseTokenGasPriceMultiplierNominator();
@@ -46,9 +57,8 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
     // changeFeeParams
     function test_SuccessfulChangeFeeParams() public {
-        createNewChain(getDiamondCutData(diamondInit));
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
 
-        address chainAddress = chainContractAddress.getHyperchain(chainId);
         UtilsFacet utilsFacet = UtilsFacet(chainAddress);
 
         FeeParams memory newFeeParams = FeeParams({
@@ -60,6 +70,9 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             minimalL2GasPrice: 250000000
         });
 
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+
+        vm.prank(governor);
         chainContractAddress.changeFeeParams(chainId, newFeeParams);
 
         FeeParams memory feeParams = utilsFacet.util_getFeeParams();
@@ -73,25 +86,27 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
     // setValidator
     function test_SuccessfulSetValidator() public {
-        createNewChain(getDiamondCutData(diamondInit));
-
-        address chainAddress = chainContractAddress.getHyperchain(chainId);
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
         GettersFacet gettersFacet = GettersFacet(chainAddress);
+        address new_validator = makeAddr("new_validator");
 
-        address validator = address(0x1);
-        chainContractAddress.setValidator(chainId, validator, true);
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
 
-        bool isActive = gettersFacet.isValidator(validator);
+        vm.prank(governor);
+        chainContractAddress.setValidator(chainId, new_validator, true);
+
+        bool isActive = gettersFacet.isValidator(new_validator);
         assertTrue(isActive);
     }
 
     // setPorterAvailability
     function test_SuccessfulSetPorterAvailability() public {
-        createNewChain(getDiamondCutData(diamondInit));
-
-        address chainAddress = chainContractAddress.getHyperchain(chainId);
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
         UtilsFacet utilsFacet = UtilsFacet(chainAddress);
 
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+
+        vm.prank(governor);
         chainContractAddress.setPorterAvailability(chainId, true);
 
         bool isAvailable = utilsFacet.util_getZkPorterAvailability();
