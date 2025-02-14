@@ -20,6 +20,13 @@ contract EvmPredeploysManager {
     bytes32 private constant CREATE2_PROXY_BYTECODE_HASH =
         0x020000453cf89ad86bc13761a15f8f205faa1dbb41ccd3553352fa3c5dd3a9a0;
 
+    // https://github.com/Zoltu/deterministic-deployment-proxy
+    address private constant DETERMINISTIC_CREATE2_PROXY = 0x7A0D94F55792C434d74a40883C6ed8545E406D12;
+    bytes32 private constant DETERMINISTIC_CREATE2_PROXY_INPUT_HASH =
+        0xa4d93d1dea5ac777c77f60dfbe95efcfc8847f592b1fb7e235171ed60949f4b0;
+    bytes32 private constant DETERMINISTIC_CREATE2_PROXY_BYTECODE_HASH =
+        0x020000453cf89ad86bc13761a15f8f205faa1dbb41ccd3553352fa3c5dd3a9a0;
+
     // https://github.com/pcaversaccio/create2deployer
     address private constant CREATE2_DEPLOYER = 0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2;
     bytes32 private constant CREATE2_DEPLOYER_INPUT_HASH =
@@ -66,6 +73,9 @@ contract EvmPredeploysManager {
         if (contractAddress == CREATE2_PROXY) {
             expectedInputHash = CREATE2_PROXY_INPUT_HASH;
             expectedBytecodeHash = CREATE2_PROXY_BYTECODE_HASH;
+        } else if (contractAddress == DETERMINISTIC_CREATE2_PROXY) {
+            expectedInputHash = DETERMINISTIC_CREATE2_PROXY_INPUT_HASH;
+            expectedBytecodeHash = DETERMINISTIC_CREATE2_PROXY_BYTECODE_HASH;
         } else if (contractAddress == CREATE2_DEPLOYER) {
             expectedInputHash = CREATE2_DEPLOYER_INPUT_HASH;
             expectedBytecodeHash = CREATE2_DEPLOYER_BYTECODE_HASH;
