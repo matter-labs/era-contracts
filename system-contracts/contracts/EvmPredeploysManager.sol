@@ -25,7 +25,7 @@ contract EvmPredeploysManager {
     bytes32 private constant DETERMINISTIC_CREATE2_PROXY_INPUT_HASH =
         0xa4d93d1dea5ac777c77f60dfbe95efcfc8847f592b1fb7e235171ed60949f4b0;
     bytes32 private constant DETERMINISTIC_CREATE2_PROXY_BYTECODE_HASH =
-        0x020000453cf89ad86bc13761a15f8f205faa1dbb41ccd3553352fa3c5dd3a9a0;
+        0x0200001f3bd554e541ab39bcf6e19564c9a6cbd700acceb65bfad0170c324d95;
 
     // https://github.com/pcaversaccio/create2deployer
     address private constant CREATE2_DEPLOYER = 0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2;
