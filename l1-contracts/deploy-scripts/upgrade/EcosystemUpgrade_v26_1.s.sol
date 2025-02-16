@@ -201,9 +201,7 @@ contract EcosystemUpgrade_v26_1 is Script {
         address ecosystemAdminAddress;
         bool testnetVerifier;
         uint256 governanceUpgradeTimerInitialDelay;
-        address v26Verifier;
-        address v26DiamondInit;
-        address v26L1AssetRouter;
+        bytes v26ChainCreationParams;
         ContractsConfig contracts;
         TokensConfig tokens;
     }
@@ -285,17 +283,10 @@ contract EcosystemUpgrade_v26_1 is Script {
         initializeConfig(configPath);
         initializeOldData();
         instantiateCreate2Factory();
-        initializeExpectedL2Addresses();
 
-        getFullListOfFactoryDependencies();
+        generatedData.forceDeploymentsData = prepareForceDeploymentsData();
 
-        // Important, this must come after the initializeExpectedL2Addresses
-        initializeGeneratedData();
-
-        deployBlobVersionedHashRetriever();
-        deployDefaultUpgrade();
         deployGenesisUpgrade();
-        deployStateTransitionDiamondFacets();
 
         saveOutput(outputPath);
     }
@@ -439,27 +430,6 @@ contract EcosystemUpgrade_v26_1 is Script {
     }
 
     function getUpgradeCalls() public returns (Call[] memory calls) {
-        // Just retrieved it from the contract
-        uint256 PREVIOUS_PROTOCOL_VERSION = getOldProtocolVersion();
-        uint256 DEADLINE = getOldProtocolDeadline();
-        uint256 NEW_PROTOCOL_VERSION = getNewProtocolVersion();
-        Call memory pauseMigrationsCall = Call({
-            target: config.contracts.bridgehubProxyAddress,
-            data: abi.encodeCall(
-                Bridgehub.pauseMigration,
-                ()
-            ),
-            value: 0
-        });
-        Call memory ctmCall = Call({
-            target: config.contracts.stateTransitionManagerAddress,
-            data: abi.encodeCall(
-                ChainTypeManager.setNewVersionUpgrade,
-                (getChainUpgradeInfo(), PREVIOUS_PROTOCOL_VERSION, DEADLINE, NEW_PROTOCOL_VERSION)
-            ),
-            value: 0
-        });
-
         // Note, that we will also need to turn off the ability to create new chains
         // in the interim of the upgrade.
         Call memory setCreationParamsCall = Call({
@@ -472,81 +442,9 @@ contract EcosystemUpgrade_v26_1 is Script {
             ),
             value: 0
         });
-        Call memory unpauseMigrationsCall = Call({
-            target: config.contracts.bridgehubProxyAddress,
-            data: abi.encodeCall(
-                Bridgehub.unpauseMigration,
-                ()
-            ),
-            value: 0
-        });
 
-        calls = new Call[](4);
-        calls[0] = pauseMigrationsCall;
-        calls[1] = ctmCall;
-        calls[2] = setCreationParamsCall;
-        calls[3] = unpauseMigrationsCall;
-    }
-
-    function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData) {
-        Diamond.FacetCut[] memory deletedFacets = _getFacetCutsForDeletion();
-
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](deletedFacets.length + 4);
-        for (uint i = 0; i < deletedFacets.length; i++) {
-            facetCuts[i] = deletedFacets[i];
-        }
-        facetCuts[deletedFacets.length] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        facetCuts[deletedFacets.length + 1] = Diamond.FacetCut({
-            facet: addresses.stateTransition.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
-        });
-        facetCuts[deletedFacets.length + 2] = Diamond.FacetCut({
-            facet: addresses.stateTransition.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-        });
-        facetCuts[deletedFacets.length + 3] = Diamond.FacetCut({
-            facet: addresses.stateTransition.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
-        });
-
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: bytes32(0),
-            recursionLeafLevelVkHash: bytes32(0),
-            recursionCircuitsSetVksHash: bytes32(0)
-        });
-
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: _composeEmptyUpgradeTx(),
-            // Don't change
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: verifierParams,
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: getNewProtocolVersion()
-        });
-        
-        upgradeCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: addresses.stateTransition.defaultUpgrade,
-            initCalldata: abi.encodeCall(
-                DefaultUpgrade.upgrade,
-                (proposedUpgrade)
-            )
-        });
+        calls = new Call[](1);
+        calls[0] = setCreationParamsCall;
     }
 
     function getEcosystemAdmin() external view returns (address) {
@@ -580,9 +478,7 @@ contract EcosystemUpgrade_v26_1 is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
-        config.v26Verifier = toml.readAddress("$.v26_verifier");
-        config.v26DiamondInit = toml.readAddress("$.v26_diamond_init");
-        config.v26L1AssetRouter = toml.readAddress("$.v26_l1_asset_router");
+        config.v26ChainCreationParams = toml.readBytes("$.v26_chain_creation_params");
 
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
@@ -744,105 +640,27 @@ contract EcosystemUpgrade_v26_1 is Script {
         });
     }
 
-    function initializeGeneratedData() internal {
-        generatedData.forceDeploymentsData = prepareForceDeploymentsData();
-    }
-
     function prepareForceDeploymentsData() public view returns (bytes memory) {
-        require(config.protocolUpgradeHandlerProxyAddress != address(0), "protocol upgrade handler not set");
+        ChainCreationParams memory v26ChainCreationParams = abi.decode(config.v26ChainCreationParams, (ChainCreationParams));
 
-        FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
-            l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
-            l1AssetRouter: config.v26L1AssetRouter,
-            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readBeaconProxyBytecode()
-            ),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.protocolUpgradeHandlerProxyAddress),
-            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2AssetRouterBytecode()
-            ),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
-            ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
-            l2SharedBridgeLegacyImpl: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
-            l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
-            dangerousTestOnlyForcedBeacon: address(0)
-        });
-
-        return abi.encode(data);
+        return v26ChainCreationParams.forceDeploymentsData;
     }
-
 
     function prepareNewChainCreationParams() internal returns (ChainCreationParams memory chainCreationParams) {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: addresses.stateTransition.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: addresses.stateTransition.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: addresses.stateTransition.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
-        });
+        ChainCreationParams memory v26ChainCreationParams = abi.decode(config.v26ChainCreationParams, (ChainCreationParams));
 
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
-        });
-
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
-            batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
-            maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
-            maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
-            priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
-            minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
-        });
-
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(config.v26Verifier),
-            verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
-            priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-            feeParams: feeParams,
-            blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
-        });
-
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: config.v26DiamondInit,
-            initCalldata: abi.encode(initializeData)
-        });
-        generatedData.diamondCutData = abi.encode(diamondCut);
+        // Diamond cut does not change.
+        generatedData.diamondCutData = abi.encode(v26ChainCreationParams.diamondCut);
 
         chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            forceDeploymentsData: generatedData.forceDeploymentsData
+
+            // DiamondCut and forceDeploymentsData dont change.
+            diamondCut: v26ChainCreationParams.diamondCut,
+            forceDeploymentsData: v26ChainCreationParams.forceDeploymentsData
         });
     }
 
@@ -961,7 +779,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         vm.serializeString("root", "contracts_config", contractsConfig);
 
         vm.serializeBytes("root", "governance_upgrade_calls", abi.encode(getUpgradeCalls()));
-        vm.serializeBytes("root", "chain_upgrade_diamond_cut", abi.encode(getChainUpgradeInfo()));
 
         string memory toml = vm.serializeAddress(
             "root",

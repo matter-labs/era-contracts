@@ -60,7 +60,6 @@ abstract contract UpgradeTestAbstract is Test {
     function _getUpgradeCalls() internal virtual returns (Call[] memory);
     function _getProtocolUpgradeHandlerAddress() internal view virtual returns (address);
     function _getOldProtocolVersion() internal view virtual returns (uint256);
-    function _getChainUpgradeInfo() internal virtual returns (Diamond.DiamondCutData memory);
 
     // --- Virtual functions for chain upgrade management -----------------------
 
@@ -163,9 +162,6 @@ abstract contract UpgradeTestAbstract is Test {
         console.log("Stage1 is done, now all the chains have to upgrade to the new version");
         console.log("Upgrading Era");
 
-        // Upgrade the chain. Note: the chainUpgrade also updates other contracts as required.
-        _upgradeChain(_getOldProtocolVersion(), _getChainUpgradeInfo());
-
         // Creating new chains should work
         _createNewChain(101101, false);
     }
@@ -217,10 +213,6 @@ contract UpgradeTestScriptBased is UpgradeTestAbstract {
 
     function _getOldProtocolVersion() internal view override returns (uint256) {
         return generateUpgradeData.getOldProtocolVersion();
-    }
-
-    function _getChainUpgradeInfo() internal override returns (Diamond.DiamondCutData memory) {
-        return generateUpgradeData.getChainUpgradeInfo();
     }
 
     // --- Implementation of virtual functions for preparing upgrades --------
@@ -305,10 +297,6 @@ contract UpgradeTestFileBased is UpgradeTestAbstract {
         return generateUpgradeData.getOldProtocolVersion();
     }
 
-    function _getChainUpgradeInfo() internal override returns (Diamond.DiamondCutData memory) {
-        string memory toml = vm.readFile(outputFile);
-        return abi.decode(toml.readBytes("$.chain_upgrade_diamond_cut"), (Diamond.DiamondCutData));
-    }
 
     // --- Implementation of virtual functions for preparing upgrades --------
 
