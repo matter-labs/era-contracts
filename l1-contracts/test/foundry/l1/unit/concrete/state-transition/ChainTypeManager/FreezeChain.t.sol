@@ -70,13 +70,15 @@ contract freezeChainTest is ChainTypeManagerTest {
         assertEq(isChainFrozen, false);
     }
 
-    function test_RevertWhen_UnfreezingChain() public {
+    function test_ChainTypeManagerCan_UnfreezeChain() public {
         address newChainAddress = createNewChain(getDiamondCutData(diamondInit));
+
         vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehub.getZKChain.selector),
             abi.encode(newChainAddress)
         );
+
         GettersFacet gettersFacet = GettersFacet(newChainAddress);
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
@@ -84,9 +86,16 @@ contract freezeChainTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         chainContractAddress.freezeChain(chainId);
 
-        vm.expectRevert(bytes.concat("q1"));
+        // Check to see if the chain has been frozen or not
+        isChainFrozen = gettersFacet.isDiamondStorageFrozen();
+        assertEq(isChainFrozen, true);
+
+        // The governor (owner of ChainTypeManager) should be able to unfreeze the chain
         chainContractAddress.unfreezeChain(chainId);
 
         vm.stopPrank();
+
+        isChainFrozen = gettersFacet.isDiamondStorageFrozen();
+        assertEq(isChainFrozen, false);
     }
 }
