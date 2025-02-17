@@ -41,7 +41,7 @@ contract ZKChainBaseTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](7);
+        selectors = new bytes4[](6);
         selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
         selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;

@@ -74,31 +74,6 @@ contract ChangeFeeParamsTest is AdminTest {
         });
 
         vm.expectRevert(InvalidPubdataPricingMode.selector);
-<<<<<<< HEAD
-=======
-
-        vm.startPrank(stateTransitionManager);
-        adminFacet.changeFeeParams(newFeeParams);
-    }
-
-    function test_revertWhen_PriorityTxPubdataExceedsMaxPubDataPerBatch(
-        uint32 maxPubdataPerBatch,
-        uint32 priorityTxMaxPubdata
-    ) public {
-        vm.assume(maxPubdataPerBatch < priorityTxMaxPubdata);
-
-        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
-        FeeParams memory newFeeParams = FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 1_000_000,
-            maxPubdataPerBatch: maxPubdataPerBatch,
-            maxL2GasPerBatch: 80_000_000,
-            priorityTxMaxPubdata: priorityTxMaxPubdata,
-            minimalL2GasPrice: 250_000_000
-        });
-
-        vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
->>>>>>> 3bcfce92 (feat: Update upgrade contracts to handle selector errors)
 
         vm.startPrank(chainTypeManager);
         adminFacet.changeFeeParams(newFeeParams);
