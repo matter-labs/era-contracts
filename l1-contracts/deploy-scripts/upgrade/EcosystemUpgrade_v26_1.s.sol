@@ -325,12 +325,7 @@ contract EcosystemUpgrade_v26_1 is Script {
         // in the interim of the upgrade.
         Call memory setCreationParamsCall = Call({
             target: config.contracts.stateTransitionManagerAddress,
-            data: abi.encodeCall(
-                ChainTypeManager.setChainCreationParams,
-                (
-                    prepareNewChainCreationParams()
-                )
-            ),
+            data: abi.encodeCall(ChainTypeManager.setChainCreationParams, (prepareNewChainCreationParams())),
             value: 0
         });
 
@@ -411,8 +406,9 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         address ctmAddress;
 
-        try IBridgehubLegacy(config.contracts.bridgehubProxyAddress)
-            .stateTransitionManager(config.eraChainId) returns (address addr) {
+        try IBridgehubLegacy(config.contracts.bridgehubProxyAddress).stateTransitionManager(config.eraChainId) returns (
+            address addr
+        ) {
             ctmAddress = addr;
         } catch {
             ctmAddress = Bridgehub(config.contracts.bridgehubProxyAddress).chainTypeManager(config.eraChainId);
@@ -425,7 +421,6 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
     }
-
 
     function instantiateCreate2Factory() internal {
         address contractAddress;
@@ -526,13 +521,19 @@ contract EcosystemUpgrade_v26_1 is Script {
     }
 
     function prepareForceDeploymentsData() public view returns (bytes memory) {
-        ChainCreationParams memory v26ChainCreationParams = abi.decode(config.v26ChainCreationParams, (ChainCreationParams));
+        ChainCreationParams memory v26ChainCreationParams = abi.decode(
+            config.v26ChainCreationParams,
+            (ChainCreationParams)
+        );
 
         return v26ChainCreationParams.forceDeploymentsData;
     }
 
     function prepareNewChainCreationParams() internal returns (ChainCreationParams memory chainCreationParams) {
-        ChainCreationParams memory v26ChainCreationParams = abi.decode(config.v26ChainCreationParams, (ChainCreationParams));
+        ChainCreationParams memory v26ChainCreationParams = abi.decode(
+            config.v26ChainCreationParams,
+            (ChainCreationParams)
+        );
 
         // Diamond cut does not change.
         generatedData.diamondCutData = abi.encode(v26ChainCreationParams.diamondCut);
@@ -543,7 +544,6 @@ contract EcosystemUpgrade_v26_1 is Script {
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-
             // DiamondCut and forceDeploymentsData dont change.
             diamondCut: v26ChainCreationParams.diamondCut,
             forceDeploymentsData: v26ChainCreationParams.forceDeploymentsData
@@ -651,10 +651,13 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         vm.serializeUint("contracts_config", "new_protocol_version", config.contracts.newProtocolVersion);
 
-        string memory contractsConfig = vm.serializeUint("contracts_config", "old_protocol_version", config.contracts.oldProtocolVersion);
+        string memory contractsConfig = vm.serializeUint(
+            "contracts_config",
+            "old_protocol_version",
+            config.contracts.oldProtocolVersion
+        );
 
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
-
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);

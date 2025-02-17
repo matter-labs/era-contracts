@@ -272,7 +272,6 @@ contract UpgradeTestFileBased is UpgradeTestAbstract {
         return generateUpgradeData.getOldProtocolVersion();
     }
 
-
     // --- Implementation of virtual functions for preparing upgrades --------
 
     function _prepareEcosystemContracts() internal override {
