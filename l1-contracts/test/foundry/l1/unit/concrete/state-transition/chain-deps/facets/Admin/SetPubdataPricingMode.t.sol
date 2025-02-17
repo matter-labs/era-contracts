@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Unauthorized, ChainAlreadyLive} from "contracts/common/L1ContractErrors.sol";
-import {PubdataPricingMode} from "../../../../../../../../../contracts/state-transition/chain-deps/ZkChainStorage.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkChainStorage.sol";
 
 contract SetPubdataPricingModeTest is AdminTest {
     event ValidiumModeStatusUpdate(PubdataPricingMode _pricingMode);
