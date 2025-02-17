@@ -86,7 +86,7 @@ contract ChainTypeManagerTest is Test {
             Diamond.FacetCut({
                 facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
                 action: Diamond.Action.Add,
-                isFreezable: true,
+                isFreezable: false,
                 selectors: Utils.getAdminSelectors()
             })
         );
@@ -102,7 +102,7 @@ contract ChainTypeManagerTest is Test {
             Diamond.FacetCut({
                 facet: address(new GettersFacet()),
                 action: Diamond.Action.Add,
-                isFreezable: true,
+                isFreezable: false,
                 selectors: Utils.getGettersSelectors()
             })
         );
