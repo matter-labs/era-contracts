@@ -35,8 +35,6 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             admin,
             abi.encodeCall(ChainTypeManager.initialize, ctmInitializeData)
         );
-
-        ChainTypeManager(address(transparentUpgradeableProxy));
     }
 
     function test_RevertWhen_genesisUpgradeIsZero() public asBridgeHub {

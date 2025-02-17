@@ -240,6 +240,17 @@ contract ChainTypeManagerTest is Test {
         vm.startPrank(governor);
     }
 
+    function _mockGetZKChainFromBridgehub(address _chainAddress) internal {
+        // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
+        // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
+        // So, we mock that behavior again.
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(_chainAddress));
+    }
+
+    function _mockMigrationPausedFromBridgehub() internal {
+        vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Functions that have been migrated from the erstwhile StateTransitionManager to Bridgehub
     ////////////////////////////////////////////////////////////////////////////////////////////

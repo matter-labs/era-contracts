@@ -21,10 +21,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
         uint256 newMaxGasLimit = 1000;
 
-        // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
-        // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
-        // So, we mock that behavior again.
-        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+        _mockGetZKChainFromBridgehub(chainAddress);
 
         vm.prank(governor); // In the ChainTypeManagerTest contract, governor is set as the owner of chainContractAddress
         chainContractAddress.setPriorityTxMaxGasLimit(chainId, newMaxGasLimit);
@@ -42,7 +39,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         uint128 newNominator = 1;
         uint128 newDenominator = 1000;
 
-        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+        _mockGetZKChainFromBridgehub(chainAddress);
 
         vm.prank(governor);
         chainContractAddress.setTokenMultiplier(chainId, newNominator, newDenominator);
@@ -69,7 +66,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             minimalL2GasPrice: 250000000
         });
 
-        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+        _mockGetZKChainFromBridgehub(chainAddress);
 
         vm.prank(governor);
         chainContractAddress.changeFeeParams(chainId, newFeeParams);
@@ -89,7 +86,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         GettersFacet gettersFacet = GettersFacet(chainAddress);
         address new_validator = makeAddr("new_validator");
 
-        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+        _mockGetZKChainFromBridgehub(chainAddress);
 
         vm.prank(governor);
         chainContractAddress.setValidator(chainId, new_validator, true);
@@ -103,7 +100,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
         UtilsFacet utilsFacet = UtilsFacet(chainAddress);
 
-        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(chainAddress));
+        _mockGetZKChainFromBridgehub(chainAddress);
 
         vm.prank(governor);
         chainContractAddress.setPorterAvailability(chainId, true);
