@@ -21,7 +21,7 @@ contract FreezeDiamondTest is AdminTest {
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit Freeze();
 
-        vm.startPrank(utilsFacet.util_getStateTransitionManager());
+        vm.startPrank(utilsFacet.util_getChainTypeManager());
         adminFacet.freezeDiamond();
     }
 }

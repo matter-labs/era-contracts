@@ -63,7 +63,7 @@ contract ChangeFeeParamsTest is AdminTest {
     }
 
     function test_revertWhen_changePubdataPricingMode() public {
-        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Validium,
             batchOverheadL1Gas: 1_000_000,
@@ -75,7 +75,7 @@ contract ChangeFeeParamsTest is AdminTest {
 
         vm.expectRevert(InvalidPubdataPricingMode.selector);
 
-        vm.startPrank(stateTransitionManager);
+        vm.startPrank(chainTypeManager);
         adminFacet.changeFeeParams(newFeeParams);
     }
 
@@ -85,7 +85,7 @@ contract ChangeFeeParamsTest is AdminTest {
     ) public {
         vm.assume(maxPubdataPerBatch < priorityTxMaxPubdata);
 
-        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
             batchOverheadL1Gas: 1_000_000,
@@ -97,7 +97,7 @@ contract ChangeFeeParamsTest is AdminTest {
 
         vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
 
-        vm.startPrank(stateTransitionManager);
+        vm.startPrank(chainTypeManager);
         adminFacet.changeFeeParams(newFeeParams);
     }
 

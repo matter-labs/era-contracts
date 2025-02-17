@@ -21,7 +21,7 @@ contract TestBaseFacet is ZKChainBase {
 
     function functionWithOnlyAdminOrChainTypeManagerModifier() external onlyAdminOrChainTypeManager {}
 
-    function functionWithOnlyBaseTokenBridgeModifier() external onlyBaseTokenBridge {}
+    function functionWithOnlyValidatorOrChainTypeManagerModifier() external onlyValidatorOrChainTypeManager {}
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
@@ -41,14 +41,13 @@ contract ZKChainBaseTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](7);
+        selectors = new bytes4[](6);
         selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
         selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;
         selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
         selectors[4] = TestBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier.selector;
-        selectors[5] = TestBaseFacet.functionWithonlyValidatorOrChainTypeManagerModifier.selector;
-        selectors[6] = TestBaseFacet.functionWithOnlyBaseTokenBridgeModifier.selector;
+        selectors[5] = TestBaseFacet.functionWithOnlyValidatorOrChainTypeManagerModifier.selector;
     }
 
     function setUp() public virtual {
