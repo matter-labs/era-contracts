@@ -54,7 +54,6 @@ abstract contract UpgradeTestAbstract is Test {
     function _getEcosystemAdmin() internal view virtual returns (address);
     function _getBridgehub() internal view virtual returns (address);
     function _getChainTypeManager() internal view virtual returns (address);
-    function _getDummyDiamondCutData() internal view virtual returns (Diamond.DiamondCutData memory);
     function _getDiamondCutData() internal view virtual returns (bytes memory);
     function _prepareForceDeploymentsData() internal view virtual returns (bytes memory);
     function _getUpgradeCalls() internal virtual returns (Call[] memory);
@@ -72,40 +71,24 @@ abstract contract UpgradeTestAbstract is Test {
     // --- Shared internal helper functions -------------------------------------
 
     /// @dev Creates a new chain. In the legacy case, we expect a revert.
-    function _createNewChain(uint256 chainId, bool legacy) internal {
+    function _createNewChain(uint256 chainId) internal {
         address ecosystemAdmin = _getEcosystemAdmin();
         // When using the new interface, we need to provide an asset id.
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         address ctm = _getChainTypeManager();
 
-        if (legacy) {
-            BridgehubLegacy bh = BridgehubLegacy(_getBridgehub());
-            bytes memory diamondCutData = abi.encode(_getDummyDiamondCutData());
-            vm.expectRevert(abi.encodeWithSignature("NonEmptyCalldata()"));
-            vm.startBroadcast(ecosystemAdmin);
-            bh.createNewChain(
-                chainId,
-                ctm,
-                ETH_TOKEN_ADDRESS,
-                uint256(keccak256(abi.encodePacked(chainId))),
-                ecosystemAdmin,
-                diamondCutData
-            );
-            vm.stopBroadcast();
-        } else {
-            Bridgehub bh = Bridgehub(_getBridgehub());
-            vm.startBroadcast(ecosystemAdmin);
-            bh.createNewChain(
-                chainId,
-                ctm,
-                ethAssetId,
-                uint256(keccak256(abi.encodePacked(chainId))),
-                ecosystemAdmin,
-                abi.encode(_getDiamondCutData(), _prepareForceDeploymentsData()),
-                new bytes[](0)
-            );
-            vm.stopBroadcast();
-        }
+        Bridgehub bh = Bridgehub(_getBridgehub());
+        vm.startBroadcast(ecosystemAdmin);
+        bh.createNewChain(
+            chainId,
+            ctm,
+            ethAssetId,
+            uint256(keccak256(abi.encodePacked(chainId))),
+            ecosystemAdmin,
+            abi.encode(_getDiamondCutData(), _prepareForceDeploymentsData()),
+            new bytes[](0)
+        );
+        vm.stopBroadcast();
     }
 
     /// @dev Executes a series of governance calls.
@@ -163,7 +146,7 @@ abstract contract UpgradeTestAbstract is Test {
         console.log("Upgrading Era");
 
         // Creating new chains should work
-        _createNewChain(101101, false);
+        _createNewChain(101101);
     }
 }
 
@@ -189,10 +172,6 @@ contract UpgradeTestScriptBased is UpgradeTestAbstract {
 
     function _getChainTypeManager() internal view override returns (address) {
         return generateUpgradeData.getChainTypeManager();
-    }
-
-    function _getDummyDiamondCutData() internal view override returns (Diamond.DiamondCutData memory) {
-        return generateUpgradeData.getDummyDiamondCutData();
     }
 
     function _getDiamondCutData() internal view override returns (bytes memory) {
@@ -268,10 +247,6 @@ contract UpgradeTestFileBased is UpgradeTestAbstract {
 
     function _getChainTypeManager() internal view override returns (address) {
         return generateUpgradeData.getChainTypeManager();
-    }
-
-    function _getDummyDiamondCutData() internal view override returns (Diamond.DiamondCutData memory) {
-        return generateUpgradeData.getDummyDiamondCutData();
     }
 
     function _getDiamondCutData() internal view override returns (bytes memory) {

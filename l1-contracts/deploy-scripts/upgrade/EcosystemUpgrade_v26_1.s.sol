@@ -271,8 +271,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         configPath = string.concat(root, configPath);
         outputPath = string.concat(root, outputPath);
         initializeConfig(configPath);
-
-        initializeOldData();
     }
 
     function prepareEcosystemContracts(string memory configPath, string memory outputPath) public {
@@ -281,7 +279,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         outputPath = string.concat(root, outputPath);
 
         initializeConfig(configPath);
-        initializeOldData();
         instantiateCreate2Factory();
 
         generatedData.forceDeploymentsData = prepareForceDeploymentsData();
@@ -298,109 +295,12 @@ contract EcosystemUpgrade_v26_1 is Script {
         );
     }
 
-    function initializeOldData() internal {
-        config.contracts.newProtocolVersion = getNewProtocolVersion();
-        config.contracts.oldProtocolVersion = getOldProtocolVersion();
-
-        uint256 ctmProtocolVersion = ChainTypeManager(config.contracts.stateTransitionManagerAddress).protocolVersion();
-        require(
-            ctmProtocolVersion != getNewProtocolVersion(),
-            "The new protocol version is already present on the ChainTypeManager"
-        );
-
-        config.contracts.oldValidatorTimelock = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
-            .validatorTimelock();
-
-        // This value does not matter for this upgrade
-        // In the future this value will be populated with the new shared bridge, but since the version on the CTM is the old one, the old bridge is stored here as well.
-        // config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
-    }
-
-
-    function getFullListOfFactoryDependencies() internal returns (bytes[] memory factoryDeps) {
-        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
-
-        // This upgrade will also require to publish:
-        // - L2GatewayUpgrade
-        // - new L2 shared bridge legacy implementation
-        // - new bridged erc20 token implementation
-        //
-        // Also, not strictly necessary, but better for consistency with the new chains:
-        // - UpgradeableBeacon
-        // - BeaconProxy
-
-        bytes[] memory upgradeSpecificDependencies = new bytes[](8);
-        upgradeSpecificDependencies[0] = L2ContractsBytecodesLib.readGatewayUpgradeBytecode();
-        upgradeSpecificDependencies[1] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
-        upgradeSpecificDependencies[2] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-
-        upgradeSpecificDependencies[3] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
-        upgradeSpecificDependencies[4] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
-
-        // We do not know whether the chain will be a rollup or a validium, just in case, we'll deploy
-        // both of the validators.
-        upgradeSpecificDependencies[5] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
-        upgradeSpecificDependencies[6] = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
-
-        upgradeSpecificDependencies[7] = L2ContractsBytecodesLib
-            .readTransparentUpgradeableProxyBytecodeFromSystemContracts();
-
-        cachedBytecodeHashes = CachedBytecodeHashes({
-            sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
-            erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2]),
-            rollupL2DAValidatorBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[5]),
-            validiumL2DAValidatorBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[6]),
-            transparentUpgradableProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[7])
-        });
-
-        factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, upgradeSpecificDependencies);
-        factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
-    }
-
     function getProtocolUpgradeHandlerAddress() public view returns (address) {
         return config.protocolUpgradeHandlerProxyAddress;
     }
 
     function getTransparentProxyAdmin() public view returns (address) {
         return config.contracts.transparentProxyAdmin;
-    }
-
-    function _getFacetCutsForDeletion() internal returns (Diamond.FacetCut[] memory facetCuts) {
-        IZKChain.Facet[] memory facets = IZKChain(config.contracts.eraDiamondProxy).facets();
-
-        // Freezability does not matter when deleting, so we just put false everywhere
-        facetCuts = new Diamond.FacetCut[](facets.length);
-        for (uint i = 0; i < facets.length; i++) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: address(0),
-                action: Diamond.Action.Remove,
-                isFreezable: false,
-                selectors: facets[i].selectors
-            });
-        }
-    }
-
-    function _composeEmptyUpgradeTx() internal returns (L2CanonicalTransaction memory transaction) {
-        transaction = L2CanonicalTransaction({
-            txType: 0,
-            from: 0,
-            to: 0,
-            gasLimit: 0,
-            gasPerPubdataByteLimit: 0,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: 0,
-            nonce: 0,
-            value: 0,
-            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
-            data: new bytes(0),
-            signature: new bytes(0),
-            factoryDeps: new uint256[](0),
-            paymasterInput: new bytes(0),
-            // Reserved dynamic type for the future use-case. Using it should be avoided,
-            // But it is still here, just in case we want to enable some additional functionality
-            reservedDynamic: new bytes(0)
-        });
     }
 
     function getNewProtocolVersion() public pure returns (uint256) {
@@ -418,15 +318,6 @@ contract EcosystemUpgrade_v26_1 is Script {
 
     function getOldProtocolVersion() public pure returns (uint256) {
         return 0x1a00000000;
-    }
-
-    function getDummyDiamondCutData() public pure returns (Diamond.DiamondCutData memory) {
-        return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: address(0),
-                initCalldata: hex""
-            });
     }
 
     function getUpgradeCalls() public returns (Call[] memory calls) {
@@ -535,12 +426,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
     }
 
-    function deployBlobVersionedHashRetriever() internal {
-        bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-        address contractAddress = deployViaCreate2(bytecode);
-        console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
-        addresses.blobVersionedHashRetriever = contractAddress;
-    }
 
     function instantiateCreate2Factory() internal {
         address contractAddress;
@@ -651,6 +536,7 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         // Diamond cut does not change.
         generatedData.diamondCutData = abi.encode(v26ChainCreationParams.diamondCut);
+        generatedData.forceDeploymentsData = abi.encode(v26ChainCreationParams.forceDeploymentsData);
 
         chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,

@@ -61,7 +61,7 @@
     "clean": "hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean",
     "clean:foundry": "forge clean",
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
-    "test:foundry": "forge test --ffi --match-path 'test/foundry/l1/*' --no-match-test 'test_MainnetFork'",
+    "test:foundry": "forge test --ffi --match-path 'test/foundry/l1/*' --no-match-test 'test_StageProofsForkScriptBased'",
     "test:zkfoundry": "forge script --sig 0x2dd0ebe3 DeployL1Script --ffi && forge test --zksync --match-path 'test/foundry/l2/*'",
     "test:stage-proofs-upgrade-fork": "ECOSYSTEM_INPUT=/upgrade-envs/v0.26.1-gateway-patch/stage-proofs.toml CHAIN_INPUT=/upgrade-envs/v0.26.1-gateway-patch/stage-proofs-era.toml forge test --match-test test_StageProofsForkScriptBased --ffi --rpc-url $SEPOLIA --gas-limit 20000000000",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
