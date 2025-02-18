@@ -33,7 +33,6 @@ bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "ZKChain: not state transit
 bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
 bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
 bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
-bytes constant ERROR_ONLY_BASE_TOKEN_BRIDGE = "ZKChain: Only base token bridge can call this function";
 
 contract ZKChainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
