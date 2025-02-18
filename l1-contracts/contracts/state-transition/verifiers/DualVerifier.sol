@@ -61,6 +61,7 @@ contract DualVerifier is IVerifier {
     }
 
     /// @inheritdoc IVerifier
+    /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
         return PLONK_VERIFIER.verificationKeyHash();
     }
