@@ -85,14 +85,14 @@ contract DualVerifier is IVerifier {
     /// @return result A new array with the first element removed. The first element was used as a hack for
     /// differentiator between FFLONK and PLONK proofs.
     function _extractProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
-        uint256 length = _proof.length;
+        uint256 resultLength = _proof.length - 1;
 
-        // Allocate memory for the new array (length - 1) since the first element is omitted.
-        result = new uint256[](length - 1);
+        // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
+        result = new uint256[](resultLength);
 
         // Copy elements starting from index 1 (the second element) of the original array.
-        for (uint256 i = 1; i < length; ++i) {
-            result[i - 1] = _proof[i];
+        assembly {
+            calldatacopy(add(result, 0x20), add(_proof.offset, 0x20), mul(resultLength, 0x20))
         }
     }
 }
