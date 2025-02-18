@@ -47,7 +47,7 @@ contract DualVerifier is IVerifier {
             revert EmptyProofLength();
         }
 
-        // The first element of `_recursiveAggregationInput` determines the verifier type (either FFLONK or PLONK).
+        // The first element of `_proof` determines the verifier type (either FFLONK or PLONK).
         uint256 verifierType = _proof[0];
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
             return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
