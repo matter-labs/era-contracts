@@ -475,7 +475,7 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         // Diamond cut does not change.
         generatedData.diamondCutData = abi.encode(v26ChainCreationParams.diamondCut);
-        generatedData.forceDeploymentsData = abi.encode(v26ChainCreationParams.forceDeploymentsData);
+        generatedData.forceDeploymentsData = v26ChainCreationParams.forceDeploymentsData;
 
         chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,

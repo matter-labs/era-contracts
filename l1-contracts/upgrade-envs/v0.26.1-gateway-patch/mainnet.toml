@@ -1,8 +1,5 @@
 era_chain_id = 324
 testnet_verifier = false
-v26_verifier = 0xdb3300726556AFA413A11aF474a8cFDa4D7fc5a5
-v26_diamond_init = 0x6eFEF84404fB3d02DD5596Bc5824eF8a71689093
-v26_l1_asset_router = 0x8829AD80E425C646DAB305381ff105169FeEcE56
 
 [contracts]
 max_number_of_chains = 100
