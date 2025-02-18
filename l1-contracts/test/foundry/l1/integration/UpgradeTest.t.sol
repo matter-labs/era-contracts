@@ -294,7 +294,7 @@ contract UpgradeTestFileBased is UpgradeTestAbstract {
         chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
     }
 
-    function test_MainnetForkFileBased() public {
+    function test_StageProofsForkFileBased() public {
         _mainnetForkTestImpl();
 
         // We should also double check that at least emergency upgrades work.
