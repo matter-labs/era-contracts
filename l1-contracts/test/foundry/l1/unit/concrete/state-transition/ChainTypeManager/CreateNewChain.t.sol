@@ -1,11 +1,16 @@
-// // SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, HashMismatch, ZeroAddress, ZKChainLimitReached} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+
+import {console} from "forge-std/console.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {
@@ -46,5 +51,18 @@ contract createNewChainTest is ChainTypeManagerTest {
 
         assertEq(newChainAdmin, admin);
         assertNotEq(newChainAddress, address(0));
+    }
+
+    function test_SuccessfulCreationOfNewChainAndReturnChainId() public {
+        createNewChain(getDiamondCutData(diamondInit));
+
+        uint256[] memory mockData = new uint256[](1);
+        mockData[0] = chainId;
+
+        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getAllZKChainChainIDs, ()), abi.encode(mockData));
+        uint256[] memory chainIds = _getAllZKChainIDs();
+
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId);
     }
 }
