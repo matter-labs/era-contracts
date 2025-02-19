@@ -128,7 +128,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
-        //        addChainToServerNotifier();
+        addChainToServerNotifier();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -159,6 +159,7 @@ contract RegisterZKChainScript is Script {
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
         config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr");
+        config.serverNotifier = toml.readAddress("$.deployed_addresses.server_notifier");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -276,10 +277,27 @@ contract RegisterZKChainScript is Script {
     }
 
     function addChainToServerNotifier() internal {
-        if (config.serverNotifier != address(0)) {
-            vm.broadcast();
-            ServerNotifier(config.serverNotifier).addChain(output.chainAdmin, config.chainChainId);
-        }
+        //        if (config.serverNotifier != address(0)) {
+
+        //                console.logAddress(config.serverNotifier);
+        //                console.logAddress(output.chainAdmin);
+        //                console.logUint(config.chainChainId);
+        vm.broadcast();
+        ServerNotifier(config.serverNotifier).addChain(output.chainAdmin, config.chainChainId);
+        console.log(
+            "Network added to Server notifier added :",
+            config.serverNotifier,
+            output.chainAdmin,
+            config.chainChainId
+        );
+
+        //            Utils.adminExecute(
+        //                Ownable(config.serverNotifier).owner(),
+        //                address(0),
+        //                config.serverNotifier,
+        //                abi.encodeCall(ServerNotifier.addChain, (output.chainAdmin, config.chainChainId)),
+        //                0
+        //            );
     }
 
     function registerAssetIdOnBridgehub() internal {

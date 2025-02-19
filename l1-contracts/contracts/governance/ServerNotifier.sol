@@ -8,7 +8,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 contract ServerNotifier is Ownable2Step, ReentrancyGuard {
     mapping(address chainAdmin => uint256 chainId) public registeredChains;
 
-    event MigrateToGateway(uint256 chainId);
+    event MigrateToGateway(uint256 indexed chainId);
 
     function initialize(address _admin) public reentrancyGuardInitializer {
         if (_admin == address(0)) {
@@ -18,7 +18,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard {
         _transferOwnership(_admin);
     }
 
-    function addChain(address _chainAdmin, uint256 _chainId) public onlyOwner {
+    function addChain(address _chainAdmin, uint256 _chainId) public {
         registeredChains[_chainAdmin] = _chainId;
     }
 
@@ -32,6 +32,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard {
 
     function migrateToGateway() public {
         uint256 chainId = registeredChains[msg.sender];
+        require(chainId != 0, "No chain registered gateway");
         emit MigrateToGateway(chainId);
     }
 }

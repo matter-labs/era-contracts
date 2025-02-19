@@ -166,7 +166,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         console.log("ServerNotifier Impl deployed at:", contractAddressImpl);
 
-        bytes memory initCalldata = abi.encodeCall(ServerNotifier.initialize, (contractAddressImpl));
+        bytes memory initCalldata = abi.encodeCall(ServerNotifier.initialize, (addresses.transparentProxyAdmin));
         address contractAddress = deployViaCreate2(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
