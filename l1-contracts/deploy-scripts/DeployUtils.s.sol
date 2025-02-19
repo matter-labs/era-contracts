@@ -88,6 +88,7 @@ struct DeployedAddresses {
     address chainAdmin;
     address accessControlRestrictionAddress;
     address blobVersionedHashRetriever;
+    address serverNotifier;
     address validatorTimelock;
     address create2Factory;
 }

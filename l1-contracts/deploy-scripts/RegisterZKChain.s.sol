@@ -29,7 +29,7 @@ import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.s
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -63,6 +63,7 @@ struct Config {
     address governance;
     address create2FactoryAddress;
     bytes32 create2Salt;
+    address serverNotifier;
 }
 
 contract RegisterZKChainScript is Script {
@@ -127,6 +128,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
+        addChainToServerNotifier();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -210,6 +212,7 @@ contract RegisterZKChainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
+        config.serverNotifier = toml.readAddress("$.deployed_addresses.server_notifier");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -270,6 +273,13 @@ contract RegisterZKChainScript is Script {
         );
         vm.broadcast();
         L1NullifierDev(config.l1Nullifier).setL2LegacySharedBridge(config.chainChainId, bridgeAddress);
+    }
+
+    function addChainToServerNotifier() internal {
+        if (config.serverNotifier != address(0)) {
+            vm.broadcast();
+            ServerNotifier(config.serverNotifier).addChain(output.chainAdmin, config.chainChainId);
+        }
     }
 
     function registerAssetIdOnBridgehub() internal {

@@ -9,7 +9,7 @@ contract ServerNotifier is Ownable2Step {
 
     event MigrateToGateway(uint256 chainId);
 
-    constructor(address _admin) {
+    function initialize(address _admin) public {
         if (_admin == address(0)) {
             revert ZeroAddress();
         }
