@@ -172,7 +172,7 @@ contract DeployL1Script is Script, DeployUtils {
             abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
         );
         console.log("ServerNotifier deployed at:", contractAddress);
-//        addresses.serverNotifier = contractAddress;
+        addresses.serverNotifier = contractAddress;
     }
 
     function getNoDAValidiumL2ValidatorAddress() internal returns (address) {

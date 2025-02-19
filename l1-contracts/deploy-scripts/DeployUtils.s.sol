@@ -90,6 +90,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
+        address serverNotifier;
     }
 
 // solhint-disable-next-line gas-struct-packing
