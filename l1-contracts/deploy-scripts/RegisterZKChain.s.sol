@@ -29,7 +29,7 @@ import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.s
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+//import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -128,7 +128,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
-        addChainToServerNotifier();
+//        addChainToServerNotifier();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -275,12 +275,12 @@ contract RegisterZKChainScript is Script {
         L1NullifierDev(config.l1Nullifier).setL2LegacySharedBridge(config.chainChainId, bridgeAddress);
     }
 
-    function addChainToServerNotifier() internal {
-        if (config.serverNotifier != address(0)) {
-            vm.broadcast();
-            ServerNotifier(config.serverNotifier).addChain(output.chainAdmin, config.chainChainId);
-        }
-    }
+//    function addChainToServerNotifier() internal {
+//        if (config.serverNotifier != address(0)) {
+//            vm.broadcast();
+//            ServerNotifier(config.serverNotifier).addChain(output.chainAdmin, config.chainChainId);
+//        }
+//    }
 
     function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
