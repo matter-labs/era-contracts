@@ -143,7 +143,7 @@ contract GatewayCTMDeployerTest is Test {
         // Just to publish bytecode
         new GatewayCTMDeployer(deployerConfig);
 
-        /*(
+        (
             DeployedContracts memory calculatedDeployedContracts,
             bytes memory create2Calldata,
             address ctmDeployerAddress
@@ -157,7 +157,6 @@ contract GatewayCTMDeployerTest is Test {
         require(ctmDeployerAddress == correctCTMDeployerAddress, "Incorrect address");
 
         DeployedContractsComparator.compareDeployedContracts(calculatedDeployedContracts, deployedContracts);
-        */
 
         // require(keccak256(abi.encode(calculatedDeployedContracts)) == keccak256(abi.encode(deployedContracts)), "Incorrect calculated addresses");
 
