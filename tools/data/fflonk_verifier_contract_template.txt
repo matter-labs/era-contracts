@@ -1567,7 +1567,7 @@ contract VerifierFflonk is IVerifierV2 {
 
             /**
              * @dev Performs modular exponentiation using the formula (value ^ power) mod R_MOD.
-             * @notice Stores values starting from the initial free memory pointer i.e., 0x80.
+             * @notice Stores values starting from the 0x00 memory slot.
              * The free memory pointer is not updated as it stays unused throughout the code execution.
              */
             {{modexp_function}}

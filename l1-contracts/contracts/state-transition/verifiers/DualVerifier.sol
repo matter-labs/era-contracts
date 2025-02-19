@@ -47,7 +47,7 @@ contract DualVerifier is IVerifier {
             revert EmptyProofLength();
         }
 
-        // The first element of `_recursiveAggregationInput` determines the verifier type (either FFLONK or PLONK).
+        // The first element of `_proof` determines the verifier type (either FFLONK or PLONK).
         uint256 verifierType = _proof[0];
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
             return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
@@ -61,6 +61,7 @@ contract DualVerifier is IVerifier {
     }
 
     /// @inheritdoc IVerifier
+    /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
         return PLONK_VERIFIER.verificationKeyHash();
     }
@@ -84,14 +85,14 @@ contract DualVerifier is IVerifier {
     /// @return result A new array with the first element removed. The first element was used as a hack for
     /// differentiator between FFLONK and PLONK proofs.
     function _extractProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
-        uint256 length = _proof.length;
+        uint256 resultLength = _proof.length - 1;
 
-        // Allocate memory for the new array (length - 1) since the first element is omitted.
-        result = new uint256[](length - 1);
+        // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
+        result = new uint256[](resultLength);
 
         // Copy elements starting from index 1 (the second element) of the original array.
-        for (uint256 i = 1; i < length; ++i) {
-            result[i - 1] = _proof[i];
+        assembly {
+            calldatacopy(add(result, 0x20), add(_proof.offset, 0x20), mul(resultLength, 0x20))
         }
     }
 }

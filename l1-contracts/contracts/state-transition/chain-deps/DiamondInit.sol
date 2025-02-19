@@ -8,7 +8,7 @@ import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
-import {ZeroAddress, EmptyAssetId, TooMuchGas} from "../../common/L1ContractErrors.sol";
+import {ZeroAddress, EmptyAssetId, TooMuchGas, EmptyBytes32} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -47,6 +47,18 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         }
         if (_initializeData.blobVersionedHashRetriever == address(0)) {
             revert ZeroAddress();
+        }
+
+        if (_initializeData.l2BootloaderBytecodeHash == bytes32(0)) {
+            revert EmptyBytes32();
+        }
+
+        if (_initializeData.l2DefaultAccountBytecodeHash == bytes32(0)) {
+            revert EmptyBytes32();
+        }
+
+        if (_initializeData.l2EvmEmulatorBytecodeHash == bytes32(0)) {
+            revert EmptyBytes32();
         }
 
         s.chainId = _initializeData.chainId;

@@ -8,6 +8,7 @@ import {
   ONE_BYTES32_HEX,
   TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
   TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+  TEST_EVM_HASHES_STORAGE,
 } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
@@ -206,12 +207,13 @@ describe("AccountCodeStorage tests", function () {
 
     it("constructed EVM contract", async () => {
       await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer", false);
+      await deployContractOnAddress(TEST_EVM_HASHES_STORAGE, "EvmHashesStorage", false);
 
       await accountCodeStorage
         .connect(deployerAccount)
         .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_EVM_BYTECODE_HASH);
 
-      expect(await accountCodeStorage.getCodeHash(RANDOM_ADDRESS)).to.be.eq(ZERO_HASH); // contract deployer doesn't have this contract hash
+      expect(await accountCodeStorage.getCodeHash(RANDOM_ADDRESS)).to.be.eq(ZERO_HASH); // EVM hash storage doesn't have this contract hash
 
       await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
     });
