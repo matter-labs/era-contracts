@@ -172,7 +172,7 @@ contract DeployL1Script is Script, DeployUtils {
             abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
         );
         console.log("ServerNotifier deployed at:", contractAddress);
-        addresses.serverNotifier = contractAddress;
+        addresses.extContracts.serverNotifier = contractAddress;
     }
 
     function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
@@ -289,7 +289,7 @@ contract DeployL1Script is Script, DeployUtils {
         bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
         address contractAddress = deployViaCreate2(bytecode, "");
         console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
-        addresses.blobVersionedHashRetriever = contractAddress;
+        addresses.extContracts.blobVersionedHashRetriever = contractAddress;
     }
 
     function registerChainTypeManager() internal {
@@ -688,8 +688,9 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress(
             "deployed_addresses",
             "blob_versioned_hash_retriever_addr",
-            addresses.blobVersionedHashRetriever
+            addresses.extContracts.blobVersionedHashRetriever
         );
+        vm.serializeAddress("deployed_addresses", "server_notifier", addresses.extContracts.serverNotifier);
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 

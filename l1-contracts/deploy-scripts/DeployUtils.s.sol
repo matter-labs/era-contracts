@@ -57,126 +57,131 @@ import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
-    struct FixedForceDeploymentsData {
-        uint256 l1ChainId;
-        uint256 eraChainId;
-        address l1AssetRouter;
-        bytes32 l2TokenProxyBytecodeHash;
-        address aliasedL1Governance;
-        uint256 maxNumberOfZKChains;
-        bytes32 bridgehubBytecodeHash;
-        bytes32 l2AssetRouterBytecodeHash;
-        bytes32 l2NtvBytecodeHash;
-        bytes32 messageRootBytecodeHash;
-        address l2SharedBridgeLegacyImpl;
-        address l2BridgedStandardERC20Impl;
-        // The forced beacon address. It is needed only for internal testing.
-        // MUST be equal to 0 in production.
-        // It will be the job of the governance to ensure that this value is set correctly.
-        address dangerousTestOnlyForcedBeacon;
-    }
+struct FixedForceDeploymentsData {
+    uint256 l1ChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedL1Governance;
+    uint256 maxNumberOfZKChains;
+    bytes32 bridgehubBytecodeHash;
+    bytes32 l2AssetRouterBytecodeHash;
+    bytes32 l2NtvBytecodeHash;
+    bytes32 messageRootBytecodeHash;
+    address l2SharedBridgeLegacyImpl;
+    address l2BridgedStandardERC20Impl;
+    // The forced beacon address. It is needed only for internal testing.
+    // MUST be equal to 0 in production.
+    // It will be the job of the governance to ensure that this value is set correctly.
+    address dangerousTestOnlyForcedBeacon;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct DeployedAddresses {
-        BridgehubDeployedAddresses bridgehub;
-        StateTransitionDeployedAddresses stateTransition;
-        BridgesDeployedAddresses bridges;
-        L1NativeTokenVaultAddresses vaults;
-        DataAvailabilityDeployedAddresses daAddresses;
-        address transparentProxyAdmin;
-        address governance;
-        address chainAdmin;
-        address accessControlRestrictionAddress;
-        address blobVersionedHashRetriever;
-        address validatorTimelock;
-        address create2Factory;
-        address serverNotifier;
-    }
+struct DeployedAddresses {
+    BridgehubDeployedAddresses bridgehub;
+    StateTransitionDeployedAddresses stateTransition;
+    BridgesDeployedAddresses bridges;
+    L1NativeTokenVaultAddresses vaults;
+    DataAvailabilityDeployedAddresses daAddresses;
+    ExtContracts extContracts;
+    address transparentProxyAdmin;
+    address governance;
+    address chainAdmin;
+    address accessControlRestrictionAddress;
+    address validatorTimelock;
+    address create2Factory;
+}
+
+// This struct is necessary because of the bug in solidity compiler, that doesn't allow big structures in public api
+struct ExtContracts {
+    address serverNotifier;
+    address blobVersionedHashRetriever;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct L1NativeTokenVaultAddresses {
-        address l1NativeTokenVaultImplementation;
-        address l1NativeTokenVaultProxy;
-    }
+struct L1NativeTokenVaultAddresses {
+    address l1NativeTokenVaultImplementation;
+    address l1NativeTokenVaultProxy;
+}
 
-    struct DataAvailabilityDeployedAddresses {
-        address rollupDAManager;
-        address l1RollupDAValidator;
-        address noDAValidiumL1DAValidator;
-        address availL1DAValidator;
-    }
-
-// solhint-disable-next-line gas-struct-packing
-    struct BridgehubDeployedAddresses {
-        address bridgehubImplementation;
-        address bridgehubProxy;
-        address ctmDeploymentTrackerImplementation;
-        address ctmDeploymentTrackerProxy;
-        address messageRootImplementation;
-        address messageRootProxy;
-    }
+struct DataAvailabilityDeployedAddresses {
+    address rollupDAManager;
+    address l1RollupDAValidator;
+    address noDAValidiumL1DAValidator;
+    address availL1DAValidator;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct BridgesDeployedAddresses {
-        address erc20BridgeImplementation;
-        address erc20BridgeProxy;
-        address sharedBridgeImplementation;
-        address sharedBridgeProxy;
-        address l1NullifierImplementation;
-        address l1NullifierProxy;
-        address bridgedStandardERC20Implementation;
-        address bridgedTokenBeacon;
-    }
+struct BridgehubDeployedAddresses {
+    address bridgehubImplementation;
+    address bridgehubProxy;
+    address ctmDeploymentTrackerImplementation;
+    address ctmDeploymentTrackerProxy;
+    address messageRootImplementation;
+    address messageRootProxy;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct Config {
-        uint256 l1ChainId;
-        address deployerAddress;
-        uint256 eraChainId;
-        address ownerAddress;
-        bool testnetVerifier;
-        bool supportL2LegacySharedBridgeTest;
-        ContractsConfig contracts;
-        TokensConfig tokens;
-    }
+struct BridgesDeployedAddresses {
+    address erc20BridgeImplementation;
+    address erc20BridgeProxy;
+    address sharedBridgeImplementation;
+    address sharedBridgeProxy;
+    address l1NullifierImplementation;
+    address l1NullifierProxy;
+    address bridgedStandardERC20Implementation;
+    address bridgedTokenBeacon;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct ContractsConfig {
-        bytes32 create2FactorySalt;
-        address create2FactoryAddr;
-        address multicall3Addr;
-        uint256 validatorTimelockExecutionDelay;
-        bytes32 genesisRoot;
-        uint256 genesisRollupLeafIndex;
-        bytes32 genesisBatchCommitment;
-        uint256 latestProtocolVersion;
-        bytes32 recursionNodeLevelVkHash;
-        bytes32 recursionLeafLevelVkHash;
-        bytes32 recursionCircuitsSetVksHash;
-        uint256 priorityTxMaxGasLimit;
-        PubdataPricingMode diamondInitPubdataPricingMode;
-        uint256 diamondInitBatchOverheadL1Gas;
-        uint256 diamondInitMaxPubdataPerBatch;
-        uint256 diamondInitMaxL2GasPerBatch;
-        uint256 diamondInitPriorityTxMaxPubdata;
-        uint256 diamondInitMinimalL2GasPrice;
-        address governanceSecurityCouncilAddress;
-        uint256 governanceMinDelay;
-        uint256 maxNumberOfChains;
-        bytes diamondCutData;
-        bytes32 bootloaderHash;
-        bytes32 defaultAAHash;
-        address availL1DAValidator;
-    }
-
-    struct TokensConfig {
-        address tokenWethAddress;
-    }
+struct Config {
+    uint256 l1ChainId;
+    address deployerAddress;
+    uint256 eraChainId;
+    address ownerAddress;
+    bool testnetVerifier;
+    bool supportL2LegacySharedBridgeTest;
+    ContractsConfig contracts;
+    TokensConfig tokens;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct GeneratedData {
-        bytes forceDeploymentsData;
-    }
+struct ContractsConfig {
+    bytes32 create2FactorySalt;
+    address create2FactoryAddr;
+    address multicall3Addr;
+    uint256 validatorTimelockExecutionDelay;
+    bytes32 genesisRoot;
+    uint256 genesisRollupLeafIndex;
+    bytes32 genesisBatchCommitment;
+    uint256 latestProtocolVersion;
+    bytes32 recursionNodeLevelVkHash;
+    bytes32 recursionLeafLevelVkHash;
+    bytes32 recursionCircuitsSetVksHash;
+    uint256 priorityTxMaxGasLimit;
+    PubdataPricingMode diamondInitPubdataPricingMode;
+    uint256 diamondInitBatchOverheadL1Gas;
+    uint256 diamondInitMaxPubdataPerBatch;
+    uint256 diamondInitMaxL2GasPerBatch;
+    uint256 diamondInitPriorityTxMaxPubdata;
+    uint256 diamondInitMinimalL2GasPrice;
+    address governanceSecurityCouncilAddress;
+    uint256 governanceMinDelay;
+    uint256 maxNumberOfChains;
+    bytes diamondCutData;
+    bytes32 bootloaderHash;
+    bytes32 defaultAAHash;
+    address availL1DAValidator;
+}
+
+struct TokensConfig {
+    address tokenWethAddress;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct GeneratedData {
+    bytes forceDeploymentsData;
+}
 
 contract DeployUtils is Script {
     using stdToml for string;
@@ -274,10 +279,10 @@ contract DeployUtils is Script {
     ) internal virtual returns (address) {
         return
             Utils.deployViaCreate2(
-            abi.encodePacked(creationCode, constructorArgs),
-            config.contracts.create2FactorySalt,
-            addresses.create2Factory
-        );
+                abi.encodePacked(creationCode, constructorArgs),
+                config.contracts.create2FactorySalt,
+                addresses.create2Factory
+            );
     }
 
     function deployBytecodesSupplier() internal {
@@ -355,8 +360,8 @@ contract DeployUtils is Script {
 
     // TODO(EVM-924): this function is unused
     function deployChainAdminWithRestrictions()
-    internal
-    returns (address chainAdmin, address accessControlRestriction)
+        internal
+        returns (address chainAdmin, address accessControlRestriction)
     {
         accessControlRestriction = deployViaCreate2(
             type(AccessControlRestriction).creationCode,
@@ -486,7 +491,7 @@ contract DeployUtils is Script {
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
-            blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
+            blobVersionedHashRetriever: addresses.extContracts.blobVersionedHashRetriever
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

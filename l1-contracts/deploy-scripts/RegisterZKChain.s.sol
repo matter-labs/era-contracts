@@ -128,7 +128,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
-//        addChainToServerNotifier();
+        //        addChainToServerNotifier();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();

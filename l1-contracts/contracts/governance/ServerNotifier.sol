@@ -5,7 +5,6 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-
 contract ServerNotifier is Ownable2Step, ReentrancyGuard {
     mapping(address chainAdmin => uint256 chainId) public registeredChains;
 
