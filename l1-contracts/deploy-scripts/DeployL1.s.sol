@@ -58,6 +58,7 @@ import {ValidiumL1DAValidator} from "contracts/state-transition/data-availabilit
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -128,6 +129,7 @@ contract DeployL1Script is Script, DeployUtils {
         deployChainTypeManagerContract();
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
+        deployServerNotifier();
 
         updateOwners();
 
@@ -156,6 +158,21 @@ contract DeployL1Script is Script, DeployUtils {
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
                 hex""
             );
+    }
+
+    function deployServerNotifier() public {
+        bytes memory bytecode = type(ServerNotifier).creationCode;
+        address contractAddressImpl = deployViaCreate2(bytecode, "");
+
+        console.log("ServerNotifier Impl deployed at:", contractAddressImpl);
+
+        bytes memory initCalldata = abi.encodeCall(ServerNotifier.initialize, (contractAddressImpl));
+        address contractAddress = deployViaCreate2(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
+        );
+        console.log("ServerNotifier deployed at:", contractAddress);
+//        addresses.serverNotifier = contractAddress;
     }
 
     function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
