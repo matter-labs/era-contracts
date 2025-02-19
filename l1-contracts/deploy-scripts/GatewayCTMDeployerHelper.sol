@@ -304,7 +304,7 @@ library GatewayCTMDeployerHelper {
     /// @notice List of factory dependencies needed for the correct execution of
     /// CTMDeployer and healthy functionaling of the system overall
     function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 18;
+        uint256 totalDependencies = 20;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -319,6 +319,8 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("VerifierFflonk.sol", "VerifierFflonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("VerifierPlonk.sol", "VerifierPlonk");
         // Include both verifiers since we cannot determine which one will be used
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
