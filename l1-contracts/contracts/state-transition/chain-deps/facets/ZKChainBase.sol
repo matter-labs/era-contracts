@@ -6,7 +6,8 @@ import {ZKChainStorage} from "../ZKChainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {Unauthorized, NotSettlementLayer} from "../../../common/L1ContractErrors.sol";
+import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
