@@ -12,27 +12,35 @@ import {UserActorHandler} from "./UserActorHandler.sol";
 
 contract LegacyBridgeActorHandler is Test {
     UserActorHandler[] public users;
+    address[] public l1Tokens;
 
     uint256 public ghost_totalDeposits;
     uint256 public ghost_totalWithdrawals;
 
-    error ReceiversArrayIsEmpty();
+    error UsersArrayIsEmpty();
+    error L1TokensArrayIsEmpty();
 
-    constructor(UserActorHandler[] memory _users) {
+    constructor(UserActorHandler[] memory _users, address[] memory _l1Tokens) {
         if (_users.length == 0) {
-            revert ReceiversArrayIsEmpty();
+            revert UsersArrayIsEmpty();
         }
         users = _users;
+
+        if (_l1Tokens.length == 0) {
+            revert L1TokensArrayIsEmpty();
+        }
+        l1Tokens = _l1Tokens;
     }
 
-    function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
+    function finalizeDeposit(uint256 _amount, address _sender, uint256 _userIndex, uint256 _l1TokenIndex) public {
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
-        uint256 receiverIndex = bound(_receiverIndex, 0, users.length - 1);
+        uint256 userIndex = bound(_userIndex, 0, users.length - 1);
+        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({
             _l1Sender: _sender,
-            _l2Receiver: address(users[receiverIndex]),
-            _l1Token: L1_TOKEN_ADDRESS,
+            _l2Receiver: address(users[userIndex]),
+            _l1Token: l1Tokens[l1TokenIndex],
             _amount: amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
@@ -40,10 +48,11 @@ contract LegacyBridgeActorHandler is Test {
         ghost_totalDeposits += amount;
     }
 
-    function withdraw(uint256 _amount, uint256 _userIndex, address _l1Receiver) public {
+    function withdraw(uint256 _amount, uint256 _userIndex, address _l1Receiver, uint256 _l1TokenIndex) public {
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         uint256 userIndex = bound(_userIndex, 0, users.length - 1);
-        address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
+        address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(l1Tokens[l1TokenIndex]);
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge({
             _l1Receiver: _l1Receiver,

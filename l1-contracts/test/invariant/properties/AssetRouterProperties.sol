@@ -15,6 +15,7 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 abstract contract AssetRouterProperties is Test {
+    address[] public l1Tokens;
     UserActorHandler[] public userActorHandlers;
     LegacyBridgeActorHandler public legacyBridgeActorHandler;
     L1AssetRouterActorHandler public l1AssetRouterActorHandler;
