@@ -482,7 +482,7 @@ abstract contract NativeTokenVault is
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
         if (_assetId != expectedAssetId) {
             // Make sure that a NativeTokenVault sent the message
-            revert AssetIdMismatch(_assetId, expectedAssetId);
+            revert AssetIdMismatch(expectedAssetId, _assetId);
         }
     }
 
