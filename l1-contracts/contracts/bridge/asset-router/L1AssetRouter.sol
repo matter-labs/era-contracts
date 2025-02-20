@@ -22,7 +22,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
+import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, TokensWithFeesNotSupported, AddressAlreadySet} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -132,7 +132,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _legacyBridge The address of the legacy bridge.
     function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external onlyOwner {
         if (address(legacyBridge) != address(0)) {
-            revert AddressAlreadyUsed(address(legacyBridge));
+            revert AddressAlreadySet(address(legacyBridge));
         }
         if (address(_legacyBridge) == address(0)) {
             revert ZeroAddress();

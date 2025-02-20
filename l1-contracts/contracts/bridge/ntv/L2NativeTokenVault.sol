@@ -23,7 +23,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -112,7 +112,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         if (l1TokenAddress == address(0)) {
-            revert TokenIsNotLegacy();
+            revert TokenNotLegacy();
         }
 
         _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
