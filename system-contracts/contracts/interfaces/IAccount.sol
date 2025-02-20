@@ -44,7 +44,4 @@ interface IAccount {
         bytes32 _possibleSignedHash,
         Transaction calldata _transaction
     ) external payable;
-
-    function hello() external payable;
-    function forwardFromIC(address _to, bytes memory _data) external payable;
 }

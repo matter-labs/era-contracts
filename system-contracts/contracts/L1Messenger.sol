@@ -14,6 +14,8 @@ import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
 import {DynamicIncrementalMerkle} from "./libraries/DynamicIncrementalMerkle.sol";
 
+event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
@@ -131,7 +133,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         // kl todo 1.
         // chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
         logsTree.push(hashedLog);
-
+        emit NewMessageRoot(block.chainid, block.number, logIdInMerkleTree, logsTree._sides);
         emit L2ToL1LogSent(_l2ToL1Log);
     }
 

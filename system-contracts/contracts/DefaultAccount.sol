@@ -58,17 +58,6 @@ contract DefaultAccount is IAccount {
         // Continue execution if not delegate called.
         _;
     }
-    event Hello(uint256 indexed);
-    function hello() external payable {
-        emit Hello(17);
-    }
-
-    function forwardFromIC(address _to, bytes memory _data) external payable {
-        (bool success, bytes memory returnData) = _to.call{value: msg.value}(_data);
-        // if (!success) {
-        // revert("Forwarding call failed");
-        // }
-    }
 
     /// @notice Validates the transaction & increments nonce.
     /// @dev The transaction is considered accepted by the account if
