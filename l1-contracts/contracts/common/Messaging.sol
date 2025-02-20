@@ -188,9 +188,11 @@ struct GasFields {
 struct InteropTrigger {
     uint256 destinationChainId;
     address sender;
+    address recipient;
     bytes32 feeBundleHash;
     bytes32 executionBundleHash;
     GasFields gasFields;
+    // kl todo add paymaster things here.
 }
 
 struct MessageInclusionProof {

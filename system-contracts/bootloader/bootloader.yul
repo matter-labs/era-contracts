@@ -521,6 +521,10 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000001000b
             }
 
+            function L2_STANDARD_TRIGGER_ACCOUNT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000e
+            }
+
             function BYTECODE_COMPRESSOR_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000800e
             }
@@ -2169,10 +2173,13 @@ object "Bootloader" {
                 // Currently only two versions are supported: 1 or 0, which basically
                 // mean whether the contract is an account or not.
                 if iszero(supportedVersion) {
+                    // kl todo intialize address as account instead
+                    if iszero(eq(addr, L2_STANDARD_TRIGGER_ACCOUNT_ADDR())) {
                     revertWithReason(
-                        FROM_IS_NOT_AN_ACCOUNT_ERR_CODE(),
-                        0
-                    )
+                            FROM_IS_NOT_AN_ACCOUNT_ERR_CODE(),
+                            0
+                        )
+                    }
                 }
             }
 

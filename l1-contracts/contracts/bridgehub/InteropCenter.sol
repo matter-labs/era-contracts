@@ -21,9 +21,9 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "../common/L1ContractErrors.sol";
-import {NotL1, NotRelayedSender, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
+import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {TransientInterop} from "./TransientInterop.sol";
 
@@ -393,7 +393,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     callStarter.data
                 );
             } else {
-                feeValue += callStarter.value * ethIsBaseTokenMultiplier;
+                feeValue += callStarter.requestedInteropCallValue * ethIsBaseTokenMultiplier;
                 // console.log("fee direct call");
                 _addCallToBundle(viaIR.feeBundleId, _requestFromStarter(callStarter), _extraInputs.sender);
             }
@@ -420,6 +420,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 );
             } else {
                 // console.log("executiondirect call");
+                // kl todo add second fee value checks here, so that msg.value - feeValue = feeValue2
                 _addCallToBundle(viaIR.executionBundleId, _requestFromStarter(callStarter), _extraInputs.sender);
             }
         }
@@ -432,6 +433,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
         InteropTrigger memory interopTrigger = InteropTrigger({
             sender: _extraInputs.sender,
+            recipient: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
             destinationChainId: _destinationChainId,
             feeBundleHash: viaIR.feeBundleHash,
             executionBundleHash: executionBundleHash,
@@ -450,7 +452,15 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     function _requestFromStarter(InteropCallStarter memory callStarter) internal returns (InteropCallRequest memory) {
-        return InteropCallRequest({to: callStarter.nextContract, data: callStarter.data, value: callStarter.value});
+        if (callStarter.value != 0) {
+            revert DirectCallNonEmptyValue(callStarter.nextContract);
+        }
+        return
+            InteropCallRequest({
+                to: callStarter.nextContract,
+                data: callStarter.data,
+                value: callStarter.requestedInteropCallValue
+            });
     }
 
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.

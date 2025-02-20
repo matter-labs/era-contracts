@@ -11,7 +11,7 @@ import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {OnlyBridgehub, CTMNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyInteropCenter, CTMNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
 import {UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
 
 /// @dev The encoding version of the data.
@@ -32,8 +32,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyInteropCenter() {
-        if (msg.sender != address(INTEROP_CENTER)) {
-            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+        if (msg.sender != address(INTEROP_CENTER) && msg.sender != address(BRIDGE_HUB)) {
+            // kl todo
+            revert OnlyInteropCenter(msg.sender, address(INTEROP_CENTER));
         }
         _;
     }

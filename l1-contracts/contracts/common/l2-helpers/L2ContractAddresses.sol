@@ -91,3 +91,5 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(0x1000d);
+
+address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(0x1000e);
