@@ -11,32 +11,48 @@ import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAUL
 import {UserActorHandler} from "./UserActorHandler.sol";
 
 contract LegacyBridgeActorHandler is Test {
-    UserActorHandler[] public receivers;
+    UserActorHandler[] public users;
 
     uint256 public ghost_totalDeposits;
+    uint256 public ghost_totalWithdrawals;
 
     error ReceiversArrayIsEmpty();
 
-    constructor(UserActorHandler[] memory _receivers) {
-        if (_receivers.length == 0) {
+    constructor(UserActorHandler[] memory _users) {
+        if (_users.length == 0) {
             revert ReceiversArrayIsEmpty();
         }
-        receivers = _receivers;
+        users = _users;
     }
 
     function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
-        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
+        uint256 receiverIndex = bound(_receiverIndex, 0, users.length - 1);
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({
             _l1Sender: _sender,
-            _l2Receiver: address(receivers[receiverIndex]),
+            _l2Receiver: address(users[receiverIndex]),
             _l1Token: L1_TOKEN_ADDRESS,
             _amount: amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
         ghost_totalDeposits += amount;
+    }
+
+    function withdraw(uint256 _amount, uint256 _userIndex, address _l1Receiver) public {
+        uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
+        uint256 userIndex = bound(_userIndex, 0, users.length - 1);
+        address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge({
+            _l1Receiver: _l1Receiver,
+            _l2Token: l2Token,
+            _amount: amount,
+            _sender: address(users[userIndex])
+        });
+
+        ghost_totalWithdrawals += amount;
     }
 
     // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
