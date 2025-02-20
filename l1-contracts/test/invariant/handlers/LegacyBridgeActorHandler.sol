@@ -10,9 +10,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
 import {UserActorHandler} from "./UserActorHandler.sol";
 
-// no cheatcodes here because they won't work with `--zksync`
-// forge 0.0.2 (27360d4 2024-12-02T00:28:35.872943000Z)
-contract L1AssetRouterActorHandler is Test {
+contract LegacyBridgeActorHandler is Test {
     UserActorHandler[] public receivers;
 
     uint256 public ghost_totalDeposits;
@@ -27,36 +25,16 @@ contract L1AssetRouterActorHandler is Test {
     }
 
     function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
-        _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
+        uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
 
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({
             _l1Sender: _sender,
             _l2Receiver: address(receivers[receiverIndex]),
             _l1Token: L1_TOKEN_ADDRESS,
-            _amount: _amount,
+            _amount: amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
-
-        ghost_totalDeposits += _amount;
-    }
-
-    function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex) public {
-        uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
-        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
-        uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
-        bytes memory data = DataEncoding.encodeBridgeMintData({
-            _originalCaller: _sender,
-            _remoteReceiver: address(receivers[receiverIndex]),
-            _originToken: L1_TOKEN_ADDRESS,
-            _amount: amount,
-            _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
-        });
-
-        // the 1st parameter is unused by `L2AssetRouter`
-        // https://github.com/matter-labs/era-contracts/blob/ac11ba99e3f2c3365a162f587b17e35b92dc4f24/l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol#L132
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit(0, assetId, data);
 
         ghost_totalDeposits += amount;
     }

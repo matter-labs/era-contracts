@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
+import {LegacyBridgeActorHandler} from "../handlers/LegacyBridgeActorHandler.sol";
 import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
 import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
@@ -15,6 +16,7 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.s
 
 abstract contract AssetRouterProperties is Test {
     UserActorHandler[] public userActorHandlers;
+    LegacyBridgeActorHandler public legacyBridgeActorHandler;
     L1AssetRouterActorHandler public l1AssetRouterActorHandler;
 
     function invariant_TotalDepositsEqualTotalSupply() public {
@@ -27,7 +29,8 @@ abstract contract AssetRouterProperties is Test {
             totalSupply = BridgedStandardERC20(l2TokenAddress).totalSupply();
         }
 
-        uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits();
+        uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits() +
+            legacyBridgeActorHandler.ghost_totalDeposits();
         for (uint256 i; i < userActorHandlers.length; i++) {
             totalDepositAmount += userActorHandlers[i].ghost_totalWithdrawalAmount();
         }
