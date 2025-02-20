@@ -63,6 +63,21 @@ contract L1AssetRouterActorHandler is Test {
         ghost_totalDeposits += amount;
     }
 
+    function finalizeDepositV3(uint256 _amount, address _sender, uint256 _receiverIndex) public {
+        uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
+        uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
+
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({
+            _l1Sender: _sender,
+            _l2Receiver: address(receivers[receiverIndex]),
+            _l1Token: L1_TOKEN_ADDRESS,
+            _amount: amount,
+            _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+        });
+
+        ghost_totalDeposits += amount;
+    }
+
     // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
     /// @notice Encodes the token data.
     /// @param name The name of the token.

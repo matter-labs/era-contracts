@@ -6,7 +6,9 @@ readonly FILE_TO_PREPROCESS="contracts/bridge/asset-router/L2AssetRouter.sol"
 
 # two-step instead one-step because MacOS sed uses -I but GNU sed uses -i
 readonly TEMP="$(mktemp)"
-sed 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' "$FILE_TO_PREPROCESS" > "$TEMP"
+sed -e 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' \
+    -e 's/msg.sender != L2_LEGACY_SHARED_BRIDGE/false/' \
+    "$FILE_TO_PREPROCESS" > "$TEMP"
 mv "$TEMP" "$FILE_TO_PREPROCESS"
 
 case "$WHERE" in
