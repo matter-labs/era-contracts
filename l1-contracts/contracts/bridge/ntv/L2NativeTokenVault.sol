@@ -232,7 +232,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _tokenOriginChainId The chain id of the origin token.
-    /// @param _nonNativeToken The address of token on its origin chain..
+    /// @param _nonNativeToken The address of token on its origin chain.
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,
