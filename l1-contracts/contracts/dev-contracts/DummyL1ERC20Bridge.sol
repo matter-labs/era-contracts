@@ -8,7 +8,6 @@ import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 contract DummyL1ERC20Bridge is L1ERC20Bridge {
-    
     constructor(
         IL1Nullifier _l1Nullifier,
         IL1AssetRouter _l1SharedBridge,

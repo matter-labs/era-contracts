@@ -23,15 +23,14 @@ contract TestnetVerifierTest is VerifierTestTest {
     function test_SucceedsWhen_proofIsEmpty() public {
         uint256[] memory emptyPublicInputs = new uint256[](1);
         uint256[] memory emptyProof = new uint256[](0);
-        uint256[] memory emptyRecursiveAggregationInput = new uint256[](0);
 
-        bool result = testnetVerifier.verify(emptyPublicInputs, emptyProof, emptyRecursiveAggregationInput);
+        bool result = testnetVerifier.verify(emptyPublicInputs, emptyProof);
 
         assertTrue(result);
     }
 
     function test_SuccessfullyVerifiesProofIfIsNotEmpty() public {
-        bool result = testnetVerifier.verify(publicInputs, serializedProof, recursiveAggregationInput);
+        bool result = testnetVerifier.verify(publicInputs, serializedProof);
 
         assertTrue(result);
     }

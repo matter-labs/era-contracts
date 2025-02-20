@@ -56,7 +56,7 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_SuccessfulConstruction() public {
-        ValidatorTimelock validator = new ValidatorTimelock(owner, executionDelay, eraChainId);
+        ValidatorTimelock validator = new ValidatorTimelock(owner, executionDelay);
 
         assertEq(validator.owner(), owner);
         assertEq(validator.executionDelay(), executionDelay);
