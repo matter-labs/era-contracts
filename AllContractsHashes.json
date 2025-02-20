@@ -1801,9 +1801,9 @@
   },
   {
     "contractName": "da-contracts/AvailL1DAValidator",
-    "evmBytecodeHash": "0x49d2a189b78fad8b968a389e84bb6889ffda92d8910a2096cdd8fe3c1e91e05d",
+    "evmBytecodeHash": "0xb5e934c55f6bc510e5046b121468a8ccf7d9afb77830c78ac41f10438e9e9850",
     "evmBytecodePath": "/da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json",
-    "evmDeployedBytecodeHash": "0xec3b01499f5f19387ab0fca9369b6fc8cc50157b725726a66ba6df0461db6a03",
+    "evmDeployedBytecodeHash": "0xec4f23b0cea195abcf8d9b0503143be63100cfe585c24314df99887483fff493",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
