@@ -128,7 +128,7 @@ interface IMailbox is IZKChainBase {
     /// @dev Warning: this function does not enforce any additional checks on the structure
     /// of the leaf. This means that it can accept intermediate nodes of the Merkle tree as a `_leaf` as
     /// well as the default "empty" leaves. It is the responsibility of the caller to ensure that the
-    /// `_leaf` is a hash of a valid leaf. 
+    /// `_leaf` is a hash of a valid leaf.
     function proveL2LeafInclusion(
         uint256 _batchNumber,
         uint256 _batchRootMask,
