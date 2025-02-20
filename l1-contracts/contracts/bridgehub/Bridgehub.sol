@@ -222,7 +222,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice Used to set the legacy chain data for the upgrade.
     /// @param _chainId The chainId of the legacy chain we are migrating.
-    function registerLegacyChain(uint256 _chainId) external override {
+    function registerLegacyChain(uint256 _chainId) external override onlyL1 {
         address ctm = chainTypeManager[_chainId];
         if (ctm == address(0)) {
             revert ChainNotLegacy();
