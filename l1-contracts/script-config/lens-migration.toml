@@ -8,5 +8,5 @@ stm = "0x590e6587b37dc4152b6b036ff88a835bd2ab8924"
 
 [canonical_ecosystem]
 stm = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
-
 verifier = "0x06aa7a7B07108F7C5539645e32DD5c21cBF9EB66"
+vallidator_timelock = "0x0000000000000000000000000000000000000000"

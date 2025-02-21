@@ -12,6 +12,7 @@ import {Diamond} from "../state-transition/libraries/Diamond.sol";
 struct MigrationParams {
     address newVerifier;
     address newCTM;
+    address newValidatorTimelock;
 }
 
 /// @author Matter Labs
@@ -21,19 +22,19 @@ contract Migrator is ZkSyncHyperchainBase {
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param params The migration params
     function upgrade(MigrationParams memory params) public returns (bytes32) {
-        address currentCTM = StateTransitionManager(s.stateTransitionManager).validatorTimelock();
-        address currentTimelock = StateTransitionManager(params.newCTM).validatorTimelock();
-        address currentBridgehub = StateTransitionManager(s.stateTransitionManager).BRIDGE_HUB();
-        address currentL1SharedBridge = address(Bridgehub(currentBridgehub).sharedBridge());
+        address currentTimelock = StateTransitionManager(s.stateTransitionManager).validatorTimelock();
 
-        s.validators[currentCTM] = false;
-        s.validators[currentTimelock] = true;
+        address newBridgehub = StateTransitionManager(s.stateTransitionManager).BRIDGE_HUB();
+        address newL1SharedBridge = address(Bridgehub(newBridgehub).sharedBridge());
+
+        s.validators[currentTimelock] = false;
+        s.validators[params.newValidatorTimelock] = true;
 
         s.verifier = IVerifier(params.newVerifier);
 
-        s.bridgehub = currentBridgehub;
+        s.bridgehub = newBridgehub;
         s.stateTransitionManager = params.newCTM;
-        s.baseTokenBridge = currentL1SharedBridge;
+        s.baseTokenBridge = newL1SharedBridge;
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }

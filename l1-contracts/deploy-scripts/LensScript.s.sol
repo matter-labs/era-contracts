@@ -88,7 +88,7 @@ contract LensScript is Script {
         config.newStateTransitionManager = toml.readAddress("$.canonical_ecosystem.stm");
         config.newBridgehub = IStateTransitionManager(config.newStateTransitionManager).BRIDGE_HUB();
         config.newProxyAdmin = address(uint160(uint256(vm.load(config.newBridgehub, PROXY_ADMIN_SLOT))));
-        config.newValidatorTimelock = StateTransitionManager(config.newStateTransitionManager).validatorTimelock();
+        config.newValidatorTimelock = toml.readAddress("$.canonical_ecosystem.validator_timelock");
         config.newVerifier = toml.readAddress("$.canonical_ecosystem.verifier");
 
         config.lensChainId = toml.readUint("$.lens_chain_id");
@@ -268,7 +268,8 @@ contract LensScript is Script {
 
         MigrationParams memory migrationParams = MigrationParams({
             newVerifier: config.newVerifier,
-            newCTM: config.newStateTransitionManager
+            newCTM: config.newStateTransitionManager,
+            newValidatorTimelock: config.newValidatorTimelock
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -279,9 +280,9 @@ contract LensScript is Script {
 
         calls.push(
             IGovernance.Call({
-                target: config.lensDiamondProxy,
+                target: config.newStateTransitionManager,
                 value: 0,
-                data: abi.encodeCall(IAdmin.executeUpgrade, (diamondCut))
+                data: abi.encodeCall(IStateTransitionManager.executeUpgrade, (config.lensChainId, diamondCut))
             })
         );
     }
@@ -309,6 +310,3 @@ contract LensScript is Script {
         }
     }
 }
-
-// todo
-// do we need to add a call to add the new validator to the validator timelock?
