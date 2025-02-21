@@ -263,7 +263,7 @@ jobs:
 
       - name: Generate verifiers
         working-directory: tools
-        run: cargo run --bin zksync_verifier_contract_generator --release -- --l2_mode
+        run: cargo run -- --l2_mode
 
       - name: Compare L2VerifierPlonk.sol
         run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol
