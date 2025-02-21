@@ -305,7 +305,14 @@ contract LensScript is Script {
                 value: 0,
                 data: abi.encodeCall(
                     IBridgehub.createNewChain,
-                    (config.lensChainId, config.newStateTransitionManager, config.baseToken, uint256(0), address(0), "0x")
+                    (
+                        config.lensChainId,
+                        config.newStateTransitionManager,
+                        config.baseToken,
+                        uint256(0),
+                        address(0),
+                        "0x"
+                    )
                 )
             })
         );

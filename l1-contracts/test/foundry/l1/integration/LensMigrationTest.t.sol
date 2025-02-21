@@ -37,7 +37,8 @@ contract LensMigrationTest is Test {
         address tempGovernance = 0xF21477B2a64c051AD1AC1d14f8c0f31db1eEF422;
         address tempGovernanceOwner = 0xEADb3890e0c3aef13e0B1D1CCFC5218395BC27a6;
 
-        (, , address baseToken, , , , address tempValidatorTimelock, , , , address newBridgehub, , , ) = lensScript.config();
+        (, , address baseToken, , , , address tempValidatorTimelock, , , , address newBridgehub, , , ) = lensScript
+            .config();
 
         vm.startPrank(tempGovernanceOwner);
 
