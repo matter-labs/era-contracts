@@ -13,7 +13,6 @@ import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, In
 
 error InvalidMessage();
 contract AssetTracker is IAssetTracker {
-    
     IAssetRouterBase public immutable ASSET_ROUTER;
 
     INativeTokenVault public immutable NATIVE_TOKEN_VAULT;
