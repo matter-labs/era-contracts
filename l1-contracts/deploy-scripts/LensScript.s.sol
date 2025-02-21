@@ -27,12 +27,12 @@ contract LensScript is Script {
         uint256 lensChainId;
         address lensDiamondProxy;
         address baseToken;
-
         address tempProxyAdmin;
         address tempBridgehub;
         address tempStateTransitionManager;
         address tempValidatorTimelock;
-
+        address tempL1SharedBridge;
+        address tempErc20Bridge;
         address newStateTransitionManager;
         address newBridgehub;
         address newProxyAdmin;
@@ -85,6 +85,9 @@ contract LensScript is Script {
         config.tempProxyAdmin = address(uint160(uint256(vm.load(config.tempBridgehub, PROXY_ADMIN_SLOT))));
         config.tempValidatorTimelock = StateTransitionManager(config.tempStateTransitionManager).validatorTimelock();
 
+        config.tempL1SharedBridge = address(IBridgehub(config.tempBridgehub).sharedBridge());
+        config.tempErc20Bridge = toml.readAddress("$.temp_ecosystem.erc20_bridge");
+
         config.newStateTransitionManager = toml.readAddress("$.canonical_ecosystem.stm");
         config.newBridgehub = IStateTransitionManager(config.newStateTransitionManager).BRIDGE_HUB();
         config.newProxyAdmin = address(uint160(uint256(vm.load(config.newBridgehub, PROXY_ADMIN_SLOT))));
@@ -92,7 +95,9 @@ contract LensScript is Script {
         config.newVerifier = toml.readAddress("$.canonical_ecosystem.verifier");
 
         config.lensChainId = toml.readUint("$.lens_chain_id");
-        config.lensDiamondProxy = IStateTransitionManager(config.tempStateTransitionManager).getHyperchain(config.lensChainId);
+        config.lensDiamondProxy = IStateTransitionManager(config.tempStateTransitionManager).getHyperchain(
+            config.lensChainId
+        );
         config.baseToken = IGetters(config.lensDiamondProxy).getBaseToken();
 
         console.log("Config:");
@@ -106,8 +111,11 @@ contract LensScript is Script {
         console.log("tempBridgehub:", config.tempBridgehub);
         console.log("tempProxyAdmin:", config.tempProxyAdmin);
         console.log("tempValidatorTimelock:", config.tempValidatorTimelock);
-        console.log("newStateTransitionManager:", config.newStateTransitionManager);
 
+        console.log("tempL1SharedBridge:", config.tempL1SharedBridge);
+        console.log("tempErc20Bridge:", config.tempErc20Bridge);
+
+        console.log("newStateTransitionManager:", config.newStateTransitionManager);
         console.log("newBridgehub:", config.newBridgehub);
         console.log("newProxyAdmin:", config.newProxyAdmin);
         console.log("newValidatorTimelock:", config.newValidatorTimelock);
@@ -116,7 +124,7 @@ contract LensScript is Script {
     }
 
     function _generateTempEcoOwnershipCalls() internal {
-        IGovernance.Call[] memory tempEcoOwnershipCalls = new IGovernance.Call[](8);
+        IGovernance.Call[] memory tempEcoOwnershipCalls = new IGovernance.Call[](12);
         // proxy admin - bh
         tempEcoOwnershipCalls[0] = IGovernance.Call({
             target: config.tempProxyAdmin,
@@ -137,36 +145,63 @@ contract LensScript is Script {
             )
         });
 
-        // bridgehub - transfer ownership
+        // proxy admin - l1 shared bridge
         tempEcoOwnershipCalls[2] = IGovernance.Call({
+            target: config.tempProxyAdmin,
+            value: 0,
+            data: abi.encodeCall(
+                ProxyAdmin.changeProxyAdmin,
+                (ITransparentUpgradeableProxy(config.tempL1SharedBridge), config.newProxyAdmin)
+            )
+        });
+
+        // proxy admin - erc20 bridge
+        tempEcoOwnershipCalls[3] = IGovernance.Call({
+            target: config.tempProxyAdmin,
+            value: 0,
+            data: abi.encodeCall(
+                ProxyAdmin.changeProxyAdmin,
+                (ITransparentUpgradeableProxy(config.tempErc20Bridge), config.newProxyAdmin)
+            )
+        });
+
+        // bridgehub - transfer ownership
+        tempEcoOwnershipCalls[4] = IGovernance.Call({
             target: config.tempBridgehub,
             value: 0,
             data: abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner))
         });
 
         // state transition manager - transfer ownership
-        tempEcoOwnershipCalls[3] = IGovernance.Call({
+        tempEcoOwnershipCalls[5] = IGovernance.Call({
             target: config.tempStateTransitionManager,
             value: 0,
             data: abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner))
         });
 
         // validator timelock - transfer ownership
-        tempEcoOwnershipCalls[4] = IGovernance.Call({
+        tempEcoOwnershipCalls[6] = IGovernance.Call({
             target: config.tempValidatorTimelock,
             value: 0,
             data: abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner))
         });
 
+        // l1 shared bridge - transfer ownership
+        tempEcoOwnershipCalls[7] = IGovernance.Call({
+            target: config.tempL1SharedBridge,
+            value: 0,
+            data: abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner))
+        });
+
         // transitionary owner Accept and transfer ownership - bh
-        tempEcoOwnershipCalls[5] = IGovernance.Call({
+        tempEcoOwnershipCalls[8] = IGovernance.Call({
             target: transitionaryOwner,
             value: 0,
             data: abi.encodeCall(TransitionaryOwner.claimOwnershipAndGiveToGovernance, (config.tempBridgehub))
         });
 
         // transitionary owner Accept and transfer ownership - stm
-        tempEcoOwnershipCalls[6] = IGovernance.Call({
+        tempEcoOwnershipCalls[9] = IGovernance.Call({
             target: transitionaryOwner,
             value: 0,
             data: abi.encodeCall(
@@ -176,28 +211,27 @@ contract LensScript is Script {
         });
 
         // transitionary owner Accept and transfer ownership - vt
-        tempEcoOwnershipCalls[7] = IGovernance.Call({
+        tempEcoOwnershipCalls[10] = IGovernance.Call({
             target: transitionaryOwner,
             value: 0,
             data: abi.encodeCall(TransitionaryOwner.claimOwnershipAndGiveToGovernance, (config.tempValidatorTimelock))
         });
 
+        // transitionary owner Accept and transfer ownership - l1 shared bridge
+        tempEcoOwnershipCalls[11] = IGovernance.Call({
+            target: transitionaryOwner,
+            value: 0,
+            data: abi.encodeCall(TransitionaryOwner.claimOwnershipAndGiveToGovernance, (config.tempL1SharedBridge))
+        });
+
         tempEcoScheduleOperation = abi.encodeWithSelector(
             IGovernance.scheduleTransparent.selector,
-            IGovernance.Operation({
-                calls: tempEcoOwnershipCalls,
-                predecessor: bytes32(0),
-                salt: bytes32(0)
-            })
+            IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)})
         );
-        
+
         tempEcoExecuteOperation = abi.encodeWithSelector(
             IGovernance.execute.selector,
-            IGovernance.Operation({
-                calls: tempEcoOwnershipCalls,
-                predecessor: bytes32(0),
-                salt: bytes32(0)
-            })
+            IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)})
         );
     }
 
@@ -228,6 +262,15 @@ contract LensScript is Script {
                 data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
             })
         );
+
+        // l1 shared bridge
+        calls.push(
+            IGovernance.Call({
+                target: config.tempL1SharedBridge,
+                value: 0,
+                data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+            })
+        );
     }
 
     function _generateRegisterChainCall() internal {
@@ -250,14 +293,7 @@ contract LensScript is Script {
                 value: 0,
                 data: abi.encodeCall(
                     IBridgehub.createNewChain,
-                    (
-                        config.lensChainId,
-                        config.lensDiamondProxy,
-                        config.baseToken,
-                        uint256(0),
-                        address(0),
-                        "0x"
-                    )
+                    (config.lensChainId, config.lensDiamondProxy, config.baseToken, uint256(0), address(0), "0x")
                 )
             })
         );

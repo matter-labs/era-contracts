@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.24;
 
-
 import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {StateTransitionManager} from "../state-transition/StateTransitionManager.sol";
 import {Bridgehub} from "../bridgehub/Bridgehub.sol";
@@ -18,7 +17,6 @@ struct MigrationParams {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract Migrator is ZkSyncHyperchainBase {
-
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param params The migration params
     function upgrade(MigrationParams memory params) public returns (bytes32) {

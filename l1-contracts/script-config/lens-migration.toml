@@ -5,6 +5,7 @@ transitionary_owner = "0x0000000000000000000000000000000000000000"
 
 [temp_ecosystem]
 stm = "0x590e6587b37dc4152b6b036ff88a835bd2ab8924"
+erc20_bridge = "0x438edfc62e6838bb0eb1c9253749f99f1f999b16"
 
 [canonical_ecosystem]
 stm = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
