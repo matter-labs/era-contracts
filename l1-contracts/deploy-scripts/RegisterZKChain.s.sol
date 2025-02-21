@@ -288,7 +288,7 @@ contract RegisterZKChainScript is Script {
             console.log("Base token asset id already registered on Bridgehub");
         } else {
             IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
-            calls[0] = IChainAdminOwnable.Call({ 
+            calls[0] = IChainAdminOwnable.Call({
                 target: config.bridgehub,
                 value: 0,
                 data: abi.encodeCall(bridgehub.addTokenAssetId, baseTokenAssetId)
@@ -383,7 +383,7 @@ contract RegisterZKChainScript is Script {
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
         IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
-        calls[0] = IChainAdminOwnable.Call({ 
+        calls[0] = IChainAdminOwnable.Call({
             target: config.bridgehub,
             value: 0,
             data: abi.encodeCall(
