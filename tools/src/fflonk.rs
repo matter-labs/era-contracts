@@ -8,7 +8,9 @@ use lazy_static::lazy_static;
 use serde_json::Value;
 
 use crate::types::{CommitmentSlot, G2Elements};
-use crate::utils::{convert_list_to_hexadecimal, create_hash_map, format_const, get_modexp_function};
+use crate::utils::{
+    convert_list_to_hexadecimal, create_hash_map, format_const, get_modexp_function,
+};
 
 lazy_static! {
     static ref G2_ELEMENTS: HashMap<&'static str, G2Elements> = create_hash_map(&[(
@@ -22,27 +24,26 @@ lazy_static! {
     ),]);
     static ref NON_RESIDUES: HashMap<&'static str, &'static str> =
         create_hash_map(&[("non_residues", "VK_NON_RESIDUES_{}"),]);
-    static ref COMMITMENT: HashMap<&'static str, CommitmentSlot> =
-        create_hash_map(&[(
-            "c0",
-            CommitmentSlot {
-                x: "VK_C0_G1_X",
-                y: "VK_C0_G1_Y"
-            }
-        ),]);
+    static ref COMMITMENT: HashMap<&'static str, CommitmentSlot> = create_hash_map(&[(
+        "c0",
+        CommitmentSlot {
+            x: "VK_C0_G1_X",
+            y: "VK_C0_G1_Y"
+        }
+    ),]);
 }
 
 pub fn insert_residue_elements_and_commitments(
     template: &str,
     vk: &HashMap<String, Value>,
     vk_hash: &str,
-    l2_mode: bool
+    l2_mode: bool,
 ) -> Result<String, Box<dyn Error>> {
     let reg = Handlebars::new();
     let residue_g2_elements = generate_residue_g2_elements(vk);
     let commitments = generate_commitments(vk);
 
-    let modexp_function = get_modexp_function(l2_mode); 
+    let modexp_function = get_modexp_function(l2_mode);
     let verifier_contract_template = template.replace("{{modexp_function}}", &modexp_function);
 
     Ok(reg.render_template(
@@ -51,7 +52,6 @@ pub fn insert_residue_elements_and_commitments(
                         "vk_hash": vk_hash}),
     )?)
 }
-
 
 fn extract_non_residues(items: &[Value], slot_name: &str) -> String {
     items
@@ -126,10 +126,7 @@ fn generate_commitments(vk: &HashMap<String, Value>) -> String {
 
     let c0 = vk.get("c0").unwrap();
     commitment.push_str("// [C0]1 = qL(X^8)+ X*qR(X^8)+ X^2*qO(X^8)+ X^3*qM(X^8)+ X^4*qC(X^8)+ X^5*Sσ1(X^8)+ X^6*Sσ2(X^8)+ X^7*Sσ3(X^8)\n");
-    commitment.push_str(&extract_commitment_slots(
-        &[c0.clone()],
-        COMMITMENT["c0"],
-    ));
+    commitment.push_str(&extract_commitment_slots(&[c0.clone()], COMMITMENT["c0"]));
 
     commitment
 }

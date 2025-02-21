@@ -30,14 +30,8 @@ error PatchUpgradeCantSetEvmEmulator();
 error PreviousUpgradeNotFinalized(bytes32 txHash);
 // 0xa0f47245
 error PreviousUpgradeNotCleaned();
-// 0x76da24b9
-error TooManyFactoryDeps();
 // 0x5cb29523
 error InvalidTxType(uint256 txType);
-// 0x08753982
-error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
-// 0xd92e233d
-error ZeroAddress();
 
 // 0x388b6f68
 error GatewayUpgradeFailed();

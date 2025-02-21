@@ -133,7 +133,11 @@ interface IMailbox is IZKChainBase {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
-    /// Proves that a certain leaf was included as part of the log merkle tree.
+    /// @dev Proves that a certain leaf was included as part of the log merkle tree.
+    /// @dev Warning: this function does not enforce any additional checks on the structure
+    /// of the leaf. This means that it can accept intermediate nodes of the Merkle tree as a `_leaf` as
+    /// well as the default "empty" leaves. It is the responsibility of the caller to ensure that the
+    /// `_leaf` is a hash of a valid leaf.
     function proveL2LeafInclusion(
         uint256 _batchNumber,
         uint256 _batchRootMask,

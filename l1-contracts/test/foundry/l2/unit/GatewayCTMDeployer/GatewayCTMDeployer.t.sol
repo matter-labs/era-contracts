@@ -18,10 +18,9 @@ import {RelayedSLDAValidator} from "contracts/state-transition/data-availability
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {L2VerifierFflonk} from "contracts/state-transition/verifiers/L2VerifierFflonk.sol";
+import {L2VerifierPlonk} from "contracts/state-transition/verifiers/L2VerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -73,11 +72,11 @@ contract GatewayCTMDeployerTest is Test {
         new ChainTypeManager(address(0));
         new ProxyAdmin();
 
-        new VerifierFflonk();
-        new VerifierPlonk();
+        new L2VerifierFflonk();
+        new L2VerifierPlonk();
 
-        new TestnetVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
-        new DualVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
+        new TestnetVerifier(L2VerifierFflonk(address(0)), L2VerifierPlonk(address(0)));
+        new DualVerifier(L2VerifierFflonk(address(0)), L2VerifierPlonk(address(0)));
 
         new ValidatorTimelock(address(0), 0);
 

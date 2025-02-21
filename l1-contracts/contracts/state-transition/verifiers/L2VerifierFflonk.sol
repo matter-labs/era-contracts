@@ -10,7 +10,7 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 /// @dev For better understanding of the protocol follow the below papers:
 /// * Fflonk Paper: https://eprint.iacr.org/2021/1167
 /// @custom:security-contact security@matterlabs.dev
-contract VerifierFflonk is IVerifierV2 {
+contract L2VerifierFflonk is IVerifierV2 {
     // ================Constants================
     uint32 internal constant DST_0 = 0;
     uint32 internal constant DST_1 = 1;

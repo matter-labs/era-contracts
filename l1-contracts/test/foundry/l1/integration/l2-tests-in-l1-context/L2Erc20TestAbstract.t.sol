@@ -108,7 +108,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
         // Basically we want all L2->L1 transactions to pass
         vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             abi.encodeWithSignature("sendToL1(bytes)"),
             abi.encode(bytes32(uint256(1)))
         );

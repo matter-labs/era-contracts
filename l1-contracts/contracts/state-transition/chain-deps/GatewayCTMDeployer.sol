@@ -13,8 +13,8 @@ import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.so
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
 import {DualVerifier} from "../verifiers/DualVerifier.sol";
-import {VerifierFflonk} from "../verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "../verifiers/VerifierPlonk.sol";
+import {L2VerifierFflonk} from "../verifiers/L2VerifierFflonk.sol";
+import {L2VerifierPlonk} from "../verifiers/L2VerifierPlonk.sol";
 
 import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
@@ -237,8 +237,8 @@ contract GatewayCTMDeployer {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts
     ) internal {
-        VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
-        VerifierPlonk verifierPlonk = new VerifierPlonk{salt: _salt}();
+        L2VerifierFflonk fflonkVerifier = new L2VerifierFflonk{salt: _salt}();
+        L2VerifierPlonk verifierPlonk = new L2VerifierPlonk{salt: _salt}();
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
                 new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
