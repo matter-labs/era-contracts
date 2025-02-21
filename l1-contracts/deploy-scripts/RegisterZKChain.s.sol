@@ -291,7 +291,7 @@ contract RegisterZKChainScript is Script {
             calls[0] = IChainAdminOwnable.Call({
                 target: config.bridgehub,
                 value: 0,
-                data: abi.encodeCall(bridgehub.addTokenAssetId, baseTokenAssetId)
+                data: abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId))
             });
             vm.broadcast(admin.owner());
             admin.multicall(calls, true);
