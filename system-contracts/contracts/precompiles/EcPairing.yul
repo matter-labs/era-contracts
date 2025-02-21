@@ -103,8 +103,8 @@ object "EcPairing" {
             // Ensure the ecpairing cost does not exceed the maximum value of a `uint32`.
             // This scenario should never occur in practice given the large number of allocated bytes needed,
             // but we include the check as a safeguard.
-            if gt(gasCost, UINT32_MAX()) {
-                gasCost := UINT32_MAX()
+            if gt(gasToPay, UINT32_MAX()) {
+                gasToPay := UINT32_MAX()
             }
 
             let success := precompileCall(precompileParams, gasToPay)
