@@ -13,5 +13,5 @@ cargo run --bin zksync_verifier_contract_generator --release -- --plonk_input_pa
 At the time of this writing, `modexp` precompile is not present on zkSync Era. In order to deploy the verifier on top of a ZK Chain, a different version has to be used with custom implementation of modular exponentiation.
 
 ```shell
-cargo run --bin zksync_verifier_contract_generator --release --  --plonk_input_path data/plonk_scheduler_key.json --fflonk_input_path data/fflonk_scheduler_key.json --plonk_output_path ../l2-contracts/contracts/verifiers/VerifierPlonk.sol --l2_mode --fflonk_output_path ../l2-contracts/contracts/verifiers/VerifierFflonk.sol
+cargo run --bin zksync_verifier_contract_generator --release --  --plonk_input_path data/plonk_scheduler_key.json --fflonk_input_path data/fflonk_scheduler_key.json --plonk_output_path ../l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol --l2_mode --fflonk_output_path ../l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
 ```

@@ -247,6 +247,26 @@ jobs:
       - name: Compare VerifierFflonk.sol
         run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierFflonk.sol
 
+  check-verifier-generator-l2:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Generate Verifier.sol
+        working-directory: tools
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --input_path data/scheduler_key.json --l2_mode
+
+      - name: Compare L2VerifierPlonk.sol
+        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol
+
+      - name: Compare L2VerifierFflonk.sol
+        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
+
   coverage:
     if: false # FIXME: coverage disabled due to stack-too-deep in VerifierFflonk.sol
     defaults:

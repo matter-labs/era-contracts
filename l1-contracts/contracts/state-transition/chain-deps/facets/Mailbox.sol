@@ -330,7 +330,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 l2ShardId: 0,
                 isService: true,
                 txNumberInBatch: _message.txNumberInBatch,
-                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
                 key: bytes32(uint256(uint160(_message.sender))),
                 value: keccak256(_message.data)
             });

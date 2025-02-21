@@ -45,9 +45,13 @@ jobs:
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/DualVerifier.sol
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/VerifierPlonk.sol
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/VerifierFflonk.sol
+          rm -rf ./l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol
+          rm -rf ./l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
           rm -rf ./l1-contracts/contracts/state-transition/verifiers/TestnetVerifier.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/PlonkVerifierTest.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/PlonkVerifierRecursiveTest.sol
+          rm -rf ./l1-contracts/contracts/dev-contracts/test/L2PlonkVerifierTest.sol
+          rm -rf ./l1-contracts/contracts/dev-contracts/test/L2PlonkVerifierRecursiveTest.sol
           rm -rf ./l1-contracts/contracts/state-transition/chain-deps/GatewayCTMDeployer.sol
 
       - name: Run Slither

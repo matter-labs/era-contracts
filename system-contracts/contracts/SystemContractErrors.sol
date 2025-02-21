@@ -76,8 +76,6 @@ error NonceNotUsed(address account, uint256 nonce);
 error NonEmptyAccount();
 // 0x536ec84b
 error NonEmptyMsgValue();
-// 0xd018e08e
-error NonIncreasingTimestamp();
 // 0x50df6bc3
 error NotAllowedToDeployInKernelSpace();
 // 0x35278d12

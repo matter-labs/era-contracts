@@ -151,7 +151,7 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the TestnetVerifier contract.
     /// @return The bytecode of the TestnetVerifier contract.
     function readL2TestnetVerifierBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2("TestnetVerifier.sol", "TestnetVerifier");
+        return Utils.readZKFoundryBytecodeL1("L2TestnetVerifier.sol", "L2TestnetVerifier");
     }
 
     /// @notice Reads the bytecode of the ValidatorTimelock contract.
