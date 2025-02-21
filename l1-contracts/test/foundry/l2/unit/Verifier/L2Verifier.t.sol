@@ -5,13 +5,13 @@ import {Test} from "forge-std/Test.sol";
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {Verifier} from "contracts/verifier/Verifier.sol";
-import {VerifierTest} from "contracts/dev-contracts/VerifierTest.sol";
+import {L2Verifier} from "contracts/state-transition/L2Verifier.sol";
+import {L2VerifierTest} from "contracts/dev-contracts/test/L2VerifierTest.sol";
 
-contract VerifierCaller {
-    Verifier public verifier;
+contract L2VerifierCaller {
+    L2Verifier public verifier;
 
-    constructor(Verifier _verifier) {
+    constructor(L2Verifier _verifier) {
         verifier = _verifier;
     }
 
@@ -25,14 +25,14 @@ contract VerifierCaller {
     }
 }
 
-contract VerifierTestTest is Test {
+contract L2VerifierTestTest is Test {
     uint256 Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     uint256[] public publicInputs;
     uint256[] public serializedProof;
 
-    Verifier public verifier;
+    L2Verifier public verifier;
 
     function setUp() public virtual {
         publicInputs.push(17257057577815541751225964212897374444694342989384539141520877492729);
@@ -82,7 +82,7 @@ contract VerifierTestTest is Test {
         serializedProof.push(7419167499813234488108910149511390953153207250610705609008080038658070088540);
         serializedProof.push(11628425014048216611195735618191126626331446742771562481735017471681943914146);
 
-        verifier = new VerifierTest();
+        verifier = new L2VerifierTest();
     }
 
     function testShouldVerify() public view {
@@ -93,10 +93,10 @@ contract VerifierTestTest is Test {
     function testShouldVerifyWithGas() public {
         // `gas snapshot` does not work well with zksync setup, so in order to obtain the amount of
         // zkevm gas consumed we do the following:
-        // - Deploy a VerifierCaller contract, which would execute in zkevm context
-        // - Call the verify function from the VerifierCaller contract and return the gas used
+        // - Deploy a L2VerifierCaller contract, which would execute in zkevm context
+        // - Call the verify function from the L2VerifierCaller contract and return the gas used
 
-        VerifierCaller caller = new VerifierCaller(verifier);
+        L2VerifierCaller caller = new L2VerifierCaller(verifier);
         (bool success, uint256 gasUsed) = caller.verify(publicInputs, serializedProof);
         assert(success);
 

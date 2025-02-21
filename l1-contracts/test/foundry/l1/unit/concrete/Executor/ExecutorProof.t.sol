@@ -20,7 +20,8 @@ contract TestExecutorFacet is ExecutorFacet {
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
     ) external view returns (bytes32) {
-        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
+        (, , bytes32 commitment) = _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
+        return commitment;
     }
 
     function getBatchProofPublicInput(
