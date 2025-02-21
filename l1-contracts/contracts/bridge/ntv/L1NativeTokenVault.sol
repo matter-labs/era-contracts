@@ -16,11 +16,11 @@ import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
-import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
+import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
+import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 
 import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
 import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred, WrongCounterpart} from "../L1BridgeContractErrors.sol";
@@ -35,7 +35,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
-    IL1AssetTracker public l1AssetTracker;
+    IAssetTracker public l1AssetTracker;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
@@ -86,8 +86,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }
 
-    function setL1AssetTracker(address _l1AssetTracker) external {
-        l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
+    function setAssetTracker(address _l1AssetTracker) external {
+        l1AssetTracker = IAssetTracker(_l1AssetTracker);
     }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.

@@ -19,7 +19,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
-import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
+import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -177,7 +177,7 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
-        nativeTokenVault.setL1AssetTracker(l1AssetTrackerAddress);
+        nativeTokenVault.setAssetTracker(l1AssetTrackerAddress);
 
         vm.prank(owner);
         l1Nullifier.setL1AssetRouter(address(sharedBridge));
@@ -220,7 +220,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             l1AssetTrackerAddress,
-            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncrease.selector),
+            abi.encodeWithSelector(IAssetTracker.handleChainBalanceIncrease.selector),
             abi.encode()
         );
 

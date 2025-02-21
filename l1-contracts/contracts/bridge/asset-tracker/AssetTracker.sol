@@ -2,15 +2,22 @@
 
 pragma solidity ^0.8.24;
 
-import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
+import {IAssetTracker} from "./IAssetTracker.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {InteropBundle, InteropCall} from "../../common/Messaging.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
 
 error InvalidMessage();
-contract AssetTrackerBase is IAssetTrackerBase {
+contract AssetTracker is IAssetTracker {
+    
+    IAssetRouterBase public immutable ASSET_ROUTER;
+
+    INativeTokenVault public immutable NATIVE_TOKEN_VAULT;
+
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -18,19 +25,30 @@ contract AssetTrackerBase is IAssetTrackerBase {
 
     mapping(uint256 chainId => mapping(bytes32 assetId => bool isMinter)) public isMinterChain;
 
-    // function handleChainBalanceIncrease(
-    //     uint256 _chainId,
-    //     bytes32 _assetId,
-    //     uint256 _amount,
-    //     bool _isNative
-    // ) external virtual;
+    constructor(address _assetRouter, address _nativeTokenVault) {
+        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
+        NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
+    }
 
-    // function handleChainBalanceDecrease(
-    //     uint256 _chainId,
-    //     bytes32 _assetId,
-    //     uint256 _amount,
-    //     bool _isNative
-    // ) external virtual;
+    function initialize() external {
+        // TODO: implement
+    }
+
+    function migrateChainBalance(uint256 _chainId, bytes32 _assetId) external {
+        // TODO: implement
+    }
+
+    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external {
+        chainBalance[_chainId][_assetId] += _amount;
+    }
+
+    function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external {
+        // Check that the chain has sufficient balance
+        if (chainBalance[_chainId][_assetId] < _amount) {
+            revert InsufficientChainBalance();
+        }
+        chainBalance[_chainId][_assetId] -= _amount;
+    }
 
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
     function processLogsAndMessages(L2Log[] calldata _logs, bytes[] calldata _messages, bytes32) external {
@@ -60,10 +78,10 @@ contract AssetTrackerBase is IAssetTrackerBase {
                     interopCall.data
                 );
                 (, , , uint256 amount, ) = DataEncoding.decodeBridgeMintData(transferData);
-                if (isMinterChain[fromChainId][assetId]) {
+                if (!isMinterChain[fromChainId][assetId]) {
                     chainBalance[fromChainId][assetId] -= amount;
                 }
-                if (isMinterChain[interopBundle.destinationChainId][assetId]) {
+                if (!isMinterChain[interopBundle.destinationChainId][assetId]) {
                     chainBalance[interopBundle.destinationChainId][assetId] += amount;
                 }
             }

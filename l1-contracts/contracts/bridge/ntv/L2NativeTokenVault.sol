@@ -22,7 +22,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/l2-helpers/L2Con
 
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
+import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 
 import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
@@ -280,7 +280,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _isNative
     ) internal override {
         // on L2s we don't track the balance.
-        // IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).handleChainBalanceDecrease(_chainId, _assetId, _amount, _isNative);
+        // IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceDecrease(_chainId, _assetId, _amount, _isNative);
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

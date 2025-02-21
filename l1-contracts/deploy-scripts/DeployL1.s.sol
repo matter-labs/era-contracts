@@ -59,7 +59,7 @@ import {ValidiumL1DAValidator} from "../contracts/state-transition/data-availabi
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
-import {L1AssetTracker} from "../contracts/bridge/asset-tracker/L1AssetTracker.sol";
+import {AssetTracker} from "../contracts/bridge/asset-tracker/AssetTracker.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -470,7 +470,7 @@ contract DeployL1Script is Script, DeployUtils {
 
     function deployAssetTrackerImplementation() internal {
         address contractAddress = deployViaCreate2(
-            type(L1AssetTracker).creationCode,
+            type(AssetTracker).creationCode,
             abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy)
         );
         console.log("AssetTrackerImplementation deployed at:", contractAddress);
@@ -478,7 +478,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployAssetTrackerProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1AssetTracker.initialize, ());
+        bytes memory initCalldata = abi.encodeCall(AssetTracker.initialize, ());
         address contractAddress = deployViaCreate2(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridgehub.assetTrackerImplementation, addresses.transparentProxyAdmin, initCalldata)
@@ -495,7 +495,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.broadcast(msg.sender);
         L1NativeTokenVault ntv = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
-        ntv.setL1AssetTracker(addresses.bridgehub.assetTrackerProxy);
+        ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
         console.log("L1NativeTokenVault updated with AssetTracker address");
     }
 
