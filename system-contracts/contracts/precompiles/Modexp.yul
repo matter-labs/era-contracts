@@ -10,7 +10,9 @@ object "Modexp" {
 
             /// @dev The gas cost of processing modexp circuit precompile.
             function MODEXP_GAS_COST() -> ret {
-                ret := 13334
+                // Current geometry is cycles_per_modexp_circuit: 25
+                // so 80'000 / 25 == 3200
+                ret := 3200
             }
 
             /// @dev The maximum amount of bytes for base.

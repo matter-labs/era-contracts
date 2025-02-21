@@ -12,7 +12,8 @@ object "EcPairing" {
 
             /// @dev The basic gas cost of processing ecpairing circuit precompile.
             function ECPAIRING_BASE_GAS_COST() -> ret {
-                ret := 100000
+                // We currently put 1 ECPairing pair per circuit. There is no additional cost.
+                ret := 0
             }
 
             /// @dev The additional gas cost of processing ecpairing circuit precompile.

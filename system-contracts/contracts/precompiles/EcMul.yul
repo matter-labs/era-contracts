@@ -12,7 +12,9 @@ object "EcMul" {
 
             /// @dev The gas cost of processing ecmul circuit precompile.
             function ECMUL_GAS_COST() -> ret {
-                ret := 3077
+                // Currently geometry is set to cycles_per_ecmul_circuit: 15,
+                // so 80'000 / 15 == 5333
+                ret := 5333
             }
 
             // ////////////////////////////////////////////////////////////////
