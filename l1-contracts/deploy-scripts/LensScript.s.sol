@@ -15,40 +15,49 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {TransitionaryOwner} from "../contracts/governance/TransitionaryOwner.sol";
 import {IAdmin} from "../contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {Diamond} from "../contracts/state-transition/libraries/Diamond.sol";
-import {MigrationParams} from "../contracts/upgrades/Migrator.sol";
+import {Migrator, MigrationParams} from "../contracts/upgrades/Migrator.sol";
 import {IGetters} from "../contracts/state-transition/chain-interfaces/IGetters.sol";
+
+struct Config {
+    uint256 lensChainId;
+    address lensDiamondProxy;
+    address baseToken;
+    address tempProxyAdmin;
+    address tempBridgehub;
+    address tempStateTransitionManager;
+    address tempValidatorTimelock;
+    address tempL1SharedBridge;
+    address tempErc20Bridge;
+    address newStateTransitionManager;
+    address newBridgehub;
+    address newProxyAdmin;
+    address newValidatorTimelock;
+    address newVerifier;
+}
 
 contract LensScript is Script {
     using stdToml for string;
 
-    bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
-    struct Config {
-        uint256 lensChainId;
-        address lensDiamondProxy;
-        address baseToken;
-        address tempProxyAdmin;
-        address tempBridgehub;
-        address tempStateTransitionManager;
-        address tempValidatorTimelock;
-        address tempL1SharedBridge;
-        address tempErc20Bridge;
-        address newStateTransitionManager;
-        address newBridgehub;
-        address newProxyAdmin;
-        address newValidatorTimelock;
-        address newVerifier;
-    }
+    bytes32 public constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     Config public config;
 
-    IGovernance.Call[] public calls;
+    IGovernance.Call[] internal calls;
     bytes public tempEcoScheduleOperation;
     bytes public tempEcoExecuteOperation;
+    bytes public vtOwnershipCall;
 
     address public migrationUpgradeAddress;
 
     address public transitionaryOwner;
+
+    function setMigrationUpgradeAddress(address _migrationUpgradeAddress) external {
+        migrationUpgradeAddress = _migrationUpgradeAddress;
+    }
+
+    function setTransitionaryOwner(address _transitionaryOwner) external {
+        transitionaryOwner = _transitionaryOwner;
+    }
 
     function run() external {
         _initializeConfig();
@@ -67,9 +76,9 @@ contract LensScript is Script {
         _generateExecuteUpgradeCall();
 
         // print generated calldata
-        _printTempGovernanceScheduleOperation();
-        _printTempGovernanceExecuteOperation();
-        _printMigrationExecuteUpgradeCall();
+        // _printTempGovernanceScheduleOperation();
+        // _printTempGovernanceExecuteOperation();
+        // _printMigrationExecuteUpgradeCall();
     }
 
     function _initializeConfig() internal {
@@ -77,8 +86,8 @@ contract LensScript is Script {
         string memory path = string.concat(root, "/script-config/lens-migration.toml");
         string memory toml = vm.readFile(path);
 
-        migrationUpgradeAddress = toml.readAddress("$.migration_upgrade_address");
-        transitionaryOwner = toml.readAddress("$.transitionary_owner");
+        // migrationUpgradeAddress = toml.readAddress("$.migration_upgrade_address");
+        // transitionaryOwner = toml.readAddress("$.transitionary_owner");
 
         config.tempStateTransitionManager = toml.readAddress("$.temp_ecosystem.stm");
         config.tempBridgehub = IStateTransitionManager(config.tempStateTransitionManager).BRIDGE_HUB();
@@ -124,7 +133,7 @@ contract LensScript is Script {
     }
 
     function _generateTempEcoOwnershipCalls() internal {
-        IGovernance.Call[] memory tempEcoOwnershipCalls = new IGovernance.Call[](12);
+        IGovernance.Call[] memory tempEcoOwnershipCalls = new IGovernance.Call[](11);
         // proxy admin - bh
         tempEcoOwnershipCalls[0] = IGovernance.Call({
             target: config.tempProxyAdmin,
@@ -180,28 +189,30 @@ contract LensScript is Script {
         });
 
         // validator timelock - transfer ownership
-        tempEcoOwnershipCalls[6] = IGovernance.Call({
-            target: config.tempValidatorTimelock,
-            value: 0,
-            data: abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner))
-        });
+        vtOwnershipCall = abi.encodeWithSelector(Ownable2Step.transferOwnership.selector, transitionaryOwner);
+
+        // IGovernance.Call({
+        //     target: config.tempValidatorTimelock,
+        //     value: 0,
+        //     data: abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner))
+        // });
 
         // l1 shared bridge - transfer ownership
-        tempEcoOwnershipCalls[7] = IGovernance.Call({
+        tempEcoOwnershipCalls[6] = IGovernance.Call({
             target: config.tempL1SharedBridge,
             value: 0,
             data: abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner))
         });
 
         // transitionary owner Accept and transfer ownership - bh
-        tempEcoOwnershipCalls[8] = IGovernance.Call({
+        tempEcoOwnershipCalls[7] = IGovernance.Call({
             target: transitionaryOwner,
             value: 0,
             data: abi.encodeCall(TransitionaryOwner.claimOwnershipAndGiveToGovernance, (config.tempBridgehub))
         });
 
         // transitionary owner Accept and transfer ownership - stm
-        tempEcoOwnershipCalls[9] = IGovernance.Call({
+        tempEcoOwnershipCalls[8] = IGovernance.Call({
             target: transitionaryOwner,
             value: 0,
             data: abi.encodeCall(
@@ -211,14 +222,14 @@ contract LensScript is Script {
         });
 
         // transitionary owner Accept and transfer ownership - vt
-        tempEcoOwnershipCalls[10] = IGovernance.Call({
+        tempEcoOwnershipCalls[9] = IGovernance.Call({
             target: transitionaryOwner,
             value: 0,
             data: abi.encodeCall(TransitionaryOwner.claimOwnershipAndGiveToGovernance, (config.tempValidatorTimelock))
         });
 
         // transitionary owner Accept and transfer ownership - l1 shared bridge
-        tempEcoOwnershipCalls[11] = IGovernance.Call({
+        tempEcoOwnershipCalls[10] = IGovernance.Call({
             target: transitionaryOwner,
             value: 0,
             data: abi.encodeCall(TransitionaryOwner.claimOwnershipAndGiveToGovernance, (config.tempL1SharedBridge))
@@ -226,7 +237,8 @@ contract LensScript is Script {
 
         tempEcoScheduleOperation = abi.encodeWithSelector(
             IGovernance.scheduleTransparent.selector,
-            IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)})
+            IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)}),
+            0
         );
 
         tempEcoExecuteOperation = abi.encodeWithSelector(
@@ -293,7 +305,7 @@ contract LensScript is Script {
                 value: 0,
                 data: abi.encodeCall(
                     IBridgehub.createNewChain,
-                    (config.lensChainId, config.lensDiamondProxy, config.baseToken, uint256(0), address(0), "0x")
+                    (config.lensChainId, config.newStateTransitionManager, config.baseToken, uint256(0), address(0), "0x")
                 )
             })
         );
@@ -311,12 +323,12 @@ contract LensScript is Script {
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: migrationUpgradeAddress,
-            initCalldata: abi.encode(migrationParams)
+            initCalldata: abi.encodeWithSelector(Migrator.upgrade.selector, migrationParams)
         });
 
         calls.push(
             IGovernance.Call({
-                target: config.newStateTransitionManager,
+                target: config.tempStateTransitionManager,
                 value: 0,
                 data: abi.encodeCall(IStateTransitionManager.executeUpgrade, (config.lensChainId, diamondCut))
             })
@@ -344,5 +356,9 @@ contract LensScript is Script {
             console.logBytes(calls[i].data);
             console.log();
         }
+    }
+
+    function govCalls() external view returns (IGovernance.Call[] memory) {
+        return calls;
     }
 }
