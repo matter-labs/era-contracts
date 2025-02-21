@@ -92,6 +92,11 @@ object "Modexp" {
             // 2. expLen bytes of exponent padded from left with (MAX_EXP_BYTES_SUPPORTED - expLen) zeros.
             // 3. modLen bytes of modulus padded from left with (MAX_MOD_BYTES_SUPPORTED - modLen) zeros.
 
+            let precompileInputBytes := add(add(MAX_BASE_BYTES_SUPPORTED(), MAX_EXP_BYTES_SUPPORTED()), MAX_MOD_BYTES_SUPPORTED())
+            for { let i := 0 } lt(i, precompileInputBytes) { i := add(i, 32) } {
+                mstore(i, 0)
+            }
+
             // Copy input base, exp and mod from calldata to memory
             calldatacopy(sub(MAX_BASE_BYTES_SUPPORTED(), baseLen), 96, baseLen)
             calldatacopy(sub(add(MAX_EXP_BYTES_SUPPORTED(), MAX_BASE_BYTES_SUPPORTED()), expLen), add(96, baseLen), expLen)
