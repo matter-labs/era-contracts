@@ -10,7 +10,7 @@ contract TestContract {
     function test() internal virtual {}
 }
 
-contract actualRefundRecipient is AddressAliasHelperSharedTest {
+contract ActualRefundRecipient is AddressAliasHelperSharedTest {
     function test_When_recipientAddressIsNotZero() public {
         address recipient = makeAddr("recipient");
         address prevMessageSender = makeAddr("prevMessageSender");
@@ -26,7 +26,8 @@ contract actualRefundRecipient is AddressAliasHelperSharedTest {
 
         vm.startBroadcast(prevMessageSender);
         address actualRecipient = addressAliasHelper.actualRefundRecipient(recipient, prevMessageSender);
-
+        vm.stopBroadcast();
+        
         assertEq(actualRecipient, prevMessageSender);
     }
 

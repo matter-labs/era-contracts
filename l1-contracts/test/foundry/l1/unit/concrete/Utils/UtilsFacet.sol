@@ -170,10 +170,6 @@ contract UtilsFacet is ZKChainBase {
         s.totalBatchesCommitted = _totalBatchesCommitted;
     }
 
-    function util_getTotalBatchesCommitted() external view returns (uint256) {
-        return s.totalBatchesCommitted;
-    }
-
     function util_getBaseTokenGasPriceMultiplierDenominator() external view returns (uint128) {
         return s.baseTokenGasPriceMultiplierDenominator;
     }
