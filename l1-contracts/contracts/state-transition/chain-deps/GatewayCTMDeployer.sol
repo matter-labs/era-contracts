@@ -12,18 +12,12 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-<<<<<<< HEAD
 import {DualVerifier} from "../verifiers/DualVerifier.sol";
-import {VerifierFflonk} from "../verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "../verifiers/VerifierPlonk.sol";
+import {L2VerifierFflonk} from "../verifiers/L2VerifierFflonk.sol";
+import {L2VerifierPlonk} from "../verifiers/L2VerifierPlonk.sol";
 
 import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
-=======
-import {L2Verifier} from "../L2Verifier.sol";
-import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {L2TestnetVerifier} from "../L2TestnetVerifier.sol";
->>>>>>> sb-oz-dec-audit-base
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
@@ -243,10 +237,9 @@ contract GatewayCTMDeployer {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts
     ) internal {
-        VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
-        VerifierPlonk verifierPlonk = new VerifierPlonk{salt: _salt}();
+        L2VerifierFflonk fflonkVerifier = new L2VerifierFflonk{salt: _salt}();
+        L2VerifierPlonk verifierPlonk = new L2VerifierPlonk{salt: _salt}();
         if (_testnetVerifier) {
-<<<<<<< HEAD
             _deployedContracts.stateTransition.verifier = address(
                 new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
             );
@@ -254,11 +247,6 @@ contract GatewayCTMDeployer {
             _deployedContracts.stateTransition.verifier = address(
                 new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
             );
-=======
-            _deployedContracts.stateTransition.verifier = address(new L2TestnetVerifier{salt: _salt}());
-        } else {
-            _deployedContracts.stateTransition.verifier = address(new L2Verifier{salt: _salt}());
->>>>>>> sb-oz-dec-audit-base
         }
     }
 
