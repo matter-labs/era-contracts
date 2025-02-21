@@ -12,7 +12,9 @@ object "EcAdd" {
 
             /// @dev The gas cost of processing ecadd circuit precompile.
             function ECADD_GAS_COST() -> ret {
-                ret := 20
+                // Current geometry: cycles_per_ecadd_circuit: 812,
+                // so 80'000 / 812 == 98
+                ret := 98
             }
 
             //////////////////////////////////////////////////////////////////

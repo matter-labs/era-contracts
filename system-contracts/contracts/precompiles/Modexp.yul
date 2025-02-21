@@ -10,7 +10,9 @@ object "Modexp" {
 
             /// @dev The gas cost of processing modexp circuit precompile.
             function MODEXP_GAS_COST() -> ret {
-                ret := 13334
+                // Current geometry is cycles_per_modexp_circuit: 25
+                // so 80'000 / 25 == 3200
+                ret := 3200
             }
 
             /// @dev The maximum amount of bytes for base.
@@ -89,6 +91,11 @@ object "Modexp" {
             // 1. baseLen bytes of base padded from left with (MAX_BASE_BYTES_SUPPORTED - baseLen) zeros.
             // 2. expLen bytes of exponent padded from left with (MAX_EXP_BYTES_SUPPORTED - expLen) zeros.
             // 3. modLen bytes of modulus padded from left with (MAX_MOD_BYTES_SUPPORTED - modLen) zeros.
+
+            let precompileInputBytes := add(add(MAX_BASE_BYTES_SUPPORTED(), MAX_EXP_BYTES_SUPPORTED()), MAX_MOD_BYTES_SUPPORTED())
+            for { let i := 0 } lt(i, precompileInputBytes) { i := add(i, 32) } {
+                mstore(i, 0)
+            }
 
             // Copy input base, exp and mod from calldata to memory
             calldatacopy(sub(MAX_BASE_BYTES_SUPPORTED(), baseLen), 96, baseLen)

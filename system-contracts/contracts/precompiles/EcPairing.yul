@@ -12,7 +12,8 @@ object "EcPairing" {
 
             /// @dev The basic gas cost of processing ecpairing circuit precompile.
             function ECPAIRING_BASE_GAS_COST() -> ret {
-                ret := 100000
+                // We currently put 1 ECPairing pair per circuit. There is no additional cost.
+                ret := 0
             }
 
             /// @dev The additional gas cost of processing ecpairing circuit precompile.
@@ -102,8 +103,8 @@ object "EcPairing" {
             // Ensure the ecpairing cost does not exceed the maximum value of a `uint32`.
             // This scenario should never occur in practice given the large number of allocated bytes needed,
             // but we include the check as a safeguard.
-            if gt(gasCost, UINT32_MAX()) {
-                gasCost := UINT32_MAX()
+            if gt(gasToPay, UINT32_MAX()) {
+                gasToPay := UINT32_MAX()
             }
 
             let success := precompileCall(precompileParams, gasToPay)
