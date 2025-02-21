@@ -27,6 +27,12 @@ object "EcPairing" {
                 ret := 192
             }
 
+            /// @notice The maximum value of the `uint32` type.
+            function UINT32_MAX() -> ret {
+                // 2^32 - 1
+                ret := 4294967295
+            }
+
             //////////////////////////////////////////////////////////////////
             //                      HELPER FUNCTIONS
             //////////////////////////////////////////////////////////////////
@@ -83,7 +89,6 @@ object "EcPairing" {
             let pairs := div(bytesSize, CHUNK_SIZE_BYTES())
 
             // We conduct all validations inside the precompileCall
-
             calldatacopy(0, 0, bytesSize)
 
             let precompileParams := unsafePackPrecompileParams(
@@ -94,6 +99,12 @@ object "EcPairing" {
                 pairs           // number of pairs
             )
             let gasToPay := ecpairingGasCost(pairs)
+            // Ensure the ecpairing cost does not exceed the maximum value of a `uint32`.
+            // This scenario should never occur in practice given the large number of allocated bytes needed,
+            // but we include the check as a safeguard.
+            if gt(gasCost, UINT32_MAX()) {
+                gasCost := UINT32_MAX()
+            }
 
             let success := precompileCall(precompileParams, gasToPay)
             let internalSuccess := mload(0)

@@ -15,7 +15,7 @@ object "Modexp" {
 
             /// @dev The maximum amount of bytes for base.
             /// @dev This restriction comes from circuit precompile call limitations.
-            function MAX_BASE_BYTES_SUPPORTED() -> ret{
+            function MAX_BASE_BYTES_SUPPORTED() -> ret {
                 ret := 32 // 256 bits
             }
 
@@ -75,41 +75,35 @@ object "Modexp" {
             let modLen := calldataload(64)
 
             // Ensure base, exponent and modulus are less than maximum supported size.
-            if gt(baseLen, MAX_BASE_BYTES_SUPPORTED()){
+            if gt(baseLen, MAX_BASE_BYTES_SUPPORTED()) {
                 burnGas()
             }
-            if gt(expLen, MAX_EXP_BYTES_SUPPORTED()){
+            if gt(expLen, MAX_EXP_BYTES_SUPPORTED()) {
                 burnGas()
             }
-            if gt(modLen, MAX_MOD_BYTES_SUPPORTED()){
+            if gt(modLen, MAX_MOD_BYTES_SUPPORTED()) {
                 burnGas()
             }
 
             // Circuit input in-memory is following:
-            // 1. baseLen bytes of base padded from right with (MAX_BASE_BYTES_SUPPORTED - baseLen) zeros.
-            // 2. expLen bytes of exponent padded from right with (MAX_EXP_BYTES_SUPPORTED - expLen) zeros.
-            // 3. modLen bytes of modulus padded from right with (MAX_MOD_BYTES_SUPPORTED - modLen) zeros.
-
-            // Allocate necessary memory
-            let precompileInputBytes := add(add(MAX_BASE_BYTES_SUPPORTED(), MAX_EXP_BYTES_SUPPORTED()), MAX_MOD_BYTES_SUPPORTED())
-            for { let i := 0 } lt(i, precompileInputBytes) { i := add(i, 32) } {
-                mstore(i, 0)
-            }
+            // 1. baseLen bytes of base padded from left with (MAX_BASE_BYTES_SUPPORTED - baseLen) zeros.
+            // 2. expLen bytes of exponent padded from left with (MAX_EXP_BYTES_SUPPORTED - expLen) zeros.
+            // 3. modLen bytes of modulus padded from left with (MAX_MOD_BYTES_SUPPORTED - modLen) zeros.
 
             // Copy input base, exp and mod from calldata to memory
-            calldatacopy(0, 96, baseLen)
-            calldatacopy(MAX_BASE_BYTES_SUPPORTED(), add(96, baseLen), expLen)
-            calldatacopy(add(MAX_EXP_BYTES_SUPPORTED(), MAX_BASE_BYTES_SUPPORTED()), add(add(96, baseLen), expLen), modLen)
+            calldatacopy(sub(MAX_BASE_BYTES_SUPPORTED(), baseLen), 96, baseLen)
+            calldatacopy(sub(add(MAX_EXP_BYTES_SUPPORTED(), MAX_BASE_BYTES_SUPPORTED()), expLen), add(96, baseLen), expLen)
+            calldatacopy(sub(add(add(MAX_EXP_BYTES_SUPPORTED(), MAX_BASE_BYTES_SUPPORTED()), MAX_MOD_BYTES_SUPPORTED()), modLen), add(add(96, baseLen), expLen), modLen)
 
             let precompileParams := unsafePackPrecompileParams(
                 0,                                  // input offset in words
                 div(precompileInputBytes, 32),      // input length in words
                 0,                                  // output offset in words
-                div(MAX_MOD_BYTES_SUPPORTED(), 32),   // output length in words
+                div(MAX_MOD_BYTES_SUPPORTED(), 32), // output length in words
                 0                                   // circuit doesn't check this value
             )
 
-            let gasToPay := MODEXP_GAS_COST() // TODO (?): make dynamic gas calculation
+            let gasToPay := MODEXP_GAS_COST()
             let success := precompileCall(precompileParams, gasToPay)
             if iszero(success) {
                 revert(0, 0)
@@ -118,7 +112,7 @@ object "Modexp" {
             // To achieve homogeneity of the circuit, we always return the max supported bytes of the modulus (e.g. 256).
             // It is assumed to be right-padded with zeros, thus we simply cut the modLen part to conform the specification.
             // See: https://eips.ethereum.org/EIPS/eip-198.
-            return(0, modLen)
+            return(sub(32, modLen), modLen)
         }
     }
 }

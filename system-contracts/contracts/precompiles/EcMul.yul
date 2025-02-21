@@ -58,7 +58,6 @@ object "EcMul" {
             calldatacopy(0, 0, 96)
 
             // We conduct all validations inside the precompileCall
-
             let precompileParams := unsafePackPrecompileParams(
                 0, // input offset in words
                 3, // input length in words (x, y, scalar)
