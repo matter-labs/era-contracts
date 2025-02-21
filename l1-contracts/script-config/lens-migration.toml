@@ -1,19 +1,12 @@
 lens_chain_id = "232"
-lens_diamond_proxy = "0xc29d04A93F893700015138E3E334eB828dAC3cef"
-base_token = "0x1ff1dC3cB9eeDbC6Eb2d99C03b30A05cA625fB5a"
 
 migration_upgrade_address = "0x0000000000000000000000000000000000000000"
 transitionary_owner = "0x0000000000000000000000000000000000000000"
 
 [temp_ecosystem]
-proxy_admin = "0x3a47b2ae67c092cdf90e91bd7cc49cc687fcff98"
-bridgehub = "0x9da9f5dad070649811d77c40ccdcab479ce3fa07"
 stm = "0x590e6587b37dc4152b6b036ff88a835bd2ab8924"
-validator_timelock = "0x5c03468829a26981c410a7930bd4853622f0b2e5"
 
 [canonical_ecosystem]
-proxy_admin = "0xc2a36181fb524a6befe639afed37a67e77d62cf1"
-bridgehub = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
 stm = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
-validator_timelock = "0x5D8ba173Dc6C3c90C8f7C04C9288BeF5FDbAd06E"
+
 verifier = "0x06aa7a7B07108F7C5539645e32DD5c21cBF9EB66"

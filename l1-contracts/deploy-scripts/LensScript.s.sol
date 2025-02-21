@@ -6,6 +6,7 @@ pragma solidity 0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IStateTransitionManager} from "../contracts/state-transition/IStateTransitionManager.sol";
+import {StateTransitionManager} from "../contracts/state-transition/StateTransitionManager.sol";
 import {IBridgehub} from "../contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "../contracts/governance/IGovernance.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -15,9 +16,12 @@ import {TransitionaryOwner} from "../contracts/governance/TransitionaryOwner.sol
 import {IAdmin} from "../contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {Diamond} from "../contracts/state-transition/libraries/Diamond.sol";
 import {MigrationParams} from "../contracts/upgrades/Migrator.sol";
+import {IGetters} from "../contracts/state-transition/chain-interfaces/IGetters.sol";
 
 contract LensScript is Script {
     using stdToml for string;
+
+    bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     struct Config {
         uint256 lensChainId;
@@ -72,24 +76,43 @@ contract LensScript is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/lens-migration.toml");
         string memory toml = vm.readFile(path);
-        
-        config.lensChainId = toml.readUint("$.lens_chain_id");
-        config.lensDiamondProxy = toml.readAddress("$.lens_diamond_proxy");
-        config.baseToken = toml.readAddress("$.base_token");
 
         migrationUpgradeAddress = toml.readAddress("$.migration_upgrade_address");
         transitionaryOwner = toml.readAddress("$.transitionary_owner");
 
-        config.tempProxyAdmin = toml.readAddress("$.temp_ecosystem.proxy_admin");
-        config.tempBridgehub = toml.readAddress("$.temp_ecosystem.bridgehub");
         config.tempStateTransitionManager = toml.readAddress("$.temp_ecosystem.stm");
-        config.tempValidatorTimelock = toml.readAddress("$.temp_ecosystem.validator_timelock");
+        config.tempBridgehub = IStateTransitionManager(config.tempStateTransitionManager).BRIDGE_HUB();
+        config.tempProxyAdmin = address(uint160(uint256(vm.load(config.tempBridgehub, PROXY_ADMIN_SLOT))));
+        config.tempValidatorTimelock = StateTransitionManager(config.tempStateTransitionManager).validatorTimelock();
 
-        config.newProxyAdmin = toml.readAddress("$.canonical_ecosystem.proxy_admin");
-        config.newBridgehub = toml.readAddress("$.canonical_ecosystem.bridgehub");
         config.newStateTransitionManager = toml.readAddress("$.canonical_ecosystem.stm");
-        config.newValidatorTimelock = toml.readAddress("$.canonical_ecosystem.validator_timelock");
+        config.newBridgehub = IStateTransitionManager(config.newStateTransitionManager).BRIDGE_HUB();
+        config.newProxyAdmin = address(uint160(uint256(vm.load(config.newBridgehub, PROXY_ADMIN_SLOT))));
+        config.newValidatorTimelock = StateTransitionManager(config.newStateTransitionManager).validatorTimelock();
         config.newVerifier = toml.readAddress("$.canonical_ecosystem.verifier");
+
+        config.lensChainId = toml.readUint("$.lens_chain_id");
+        config.lensDiamondProxy = IStateTransitionManager(config.tempStateTransitionManager).getHyperchain(config.lensChainId);
+        config.baseToken = IGetters(config.lensDiamondProxy).getBaseToken();
+
+        console.log("Config:");
+        console.log("lensChainId:", config.lensChainId);
+        console.log("lensDiamondProxy:", config.lensDiamondProxy);
+        console.log("baseToken:", config.baseToken);
+        console.log("migrationUpgradeAddress:", migrationUpgradeAddress);
+        console.log("transitionaryOwner:", transitionaryOwner);
+
+        console.log("tempStateTransitionManager:", config.tempStateTransitionManager);
+        console.log("tempBridgehub:", config.tempBridgehub);
+        console.log("tempProxyAdmin:", config.tempProxyAdmin);
+        console.log("tempValidatorTimelock:", config.tempValidatorTimelock);
+        console.log("newStateTransitionManager:", config.newStateTransitionManager);
+
+        console.log("newBridgehub:", config.newBridgehub);
+        console.log("newProxyAdmin:", config.newProxyAdmin);
+        console.log("newValidatorTimelock:", config.newValidatorTimelock);
+        console.log("newVerifier:", config.newVerifier);
+        console.log();
     }
 
     function _generateTempEcoOwnershipCalls() internal {
@@ -245,8 +268,7 @@ contract LensScript is Script {
 
         MigrationParams memory migrationParams = MigrationParams({
             newVerifier: config.newVerifier,
-            newCTM: config.newStateTransitionManager,
-            newBridgehub: config.newBridgehub
+            newCTM: config.newStateTransitionManager
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
