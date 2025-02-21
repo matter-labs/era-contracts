@@ -1,5 +1,5 @@
+use serde_json::Value;
 use std::collections::HashMap;
-use serde_json::{Value};
 
 pub fn format_mstore(hex_value: &str, slot: &str) -> String {
     format!("            mstore({}, 0x{})\n", slot, hex_value)
@@ -51,7 +51,8 @@ pub fn get_modexp_function(l2_mode: bool) -> String {
                     value := mulmod(value, value, R_MOD)
                     power := shr(1, power)
                 }
-            }"#.to_string()
+            }"#
+        .to_string()
     } else {
         r#"function modexp(value, power) -> res {
                 mstore(0x00, 0x20)
@@ -64,6 +65,7 @@ pub fn get_modexp_function(l2_mode: bool) -> String {
                     revertWithMessage(24, "modexp precompile failed")
                 }
                 res := mload(0x00)
-            }"#.to_string()
+            }"#
+        .to_string()
     }
 }

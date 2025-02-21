@@ -14,10 +14,6 @@ error Unauthorized(address);
 error UnsupportedPaymasterFlow();
 // 0xcea34703
 error MalformedBytecode(BytecodeError);
-// 0xc352bb73
-error UnknownVerifierType();
-// 0x456f8f7a
-error EmptyProofLength();
 
 enum BytecodeError {
     Version,

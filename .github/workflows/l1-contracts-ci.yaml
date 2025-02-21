@@ -248,7 +248,6 @@ jobs:
         run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierFflonk.sol
 
   check-verifier-generator-l2:
-    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -257,9 +256,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Generate Verifier.sol
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.72.0
+
+      - name: Generate verifiers
         working-directory: tools
-        run: cargo run --bin zksync_verifier_contract_generator --release -- --input_path data/scheduler_key.json --l2_mode
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --l2_mode
 
       - name: Compare L2VerifierPlonk.sol
         run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol

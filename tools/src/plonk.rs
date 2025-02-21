@@ -8,7 +8,9 @@ use lazy_static::lazy_static;
 use serde_json::Value;
 
 use crate::types::{CommitmentSlot, G2Elements};
-use crate::utils::{convert_list_to_hexadecimal, create_hash_map, format_const, format_mstore, get_modexp_function};
+use crate::utils::{
+    convert_list_to_hexadecimal, create_hash_map, format_const, format_mstore, get_modexp_function,
+};
 
 lazy_static! {
     static ref COMMITMENTS_SLOTS: HashMap<&'static str, CommitmentSlot> = create_hash_map(&[
@@ -83,8 +85,9 @@ pub fn insert_residue_elements_and_commitments(
     let verifier_contract_template =
         template.replace("{{residue_g2_elements}}", &residue_g2_elements);
 
-    let modexp_function = get_modexp_function(l2_mode); 
-    let verifier_contract_template = verifier_contract_template.replace("{{modexp_function}}", &modexp_function);
+    let modexp_function = get_modexp_function(l2_mode);
+    let verifier_contract_template =
+        verifier_contract_template.replace("{{modexp_function}}", &modexp_function);
 
     Ok(reg.render_template(
         &verifier_contract_template,
