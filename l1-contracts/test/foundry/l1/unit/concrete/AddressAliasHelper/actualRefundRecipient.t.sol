@@ -27,7 +27,7 @@ contract ActualRefundRecipient is AddressAliasHelperSharedTest {
         vm.startBroadcast(prevMessageSender);
         address actualRecipient = addressAliasHelper.actualRefundRecipient(recipient, prevMessageSender);
         vm.stopBroadcast();
-        
+
         assertEq(actualRecipient, prevMessageSender);
     }
 
