@@ -33,6 +33,7 @@ struct Config {
     address newProxyAdmin;
     address newValidatorTimelock;
     address newVerifier;
+    address governance;
 }
 
 contract LensScript is Script {
@@ -48,16 +49,7 @@ contract LensScript is Script {
     bytes public vtOwnershipCall;
 
     address public migrationUpgradeAddress;
-
     address public transitionaryOwner;
-
-    function setMigrationUpgradeAddress(address _migrationUpgradeAddress) external {
-        migrationUpgradeAddress = _migrationUpgradeAddress;
-    }
-
-    function setTransitionaryOwner(address _transitionaryOwner) external {
-        transitionaryOwner = _transitionaryOwner;
-    }
 
     function run() external {
         _initializeConfig();
@@ -76,9 +68,10 @@ contract LensScript is Script {
         _generateExecuteUpgradeCall();
 
         // print generated calldata
-        // _printTempGovernanceScheduleOperation();
-        // _printTempGovernanceExecuteOperation();
-        // _printMigrationExecuteUpgradeCall();
+        _printValidatorTimelockOwnershipCall();
+        _printTempGovernanceScheduleOperation();
+        _printTempGovernanceExecuteOperation();
+        _printMigrationExecuteUpgradeCall();
     }
 
     function _initializeConfig() internal {
@@ -86,8 +79,23 @@ contract LensScript is Script {
         string memory path = string.concat(root, "/script-config/lens-migration.toml");
         string memory toml = vm.readFile(path);
 
-        // migrationUpgradeAddress = toml.readAddress("$.migration_upgrade_address");
-        // transitionaryOwner = toml.readAddress("$.transitionary_owner");
+        config.governance = toml.readAddress("$.canonical_ecosystem.governance");
+
+        address migrationUpgradeAddressFromFile = toml.readAddress("$.migration_upgrade_address");
+
+        if (migrationUpgradeAddressFromFile == address(0)) {
+            migrationUpgradeAddress = address(new Migrator());
+        } else {
+            migrationUpgradeAddress = migrationUpgradeAddressFromFile;
+        }
+
+        address transitionaryOwnerFromFile = toml.readAddress("$.transitionary_owner");
+
+        if (transitionaryOwnerFromFile == address(0)) {
+            transitionaryOwner = address(new TransitionaryOwner(config.governance));
+        } else {
+            transitionaryOwner = transitionaryOwnerFromFile;
+        }
 
         config.tempStateTransitionManager = toml.readAddress("$.temp_ecosystem.stm");
         config.tempBridgehub = IStateTransitionManager(config.tempStateTransitionManager).BRIDGE_HUB();
@@ -189,7 +197,7 @@ contract LensScript is Script {
         });
 
         // validator timelock - transfer ownership
-        vtOwnershipCall = abi.encodeWithSelector(Ownable2Step.transferOwnership.selector, transitionaryOwner);
+        vtOwnershipCall = abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner));
 
         // IGovernance.Call({
         //     target: config.tempValidatorTimelock,
@@ -235,15 +243,14 @@ contract LensScript is Script {
             data: abi.encodeCall(TransitionaryOwner.claimOwnershipAndGiveToGovernance, (config.tempL1SharedBridge))
         });
 
-        tempEcoScheduleOperation = abi.encodeWithSelector(
-            IGovernance.scheduleTransparent.selector,
-            IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)}),
-            0
+        tempEcoScheduleOperation = abi.encodeCall(
+            IGovernance.scheduleTransparent,
+            (IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)}), 0)
         );
 
-        tempEcoExecuteOperation = abi.encodeWithSelector(
-            IGovernance.execute.selector,
-            IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)})
+        tempEcoExecuteOperation = abi.encodeCall(
+            IGovernance.execute,
+            (IGovernance.Operation({calls: tempEcoOwnershipCalls, predecessor: bytes32(0), salt: bytes32(0)}))
         );
     }
 
@@ -330,7 +337,7 @@ contract LensScript is Script {
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: migrationUpgradeAddress,
-            initCalldata: abi.encodeWithSelector(Migrator.upgrade.selector, migrationParams)
+            initCalldata: abi.encodeCall(Migrator.upgrade, (migrationParams))
         });
 
         calls.push(
@@ -340,6 +347,12 @@ contract LensScript is Script {
                 data: abi.encodeCall(IStateTransitionManager.executeUpgrade, (config.lensChainId, diamondCut))
             })
         );
+    }
+
+    function _printValidatorTimelockOwnershipCall() internal view {
+        console.log("Validator Timelock Ownership Call:");
+        console.logBytes(vtOwnershipCall);
+        console.log();
     }
 
     function _printTempGovernanceScheduleOperation() internal view {

@@ -22,7 +22,7 @@ contract Migrator is ZkSyncHyperchainBase {
     function upgrade(MigrationParams memory params) public returns (bytes32) {
         address currentTimelock = StateTransitionManager(s.stateTransitionManager).validatorTimelock();
 
-        address newBridgehub = StateTransitionManager(s.stateTransitionManager).BRIDGE_HUB();
+        address newBridgehub = StateTransitionManager(params.newCTM).BRIDGE_HUB();
         address newL1SharedBridge = address(Bridgehub(newBridgehub).sharedBridge());
 
         s.validators[currentTimelock] = false;
