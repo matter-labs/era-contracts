@@ -121,7 +121,7 @@ function OVERHEAD() -> overhead { overhead := 2000 }
 
 function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
 
-function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+function MAX_POINTER_READ_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
 
 function EMPTY_KECCAK() -> value {  // keccak("")
     value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470

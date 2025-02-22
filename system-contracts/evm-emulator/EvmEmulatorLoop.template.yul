@@ -373,14 +373,14 @@ for { } true { } {
         dstOffset := add(dstOffset, MEM_OFFSET())
 
         // EraVM will revert if offset + length overflows uint32
-        if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
-            sourceOffset := MAX_CALLDATA_OFFSET()
+        if gt(sourceOffset, MAX_POINTER_READ_OFFSET()) {
+            sourceOffset := MAX_POINTER_READ_OFFSET()
         }
 
         // Check bytecode out-of-bounds access
         let truncatedLen := len
-        if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
-            truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
+        if gt(add(sourceOffset, len), MAX_POINTER_READ_OFFSET()) { // in theory we could also copy MAX_POINTER_READ_OFFSET slot, but it is unreachable
+            truncatedLen := sub(MAX_POINTER_READ_OFFSET(), sourceOffset) // truncate
             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
         }
 
@@ -774,8 +774,8 @@ for { } true { } {
         let counter
         counter, sp, stackHead := popStackItem(sp, stackHead)
 
-        // Counter certainly can't be bigger than uint32.
-        if gt(counter, MAX_UINT32()) {
+        // Counter certainly can't be bigger than uint32 - 32.
+        if gt(counter, MAX_POINTER_READ_OFFSET()) {
             panic()
         } 
 
@@ -804,8 +804,8 @@ for { } true { } {
             continue
         }
 
-        // Counter certainly can't be bigger than uint32.
-        if gt(counter, MAX_UINT32()) {
+        // Counter certainly can't be bigger than uint32 - 32.
+        if gt(counter, MAX_POINTER_READ_OFFSET()) {
             panic()
         } 
 
