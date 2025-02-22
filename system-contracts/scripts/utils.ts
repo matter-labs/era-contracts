@@ -40,7 +40,7 @@ export function readYulBytecode(description: YulContractDescription) {
 
 export function readZasmBytecode(description: ZasmContractDescription) {
   const contractName = description.codeName;
-  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm/${contractName}.zbin`;
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm/${contractName}.zasm.zbin`;
   return readBytecodeUtf8(path);
 }
 
