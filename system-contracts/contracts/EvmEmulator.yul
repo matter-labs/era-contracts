@@ -2991,6 +2991,8 @@ object "EvmEmulator" {
                 loadReturndataIntoActivePtr()
             
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
+
+                swapActivePointerWithBytecodePointer()
             }
 
             ////////////////////////////////////////////////////////////////
