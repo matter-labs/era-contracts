@@ -17,8 +17,6 @@ object "EvmEmulator" {
             }
 
             mstore(BYTECODE_LEN_OFFSET(), size)
-
-            swapActivePointerWithBytecodePointer()
         }
 
         function padBytecode(offset, len) -> blobLen {
@@ -118,8 +116,6 @@ object "EvmEmulator" {
                 loadReturndataIntoActivePtr()
             
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
-
-                swapActivePointerWithBytecodePointer()
             }
 
             <!-- @include EvmEmulatorFunctions.template.yul -->

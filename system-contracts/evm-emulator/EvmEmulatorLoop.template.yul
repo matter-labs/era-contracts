@@ -429,9 +429,7 @@ for { } true { } {
         }
 
         if truncatedLen {
-            swapActivePointerWithBytecodePointer()
             copyActivePtrData(dstOffset, sourceOffset, truncatedLen)
-            swapActivePointerWithBytecodePointer()
         }
         
         ip := add(ip, 1)
@@ -538,7 +536,9 @@ for { } true { } {
             panic()
         }
 
+        swapActivePointerWithEvmReturndataPointer()
         copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
+        swapActivePointerWithEvmReturndataPointer()
         ip := add(ip, 1)
     }
     case 0x3F { // OP_EXTCODEHASH
