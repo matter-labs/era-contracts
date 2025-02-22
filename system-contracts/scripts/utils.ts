@@ -34,13 +34,13 @@ export interface DeployedDependency {
 
 export function readYulBytecode(description: YulContractDescription) {
   const contractName = description.codeName;
-  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul/${contractName}.yul.zbin`;
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul/${contractName}.zbin`;
   return readBytecodeUtf8(path);
 }
 
 export function readZasmBytecode(description: ZasmContractDescription) {
   const contractName = description.codeName;
-  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm/${contractName}.zasm.zbin`;
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm/${contractName}.zbin`;
   return readBytecodeUtf8(path);
 }
 
