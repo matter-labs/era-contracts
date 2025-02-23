@@ -221,7 +221,22 @@ library Utils {
     }
 
     /**
-     * @dev Returns the bytecode of a given system contract.
+     * @dev Returns the bytecode of a given system contract in yul.
+     */
+    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat(
+            "/../system-contracts/zkout/",
+            filename,
+            ".yul/contracts-preprocessed/",
+            filename,
+            ".yul.json"
+        );
+
+        return readFoundryBytecode(path);
+    }
+
+    /**
+     * @dev Returns the bytecode of a given precompile system contract.
      */
     function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
         string memory path = string.concat(
@@ -231,17 +246,6 @@ library Utils {
             filename,
             ".yul.json"
         );
-
-        // It is the only exceptional case
-        if (keccak256(abi.encodePacked(filename)) == keccak256(abi.encodePacked("EventWriter"))) {
-            path = string.concat(
-                "/../system-contracts/zkout/",
-                filename,
-                ".yul/contracts-preprocessed/",
-                filename,
-                ".yul.json"
-            );
-        }
 
         return readFoundryBytecode(path);
     }
