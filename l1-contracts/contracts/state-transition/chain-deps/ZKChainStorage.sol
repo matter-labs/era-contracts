@@ -100,9 +100,6 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of default account (bytecode for EOA).
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2DefaultAccountBytecodeHash;
-    /// @notice Bytecode hash of evm emulator.
-    /// @dev Used as an input to zkp-circuit.
-    bytes32 l2EvmEmulatorBytecodeHash;
     /// @dev Indicates that the porter may be touched on L2 transactions.
     /// @dev Used as an input to zkp-circuit.
     bool zkPorterIsAvailable;
@@ -175,4 +172,7 @@ struct ZKChainStorage {
     /// @dev Whether the chain is a permanent rollup. Note, that it only enforces the DA validator pair, but
     /// it does not enforce any other parameters, e.g. `pubdataPricingMode`
     bool isPermanentRollup;
+    /// @notice Bytecode hash of evm emulator.
+    /// @dev Used as an input to zkp-circuit.
+    bytes32 l2EvmEmulatorBytecodeHash;
 }
