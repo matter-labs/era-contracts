@@ -404,7 +404,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function getNewProtocolVersion() public returns (uint256) {
-        return 0x1a00000000;
+        return 0x1b00000000; // 27
     }
 
     function getProtocolUpgradeNonce() public returns (uint256) {
