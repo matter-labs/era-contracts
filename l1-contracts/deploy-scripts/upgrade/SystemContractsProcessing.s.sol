@@ -374,16 +374,14 @@ library SystemContractsProcessing {
     function getBaseListOfDependencies() internal returns (bytes[] memory factoryDeps) {
         // Note that it is *important* that these go first in this exact order,
         // since the server will rely on it.
-        bytes[] memory bootloaderAndDefaultAABytecodes = new bytes[](2);
-        bootloaderAndDefaultAABytecodes[0] = Utils.getBatchBootloaderBytecodeHash();
-        bootloaderAndDefaultAABytecodes[1] = Utils.readSystemContractsBytecode("DefaultAccount");
+        bytes[] memory basicBytecodes = new bytes[](3);
+        basicBytecodes[0] = Utils.getBatchBootloaderBytecodeHash();
+        basicBytecodes[1] = Utils.readSystemContractsBytecode("DefaultAccount");
+        basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();
         bytes[] memory otherBytecodes = getOtherContractsBytecodes();
 
-        factoryDeps = mergeBytesArrays(
-            mergeBytesArrays(bootloaderAndDefaultAABytecodes, systemBytecodes),
-            otherBytecodes
-        );
+        factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
     }
 }

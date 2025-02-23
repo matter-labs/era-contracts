@@ -196,6 +196,13 @@ library Utils {
     }
 
     /**
+     * @dev Returns the bytecode hash of the EVM emulator.
+     */
+    function getEvmEmulatorBytecodeHash() internal view returns (bytes memory) {
+        return readZKFoundryBytecodeSystemContracts("EvmEmulator.yul/contracts-preprocessed", "EvmEmulator.yul");
+    }
+
+    /**
      * @dev Read hardhat bytecodes
      */
     function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {

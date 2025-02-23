@@ -741,6 +741,7 @@ contract EcosystemUpgrade is Script {
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
         config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+        config.contracts.evmEmulatorHash = toml.readBytes32("$.contracts.evm_emulator_hash");
 
         config.contracts.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
@@ -886,6 +887,7 @@ contract EcosystemUpgrade is Script {
         // Double check for consistency:
         require(bytes32(factoryDeps[0]) == config.contracts.bootloaderHash, "bootloader hash factory dep mismatch");
         require(bytes32(factoryDeps[1]) == config.contracts.defaultAAHash, "default aa hash factory dep mismatch");
+        require(bytes32(factoryDeps[2]) == config.contracts.evmEmulatorHash, "EVM emulator hash factory dep mismatch");
 
         factoryDepsHashes = factoryDeps;
     }
