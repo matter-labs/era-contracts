@@ -1,7 +1,7 @@
 lens_chain_id = "232"
 
-migration_upgrade_address = "0x0000000000000000000000000000000000000000"
-transitionary_owner = "0x0000000000000000000000000000000000000000"
+migration_upgrade_address = "0x4d89b79A893aC95eB46E96e452AD21F71144c918"
+transitionary_owner = "0x52bBEa5e3CD4B3F731151acd051F83d2c14a66dc"
 
 [temp_ecosystem]
 stm = "0x590e6587b37dc4152b6b036ff88a835bd2ab8924"
@@ -11,4 +11,4 @@ erc20_bridge = "0x438edfc62e6838bb0eb1c9253749f99f1f999b16"
 stm = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
 verifier = "0x06aa7a7B07108F7C5539645e32DD5c21cBF9EB66"
 validator_timelock = "0x5D8ba173Dc6C3c90C8f7C04C9288BeF5FDbAd06E"
-governance = "0x8f7a9912416e8AdC4D9c21FAe1415D3318A11897"
+governance = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
