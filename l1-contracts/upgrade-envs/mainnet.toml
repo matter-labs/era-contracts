@@ -21,6 +21,7 @@ diamond_init_priority_tx_max_pubdata = 99000
 diamond_init_minimal_l2_gas_price = 250000000
 bootloader_hash = "0x010008e5b883de8897598e83d383e332b87d09164363816c15f22353c3cd910d"
 default_aa_hash = "0x0100052307b3b66ef67935255483d39b3c8dcdb47fdf94dddca11ebe8271afe6"
+evm_emulator_hash = "0x0100052307b3b66ef67935255483d39b3c8dcdb47fdf94dddca11ebe8271afe6"
 bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
 transparent_proxy_admin = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"
 
