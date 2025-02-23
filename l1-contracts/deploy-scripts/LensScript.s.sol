@@ -318,7 +318,7 @@ contract LensScript is Script {
                         config.baseToken,
                         uint256(0),
                         address(0),
-                        "0x"
+                        ""
                     )
                 )
             })
