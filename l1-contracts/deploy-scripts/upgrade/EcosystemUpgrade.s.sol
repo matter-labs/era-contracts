@@ -120,8 +120,7 @@ struct StateTransitionDeployedAddresses {
 
 contract EcosystemUpgrade is Script {
     using stdToml for string;
-
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     // solhint-disable-next-line gas-struct-packing
@@ -256,17 +255,7 @@ contract EcosystemUpgrade is Script {
     GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
 
-    uint256[] factoryDepsHashes;
-
-    struct CachedBytecodeHashes {
-        bytes32 sharedL2LegacyBridgeBytecodeHash;
-        bytes32 erc20StandardImplBytecodeHash;
-        bytes32 rollupL2DAValidatorBytecodeHash;
-        bytes32 validiumL2DAValidatorBytecodeHash;
-        bytes32 transparentUpgradableProxyBytecodeHash;
-    }
-
-    CachedBytecodeHashes internal cachedBytecodeHashes;
+    uint256[] internal factoryDepsHashes;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -464,7 +453,7 @@ contract EcosystemUpgrade is Script {
     function getOldProtocolDeadline() public returns (uint256) {
         // Note, that it is this way by design, on stage2 it
         // will be set to 0
-        return type(uint256).max;
+        return type(uint256).max; // TODO
     }
 
     function getOldProtocolVersion() public returns (uint256) {
@@ -582,7 +571,9 @@ contract EcosystemUpgrade is Script {
 
     function generateForceDeploymentData() internal {
         require(upgradeConfig.expectedL2AddressesInitialized, "Expected L2 addresses not initialized");
-        generatedData.forceDeploymentsData = prepareForceDeploymentsData();
+        FixedForceDeploymentsData memory forceDeploymentsData = prepareForceDeploymentsData();
+
+        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
 
         upgradeConfig.forceDeploymentDataGenerated = true;
     }
@@ -590,25 +581,26 @@ contract EcosystemUpgrade is Script {
     function initializeExpectedL2Addresses() internal {
         address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
 
+        // TODO
         addresses.expectedL2Addresses = ExpectedL2Addresses({
             expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                cachedBytecodeHashes.rollupL2DAValidatorBytecodeHash,
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
                 hex""
             ),
             expectedValidiumL2DAValidator: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                cachedBytecodeHashes.validiumL2DAValidatorBytecodeHash,
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
                 hex""
             ),
             l2SharedBridgeLegacyImpl: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                cachedBytecodeHashes.sharedL2LegacyBridgeBytecodeHash,
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()),
                 hex""
             ),
             l2BridgedStandardERC20Impl: Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                cachedBytecodeHashes.erc20StandardImplBytecodeHash,
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readStandardERC20Bytecode()),
                 hex""
             )
         });
@@ -623,6 +615,7 @@ contract EcosystemUpgrade is Script {
     function getFullListOfFactoryDependencies() internal returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
+        /// TODO
         // This upgrade will also require to publish:
         // - L2GatewayUpgrade
         // - new L2 shared bridge legacy implementation
@@ -647,14 +640,6 @@ contract EcosystemUpgrade is Script {
 
         upgradeSpecificDependencies[7] = L2ContractsBytecodesLib
             .readTransparentUpgradeableProxyBytecodeFromSystemContracts();
-
-        cachedBytecodeHashes = CachedBytecodeHashes({
-            sharedL2LegacyBridgeBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[1]),
-            erc20StandardImplBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[2]),
-            rollupL2DAValidatorBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[5]),
-            validiumL2DAValidatorBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[6]),
-            transparentUpgradableProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(upgradeSpecificDependencies[7])
-        });
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, upgradeSpecificDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
@@ -714,10 +699,10 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function prepareForceDeploymentsData() internal view returns (bytes memory) {
+    function prepareForceDeploymentsData() public view returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
-        FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
+        data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.sharedBridgeProxy,
@@ -738,8 +723,6 @@ contract EcosystemUpgrade is Script {
             l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0)
         });
-
-        return abi.encode(data);
     }
 
     function saveOutput(string memory outputPath) internal {
@@ -941,7 +924,8 @@ contract EcosystemUpgrade is Script {
         BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(addresses.bytecodesSupplier), allDeps);
 
         for (uint256 i = 0; i < allDeps.length; i++) {
-            factoryDeps[i] = uint256(L2ContractHelper.hashL2Bytecode(allDeps[i]));
+            uint256 bytecodeHash = uint256(L2ContractHelper.hashL2Bytecode(allDeps[i]));
+            factoryDeps[i] = bytecodeHash;
         }
 
         // Double check for consistency:
@@ -1461,9 +1445,9 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployGovernanceUpgradeTimer() internal {
-        uint256 INITIAL_DELAY = config.governanceUpgradeTimerInitialDelay;
+        uint256 initialDelay = config.governanceUpgradeTimerInitialDelay;
 
-        uint256 MAX_ADDITIONAL_DELAY = 2 weeks; // TODO
+        uint256 maxAdditionalDelay = 2 weeks; 
 
         // It may make sense to have a separate admin there, but
         // using the same as bridgehub is just as fine.
@@ -1471,14 +1455,14 @@ contract EcosystemUpgrade is Script {
 
         bytes memory bytecode = abi.encodePacked(
             type(GovernanceUpgradeTimer).creationCode,
-            abi.encode(INITIAL_DELAY, MAX_ADDITIONAL_DELAY, config.ownerAddress, config.ecosystemAdminAddress)
+            abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, config.ecosystemAdminAddress)
         );
 
         addresses.upgradeTimer = deployViaCreate2(bytecode);
         notifyAboutDeployment(
             addresses.upgradeTimer,
             "GovernanceUpgradeTimer",
-            abi.encode(INITIAL_DELAY, MAX_ADDITIONAL_DELAY, config.ownerAddress, config.ecosystemAdminAddress)
+            abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, config.ecosystemAdminAddress)
         );
     }
 
