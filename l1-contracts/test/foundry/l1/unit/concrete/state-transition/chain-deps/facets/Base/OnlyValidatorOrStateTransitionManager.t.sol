@@ -5,7 +5,6 @@ import {ZKChainBaseTest} from "./_Base_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract OnlyValidatorOrChainTypeManagerTest is ZKChainBaseTest {
-
     function test_revertWhen_calledByNonValidator() public {
         address nonValidator = makeAddr("nonValidator");
 
