@@ -4,12 +4,13 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, stdStorage, Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 
@@ -39,6 +40,8 @@ import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridge
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 
 abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeployer {
+    using stdStorage for StdStorage;
+
     function test_registerLegacyToken() external {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
@@ -48,6 +51,44 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
             abi.encode(l1Token)
         );
         L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
+    }
+
+    function test_registerLegacyToken_IncorrectConfiguration() external {
+        address l2Token = makeAddr("l2Token");
+        address l1Token = makeAddr("l1Token");
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
+        
+        assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
+
+        stdstore
+            .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+            .sig(INativeTokenVault.tokenAddress.selector)
+            .with_key(assetId)
+            .checked_write(l2Token);
+        
+        stdstore
+            .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+            .sig(INativeTokenVault.assetId.selector)
+            .with_key(l2Token)
+            .checked_write(assetId);
+
+        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
+
+        vm.mockCall(
+            sharedBridgeLegacy,
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
+            abi.encode(l1Token)
+        );
+        l2NativeTokenVault.setLegacyTokenAssetId(l2Token);
+
+        assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
     }
 
     function test_registerLegacyTokenRevertNotLegacy() external {
@@ -106,9 +147,48 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
         l2NativeTokenVault.bridgeMint(originChainId, assetId, data);
 
-        assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
-        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
-        assertNotEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
+        assertEq(l2NativeTokenVault.originChainId(assetId), originChainId);
+        assertEq(l2NativeTokenVault.tokenAddress(assetId), expectedL2TokenAddress);
+        assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), assetId);
+    }
+
+    function test_bridgeMint_CorrectlySetL2LegacyToken() external {
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+
+        uint256 originChainId = L1_CHAIN_ID;
+        address originToken = makeAddr("l1Token");
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(originChainId, originToken);
+
+        address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(originChainId, originToken);
+
+        address depositor = makeAddr("depositor");
+        address receiver = makeAddr("receiver");
+        uint256 amount = 100;
+        bytes memory erc20Metadata = DataEncoding.encodeTokenData(originChainId, abi.encode("Token"), abi.encode("T"), abi.encode(18));
+        bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
+
+        assertNotEq(block.chainid, originChainId);
+
+        assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
+
+        // this `mockCall` ensures the branch for legacy tokens is chosen
+        vm.mockCall(
+            sharedBridgeLegacy,
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
+            abi.encode(originToken)
+        );
+        // fails on the following line without this `mockCall`
+        // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
+        vm.mockCall(
+            expectedL2TokenAddress,
+            abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)),
+            ""
+        );
+        vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
+        l2NativeTokenVault.bridgeMint(originChainId, assetId, data);
+
         assertEq(l2NativeTokenVault.originChainId(assetId), originChainId);
         assertEq(l2NativeTokenVault.tokenAddress(assetId), expectedL2TokenAddress);
         assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), assetId);
