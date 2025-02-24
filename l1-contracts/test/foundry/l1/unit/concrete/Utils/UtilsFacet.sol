@@ -178,18 +178,6 @@ contract UtilsFacet is ZKChainBase {
         return s.baseTokenGasPriceMultiplierNominator;
     }
 
-    function util_setTotalBatchesCommitted(uint256 _totalBatchesCommitted) external {
-        s.totalBatchesCommitted = _totalBatchesCommitted;
-    }
-
-    function util_getBaseTokenGasPriceMultiplierDenominator() external view returns (uint128) {
-        return s.baseTokenGasPriceMultiplierDenominator;
-    }
-
-    function util_getBaseTokenGasPriceMultiplierNominator() external view returns (uint128) {
-        return s.baseTokenGasPriceMultiplierNominator;
-    }
-
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
