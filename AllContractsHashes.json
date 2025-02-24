@@ -897,11 +897,11 @@
   },
   {
     "contractName": "l1-contracts/DiamondCutTestContract",
-    "zkBytecodeHash": "0x01000399a7dc031e58d163773c931742e24bbabd4dad9c54eb6d9f3a24eb6f04",
+    "zkBytecodeHash": "0x01000399ec20c72a61248c03579d7a4af5ad9eb322c96350d84a66256e585d0b",
     "zkBytecodePath": "/l1-contracts/zkout/DiamondCutTestContract.sol/DiamondCutTestContract.json",
-    "evmBytecodeHash": "0xbb40b2a2325c82c00d7ba42bbddf87560ceec07a1d11334890022f1f6058fba9",
+    "evmBytecodeHash": "0xc6a508dbf514404c76eceaaa369441e6aca709f67a547b4aab0424758f970c56",
     "evmBytecodePath": "/l1-contracts/out/DiamondCutTestContract.sol/DiamondCutTestContract.json",
-    "evmDeployedBytecodeHash": "0xde430b32967e4d58460082ae3277b307d8aab694b3017a6991dd362d80abc33f"
+    "evmDeployedBytecodeHash": "0x47d818758a7cb3f4c2a176c11fe98e14cc9d333fb6585e00d1fe1c37cda4ed1f"
   },
   {
     "contractName": "l1-contracts/DiamondInit",
@@ -953,11 +953,11 @@
   },
   {
     "contractName": "l1-contracts/DummyChainTypeManager",
-    "zkBytecodeHash": "0x010006f55f77f18c211b96e7029a84bbc033e4049e655a861f285b735b4af692",
+    "zkBytecodeHash": "0x010006f5e9939b05b7d02368d4e04495bb3bd612f000fea1b2ccc2813d2fee83",
     "zkBytecodePath": "/l1-contracts/zkout/DummyChainTypeManager.sol/DummyChainTypeManager.json",
-    "evmBytecodeHash": "0x986a3a51dcc6210c94be44ca6a2717b7a6e53a928b0a8a06bef5276a0e268814",
+    "evmBytecodeHash": "0x2f3ca9106f033e49e76e4fa83bc19e0141d185e55746249c8fb4e704c9eaabf1",
     "evmBytecodePath": "/l1-contracts/out/DummyChainTypeManager.sol/DummyChainTypeManager.json",
-    "evmDeployedBytecodeHash": "0xc2e6b0192269f5ee4139e9058fffa710de489f3a627de8458dff2d33bfe80b2b"
+    "evmDeployedBytecodeHash": "0x463b05396bf3d6e4e158c8f97fcccbf11c706e93843b923ae2b4b44a27406fad"
   },
   {
     "contractName": "l1-contracts/DummyChainTypeManagerForValidatorTimelock",
@@ -1609,11 +1609,11 @@
   },
   {
     "contractName": "l1-contracts/TestExecutor",
-    "zkBytecodeHash": "0x010005e31342c1ed0fc4c5ebbaae4aaa6eecdad5c8132a642e44ed7c9c2a7a7d",
+    "zkBytecodeHash": "0x010005e3624dee09e2f5514f6cd314d95a0b4c160bbf8126ca12fcc18b9b2b3f",
     "zkBytecodePath": "/l1-contracts/zkout/TestExecutor.sol/TestExecutor.json",
-    "evmBytecodeHash": "0x4c401fdaa97569bbab9ea83d0e1f6d826382dd4be74298a42983c77528b1103a",
+    "evmBytecodeHash": "0xfe8bc8d7dba3cb41ea34a9c605389a83c984f042c92e69e952d1b6363167781c",
     "evmBytecodePath": "/l1-contracts/out/TestExecutor.sol/TestExecutor.json",
-    "evmDeployedBytecodeHash": "0x14bcf5a377b1cb24ebc464cef25eb989a3c3eb5ac75fc52671082319afde453e"
+    "evmDeployedBytecodeHash": "0xbe4ccacd8dbd481054a9215d90a8206007042efd7fc7a8ec1bbf33a97ba80473"
   },
   {
     "contractName": "l1-contracts/TestnetERC20Token",
