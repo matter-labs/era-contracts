@@ -10,6 +10,8 @@ import "forge-std/console.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -65,5 +67,49 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
 
         vm.expectRevert(TokenIsLegacy.selector);
         L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerToken(l2Token);
+    }
+
+    function test_bridgeMint() external {
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+        IL2SharedBridgeLegacy l2SharedBridgeLegacy = l2NativeTokenVault.L2_LEGACY_SHARED_BRIDGE();
+
+        uint256 originChainId = L1_CHAIN_ID;
+        address originToken = makeAddr("l1Token");
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(originChainId, originToken);
+
+        address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(originChainId, originToken);
+
+        address depositor = makeAddr("depositor");
+        address receiver = makeAddr("receiver");
+        bytes memory erc20Metadata = DataEncoding.encodeTokenData(originChainId, abi.encode("Token"), abi.encode("T"), abi.encode(18));
+        bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, 100, erc20Metadata);
+
+        assertNotEq(block.chainid, originChainId);
+        assertNotEq(address(l2SharedBridgeLegacy), address(0));
+        assertEq(address(l2SharedBridgeLegacy), sharedBridgeLegacy);
+        assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertEq(l2NativeTokenVault.assetId(l2NativeTokenVault.l2TokenAddress(originToken)), bytes32(0));
+
+        vm.mockCall(
+            sharedBridgeLegacy,
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
+            abi.encode(originToken)
+        );
+        // fails on the following line without mocking
+        // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
+        vm.mockCall(
+            expectedL2TokenAddress,
+            abi.encodeWithSelector(IBridgedStandardToken.bridgeMint.selector),
+            ""
+        );
+        vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
+        l2NativeTokenVault.bridgeMint(originChainId, assetId, data);
+        // TODO: expect events
+
+        assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertEq(l2NativeTokenVault.originChainId(assetId), L1_CHAIN_ID);
+        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertEq(l2NativeTokenVault.assetId(l2NativeTokenVault.l2TokenAddress(originToken)), assetId);
     }
 }
