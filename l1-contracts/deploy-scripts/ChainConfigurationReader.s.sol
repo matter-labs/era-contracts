@@ -24,24 +24,11 @@ contract ChainConfigurationReader is Script {
         uint256 baseTokenGasPriceMultiplierNominator = diamondProxy.baseTokenGasPriceMultiplierNominator();
         uint256 baseTokenGasPriceMultiplierDenominator = diamondProxy.baseTokenGasPriceMultiplierDenominator();
 
-        console.log("=====INFO ABOUT CHAIN %d =====", chainId);
-        console.log("Diamond Proxy %s", address(diamondProxy));
-        console.log("ChainAdmin %s", chainAdmin);
-        console.log("Token Multiplier Setter of ChainAdmin %s", tokenMultiplierSetter);
-        console.log("Owner of ChainAdmin %s", owner);
-        console.log("Protocol Version %d.%d.%d", major, minor, patch);
-        if (pubdataPricingMode == PubdataPricingMode.Validium) {
-            console.log("Pubdata Pricing Mode: Validium");
-        } else if (pubdataPricingMode == PubdataPricingMode.Rollup) {
-            console.log("Pubdata Pricing Mode: Rollup");
-        }
+        if (pubdataPricingMode == PubdataPricingMode.Validium) {} else if (
+            pubdataPricingMode == PubdataPricingMode.Rollup
+        ) {}
 
-        console.log("==Validators==");
         getNewValidators(validatorTimelock, chainId);
-        console.log("==BASE TOKEN==");
-        console.log("address: %s", basetoken);
-        console.log("nominator: %s", baseTokenGasPriceMultiplierNominator);
-        console.log("denominator: %s", baseTokenGasPriceMultiplierDenominator);
     }
 
     function getNewValidators(address validatorTimelock, uint256 chainId) internal {
@@ -51,7 +38,6 @@ contract ChainConfigurationReader is Script {
         Vm.EthGetLogs[] memory logs = vm.eth_getLogs(1, block.number, validatorTimelock, topics);
         for (uint256 i = 0; i < logs.length; i++) {
             Vm.EthGetLogs memory log = logs[i];
-            console.log("New Validator", bytesToAddress(log.data));
         }
     }
 
