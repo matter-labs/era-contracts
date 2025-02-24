@@ -11,38 +11,44 @@ import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 
-string constant ECOSYSTEM_INPUT = "/upgrade-envs/mainnet.toml";
-string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
-string constant CHAIN_INPUT = "/upgrade-envs/mainnet-era.toml";
-string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-era.toml";
+string constant ECOSYSTEM_INPUT = "/upgrade-envs/stage-proofs.toml";
+string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs.toml";
+string constant CHAIN_INPUT = "/upgrade-envs/stage-proofs-era.toml";
+string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs-era.toml";
 
 contract UpgradeTest is Test {
-    EcosystemUpgrade generateUpgradeData;
+    EcosystemUpgrade ecosystemUpgrade;
     ChainUpgrade chainUpgrade;
 
     function setUp() public {
-        generateUpgradeData = new EcosystemUpgrade();
+        ecosystemUpgrade = new EcosystemUpgrade();
+        ecosystemUpgrade.initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
+
         chainUpgrade = new ChainUpgrade();
     }
 
     function test_MainnetFork() public {
         console.log("Preparing ecosystem contracts");
         // Firstly, we deploy all the contracts.
-        generateUpgradeData.prepareEcosystemContracts(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
+        ecosystemUpgrade.prepareEcosystemContracts();
 
         // For chain, we have deployed the DA validator contracts
         // and also updated the chain admin.
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
-        console.log("Starting stage1 of the upgrade!");
-        // Now, some time has passed and we are ready to start the upgrade of the
-        // ecosystem.
-        Call[] memory stage1Calls = generateUpgradeData.getStage1UpgradeCalls();
 
-        governanceMulticall(generateUpgradeData.getOwnerAddress(), stage1Calls);
+        Call[][] memory allCalls = new Call[][](3);
+        allCalls[0] = ecosystemUpgrade.preparePauseMigrationsCall();
+        allCalls[1] = ecosystemUpgrade.prepareNewChainCreationParamsCall();
+        allCalls[2] = ecosystemUpgrade.provideSetNewVersionUpgradeCall();
+        Call[] memory setUpgradeCalls = ecosystemUpgrade.mergeCallsArray(allCalls);
 
-        console.log("Stage1 is done, now all the chains have to upgrade to the new version");
+        console.log("Starting ecosystem upgrade!");
+
+        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), setUpgradeCalls);
+
+        console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 
         console.log("Upgrading Era");
 
@@ -50,24 +56,14 @@ contract UpgradeTest is Test {
         // Note, that the step below also updated ValidatorTimelock so the server needs to be ready for that.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
         chainUpgrade.upgradeChain(
-            generateUpgradeData.getOldProtocolVersion(),
-            generateUpgradeData.getChainUpgradeInfo()
+            ecosystemUpgrade.getOldProtocolVersion(),
+            ecosystemUpgrade.getChainUpgradeInfo()
         );
 
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
         // so it was tested in e2e local environment.
-
-        vm.warp(block.timestamp + generateUpgradeData.getInitialDelay());
-
-        console.log("Starting stage2 of the upgrade!");
-        governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());
-
-        // TODO: here we should have tests that the bridging works for the previously deployed chains
-        // and that it does not work for those that did not upgrade.
-        // TODO: test that creation of new chains works under new conditions.
-        // TODO: if not hard, include test for deploying a gateway and migrating Era to it.
     }
 
     /// @dev This is a contract that is used for additional visibility of transactions
