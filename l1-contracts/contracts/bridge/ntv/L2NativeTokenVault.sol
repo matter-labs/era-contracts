@@ -104,9 +104,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
     /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
-        uint256 originChainId = originChainId[_l2TokenAddress];
-        if (originChainId == 0 || assetId[_l2TokenAddress] != bytes32(0)) {
-            revert AssetIdAlreadyRegistered();
+        if (originChainId[_l2TokenAddress] != 0) {
+            if (assetId[_l2TokenAddress] != bytes32(0)) {
+                revert AssetIdAlreadyRegistered();
+            }
         }
         if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
             revert NoLegacySharedBridge();
