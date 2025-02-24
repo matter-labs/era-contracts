@@ -120,7 +120,7 @@ struct StateTransitionDeployedAddresses {
 
 contract EcosystemUpgrade is Script {
     using stdToml for string;
-    
+
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     // solhint-disable-next-line gas-struct-packing
@@ -1495,6 +1495,15 @@ contract EcosystemUpgrade is Script {
     }
 
     ////////////////////////////// Preparing calls /////////////////////////////////
+
+    function prepareDefaultGovernanceCalls() public returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](3);
+        allCalls[0] = preparePauseMigrationsCall();
+        allCalls[1] = prepareNewChainCreationParamsCall();
+        allCalls[2] = provideSetNewVersionUpgradeCall();
+
+        calls = mergeCallsArray(allCalls);
+    }
 
     function provideSetNewVersionUpgradeCall() public returns (Call[] memory calls) {
         // Just retrieved it from the contract
