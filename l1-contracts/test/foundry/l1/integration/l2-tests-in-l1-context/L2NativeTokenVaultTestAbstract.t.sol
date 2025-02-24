@@ -88,7 +88,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
 
         assertEq(l2NativeTokenVault.originChainId(assetId), 0);
         assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
-        assertEq(l2NativeTokenVault.assetId(l2NativeTokenVault.l2TokenAddress(originToken)), bytes32(0));
+        assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
 
         // this `mockCall` ensures the branch for legacy tokens is chosen
         vm.mockCall(
@@ -107,8 +107,9 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         l2NativeTokenVault.bridgeMint(originChainId, assetId, data);
 
         assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
-        assertEq(l2NativeTokenVault.originChainId(assetId), originChainId);
         assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertNotEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
+        assertEq(l2NativeTokenVault.originChainId(assetId), originChainId);
         assertEq(l2NativeTokenVault.tokenAddress(assetId), expectedL2TokenAddress);
         assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), assetId);
     }
