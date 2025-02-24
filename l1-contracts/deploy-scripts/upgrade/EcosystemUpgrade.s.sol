@@ -247,6 +247,8 @@ contract EcosystemUpgrade is Script {
         bool expectedL2AddressesInitialized;
         bool forceDeploymentDataGenerated;
         bool diamondCutPrepared;
+        bool factoryDepsPublished;
+        bool ecosystemContractsDeployed;
         string outputPath;
     }
 
@@ -279,22 +281,28 @@ contract EcosystemUpgrade is Script {
         upgradeConfig.initialized = true;
     }
 
-    function prepareEcosystemContracts() public {
+    function prepareEcosystemUpgrade() public {
+        deployEcosystemContracts();
+        publishBytecodes();
+        generateUpgradeData();       
+    }
+
+    function deployEcosystemContracts() public {
         require(upgradeConfig.initialized, "Not initialized");
 
         instantiateCreate2Factory();
 
         deployBytecodesSupplier();
-        publishBytecodes();
-        initializeExpectedL2Addresses();
 
         deployBlobVersionedHashRetriever();
-        deployVerifier();
+        deployDualVerifier();
         deployDefaultUpgrade();
         deployGenesisUpgrade();
         deployGatewayUpgrade();
 
+        initializeExpectedL2Addresses();
         deployDAValidators();
+
         deployValidatorTimelock();
 
         deployBridgehubImplementation();
@@ -310,27 +318,43 @@ contract EcosystemUpgrade is Script {
 
         deployCTMDeploymentTracker();
 
-        // Important, this must come after the initializeExpectedL2Addresses
-        initializeGeneratedData();
-
         deployChainTypeManagerContract();
-        setChainTypeManagerInValidatorTimelock();
 
         deployTransitionaryOwner();
         deployL2WrappedBaseTokenStore();
         deployGovernanceUpgradeTimer();
 
-        updateOwners();
+        // Additional configuration after deploy
+
+        setChainTypeManagerInValidatorTimelock();
+
+        address[] memory ownershipsToTransfer = new address[](4);
+        ownershipsToTransfer[0] = addresses.validatorTimelock;
+        ownershipsToTransfer[1] = addresses.bridges.sharedBridgeProxy;
+        ownershipsToTransfer[2] = addresses.bridgehub.ctmDeploymentTrackerProxy;
+        ownershipsToTransfer[3] = addresses.daAddresses.rollupDAManager;
+        transferOwnershipsToGovernance(ownershipsToTransfer);
+
+        upgradeConfig.ecosystemContractsDeployed = true;
+    }
+
+    function generateUpgradeData() public {
+        require(upgradeConfig.initialized, "Not initialized");
+        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
+
+        // Important, this must come after the initializeExpectedL2Addresses
+        generateForceDeploymentData();
+        prepareDiamondCutData();
 
         saveOutput(upgradeConfig.outputPath);
     }
 
     function run() public {
         initialize(
-            vm.envString("GATEWAY_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("GATEWAY_UPGRADE_ECOSYSTEM_OUTPUT")
+            vm.envString("UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
         );
-        prepareEcosystemContracts();
+        prepareEcosystemUpgrade();
     }
 
     function initializeOldData() internal {
@@ -397,10 +421,10 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function _composeUpgradeTx(IL2ContractDeployer.ForceDeployment[] memory forceDeploymetns) internal returns (L2CanonicalTransaction memory transaction) {
+    function _composeUpgradeTx(IL2ContractDeployer.ForceDeployment[] memory forceDeployments) internal returns (L2CanonicalTransaction memory transaction) {
         bytes memory data = abi.encodeCall(
             IL2ContractDeployer.forceDeployOnAddresses,
-            (forceDeploymetns)
+            (forceDeployments)
         );
 
         transaction = L2CanonicalTransaction({
@@ -448,7 +472,9 @@ contract EcosystemUpgrade is Script {
     }
 
     function getChainUpgradeInfo() public returns (Diamond.DiamondCutData memory upgradeCutData) {
-        Diamond.FacetCut[] memory facetCuts = mergeFacets(_getFacetCutsForDeletion(), getFacetCuts());
+        require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
+
+        Diamond.FacetCut[] memory facetCuts = mergeFacets(getFacetCutsForDeletion(), getFacetCuts());
 
         VerifierParams memory verifierParams = VerifierParams({
             recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
@@ -554,7 +580,7 @@ contract EcosystemUpgrade is Script {
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
     }
 
-    function initializeGeneratedData() internal {
+    function generateForceDeploymentData() internal {
         require(upgradeConfig.expectedL2AddressesInitialized, "Expected L2 addresses not initialized");
         generatedData.forceDeploymentsData = prepareForceDeploymentsData();
 
@@ -717,8 +743,6 @@ contract EcosystemUpgrade is Script {
     }
 
     function saveOutput(string memory outputPath) internal {
-        prepareDiamondCutData();
-
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
         vm.serializeAddress(
             "bridgehub",
@@ -741,6 +765,11 @@ contract EcosystemUpgrade is Script {
         vm.serializeAddress(
             "state_transition",
             "state_transition_implementation_addr",
+            addresses.stateTransition.chainTypeManagerImplementation
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "chaint_type_manager_implementation_addr",
             addresses.stateTransition.chainTypeManagerImplementation
         );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
@@ -904,7 +933,7 @@ contract EcosystemUpgrade is Script {
 
     /////////////////////////// Blockchain interactions ////////////////////////////
 
-    function publishBytecodes() internal {
+    function publishBytecodes() public {
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
@@ -921,16 +950,18 @@ contract EcosystemUpgrade is Script {
         require(bytes32(factoryDeps[2]) == config.contracts.evmEmulatorHash, "EVM emulator hash factory dep mismatch");
 
         factoryDepsHashes = factoryDeps;
+
+        upgradeConfig.factoryDepsPublished = true;
     }
 
-    function setChainTypeManagerInValidatorTimelock() internal {
+    function setChainTypeManagerInValidatorTimelock() public {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
         vm.broadcast(msg.sender);
         validatorTimelock.setChainTypeManager(IChainTypeManager(config.contracts.stateTransitionManagerAddress));
         console.log("ChainTypeManager set in ValidatorTimelock");
     }
 
-    function setL1LegacyBridge() internal {
+    function setL1LegacyBridge() public {
         vm.startBroadcast(config.deployerAddress);
         L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(
             L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress)
@@ -938,26 +969,25 @@ contract EcosystemUpgrade is Script {
         vm.stopBroadcast();
     }
 
-    function _moveGovernanceToOwner(address target) internal {
+    function _transferOwnershipToGovernance(address target) internal {
         Ownable2StepUpgradeable(target).transferOwnership(addresses.transitionaryOwner);
         TransitionaryOwner(addresses.transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
     }
 
-    function _moveGovernanceToEcosystemAdmin(address target) internal {
-        // Is agile enough to accept ownership quickly `config.ecosystemAdminAddress`
+    function _transferOwnershipToEcosystemAdmin(address target) internal {
+        // Is agile enough to accept ownership quickly
         Ownable2StepUpgradeable(target).transferOwnership(config.ecosystemAdminAddress);
     }
 
-    function updateOwners() internal {
+    function transferOwnershipsToGovernance(address[] memory addressesToUpdate) public {
         vm.startBroadcast(msg.sender);
 
         // Note, that it will take some time for the governance to sign the "acceptOwnership" transaction,
         // in order to avoid any possibility of the front-run, we will temporarily give the ownership to the
         // contract that can only transfer ownership to the governance.
-        _moveGovernanceToOwner(addresses.validatorTimelock);
-        _moveGovernanceToOwner(addresses.bridges.sharedBridgeProxy);
-        _moveGovernanceToOwner(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        _moveGovernanceToOwner(addresses.daAddresses.rollupDAManager);
+        for (uint256 i; i < addressesToUpdate.length; i++) {
+            _transferOwnershipToGovernance(addressesToUpdate[i]);
+        }
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -1002,7 +1032,7 @@ contract EcosystemUpgrade is Script {
         addresses.bytecodesSupplier = contractAddress;
     }
 
-    function deployVerifier() internal {
+    function deployDualVerifier() internal {
         address verifierFflonk = deployVerifierFflonk();
         address verifierPlonk = deployVerifierPlonk();
         bytes memory code;
@@ -1080,6 +1110,7 @@ contract EcosystemUpgrade is Script {
         addresses.daAddresses.l1ValidiumDAValidator = validiumDAValidator;
 
         vm.broadcast(msg.sender);
+        // TODO
         RollupDAManager(rollupDAManager).updateDAPair(
             address(rollupDAValidator),
             addresses.expectedL2Addresses.expectedRollupL2DAValidator,
@@ -1432,7 +1463,7 @@ contract EcosystemUpgrade is Script {
     function deployGovernanceUpgradeTimer() internal {
         uint256 INITIAL_DELAY = config.governanceUpgradeTimerInitialDelay;
 
-        uint256 MAX_ADDITIONAL_DELAY = 2 weeks;
+        uint256 MAX_ADDITIONAL_DELAY = 2 weeks; // TODO
 
         // It may make sense to have a separate admin there, but
         // using the same as bridgehub is just as fine.
@@ -1521,6 +1552,15 @@ contract EcosystemUpgrade is Script {
             target: config.contracts.bridgehubProxyAddress,
             value: 0,
             data: abi.encodeCall(IBridgehub.pauseMigration, ())
+        });
+    }
+
+    function prepareUnpauseMigrationsCall() public view returns (Call[] memory result) {
+        result = new Call[](1);
+        result[0] = Call({
+            target: config.contracts.bridgehubProxyAddress,
+            value: 0,
+            data: abi.encodeCall(IBridgehub.unpauseMigration, ())
         });
     }
 

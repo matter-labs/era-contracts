@@ -28,9 +28,8 @@ contract UpgradeTest is Test {
     }
 
     function test_MainnetFork() public {
-        console.log("Preparing ecosystem contracts");
-        // Firstly, we deploy all the contracts.
-        ecosystemUpgrade.prepareEcosystemContracts();
+        console.log("Preparing ecosystem upgrade");
+        ecosystemUpgrade.prepareEcosystemUpgrade();
 
         // For chain, we have deployed the DA validator contracts
         // and also updated the chain admin.
