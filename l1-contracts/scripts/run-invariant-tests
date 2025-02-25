@@ -4,6 +4,8 @@ set -e -o pipefail
 
 readonly FILE_TO_PREPROCESS="contracts/bridge/asset-router/L2AssetRouter.sol"
 
+trap "git restore \"$FILE_TO_PREPROCESS\"" EXIT
+
 # two-step instead one-step because MacOS sed uses -I but GNU sed uses -i
 readonly TEMP="$(mktemp)"
 sed -e 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' \
@@ -36,9 +38,6 @@ case "$WHERE" in
     ;;
   *) 
     echo "error: WHERE environment variable must be set to either 'L1' or 'L2'" >&2
-    git restore "$FILE_TO_PREPROCESS"
     exit 1
     ;;
 esac
-
-git restore "$FILE_TO_PREPROCESS"
