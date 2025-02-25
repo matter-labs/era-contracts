@@ -41,7 +41,7 @@ library Utils {
     // Create2Factory deterministic bytecode.
     // https://github.com/Arachnid/deterministic-deployment-proxy
     bytes internal constant CREATE2_FACTORY_BYTECODE =
-        hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+        hex"602080600a5f395ff3fe36601f19018060205f375f35905f34f58015601c575f526014600cf35b5f80fd";
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
