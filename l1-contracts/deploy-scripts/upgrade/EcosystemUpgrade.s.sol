@@ -119,7 +119,7 @@ struct StateTransitionDeployedAddresses {
 }
 
 /// @notice Script used for default upgrade flow
-/// @dev For more complex upgrades, this script can be inherited and its functionality overriden if needed.
+/// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract EcosystemUpgrade is Script {
     using stdToml for string;
 
