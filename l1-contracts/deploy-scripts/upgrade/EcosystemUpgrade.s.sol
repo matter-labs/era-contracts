@@ -318,9 +318,15 @@ contract EcosystemUpgrade is Script {
         deployL2WrappedBaseTokenStore();
         deployGovernanceUpgradeTimer();
 
-        // Additional configuration after deploy
+        // Additional (optional) configuration after deploy
 
         setChainTypeManagerInValidatorTimelock();
+
+        allowDAPair(
+            addresses.daAddresses.rollupDAManager,
+            addresses.daAddresses.l1RollupDAValidator,
+            addresses.expectedL2Addresses.expectedRollupL2DAValidator
+        );
 
         address[] memory ownershipsToTransfer = new address[](4);
         ownershipsToTransfer[0] = addresses.validatorTimelock;
@@ -350,24 +356,6 @@ contract EcosystemUpgrade is Script {
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
-    }
-
-    // TODO
-    function initializeOldData() internal virtual {
-        config.contracts.newProtocolVersion = getNewProtocolVersion();
-        config.contracts.oldProtocolVersion = getOldProtocolVersion();
-
-        uint256 ctmProtocolVersion = ChainTypeManager(config.contracts.stateTransitionManagerAddress).protocolVersion();
-        require(
-            ctmProtocolVersion != getNewProtocolVersion(),
-            "The new protocol version is already present on the ChainTypeManager"
-        );
-
-        config.contracts.oldValidatorTimelock = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
-            .validatorTimelock();
-
-        // In the future this value will be populated with the new shared bridge, but since the version on the CTM is the old one, the old bridge is stored here as well.
-        config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -576,6 +564,23 @@ contract EcosystemUpgrade is Script {
         config.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
+    }
+
+    function initializeOldData() internal virtual {
+        config.contracts.newProtocolVersion = getNewProtocolVersion();
+        config.contracts.oldProtocolVersion = getOldProtocolVersion();
+
+        uint256 ctmProtocolVersion = ChainTypeManager(config.contracts.stateTransitionManagerAddress).protocolVersion();
+        require(
+            ctmProtocolVersion != getNewProtocolVersion(),
+            "The new protocol version is already present on the ChainTypeManager"
+        );
+
+        config.contracts.oldValidatorTimelock = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
+            .validatorTimelock();
+
+        // In the future this value will be populated with the new shared bridge, but since the version on the CTM is the old one, the old bridge is stored here as well.
+        config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
     }
 
     function generateForceDeploymentData() internal virtual {
@@ -949,29 +954,44 @@ contract EcosystemUpgrade is Script {
         upgradeConfig.factoryDepsPublished = true;
     }
 
+    // Permissioned actions
+
     function setChainTypeManagerInValidatorTimelock() public virtual {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-        vm.broadcast(msg.sender);
-        validatorTimelock.setChainTypeManager(IChainTypeManager(config.contracts.stateTransitionManagerAddress));
+        if (address(validatorTimelock.chainTypeManager()) != config.contracts.stateTransitionManagerAddress) {
+            vm.broadcast(msg.sender);
+            validatorTimelock.setChainTypeManager(IChainTypeManager(config.contracts.stateTransitionManagerAddress));
+        }
         console.log("ChainTypeManager set in ValidatorTimelock");
     }
 
     function setL1LegacyBridge() public virtual {
-        vm.startBroadcast(config.deployerAddress);
-        L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(
-            L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress)
-        );
-        vm.stopBroadcast();
+        if (
+            address(L1AssetRouter(addresses.bridges.sharedBridgeProxy).legacyBridge()) !=
+            config.contracts.legacyErc20BridgeAddress
+        ) {
+            vm.startBroadcast(config.deployerAddress);
+            L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(
+                L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress)
+            );
+            vm.stopBroadcast();
+        }
+
+        console.log("L1LegacyBridge set in L1AssetRouter");
     }
 
     function _transferOwnershipToGovernance(address target) internal virtual {
-        Ownable2StepUpgradeable(target).transferOwnership(addresses.transitionaryOwner);
-        TransitionaryOwner(addresses.transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
+        if (Ownable2StepUpgradeable(target).owner() != config.ownerAddress) {
+            Ownable2StepUpgradeable(target).transferOwnership(addresses.transitionaryOwner);
+            TransitionaryOwner(addresses.transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
+        }
     }
 
     function _transferOwnershipToEcosystemAdmin(address target) internal virtual {
-        // Is agile enough to accept ownership quickly
-        Ownable2StepUpgradeable(target).transferOwnership(config.ecosystemAdminAddress);
+        if (Ownable2StepUpgradeable(target).owner() != config.ecosystemAdminAddress) {
+            // Is agile enough to accept ownership quickly
+            Ownable2StepUpgradeable(target).transferOwnership(config.ecosystemAdminAddress);
+        }
     }
 
     function transferOwnershipsToGovernance(address[] memory addressesToUpdate) public virtual {
@@ -986,6 +1006,24 @@ contract EcosystemUpgrade is Script {
 
         vm.stopBroadcast();
         console.log("Owners updated");
+    }
+
+    function allowDAPair(
+        address rollupDAManager,
+        address l1RollupDAValidator,
+        address expectedRollupL2DAValidator
+    ) public virtual {
+        if (
+            !RollupDAManager(rollupDAManager).isPairAllowed(address(l1RollupDAValidator), expectedRollupL2DAValidator)
+        ) {
+            vm.broadcast(msg.sender);
+            RollupDAManager(rollupDAManager).updateDAPair(
+                address(l1RollupDAValidator),
+                expectedRollupL2DAValidator,
+                true
+            );
+        }
+        console.log("DA pair set");
     }
 
     /////////////////////////// Deployment of contracts ////////////////////////////
@@ -1079,7 +1117,7 @@ contract EcosystemUpgrade is Script {
 
     function deployDAValidators() internal virtual {
         // Note, that here we use the `msg.sender` address, while the final owner should be the decentralized governance.
-        // The ownership will be transferred later during the `updateOwners` step.
+        // The ownership will be transferred later.
         address rollupDAManager = address(
             create2WithDeterministicOwner(type(RollupDAManager).creationCode, msg.sender)
         );
@@ -1087,12 +1125,15 @@ contract EcosystemUpgrade is Script {
         notifyAboutDeployment(rollupDAManager, "RollupDAManager", hex"");
 
         if (RollupDAManager(rollupDAManager).owner() != address(msg.sender)) {
-            require(
-                RollupDAManager(rollupDAManager).pendingOwner() == address(msg.sender),
-                "Ownership was not set correctly"
-            );
-            vm.broadcast(msg.sender);
-            RollupDAManager(rollupDAManager).acceptOwnership();
+            if (RollupDAManager(rollupDAManager).pendingOwner() == address(msg.sender)) {
+                vm.broadcast(msg.sender);
+                RollupDAManager(rollupDAManager).acceptOwnership();
+            } else {
+                require(
+                    RollupDAManager(rollupDAManager).owner() == config.ownerAddress,
+                    "Ownership was not set correctly"
+                );
+            }
         }
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
@@ -1103,14 +1144,6 @@ contract EcosystemUpgrade is Script {
         address validiumDAValidator = deployViaCreate2(type(ValidiumL1DAValidator).creationCode);
         notifyAboutDeployment(validiumDAValidator, "ValidiumL1DAValidator", hex"");
         addresses.daAddresses.l1ValidiumDAValidator = validiumDAValidator;
-
-        vm.broadcast(msg.sender);
-        // TODO
-        RollupDAManager(rollupDAManager).updateDAPair(
-            address(rollupDAValidator),
-            addresses.expectedL2Addresses.expectedRollupL2DAValidator,
-            true
-        );
     }
 
     function deployValidatorTimelock() internal virtual {
@@ -1449,8 +1482,12 @@ contract EcosystemUpgrade is Script {
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.sharedBridgeProxy);
         IL1Nullifier l1Nullifier = IL1Nullifier(config.contracts.oldSharedBridgeProxyAddress);
 
-        vm.broadcast(msg.sender);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        if (address(sharedBridge.nativeTokenVault()) != addresses.vaults.l1NativeTokenVaultProxy) {
+            vm.broadcast(msg.sender);
+            sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        }
+
+        // Permissionless
         vm.broadcast(msg.sender);
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
