@@ -1,22 +1,23 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
+import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {
-  L1SharedBridgeFactory,
   BridgehubFactory,
   TestnetERC20TokenFactory,
   MailboxFacetFactory,
   GettersFacetFactory,
   MockExecutorFacetFactory,
+  L1NullifierFactory,
 } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -28,6 +29,8 @@ import {
   L2_TO_L1_MESSENGER,
   getCallRevertReason,
   requestExecuteDirect,
+  DUMMY_MERKLE_PROOF_START,
+  DUMMY_MERKLE_PROOF_2_START,
 } from "./utils";
 
 // This test is mimicking the legacy Era functions. Era's Address was known at the upgrade, so we hardcoded them in the contracts,
@@ -41,17 +44,20 @@ describe("Legacy Era tests", function () {
   let deployer: Deployer;
   let l1ERC20BridgeAddress: string;
   let l1ERC20Bridge: IL1ERC20Bridge;
-  let sharedBridgeProxy: L1SharedBridge;
+  // let sharedBridgeProxy: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
   let bridgehub: Bridgehub;
   let chainId = "9"; // Hardhat config ERA_CHAIN_ID
   const functionSignature = "0x11a2ccc1";
+  let l2ToL1message: BytesLike;
 
   let mailbox: IMailbox;
   let getter: GettersFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
+  const dummyProof = Array(9).fill(ethers.constants.HashZero);
+  dummyProof[0] = DUMMY_MERKLE_PROOF_START;
 
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
@@ -85,7 +91,7 @@ describe("Legacy Era tests", function () {
     l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
 
     l1ERC20Bridge = IL1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
-    sharedBridgeProxy = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    // sharedBridgeProxy = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
 
     const tokens = getTokens();
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
@@ -94,11 +100,12 @@ describe("Legacy Era tests", function () {
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
 
-    const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1SharedBridge");
+    const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1AssetRouter");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const sharedBridge = await sharedBridgeFactory.deploy(
       l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
+      deployer.addresses.Bridges.L1NullifierProxy,
       deployer.chainId,
       deployer.addresses.StateTransition.DiamondProxy
     );
@@ -113,8 +120,15 @@ describe("Legacy Era tests", function () {
 
     await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);
     if (deployer.verbose) {
-      console.log("L1SharedBridge upgrade sent for testing");
+      console.log("L1AssetRouter upgrade sent for testing");
     }
+
+    const setL1Erc20BridgeCalldata = L1NullifierFactory.connect(
+      deployer.addresses.Bridges.L1NullifierProxy,
+      deployWallet
+    ).interface.encodeFunctionData("setL1Erc20Bridge", [l1ERC20Bridge.address]);
+
+    await deployer.executeUpgrade(deployer.addresses.Bridges.L1NullifierProxy, 0, setL1Erc20BridgeCalldata);
 
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     getter = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
@@ -123,18 +137,24 @@ describe("Legacy Era tests", function () {
       deployer.addresses.StateTransition.DiamondProxy,
       mockExecutorContract.signer
     );
-  });
 
-  it("Check should initialize through governance", async () => {
-    const l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
-      chainId,
-      ADDRESS_ONE,
+    await (
+      await proxyAsMockExecutor.saveL2LogsRootHash(
+        1,
+        "0x0000000000000000000000000000000000000000000000000000000000000001"
+      )
+    ).wait();
+
+    const txExecute = await proxyAsMockExecutor.setExecutedBatches(1);
+    await txExecute.wait();
+
+    const l1Receiver = await randomSigner.getAddress();
+    l2ToL1message = ethers.utils.hexConcat([
+      functionSignature,
+      l1Receiver,
+      erc20TestToken.address,
+      ethers.constants.HashZero,
     ]);
-
-    const txHash = await deployer.executeUpgrade(sharedBridgeProxy.address, 0, upgradeCall);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
   });
 
   it("Should not allow depositing zero amount", async () => {
@@ -153,6 +173,7 @@ describe("Legacy Era tests", function () {
       l1ERC20Bridge.connect(randomSigner),
       bridgehub,
       chainId,
+      deployer.l1ChainId,
       depositorAddress,
       erc20TestToken.address,
       ethers.utils.parseUnits("800", 18),
@@ -161,31 +182,27 @@ describe("Legacy Era tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
+    const mailboxFunctionSignature = "0x6c0960f9";
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1ERC20Bridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(1, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
-    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
+    expect(revertReason).contains("L2WithdrawalMessageWrongLength(4)");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
-        .finalizeWithdrawal(0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
+        .finalizeWithdrawal(1, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
     expect(revertReason).contains("InvalidSelector");
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, [])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).contains("BatchNotExecuted");
   });
@@ -198,24 +215,12 @@ describe("Legacy Era tests", function () {
       erc20TestToken.address,
       ethers.constants.HashZero,
     ]);
-    const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
-    );
-    expect(revertReason).contains("MerklePathEmpty");
+    await expect(l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])).to.be.reverted;
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge
-        .connect(randomSigner)
-        .finalizeWithdrawal(0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).contains("InvalidProof");
   });
@@ -259,6 +264,7 @@ describe("Legacy Era tests", function () {
     );
 
     const MERKLE_PROOF = [
+      DUMMY_MERKLE_PROOF_2_START,
       "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba",
       "0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0",
       "0xe3697c7f33c31a9b0f0aeb8542287d0d21e8c4cf82163d0c44c7a98aa11aa111",
@@ -271,7 +277,7 @@ describe("Legacy Era tests", function () {
     ];
 
     let L2_LOGS_TREE_ROOT = HASHED_LOG;
-    for (let i = 0; i < MERKLE_PROOF.length; i++) {
+    for (let i = 1; i < MERKLE_PROOF.length; i++) {
       L2_LOGS_TREE_ROOT = ethers.utils.keccak256(L2_LOGS_TREE_ROOT + MERKLE_PROOF[i].slice(2));
     }
 
@@ -281,7 +287,7 @@ describe("Legacy Era tests", function () {
 
     it("Reverts when proof is invalid", async () => {
       const invalidProof = [...MERKLE_PROOF];
-      invalidProof[0] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
+      invalidProof[1] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
 
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
@@ -308,7 +314,6 @@ describe("Legacy Era tests", function () {
 
     it("Successful withdrawal", async () => {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-
       await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
       const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
       expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);

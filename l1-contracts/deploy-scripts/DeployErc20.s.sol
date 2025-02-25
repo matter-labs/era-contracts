@@ -45,13 +45,22 @@ contract DeployErc20Script is Script {
         saveOutput();
     }
 
+    function getTokensAddresses() public view returns (address[] memory) {
+        uint256 tokensLength = config.tokens.length;
+        address[] memory addresses = new address[](tokensLength);
+        for (uint256 i = 0; i < tokensLength; ++i) {
+            addresses[i] = config.tokens[i].addr;
+        }
+        return addresses;
+    }
+
     function initializeConfig() internal {
         config.deployerAddress = msg.sender;
 
         string memory root = vm.projectRoot();
 
         // Grab config from output of l1 deployment
-        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
         string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
@@ -61,7 +70,7 @@ contract DeployErc20Script is Script {
         config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
 
         // Grab config from custom config file
-        path = string.concat(root, "/script-config/config-deploy-erc20.toml");
+        path = string.concat(root, vm.envString("TOKENS_CONFIG"));
         toml = vm.readFile(path);
         config.additionalAddressesForMinting = vm.parseTomlAddressArray(toml, "$.additional_addresses_for_minting");
 
@@ -83,7 +92,7 @@ contract DeployErc20Script is Script {
     function deployTokens() internal {
         uint256 tokensLength = config.tokens.length;
         for (uint256 i = 0; i < tokensLength; ++i) {
-            TokenDescription memory token = config.tokens[i];
+            TokenDescription storage token = config.tokens[i];
             console.log("Deploying token:", token.name);
             address tokenAddress = deployErc20({
                 name: token.name,
@@ -128,6 +137,9 @@ contract DeployErc20Script is Script {
                     revert MintFailed();
                 }
                 console.log("Minting to:", additionalAddressesForMinting[i]);
+                if (!success) {
+                    revert MintFailed();
+                }
             }
         }
 
@@ -158,4 +170,7 @@ contract DeployErc20Script is Script {
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, config.create2FactoryAddr);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }
