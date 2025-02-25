@@ -17,8 +17,8 @@ abstract contract AssetRouter_ActorHandler_Deployer is AssetRouterProperties {
     function deployActorHandlers() internal {
         l1Tokens.push(L1_TOKEN_ADDRESS);
         l1Tokens.push(ETH_TOKEN_ADDRESS);
-        address ethL2Address = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(ETH_TOKEN_ADDRESS);
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(ethL2Address);
+        // address ethL2Address = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(ETH_TOKEN_ADDRESS);
+        // L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(ethL2Address);
 
         userActorHandlers.push(new UserActorHandler());
         legacyBridgeActorHandler = new LegacyBridgeActorHandler(userActorHandlers, l1Tokens);

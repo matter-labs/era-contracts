@@ -20,7 +20,7 @@ abstract contract AssetRouterProperties is Test {
     LegacyBridgeActorHandler public legacyBridgeActorHandler;
     L1AssetRouterActorHandler public l1AssetRouterActorHandler;
 
-    function invariant_TotalDepositsEqualTotalSupply() public {
+    function invariant_TotalDepositsEqualTotalSupply() external {
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
         uint256 totalSupply;
@@ -43,7 +43,7 @@ abstract contract AssetRouterProperties is Test {
         );
     }
 
-    function invariant_L1AssetRouterActorHandlerHasZeroBalance() public {
+    function invariant_L1AssetRouterActorHandlerHasZeroBalance() external {
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
         if (l2TokenAddress.code.length == 0) {
@@ -55,5 +55,31 @@ abstract contract AssetRouterProperties is Test {
             0,
             "L1AssetRouter must own zero bridged tokens"
         );
+    }
+
+    function invariant_BridgedTokensConfiguredCorrectly() external {
+        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+
+        for (uint256 i; i < l1Tokens.length; i++) {
+            address l2Token = l2NativeTokenVault.l2TokenAddress(l1Tokens[i]);
+
+            bytes32 assetId = l2NativeTokenVault.assetId(l2Token);
+            uint256 originChainId = l2NativeTokenVault.originChainId(assetId);
+            address tokenAddress = l2NativeTokenVault.tokenAddress(assetId);
+
+            // the true branch checks the case when the token has not yet been bridged
+            // while the false branch checks the other case
+            if (l2Token == address(0) || assetId == bytes32(0) || originChainId == 0 || tokenAddress == address(0)) {
+                assertEq(l2Token, address(0));
+                assertEq(assetId, bytes32(0));
+                assertEq(originChainId, 0);
+                assertEq(tokenAddress, address(0));
+            } else {
+                assertNotEq(l2Token, address(0));
+                assertNotEq(assetId, bytes32(0));
+                assertNotEq(originChainId, 0);
+                assertNotEq(tokenAddress, address(0));
+            }
+        }
     }
 }
