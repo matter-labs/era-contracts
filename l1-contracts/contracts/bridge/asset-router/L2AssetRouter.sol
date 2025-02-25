@@ -38,7 +38,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (false) {
+            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
@@ -51,7 +51,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
         if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if ((false) && (msg.sender != address(this))) {
+            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
@@ -62,7 +62,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
-        if (false) {
+        if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
             revert InvalidCaller(msg.sender);
         }
         _;
