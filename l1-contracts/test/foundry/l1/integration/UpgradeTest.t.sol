@@ -36,11 +36,16 @@ contract UpgradeTest is Test {
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
-        Call[] memory upgradeGovernanceCalls = ecosystemUpgrade.prepareDefaultGovernanceCalls();
+        (Call[] memory upgradeGovernanceStage1Calls, Call[] memory upgradeGovernanceStage2Calls) = ecosystemUpgrade
+            .prepareDefaultGovernanceCalls();
 
-        console.log("Starting ecosystem upgrade!");
+        console.log("Starting ecosystem upgrade stage 1!");
 
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceCalls);
+        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
+
+        console.log("Starting ecosystem upgrade stage 2!");
+
+        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 

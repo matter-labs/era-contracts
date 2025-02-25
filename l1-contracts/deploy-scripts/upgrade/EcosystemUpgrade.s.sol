@@ -243,6 +243,7 @@ contract EcosystemUpgrade is Script {
         address tokenWethAddress;
     }
 
+    /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
         bool initialized;
         bool expectedL2AddressesInitialized;
@@ -272,12 +273,14 @@ contract EcosystemUpgrade is Script {
         upgradeConfig.initialized = true;
     }
 
+    /// @notice Full default upgrade preparation flow
     function prepareEcosystemUpgrade() public virtual {
         deployEcosystemContracts();
         publishBytecodes();
         generateUpgradeData();
     }
 
+    /// @notice Deploy everything that should be deployed
     function deployEcosystemContracts() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
@@ -329,6 +332,7 @@ contract EcosystemUpgrade is Script {
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
+    /// @notice Generate data required for the upgrade
     function generateUpgradeData() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
         require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
@@ -340,11 +344,15 @@ contract EcosystemUpgrade is Script {
         saveOutput(upgradeConfig.outputPath);
     }
 
+    /// @notice E2e upgrade generation
     function run() public virtual {
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
+
+        prepareDefaultGovernanceCalls();
     }
 
+    // TODO
     function initializeOldData() internal virtual {
         config.contracts.newProtocolVersion = getNewProtocolVersion();
         config.contracts.oldProtocolVersion = getOldProtocolVersion();
@@ -366,6 +374,7 @@ contract EcosystemUpgrade is Script {
         return config.ownerAddress;
     }
 
+    /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         IZKChain.Facet[] memory facets = IZKChain(config.contracts.eraDiamondProxy).facets();
 
@@ -381,6 +390,7 @@ contract EcosystemUpgrade is Script {
         }
     }
 
+    /// @notice Get new facet cuts
     function getFacetCuts() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -409,6 +419,7 @@ contract EcosystemUpgrade is Script {
         });
     }
 
+    /// @notice Build L1 -> L2 upgrade tx
     function _composeUpgradeTx(
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments
     ) internal virtual returns (L2CanonicalTransaction memory transaction) {
@@ -456,6 +467,8 @@ contract EcosystemUpgrade is Script {
         return 0x1a00000000;
     }
 
+    // TODO
+    /// @notice Generate upgrade cut data
     function getChainUpgradeInfo() public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
@@ -902,6 +915,8 @@ contract EcosystemUpgrade is Script {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
+
+        vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
 
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", abi.encode(getChainUpgradeInfo()));
 
@@ -1492,11 +1507,39 @@ contract EcosystemUpgrade is Script {
 
     ////////////////////////////// Preparing calls /////////////////////////////////
 
-    function prepareDefaultGovernanceCalls() public virtual returns (Call[] memory calls) {
+    function prepareDefaultGovernanceCalls()
+        public
+        virtual
+        returns (Call[] memory stage1Calls, Call[] memory stage2Calls)
+    {
+        // Default upgrade is done it 2 stages:
+        // 1. Pause migration to/from Gateway
+        // 2. Perform upgrade
+        stage1Calls = prepareStage1GovernanceCalls();
+        vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
+
+        stage2Calls = prepareStage2GovernanceCalls();
+
+        string memory governanceCallsSerialized = vm.serializeBytes(
+            "governance_calls",
+            "governance_stage2_calls",
+            abi.encode(stage2Calls)
+        );
+
+        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+    }
+
+    /// @notice The first step of upgrade. By default it just stops gateway migrations
+    function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
+        calls = preparePauseGatewayMigrationsCall();
+    }
+
+    /// @notice The second step of upgrade. By default it is actual upgrade
+    function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](3);
-        allCalls[0] = preparePauseMigrationsCall();
-        allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
+        allCalls[0] = prepareNewChainCreationParamsCall();
+        allCalls[1] = provideSetNewVersionUpgradeCall();
+        allCalls[2] = prepareUnpauseGatewayMigrationsCall();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1535,7 +1578,7 @@ contract EcosystemUpgrade is Script {
         calls[2] = timerCall;
     }
 
-    function preparePauseMigrationsCall() public view virtual returns (Call[] memory result) {
+    function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
         result = new Call[](1);
         result[0] = Call({
             target: config.contracts.bridgehubProxyAddress,
@@ -1544,7 +1587,7 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function prepareUnpauseMigrationsCall() public view virtual returns (Call[] memory result) {
+    function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
         result = new Call[](1);
         result[0] = Call({
             target: config.contracts.bridgehubProxyAddress,
