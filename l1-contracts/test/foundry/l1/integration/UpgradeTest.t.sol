@@ -49,10 +49,7 @@ contract UpgradeTest is Test {
         // Now, the admin of the Era needs to call the upgrade function.
         // Note, that the step below also updated ValidatorTimelock so the server needs to be ready for that.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
-        chainUpgrade.upgradeChain(
-            ecosystemUpgrade.getOldProtocolVersion(),
-            ecosystemUpgrade.getChainUpgradeInfo()
-        );
+        chainUpgrade.upgradeChain(ecosystemUpgrade.getOldProtocolVersion(), ecosystemUpgrade.getChainUpgradeInfo());
 
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions
