@@ -173,6 +173,8 @@ contract DeployL1Script is Script, DeployUtils {
         );
         console.log("ServerNotifier deployed at:", contractAddress);
         addresses.extContracts.serverNotifier = contractAddress;
+        vm.broadcast();
+        ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).setServerNotifier(contractAddress);
     }
 
     function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
