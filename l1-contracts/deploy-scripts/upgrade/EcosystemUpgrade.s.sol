@@ -259,6 +259,7 @@ contract EcosystemUpgrade is Script {
     DeployedAddresses internal addresses;
 
     uint256[] internal factoryDepsHashes;
+    mapping(bytes32 => bool) internal isHashInFactoryDeps;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -411,8 +412,12 @@ contract EcosystemUpgrade is Script {
     function _composeUpgradeTx(
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments
     ) internal virtual returns (L2CanonicalTransaction memory transaction) {
+        // Sanity check
+        for (uint256 i; i < forceDeployments.length; i++) {
+            require(isHashInFactoryDeps[forceDeployments[i].bytecodeHash], "Bytecode hash not in factory deps");
+        }
+
         bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
-        // TODO verify hashes
 
         transaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
@@ -952,8 +957,9 @@ contract EcosystemUpgrade is Script {
         BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(addresses.bytecodesSupplier), allDeps);
 
         for (uint256 i = 0; i < allDeps.length; i++) {
-            uint256 bytecodeHash = uint256(L2ContractHelper.hashL2Bytecode(allDeps[i]));
-            factoryDeps[i] = bytecodeHash;
+            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(allDeps[i]);
+            factoryDeps[i] = uint256(bytecodeHash);
+            isHashInFactoryDeps[bytecodeHash] = true;
         }
 
         // Double check for consistency:
