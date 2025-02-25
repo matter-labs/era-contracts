@@ -207,6 +207,12 @@ jobs:
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
 
+      # Installing the specific version of `lcov` because of
+      # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
+      # https://github.com/zgosalvez/github-actions-report-lcov/issues/282
+      - name: Install LCOV
+        run: sudo apt update && sudo apt install -y lcov=1.15-1
+
       # To ignore coverage for certain directories modify the paths in this step as needed. The
       # below default ignores coverage results for the test and script directories. Alternatively,
       # to include coverage in all directories, comment out this step. Note that because this
@@ -215,9 +221,7 @@ jobs:
       # The `--rc branch_coverage=1` part keeps branch info in the filtered report, since lcov
       # defaults to removing branch info.
       - name: Filter directories
-        run: |
-          sudo apt update && sudo apt install -y lcov
-          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' --output-file lcov.info --rc branch_coverage=1
+        run: lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' --output-file lcov.info --rc branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is
