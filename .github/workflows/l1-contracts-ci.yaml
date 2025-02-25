@@ -233,7 +233,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
 
       - name: Verify minimum coverage
-        uses: zgosalvez/github-actions-report-lcov@v2
+        uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
