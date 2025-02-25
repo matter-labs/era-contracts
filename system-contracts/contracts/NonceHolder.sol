@@ -6,7 +6,7 @@ import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
-import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized} from "./SystemContractErrors.sol";
+import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized, NonZeroNonceKey} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -33,7 +33,8 @@ contract NonceHolder is INonceHolder, SystemContractBase {
 
     /// RawNonces for accounts are stored in format
     /// minNonce + 2^128 * deploymentNonce, where deploymentNonce
-    /// is the nonce used for deploying smart contracts.
+    /// is the nonce used for deploying smart contracts,
+    /// and minNonce is the first unused nonce with nonceKey (upper 192 bits) zero.
     mapping(uint256 account => uint256 packedMinAndDeploymentNonce) internal rawNonces;
 
     /// Mapping of values under nonces for accounts.
@@ -79,28 +80,34 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     }
 
     /// @notice Sets the nonce value `key` for the msg.sender as used.
-    /// @param _key The nonce key under which the value will be set.
-    /// @param _value The value to store under the _key.
+    /// @param _nonce The nonce key under which the value will be set.
+    /// @param _storedValue The value to store under the _nonce.
     /// @dev The value must be non-zero.
-    function setValueUnderNonce(uint256 _key, uint256 _value) public onlySystemCall {
+    function setValueUnderNonce(uint256 _nonce, uint256 _storedValue) public onlySystemCall {
         IContractDeployer.AccountInfo memory accountInfo = DEPLOYER_SYSTEM_CONTRACT.getAccountInfo(msg.sender);
 
-        if (_value == 0) {
+        if (_storedValue == 0) {
             revert ZeroNonceError();
         }
-        // If an account has sequential nonce ordering, we enforce that the previous
+        // If an account has keyed-sequential nonce ordering, we enforce that the previous
         // nonce has already been used.
-        if (accountInfo.nonceOrdering == IContractDeployer.AccountNonceOrdering.Sequential && _key != 0) {
-            if (!isNonceUsed(msg.sender, _key - 1)) {
+        (uint192 _nonceKey, uint64 nonceValue) = _splitKeyedNonce(_nonce);
+        if (accountInfo.nonceOrdering == IContractDeployer.AccountNonceOrdering.KeyedSequential && nonceValue != 0) {
+            if (!isNonceUsed(msg.sender, _nonce - 1)) {
                 revert NonceJumpError();
             }
         }
 
         uint256 addressAsKey = uint256(uint160(msg.sender));
 
-        nonceValues[addressAsKey][_key] = _value;
+        nonceValues[addressAsKey][_nonce] = _storedValue;
 
-        emit ValueSetUnderNonce(msg.sender, _key, _value);
+        emit ValueSetUnderNonce(msg.sender, _nonce, _storedValue);
+    }
+
+    function _splitKeyedNonce(uint256 _nonce) private pure returns (uint192 nonceKey, uint64 nonceValue) {
+        nonceKey = uint192(_nonce >> 64);
+        nonceValue = uint64(_nonce);
     }
 
     /// @notice Gets the value stored under a custom nonce for msg.sender.
@@ -115,6 +122,14 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// to the `_expectedNonce`.
     /// @param _expectedNonce The expected minimal nonce for the account.
     function incrementMinNonceIfEquals(uint256 _expectedNonce) external onlySystemCall {
+        // minNonce only applies to nonces with nonceKey == 0.
+        // AAs that try to use this method with a keyed nonce will revert.
+        // For keyed nonces, `setValueUnderNonce` should be used.
+        uint192 nonceKey = uint192(_expectedNonce >> 64);
+        if (nonceKey != 0) {
+            revert NonZeroNonceKey(nonceKey);
+        }
+
         uint256 addressAsKey = uint256(uint160(msg.sender));
         uint256 oldRawNonce = rawNonces[addressAsKey];
 
