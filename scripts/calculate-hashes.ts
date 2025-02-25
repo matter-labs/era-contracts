@@ -405,7 +405,7 @@ const main = async () => {
   const args = process.argv;
   if (args.length > 3 || (args.length == 3 && !args.includes("--check-only"))) {
     console.log(
-      "This command can be used with no arguments or with the --check-only flag. Use the --check-only flag to check the hashes without updating the SystemContractsHashes.json file."
+      `This command can be used with no arguments or with the --check-only flag. Use the --check-only flag to check the hashes without updating the ${OUTPUT_FILE_PATH} file.`
     );
     process.exit(1);
   }
@@ -420,15 +420,15 @@ const main = async () => {
   const newSystemContractsHashes = systemContractsDetails;
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
   if (_.isEqual(newSystemContractsHashes, oldSystemContractsHashes)) {
-    console.log("Calculated hashes match the hashes in the SystemContractsHashes.json file.");
+    console.log(`Calculated hashes match the hashes in the ${OUTPUT_FILE_PATH} file.`);
     console.log("Exiting...");
     return;
   }
   const differences = findDifferences(newSystemContractsHashes, oldSystemContractsHashes);
-  console.log("Calculated hashes differ from the hashes in the SystemContractsHashes.json file. Differences:");
+  console.log(`Calculated hashes differ from the hashes in the ${OUTPUT_FILE_PATH} file. Differences:`);
   console.log(differences);
   if (checkOnly) {
-    console.log("You can use the `yarn calculate-hashes:fix` command to update the AllContractsHashes.json file.");
+    console.log(`You can use the \`yarn calculate-hashes:fix\` command to update the ${OUTPUT_FILE_PATH} file.`);
     console.log("Exiting...");
     process.exit(1);
   } else {
