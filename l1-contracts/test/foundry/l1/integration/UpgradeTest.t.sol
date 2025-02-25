@@ -13,8 +13,8 @@ import {Test} from "forge-std/Test.sol";
 
 string constant ECOSYSTEM_INPUT = "/upgrade-envs/stage-proofs.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs.toml";
-string constant CHAIN_INPUT = "/upgrade-envs/stage-proofs-era.toml";
-string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs-era.toml";
+string constant CHAIN_INPUT = "/upgrade-envs/stage-era.toml";
+string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-era.toml";
 
 contract UpgradeTest is Test {
     EcosystemUpgrade ecosystemUpgrade;
@@ -31,8 +31,6 @@ contract UpgradeTest is Test {
         console.log("Preparing ecosystem upgrade");
         ecosystemUpgrade.prepareEcosystemUpgrade();
 
-        // For chain, we have deployed the DA validator contracts
-        // and also updated the chain admin.
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
@@ -52,7 +50,6 @@ contract UpgradeTest is Test {
         console.log("Upgrading Era");
 
         // Now, the admin of the Era needs to call the upgrade function.
-        // Note, that the step below also updated ValidatorTimelock so the server needs to be ready for that.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
         chainUpgrade.upgradeChain(ecosystemUpgrade.getOldProtocolVersion(), ecosystemUpgrade.generateUpgradeCutData());
 

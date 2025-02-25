@@ -295,10 +295,9 @@ contract EcosystemUpgrade is Script {
         deployGenesisUpgrade();
         deployGatewayUpgrade();
 
+        // TODO: can we ignore unneeded updates?
         initializeExpectedL2Addresses();
         deployDAValidators();
-
-        deployValidatorTimelock();
 
         deployBridgehubImplementation();
         deployMessageRootContract();
@@ -311,8 +310,6 @@ contract EcosystemUpgrade is Script {
         deployL1NativeTokenVaultProxy();
         deployErc20BridgeImplementation();
 
-        deployCTMDeploymentTracker();
-
         deployChainTypeManagerContract();
 
         deployTransitionaryOwner();
@@ -321,19 +318,15 @@ contract EcosystemUpgrade is Script {
 
         // Additional (optional) configuration after deploy
 
-        setChainTypeManagerInValidatorTimelock();
-
         allowDAPair(
             addresses.daAddresses.rollupDAManager,
             addresses.daAddresses.l1RollupDAValidator,
             addresses.expectedL2Addresses.expectedRollupL2DAValidator
         );
 
-        address[] memory ownershipsToTransfer = new address[](4);
-        ownershipsToTransfer[0] = addresses.validatorTimelock;
-        ownershipsToTransfer[1] = addresses.bridges.sharedBridgeProxy;
-        ownershipsToTransfer[2] = addresses.bridgehub.ctmDeploymentTrackerProxy;
-        ownershipsToTransfer[3] = addresses.daAddresses.rollupDAManager;
+        address[] memory ownershipsToTransfer = new address[](2);
+        ownershipsToTransfer[0] = addresses.bridges.sharedBridgeProxy;
+        ownershipsToTransfer[1] = addresses.daAddresses.rollupDAManager;
         transferOwnershipsToGovernance(ownershipsToTransfer);
 
         upgradeConfig.ecosystemContractsDeployed = true;
@@ -1612,13 +1605,6 @@ contract EcosystemUpgrade is Script {
             ),
             value: 0
         });
-        // Note, that the server requires that the validator timelock is updated together with the protocol version
-        // as it relies on it to dynamically fetch the validator timelock address.
-        Call memory setValidatorTimelockCall = Call({
-            target: config.contracts.stateTransitionManagerAddress,
-            data: abi.encodeCall(ChainTypeManager.setValidatorTimelock, (addresses.validatorTimelock)),
-            value: 0
-        });
 
         // The call that will start the timer till the end of the upgrade.
         Call memory timerCall = Call({
@@ -1627,10 +1613,9 @@ contract EcosystemUpgrade is Script {
             value: 0
         });
 
-        calls = new Call[](3);
+        calls = new Call[](2);
         calls[0] = ctmCall;
-        calls[1] = setValidatorTimelockCall;
-        calls[2] = timerCall;
+        calls[1] = timerCall;
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
