@@ -35,7 +35,7 @@ jobs:
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
-          forge build
+          forge build --via-ir
 
       - name: Build l2 contracts
         working-directory: l2-contracts
