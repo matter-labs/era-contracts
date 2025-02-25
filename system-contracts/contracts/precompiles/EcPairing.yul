@@ -81,6 +81,10 @@ object "EcPairing" {
             ////////////////////////////////////////////////////////////////
 
             let bytesSize := calldatasize()
+            if iszero(bytesSize) {
+                mstore(0, true)
+                return(0, 32)
+            }
 
             // Check that the input is the multiple of pairs of G1 and G2.
             if mod(bytesSize, CHUNK_SIZE_BYTES()){
