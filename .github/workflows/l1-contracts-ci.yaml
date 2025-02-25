@@ -211,7 +211,9 @@ jobs:
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
       # https://github.com/zgosalvez/github-actions-report-lcov/issues/282
       - name: Install LCOV
-        run: sudo apt update && sudo apt install -y lcov=1.15-1
+        uses: hrishikesh-kadam/setup-lcov@6c1aa0cc9e1c02f9f58f01ac599f1064ccc83470 # v1.1.0
+        with:
+          ref: v1.16
 
       # To ignore coverage for certain directories modify the paths in this step as needed. The
       # below default ignores coverage results for the test and script directories. Alternatively,
