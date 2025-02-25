@@ -455,9 +455,8 @@ contract EcosystemUpgrade is Script {
         return 0x1a00000000;
     }
 
-    // TODO
     /// @notice Generate upgrade cut data
-    function getChainUpgradeInfo() public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
+    function generateUpgradeCutData() public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
         Diamond.FacetCut[] memory facetCuts = mergeFacets(getFacetCutsForDeletion(), getFacetCuts());
@@ -923,7 +922,7 @@ contract EcosystemUpgrade is Script {
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
 
-        vm.serializeBytes("root", "chain_upgrade_diamond_cut", abi.encode(getChainUpgradeInfo()));
+        vm.serializeBytes("root", "chain_upgrade_diamond_cut", abi.encode(generateUpgradeCutData()));
 
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
@@ -1590,7 +1589,7 @@ contract EcosystemUpgrade is Script {
             target: config.contracts.stateTransitionManagerAddress,
             data: abi.encodeCall(
                 ChainTypeManager.setNewVersionUpgrade,
-                (getChainUpgradeInfo(), previousProtocolVersion, deadline, newProtocolVersion)
+                (generateUpgradeCutData(), previousProtocolVersion, deadline, newProtocolVersion)
             ),
             value: 0
         });
