@@ -58,7 +58,13 @@ contract ChainTypeManagerTest is Test {
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
         vm.prank(governor);
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)), address(0));
+        bridgehub.setAddresses(
+            sharedBridge,
+            ICTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0)),
+            address(0),
+            address(0)
+        );
 
         vm.mockCall(
             address(sharedBridge),

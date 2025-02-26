@@ -86,6 +86,8 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 interopCenterBytecodeHash;
+    bytes32 assetTrackerBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
@@ -162,6 +164,8 @@ contract EcosystemUpgrade is Script {
         address messageRootProxy;
         address interopCenterImplementation;
         address interopCenterProxy;
+        address assetTrackerImplementation;
+        address assetTrackerProxy;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -640,7 +644,8 @@ contract EcosystemUpgrade is Script {
                     addresses.bridges.sharedBridgeProxy,
                     CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
                     MessageRoot(addresses.bridgehub.messageRootProxy),
-                    addresses.bridgehub.interopCenterProxy
+                    addresses.bridgehub.interopCenterProxy,
+                    addresses.bridgehub.assetTrackerProxy
                 )
             ),
             value: 0
@@ -1494,6 +1499,12 @@ contract EcosystemUpgrade is Script {
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            interopCenterBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readInteropCenterBytecode()
+            ),
+            assetTrackerBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readAssetTrackerBytecode()
+            ),
             l2SharedBridgeLegacyImpl: addresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: addresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0)

@@ -18,6 +18,12 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter");
     }
 
+    /// @notice Reads the bytecode of the AssetTracker contract.
+    /// @return The bytecode of the AssetTracker contract.
+    function readAssetTrackerBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL1("AssetTracker.sol", "AssetTracker");
+    }
+
     /// @notice Reads the bytecode of the L2NativeTokenVault contract.
     /// @return The bytecode of the L2NativeTokenVault contract.
     function readL2NativeTokenVaultBytecode() internal view returns (bytes memory) {

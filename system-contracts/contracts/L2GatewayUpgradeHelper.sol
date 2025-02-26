@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER, L2_INTEROP_HANDLER} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER, L2_INTEROP_HANDLER, L2_ASSET_TRACKER_ADDRESS} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -48,7 +48,13 @@ library L2GenesisUpgradeHelper {
         // Prepare calldata to set addresses in BridgeHub.
         bytes memory bridgehubConstructorData = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_INTEROP_CENTER))
+            (
+                L2_ASSET_ROUTER,
+                _ctmDeployer,
+                address(L2_MESSAGE_ROOT),
+                address(L2_INTEROP_CENTER),
+                L2_ASSET_TRACKER_ADDRESS
+            )
         );
 
         // Execute the call to set addresses in BridgeHub.
@@ -80,17 +86,34 @@ library L2GenesisUpgradeHelper {
             }
         }
 
-        bytes memory interopHandlerConstructorData = abi.encodeCall(L2_INTEROP_HANDLER.setInteropAccountBytecode, ());
+        bytes memory messageRootConstructorData = abi.encodeCall(
+            L2_MESSAGE_ROOT.setAddresses,
+            (L2_ASSET_TRACKER_ADDRESS)
+        );
 
         (bool success3, bytes memory returnData3) = SystemContractHelper.mimicCall(
-            address(L2_INTEROP_HANDLER),
+            address(L2_MESSAGE_ROOT),
             bridgehubOwner,
-            interopHandlerConstructorData
+            messageRootConstructorData
         );
         if (!success3) {
             // Progapatate revert reason
             assembly {
                 revert(add(returnData3, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory interopHandlerConstructorData = abi.encodeCall(L2_INTEROP_HANDLER.setInteropAccountBytecode, ());
+
+        (bool success4, bytes memory returnData4) = SystemContractHelper.mimicCall(
+            address(L2_INTEROP_HANDLER),
+            bridgehubOwner,
+            interopHandlerConstructorData
+        );
+        if (!success4) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData4, 0x20), returndatasize())
             }
         }
     }
@@ -117,7 +140,7 @@ library L2GenesisUpgradeHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployments = new ForceDeployment[](5);
+        forceDeployments = new ForceDeployment[](6);
 
         // Configure the MessageRoot deployment.
         forceDeployments[0] = ForceDeployment({
@@ -214,6 +237,14 @@ library L2GenesisUpgradeHelper {
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance
             )
+        });
+
+        forceDeployments[5] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.assetTrackerBytecodeHash,
+            newAddress: L2_ASSET_TRACKER_ADDRESS,
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT)
         });
     }
 

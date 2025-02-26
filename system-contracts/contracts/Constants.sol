@@ -90,6 +90,7 @@ address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACTS_OFFSET + 0x08));
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x09));
 IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x0b));
+address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.

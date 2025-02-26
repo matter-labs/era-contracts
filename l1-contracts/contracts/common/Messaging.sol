@@ -2,6 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+bytes1 constant BUNDLE_IDENTIFIER = 0x01;
+bytes1 constant TRIGGER_IDENTIFIER = 0x02;
+
 /// @dev The enum that represents the transaction execution status
 /// @param Failure The transaction execution failed
 /// @param Success The transaction execution succeeded

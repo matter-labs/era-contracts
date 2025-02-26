@@ -18,7 +18,7 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {L2_MESSENGER} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, INTEROP_OPERATION_TX_TYPE, INSERT_MSG_ADDRESS_ON_DESTINATION} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest, BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "../common/L1ContractErrors.sol";
 import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
@@ -218,7 +218,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             return interopBundleHash;
         } else {
             emit InteropBundleSent(interopBundleHash, interopBundle);
-            L2_MESSENGER.sendToL1(interopBundleBytes);
+            L2_MESSENGER.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
         }
     }
 
@@ -278,7 +278,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             // kl todo add to MessageRoot here.
         } else {
             emit InteropTriggerSent(_interopTrigger);
-            return L2_MESSENGER.sendToL1(abi.encode(_interopTrigger));
+            return L2_MESSENGER.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
         }
     }
 

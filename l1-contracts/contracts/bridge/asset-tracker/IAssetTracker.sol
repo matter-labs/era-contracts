@@ -3,11 +3,12 @@
 pragma solidity ^0.8.21;
 
 import {L2Log} from "../../common/Messaging.sol";
+import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 interface IAssetTracker {
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
     function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
-    function processLogsAndMessages(L2Log[] calldata _logs, bytes[] calldata _messages, bytes32) external;
+    function processLogsAndMessages(ProcessLogsInput calldata) external;
 }

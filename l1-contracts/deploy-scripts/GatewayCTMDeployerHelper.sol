@@ -6,7 +6,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -196,7 +196,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.chainTypeManagerImplementation = _deployInternal(
             "ChainTypeManager",
             "ChainTypeManager.sol",
-            abi.encode(L2_BRIDGEHUB_ADDR),
+            abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR),
             innerConfig
         );
 

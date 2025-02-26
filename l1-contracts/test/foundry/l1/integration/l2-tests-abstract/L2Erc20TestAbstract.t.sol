@@ -23,7 +23,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -33,6 +33,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "./_SharedL2ContractDeployer.sol";
+import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest, BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "contracts/common/Messaging.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     function performDeposit(address depositor, address receiver, uint256 amount) internal {
@@ -47,12 +48,14 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
-        performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
+        performDeposit(makeAddr("someDepositor"), makeAddr("someReceiver"), 1);
 
         l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
         if (l2TokenAddress == address(0)) {
             revert("Token not initialized");
         }
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        BridgedStandardERC20(l2TokenAddress).bridgeMint(address(this), 100000);
     }
 
     function test_shouldFinalizeERC20Deposit() public {
@@ -122,7 +125,50 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         );
     }
 
-    function test_calldataWith() public {
+    function test_requestTokenTransferInterop() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        vm.deal(address(this), 1000 ether);
+
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
+        );
+
+        InteropCallStarter[] memory feePaymentCalls = new InteropCallStarter[](1);
+        feePaymentCalls[0] = InteropCallStarter({
+            directCall: true,
+            nextContract: address(this),
+            data: "",
+            value: 0,
+            requestedInteropCallValue: 1 ether
+        });
+
+        InteropCallStarter[] memory executionCalls = new InteropCallStarter[](1);
+        executionCalls[0] = InteropCallStarter({
+            directCall: false,
+            nextContract: L2_ASSET_ROUTER_ADDR,
+            data: secondBridgeCalldata,
+            value: 0,
+            requestedInteropCallValue: 0
+        });
+
+        GasFields memory options = GasFields({
+            gasLimit: 30000000,
+            gasPerPubdataByteLimit: 1000,
+            refundRecipient: address(this)
+        });
+        uint256 destinationChainId = 270;
+        vm.mockCall(
+            address(L2_MESSENGER),
+            abi.encodeWithSelector(L2_MESSENGER.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        l2InteropCenter.requestInterop{value: 3 ether}(destinationChainId, feePaymentCalls, executionCalls, options);
+    }
+
+    function test_requestL2TransactionDirectWithCalldata() public {
+        // Note: get this from real local txs
         bytes
             memory data = hex"d52471c1000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001f9000000000000000000000000000000000000000000000001158e460913d000000000000000000000000000009ca26d77cde9cff9145d06725b400b2ec4bbc6160000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000023c34600000000000000000000000000000000000000000000000000000000000000032000000000000000000000000000000000000000000000000000000000000001400000000000000000000000009ca26d77cde9cff9145d06725b400b2ec4bbc61600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
         // bytes

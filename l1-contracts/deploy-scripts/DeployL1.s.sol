@@ -430,6 +430,7 @@ contract DeployL1Script is Script, DeployUtils {
 
     function setBridgehubParams() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        MessageRoot messageRoot = MessageRoot(addresses.bridgehub.messageRootProxy);
         InteropCenter interopCenter = InteropCenter(addresses.bridgehub.interopCenterProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
@@ -437,9 +438,11 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridges.sharedBridgeProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
-            addresses.bridgehub.interopCenterProxy
+            addresses.bridgehub.interopCenterProxy,
+            addresses.bridgehub.assetTrackerProxy
         );
         interopCenter.setAddresses(addresses.bridges.sharedBridgeProxy);
+        messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
@@ -471,7 +474,11 @@ contract DeployL1Script is Script, DeployUtils {
     function deployAssetTrackerImplementation() internal {
         address contractAddress = deployViaCreate2(
             type(AssetTracker).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy)
+            abi.encode(
+                addresses.bridges.sharedBridgeProxy,
+                addresses.vaults.l1NativeTokenVaultProxy,
+                addresses.bridgehub.messageRootProxy
+            )
         );
         console.log("AssetTrackerImplementation deployed at:", contractAddress);
         addresses.bridgehub.assetTrackerImplementation = contractAddress;
@@ -828,6 +835,9 @@ contract DeployL1Script is Script, DeployUtils {
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
             interopCenterBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readInteropCenterBytecode()
+            ),
+            assetTrackerBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readAssetTrackerBytecode()
             ),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain

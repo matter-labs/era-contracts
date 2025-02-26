@@ -85,11 +85,12 @@ IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCode
 
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
-IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE_ADDRESS = IL2MessageRootStorage(address(0x1000b));
+IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(0x1000b));
 
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(0x1000c));
 
-/// @dev the address of the L2 asset tracker
-address constant L2_ASSET_TRACKER_ADDR = address(0x1000d);
+/// @dev the address of the L2 standard trigger account
+address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(0x1000d);
 
-address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(0x1000e);
+/// @dev the address of the L2 asset tracker
+address constant L2_ASSET_TRACKER_ADDR = address(0x1000e);

@@ -225,7 +225,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             directCall: true,
             nextContract: INSERT_MSG_ADDRESS_ON_DESTINATION,
             data: "",
-            value: value,
+            value: 0,
             requestedInteropCallValue: value
         });
         InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);

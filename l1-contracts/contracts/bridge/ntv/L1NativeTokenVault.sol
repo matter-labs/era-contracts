@@ -301,11 +301,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 _amount,
         bool _isNative
     ) internal override {
-        // Note, that we do not update balances for chains where the assetId comes from,
-        // since these chains can mint new instances of the token.
-        if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
-            l1AssetTracker.handleChainBalanceDecrease(_chainId, _assetId, _amount, _isNative);
-        }
+        // we update in the asset tracker itself, since we parse the messages there
+
     }
 
     /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.

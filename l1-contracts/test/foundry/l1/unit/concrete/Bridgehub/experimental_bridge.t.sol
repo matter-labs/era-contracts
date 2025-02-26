@@ -35,6 +35,8 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {AssetIdNotSupported, ZeroChainId, AssetIdAlreadyRegistered, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -42,6 +44,7 @@ contract ExperimentalBridgeTest is Test {
     address weth;
     Bridgehub bridgehub;
     IInteropCenter interopCenter;
+    IAssetTracker assetTracker;
     DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
@@ -122,6 +125,7 @@ contract ExperimentalBridgeTest is Test {
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
 
         ntv = _deployNTV(address(mockSharedBridge));
+        assetTracker = new AssetTracker(address(mockSharedBridge), address(ntv), address(0));
 
         mockSecondSharedBridge.setNativeTokenVault(ntv);
 
@@ -232,7 +236,8 @@ contract ExperimentalBridgeTest is Test {
             sharedBridgeAddress,
             ICTMDeploymentTracker(address(0)),
             messageRoot,
-            address(interopCenter)
+            address(interopCenter),
+            address(assetTracker)
         );
         interopCenter.setAddresses(sharedBridgeAddress);
         vm.stopPrank();
@@ -440,6 +445,7 @@ contract ExperimentalBridgeTest is Test {
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
             IMessageRoot(address(0)),
+            address(0),
             address(0)
         );
         vm.stopPrank();
@@ -479,6 +485,7 @@ contract ExperimentalBridgeTest is Test {
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
             IMessageRoot(address(0)),
+            address(0),
             address(0)
         );
         vm.stopPrank();
@@ -519,7 +526,8 @@ contract ExperimentalBridgeTest is Test {
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
             IMessageRoot(randomMessageRoot),
-            address(interopCenter)
+            address(interopCenter),
+            address(assetTracker)
         );
 
         assertTrue(bridgehub.sharedBridge() == randomAssetRouter, "Shared bridge is already there");
@@ -544,7 +552,8 @@ contract ExperimentalBridgeTest is Test {
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
             IMessageRoot(randomMessageRoot),
-            address(interopCenter)
+            address(interopCenter),
+            address(assetTracker)
         );
 
         assertTrue(bridgehub.sharedBridge() == address(0), "Shared bridge is already there");

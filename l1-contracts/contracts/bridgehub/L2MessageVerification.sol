@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
 import {MessageHashing, ProofVerificationResult} from "../common/libraries/MessageHashing.sol";
-import {L2_MESSAGE_ROOT_STORAGE_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, MessageRootMissing, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../state-transition/L1StateTransitionErrors.sol";
 
 error MessageRootMismatch(uint256 chainId, uint256 batchNumber, bytes32 correctRoot, bytes32 providedRoot);
@@ -25,7 +25,7 @@ contract L2MessageVerification is MessageVerification {
             _proof
         );
         if (proofVerificationResult.finalProofNode) {
-            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE_ADDRESS.msgRoots(_chainId, _batchNumber);
+            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(_chainId, _batchNumber);
             if (correctBatchRoot == bytes32(0)) {
                 revert MessageRootMissing(_chainId, _batchNumber, proofVerificationResult.batchSettlementRoot);
             }

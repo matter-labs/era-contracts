@@ -122,11 +122,15 @@ error InvalidCaller(address);
 // 0x4fbe5dba
 error InvalidDelay();
 //
+error InvalidInteropCalldata(bytes4);
+//
 error InvalidLogKey(uint256 expectedLogKey, uint256 logKey);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 //
-error InvalidLogValue(bytes32 expectedValue, bytes32 providedValue);
+error InvalidLogValue(uint256 chainId, bytes32 expectedValue, bytes32 providedValue);
+//
+error InvalidMessage();
 //
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0xd8e9405c
@@ -259,6 +263,8 @@ error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 error QueueIsEmpty();
 // 0xab143c06
 error Reentrancy();
+//
+error ReconstructionMismatch(bytes32, bytes32);
 // 0x667d17de
 error RemoveFunctionFacetAddressNotZero(address facet);
 // 0xa2d4b16c

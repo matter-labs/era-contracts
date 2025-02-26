@@ -522,7 +522,7 @@ object "Bootloader" {
             }
 
             function L2_STANDARD_TRIGGER_ACCOUNT_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000001000e
+                ret := 0x000000000000000000000000000000000001000d
             }
 
             function BYTECODE_COMPRESSOR_ADDR() -> ret {

@@ -365,7 +365,13 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), new MessageRoot(bridgehub), address(1));
+        bridgehub.setAddresses(
+            sharedBridge,
+            ICTMDeploymentTracker(address(0)),
+            new MessageRoot(bridgehub),
+            address(1),
+            address(1)
+        );
         vm.stopPrank();
 
         // ctm deployer address is 0 in this test

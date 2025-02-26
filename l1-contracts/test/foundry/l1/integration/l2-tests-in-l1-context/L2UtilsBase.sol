@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 import {StdStorage, stdStorage, stdToml, Test} from "forge-std/Test.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
 
 import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
@@ -77,7 +77,8 @@ library L2UtilsBase {
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            L2_INTEROP_CENTER_ADDR
+            L2_INTEROP_CENTER_ADDR,
+            L2_ASSET_TRACKER_ADDR
         );
         vm.prank(_args.aliasedOwner);
         vm.chainId(_args.l1ChainId);
