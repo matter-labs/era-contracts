@@ -215,9 +215,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
-                    revert MismatchL2DAValidator();
-                }
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
+                //     revert MismatchL2DAValidator();
+                // }
+                ///
+                /// DEBUG SUPPORT END
+                ///
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
@@ -234,25 +240,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 revert UnexpectedSystemLog(logKey);
             }
         }
-        ///
-        /// DEBUG SUPPORT START
-        ///
-        processedLogs = 255;
-        ///
-        /// DEBUG SUPPORT END
-        ///
 
         // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
         // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            ///
-            /// DEBUG SUPPORT START
-            ///
-            processedLogs = 127;
-            ///
-            /// DEBUG SUPPORT END
-            ///
             if (processedLogs != 127) {
                 revert MissingSystemLogs(127, processedLogs);
             }
