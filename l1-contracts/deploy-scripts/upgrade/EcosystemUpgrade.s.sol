@@ -167,7 +167,6 @@ contract EcosystemUpgrade is Script {
     struct BridgehubDeployedAddresses {
         address bridgehubImplementation;
         address ctmDeploymentTrackerImplementation;
-        address ctmDeploymentTrackerProxy;
         address messageRootImplementation;
         address messageRootProxy;
     }
@@ -237,6 +236,7 @@ contract EcosystemUpgrade is Script {
         uint256 oldProtocolVersion;
         address l1LegacySharedBridge;
         address l1NativeTokenVaultProxy;
+        address ctmDeploymentTrackerProxy;
     }
 
     struct TokensConfig {
@@ -300,6 +300,7 @@ contract EcosystemUpgrade is Script {
         deployDAValidators();
 
         deployBridgehubImplementation();
+        deployCTMDeploymentTrackerImplementation();
         deployMessageRootContract();
 
         deployL1NullifierContracts();
@@ -584,6 +585,8 @@ contract EcosystemUpgrade is Script {
 
         config.contracts.l1NativeTokenVaultProxy = address(L1AssetRouter(config.contracts.oldSharedBridgeProxyAddress).nativeTokenVault());
 
+        config.contracts.ctmDeploymentTrackerProxy = address(Bridgehub(config.contracts.bridgehubProxyAddress).l1CtmDeployer());
+
         config.contracts.eraDiamondProxy = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
             .getHyperchain(config.eraChainId);
         config.contracts.legacyErc20BridgeAddress = address(
@@ -754,11 +757,6 @@ contract EcosystemUpgrade is Script {
 
     function saveOutput(string memory outputPath) internal virtual {
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_proxy_addr",
-            addresses.bridgehub.ctmDeploymentTrackerProxy
-        );
         vm.serializeAddress(
             "bridgehub",
             "ctm_deployment_tracker_implementation_addr",
@@ -1217,7 +1215,7 @@ contract EcosystemUpgrade is Script {
         addresses.bridgehub.messageRootProxy = messageRootProxy;
     }
 
-    function deployCTMDeploymentTracker() internal virtual {
+    function deployCTMDeploymentTrackerImplementation() internal virtual {
         bytes memory ctmDTBytecode = abi.encodePacked(
             type(CTMDeploymentTracker).creationCode,
             abi.encode(config.contracts.bridgehubProxyAddress, addresses.bridges.sharedBridgeProxy)
@@ -1230,27 +1228,6 @@ contract EcosystemUpgrade is Script {
             "CTM Deployment Tracker Implementation"
         );
         addresses.bridgehub.ctmDeploymentTrackerImplementation = ctmDTImplementation;
-
-        bytes memory bytecode = abi.encodePacked(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                ctmDTImplementation,
-                config.contracts.transparentProxyAdmin,
-                abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress))
-            )
-        );
-        address ctmDTProxy = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            ctmDTProxy,
-            "TransparentUpgradeableProxy",
-            abi.encode(
-                ctmDTImplementation,
-                config.contracts.transparentProxyAdmin,
-                abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress))
-            ),
-            "CTM Deployment Tracker Proxy deployed at:"
-        );
-        addresses.bridgehub.ctmDeploymentTrackerProxy = ctmDTProxy;
     }
 
     function deployChainTypeManagerContract() internal virtual {
@@ -1634,7 +1611,7 @@ contract EcosystemUpgrade is Script {
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         // TODO
-        calls = new Call[](5);
+        calls = new Call[](6);
 
         calls[0] = _buildCallProxyUpgrade(config.contracts.stateTransitionManagerAddress, addresses.stateTransition.chainTypeManagerImplementation);
         
@@ -1642,11 +1619,12 @@ contract EcosystemUpgrade is Script {
         
         // Note, that we do not need to run the initializer
         calls[2] = _buildCallProxyUpgrade(config.contracts.oldSharedBridgeProxyAddress, addresses.bridges.l1NullifierImplementation);
-        
 
         calls[3] = _buildCallProxyUpgrade(config.contracts.legacyErc20BridgeAddress, addresses.bridges.erc20BridgeImplementation);
 
         calls[4] = _buildCallProxyUpgrade(config.contracts.l1NativeTokenVaultProxy, addresses.vaults.l1NativeTokenVaultImplementation);
+
+        calls[5] = _buildCallProxyUpgrade(config.contracts.ctmDeploymentTrackerProxy, addresses.bridgehub.ctmDeploymentTrackerImplementation);
     }
 
     /// @notice Additional calls to configure contracts
