@@ -203,6 +203,7 @@ contract EcosystemUpgrade is Script {
 
     // solhint-disable-next-line gas-struct-packing
     struct ContractsConfig {
+        address bytecodesSupplierAddress;
         bytes32 create2FactorySalt;
         address create2FactoryAddr;
         uint256 validatorTimelockExecutionDelay;
@@ -287,7 +288,8 @@ contract EcosystemUpgrade is Script {
 
         instantiateCreate2Factory();
 
-        deployBytecodesSupplier(); // TODO not needed?
+        // TODO not needed?
+        // deployBytecodesSupplier();
 
         deployBlobVersionedHashRetriever(); // TODO not needed?
         deployDualVerifier();
@@ -546,6 +548,7 @@ contract EcosystemUpgrade is Script {
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
+        config.contracts.bytecodesSupplierAddress = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
@@ -908,7 +911,6 @@ contract EcosystemUpgrade is Script {
             "validium_l1_da_validator_addr",
             addresses.daAddresses.l1ValidiumDAValidator
         );
-        vm.serializeAddress("deployed_addresses", "l1_bytecodes_supplier_addr", addresses.bytecodesSupplier);
         vm.serializeAddress(
             "deployed_addresses",
             "l2_wrapped_base_token_store_addr",
@@ -944,7 +946,7 @@ contract EcosystemUpgrade is Script {
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
 
-        BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(addresses.bytecodesSupplier), allDeps);
+        BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(config.contracts.bytecodesSupplierAddress), allDeps);
 
         for (uint256 i = 0; i < allDeps.length; i++) {
             bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(allDeps[i]);
