@@ -287,16 +287,16 @@ contract EcosystemUpgrade is Script {
 
         instantiateCreate2Factory();
 
-        deployBytecodesSupplier();
+        deployBytecodesSupplier(); // TODO not needed?
 
-        deployBlobVersionedHashRetriever();
+        deployBlobVersionedHashRetriever(); // TODO not needed?
         deployDualVerifier();
         deployDefaultUpgrade();
         deployGenesisUpgrade();
-        deployGatewayUpgrade();
+        deployGatewayUpgrade(); // TODO not needed?
 
-        // TODO: can we ignore unneeded updates?
         initializeExpectedL2Addresses();
+        // TODO: can we remove DA redeploy?
         deployDAValidators();
 
         deployBridgehubImplementation();
@@ -306,15 +306,15 @@ contract EcosystemUpgrade is Script {
         deployL1NullifierImplementation();
         deployL1AssetRouterImplementation();
         deployBridgedStandardERC20Implementation();
-        deployBridgedTokenBeacon(); // TODO unneeded?
+        deployBridgedTokenBeacon(); // TODO not needed?
         deployL1NativeTokenVaultImplementation();
         deployErc20BridgeImplementation();
 
         deployChainTypeManagerContract();
 
-        deployTransitionaryOwner();
-        deployL2WrappedBaseTokenStore();
-        deployGovernanceUpgradeTimer();
+        deployTransitionaryOwner(); // TODO unused?
+        deployL2WrappedBaseTokenStore(); // TODO not needed?
+        deployGovernanceUpgradeTimer(); // TODO not needed?
 
         // Additional (optional) configuration after deploy
 
@@ -325,7 +325,7 @@ contract EcosystemUpgrade is Script {
         );
 
         address[] memory ownershipsToTransfer = new address[](1);
-        ownershipsToTransfer[0] = addresses.daAddresses.rollupDAManager; // TODO
+        ownershipsToTransfer[0] = addresses.daAddresses.rollupDAManager;
         transferOwnershipsToGovernance(ownershipsToTransfer);
 
         upgradeConfig.ecosystemContractsDeployed = true;
