@@ -1584,15 +1584,20 @@ contract EcosystemUpgrade is Script {
 
     /// @notice The second step of upgrade. By default it is actual upgrade
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-        allCalls[0] = prepareNewChainCreationParamsCall();
-        allCalls[1] = provideSetNewVersionUpgradeCall();
-        allCalls[2] = prepareUnpauseGatewayMigrationsCall();
+        Call[][] memory allCalls = new Call[][](6);
+        allCalls[0] = prepareUpgradeProxiesCalls();
+        allCalls[1] = prepareNewChainCreationParamsCall();
+        allCalls[2] = provideSetNewVersionUpgradeCall();
+        allCalls[3] = prepareUnpauseGatewayMigrationsCall();
+        allCalls[4] = prepareContractsConfigurationCalls();
+        allCalls[5] = prepareGovernanceUpgradeTimerCheckCall(); // TODO not needed?
 
         calls = mergeCallsArray(allCalls);
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
+        require(config.contracts.stateTransitionManagerAddress != address(0), "stateTransitionManagerAddress is zero in config");
+
         // Just retrieved it from the contract
         uint256 previousProtocolVersion = getOldProtocolVersion();
         uint256 deadline = getOldProtocolDeadline();
@@ -1607,6 +1612,7 @@ contract EcosystemUpgrade is Script {
         });
 
         // The call that will start the timer till the end of the upgrade.
+        // TODO
         Call memory timerCall = Call({
             target: addresses.upgradeTimer,
             data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
@@ -1619,6 +1625,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
+        require(config.contracts.bridgehubProxyAddress != address(0), "bridgehubProxyAddress is zero in config");
+
         result = new Call[](1);
         result[0] = Call({
             target: config.contracts.bridgehubProxyAddress,
@@ -1628,6 +1636,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
+        require(config.contracts.bridgehubProxyAddress != address(0), "bridgehubProxyAddress is zero in config");
+
         result = new Call[](1);
         result[0] = Call({
             target: config.contracts.bridgehubProxyAddress,
@@ -1652,11 +1662,126 @@ contract EcosystemUpgrade is Script {
     }
 
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
+        require(config.contracts.stateTransitionManagerAddress != address(0), "stateTransitionManagerAddress is zero in config");
         calls = new Call[](1);
 
         calls[0] = Call({
             target: config.contracts.stateTransitionManagerAddress,
             data: abi.encodeCall(ChainTypeManager.setChainCreationParams, (prepareNewChainCreationParams())),
+            value: 0
+        });
+    }
+
+    /// @notice Update implementations in proxies
+    function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
+        // TODO
+        calls = new Call[](4);
+
+        calls[0] = _buildCallProxyUpgrade(config.contracts.stateTransitionManagerAddress, addresses.stateTransition.chainTypeManagerImplementation);
+        
+        calls[1] = _buildCallProxyUpgradeAndCall(config.contracts.bridgehubProxyAddress, addresses.bridgehub.bridgehubImplementation, abi.encodeCall(Bridgehub.initializeV2, ()));
+        
+        // Note, that we do not need to run the initializer
+        calls[2] = _buildCallProxyUpgrade(config.contracts.oldSharedBridgeProxyAddress, addresses.bridges.l1NullifierImplementation);
+        
+
+        calls[3] = _buildCallProxyUpgrade(config.contracts.legacyErc20BridgeAddress, addresses.bridges.erc20BridgeImplementation);
+    }
+
+    /// @notice Additional calls to configure contracts
+    function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
+        calls = new Call[](4);
+
+        // Now, we need to update the bridgehub
+        // TODO
+        /*calls[5] = Call({
+            target: config.contracts.bridgehubProxyAddress,
+            data: abi.encodeCall(
+                Bridgehub.setAddresses,
+                (
+                    addresses.bridges.sharedBridgeProxy,
+                    CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
+                    MessageRoot(addresses.bridgehub.messageRootProxy)
+                )
+            ),
+            value: 0
+        });*/
+
+        // Setting the necessary params for the L1Nullifier contract
+        calls[0] = Call({
+            target: config.contracts.oldSharedBridgeProxyAddress,
+            data: abi.encodeCall(
+                L1Nullifier.setL1NativeTokenVault,
+                (L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy)))
+            ),
+            value: 0
+        });
+        // TODO not neeeded?
+        calls[1] = Call({
+            target: config.contracts.oldSharedBridgeProxyAddress,
+            data: abi.encodeCall(L1Nullifier.setL1AssetRouter, (addresses.bridges.sharedBridgeProxy)),
+            value: 0
+        });
+        // TODO not neeeded?
+        calls[2] = Call({
+            target: config.contracts.stateTransitionManagerAddress,
+            // Making the old protocol version no longer invalid
+            data: abi.encodeCall(ChainTypeManager.setProtocolVersionDeadline, (getOldProtocolVersion(), 0)),
+            value: 0
+        });
+
+        // TODO not neeeded?
+        calls[3] = Call({
+            target: addresses.upgradeTimer,
+            // Double checking that the deadline has passed.
+            data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
+            value: 0
+        });
+    }
+
+    /// @notice Double checking that the deadline has passed.
+    function prepareGovernanceUpgradeTimerCheckCall() public virtual returns (Call[] memory calls) {
+        require(addresses.upgradeTimer != address(0), "upgradeTimer is zero");
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: addresses.upgradeTimer,
+            // Double checking that the deadline has passed.
+            data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
+            value: 0
+        });
+    }
+
+
+    function _buildCallProxyUpgrade(address proxyAddress, address newImplementationAddress) internal virtual returns(Call memory call) {
+        require(config.contracts.transparentProxyAdmin != address(0), 'transparentProxyAdmin not configured');
+
+        call = Call({
+            target: config.contracts.transparentProxyAdmin,
+            data: abi.encodeCall(
+                ProxyAdmin.upgrade,
+                (
+                    ITransparentUpgradeableProxy(payable(proxyAddress)),
+                    newImplementationAddress
+                )
+            ),
+            value: 0
+        });
+    }
+
+    function _buildCallProxyUpgradeAndCall(address proxyAddress, address newImplementationAddress, bytes memory data) internal virtual returns(Call memory call) {
+        require(config.contracts.transparentProxyAdmin != address(0), 'transparentProxyAdmin not configured');
+
+        call = Call({
+            target: config.contracts.transparentProxyAdmin,
+            data: abi.encodeCall(
+                ProxyAdmin.upgradeAndCall,
+                (
+                    ITransparentUpgradeableProxy(payable(proxyAddress)),
+                    newImplementationAddress,
+                    data
+                )
+            ),
             value: 0
         });
     }
