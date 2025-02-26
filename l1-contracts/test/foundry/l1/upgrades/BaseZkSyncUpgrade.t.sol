@@ -146,9 +146,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // Patch upgrade can't set upgrade txn
     function test_revertWhen_PatchCantSetUpgradeTxn() public {
-        // Change bootload and default account hashes to 0, to skip previous path only checks
+        // Change basic hashes to 0, to skip previous path only checks
         proposedUpgrade.bootloaderHash = bytes32(0);
         proposedUpgrade.defaultAccountHash = bytes32(0);
+        proposedUpgrade.evmEmulatorHash = bytes32(0);
 
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
         proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);
