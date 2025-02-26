@@ -79,7 +79,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         if (
             _nonceOrdering != AccountNonceOrdering.Arbitrary ||
-            currentInfo.nonceOrdering != AccountNonceOrdering.Sequential
+            currentInfo.nonceOrdering != AccountNonceOrdering.KeyedSequential
         ) {
             revert InvalidNonceOrderingChange();
         }
@@ -210,7 +210,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
         // Accounts have sequential nonces by default.
-        newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+        newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_deployment.newAddress, newAccountInfo);
 
         _constructContract({
@@ -289,7 +289,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
         // Accounts have sequential nonces by default.
-        newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+        newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
         _constructContract({

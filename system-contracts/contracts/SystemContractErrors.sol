@@ -196,6 +196,9 @@ error TooMuchGas();
 // 0x8c13f15d
 error InvalidNewL2BlockNumber(uint256 l2BlockNumber);
 
+// 0xe0a0dd23
+error InvalidNonceKey(uint192 nonceKey);
+
 enum CodeHashReason {
     NotContractOnConstructor,
     NotConstructedContract

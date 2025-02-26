@@ -6,7 +6,7 @@ import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
-import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized} from "./SystemContractErrors.sol";
+import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized, InvalidNonceKey} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -33,13 +33,18 @@ contract NonceHolder is INonceHolder, SystemContractBase {
 
     /// RawNonces for accounts are stored in format
     /// minNonce + 2^128 * deploymentNonce, where deploymentNonce
-    /// is the nonce used for deploying smart contracts.
+    /// is the nonce used for deploying smart contracts,
+    /// and minNonce is the first unused nonce with nonceKey (upper 192 bits) zero.
     mapping(uint256 account => uint256 packedMinAndDeploymentNonce) internal rawNonces;
 
     /// Mapping of values under nonces for accounts.
     /// The main key of the mapping is the 256-bit address of the account, while the
     /// inner mapping is a mapping from a nonce to the value stored there.
-    mapping(uint256 account => mapping(uint256 nonceKey => uint256 value)) internal nonceValues;
+    /// DEPRECATED: users can no longer set values under nonces.
+    mapping(uint256 account => mapping(uint256 nonce => uint256 storedValue)) internal __DEPRECATED_nonceValues;
+
+    /// This mapping tracks minNonce for non-zero nonce keys.
+    mapping(uint256 account => mapping(uint192 nonceKey => uint64 nonceValue)) internal keyedNonces;
 
     /// @notice Returns the current minimal nonce for account.
     /// @param _address The account to return the minimal nonce for
@@ -78,43 +83,25 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         (, oldMinNonce) = _splitRawNonce(oldRawNonce);
     }
 
-    /// @notice Sets the nonce value `key` for the msg.sender as used.
-    /// @param _key The nonce key under which the value will be set.
-    /// @param _value The value to store under the _key.
-    /// @dev The value must be non-zero.
-    function setValueUnderNonce(uint256 _key, uint256 _value) public onlySystemCall {
-        IContractDeployer.AccountInfo memory accountInfo = DEPLOYER_SYSTEM_CONTRACT.getAccountInfo(msg.sender);
-
-        if (_value == 0) {
-            revert ZeroNonceError();
-        }
-        // If an account has sequential nonce ordering, we enforce that the previous
-        // nonce has already been used.
-        if (accountInfo.nonceOrdering == IContractDeployer.AccountNonceOrdering.Sequential && _key != 0) {
-            if (!isNonceUsed(msg.sender, _key - 1)) {
-                revert NonceJumpError();
-            }
-        }
-
-        uint256 addressAsKey = uint256(uint160(msg.sender));
-
-        nonceValues[addressAsKey][_key] = _value;
-
-        emit ValueSetUnderNonce(msg.sender, _key, _value);
-    }
-
-    /// @notice Gets the value stored under a custom nonce for msg.sender.
-    /// @param _key The key under which to get the stored value.
-    /// @return The value stored under the `_key` for the msg.sender.
-    function getValueUnderNonce(uint256 _key) public view returns (uint256) {
-        uint256 addressAsKey = uint256(uint160(msg.sender));
-        return nonceValues[addressAsKey][_key];
+    function _splitKeyedNonce(uint256 _nonce) private pure returns (uint192 nonceKey, uint64 nonceValue) {
+        nonceKey = uint192(_nonce >> 64);
+        nonceValue = uint64(_nonce);
     }
 
     /// @notice A convenience method to increment the minimal nonce if it is equal
     /// to the `_expectedNonce`.
+    /// @dev This function only increments minMince for nonces with nonceKey == 0.
+    /// AAs that try to use this method with a keyed nonce will revert.
+    /// For keyed nonces, `incrementMinNonceIfEqualsKeyed` should be used.
+    /// This is to prevent DefaultAccount and other deployed AAs from
+    /// unintentionally allowing keyed nonces to be used.
     /// @param _expectedNonce The expected minimal nonce for the account.
     function incrementMinNonceIfEquals(uint256 _expectedNonce) external onlySystemCall {
+        (uint192 nonceKey, ) = _splitKeyedNonce(_expectedNonce);
+        if (nonceKey != 0) {
+            revert InvalidNonceKey(nonceKey);
+        }
+
         uint256 addressAsKey = uint256(uint160(msg.sender));
         uint256 oldRawNonce = rawNonces[addressAsKey];
 
@@ -125,6 +112,27 @@ contract NonceHolder is INonceHolder, SystemContractBase {
 
         unchecked {
             rawNonces[addressAsKey] = oldRawNonce + 1;
+        }
+    }
+
+    /// @notice A convenience method to increment the minimal nonce if it is equal
+    /// to the `_expectedNonce`. This is a keyed counterpart to `incrementMinNonceIfEquals`.
+    /// Reverts for nonces with nonceKey == 0.
+    /// @param _expectedNonce The expected minimal nonce for the account.
+    function incrementMinNonceIfEqualsKeyed(uint256 _expectedNonce) external onlySystemCall {
+        (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_expectedNonce);
+        if (nonceKey == 0) {
+            revert InvalidNonceKey(nonceKey);
+        }
+
+        uint256 addressAsKey = uint256(uint160(msg.sender));
+        uint64 oldNonceValue = keyedNonces[addressAsKey][nonceKey];
+        if (oldNonceValue != nonceValue) {
+            revert ValueMismatch(nonceValue, oldNonceValue);
+        }
+
+        unchecked {
+            keyedNonces[addressAsKey][nonceKey] = nonceValue + 1;
         }
     }
 
@@ -161,7 +169,9 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @return `true` if the nonce has been used, `false` otherwise.
     function isNonceUsed(address _address, uint256 _nonce) public view returns (bool) {
         uint256 addressAsKey = uint256(uint160(_address));
-        return (_nonce < getMinNonce(_address) || nonceValues[addressAsKey][_nonce] > 0);
+        (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_nonce);
+        // We keep the `nonceValues` check here, until it is confirmed that this mapping has never been used by anyone.
+        return _nonce < getMinNonce(_address) || nonceValue < keyedNonces[addressAsKey][nonceKey] || __DEPRECATED_nonceValues[addressAsKey][_nonce] > 0;
     }
 
     /// @notice Checks and reverts based on whether the nonce is used (not used).
