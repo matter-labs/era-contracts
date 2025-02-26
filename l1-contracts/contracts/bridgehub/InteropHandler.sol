@@ -16,7 +16,7 @@ import {BASE_TOKEN_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, L2Log} from "../common/Messaging.sol";
-import {L2_MESSAGE_ROOT_STORAGE_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
+// import {L2_MESSAGE_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {MessageHashing, ProofVerificationResult} from "../common/libraries/MessageHashing.sol";
 
 enum BytecodeError {

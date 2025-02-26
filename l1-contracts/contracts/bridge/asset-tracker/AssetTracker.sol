@@ -146,6 +146,16 @@ contract AssetTracker is IAssetTracker {
         _appendChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            AssetHandler Functions
+    //////////////////////////////////////////////////////////////*/
+
+    // kl todo add asset handler functions for migrating to GW
+
+    /*//////////////////////////////////////////////////////////////
+                            Helper Functions
+    //////////////////////////////////////////////////////////////*/
+
     function parseInteropBundle(bytes calldata _bundleData) external pure returns (InteropBundle memory interopBundle) {
         interopBundle = abi.decode(_bundleData[1:], (InteropBundle));
     }
