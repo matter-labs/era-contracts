@@ -298,7 +298,7 @@ contract EcosystemUpgrade is Script {
         deployGatewayUpgrade(); // TODO not needed?
 
         initializeExpectedL2Addresses();
-        // TODO: can we remove DA redeploy?
+        // TODO: can we remove DA redeploy? It isn't behind a proxy
         deployDAValidators();
 
         deployBridgehubImplementation();
@@ -584,12 +584,17 @@ contract EcosystemUpgrade is Script {
             .chainTypeManager(config.eraChainId);
         config.contracts.l1AssetRouterProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge(); // TODO old?
 
-        config.contracts.l1NativeTokenVaultProxy = address(L1AssetRouter(config.contracts.l1AssetRouterProxyAddress).nativeTokenVault());
-        config.contracts.l1NullifierAddress = address(L1AssetRouter(config.contracts.l1AssetRouterProxyAddress).L1_NULLIFIER());
+        config.contracts.l1NativeTokenVaultProxy = address(
+            L1AssetRouter(config.contracts.l1AssetRouterProxyAddress).nativeTokenVault()
+        );
+        config.contracts.l1NullifierAddress = address(
+            L1AssetRouter(config.contracts.l1AssetRouterProxyAddress).L1_NULLIFIER()
+        );
 
-        config.contracts.ctmDeploymentTrackerProxy = address(Bridgehub(config.contracts.bridgehubProxyAddress).l1CtmDeployer());
+        config.contracts.ctmDeploymentTrackerProxy = address(
+            Bridgehub(config.contracts.bridgehubProxyAddress).l1CtmDeployer()
+        );
         config.contracts.messageRootProxy = address(Bridgehub(config.contracts.bridgehubProxyAddress).messageRoot());
-        
 
         config.contracts.eraDiamondProxy = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
             .getHyperchain(config.eraChainId);
@@ -815,7 +820,11 @@ contract EcosystemUpgrade is Script {
             addresses.bridges.bridgedStandardERC20Implementation
         );
 
-        string memory bridges = vm.serializeAddress("bridges", "bridged_token_beacon", addresses.bridges.bridgedTokenBeacon);
+        string memory bridges = vm.serializeAddress(
+            "bridges",
+            "bridged_token_beacon",
+            addresses.bridges.bridgedTokenBeacon
+        );
 
         vm.serializeUint(
             "contracts_config",
@@ -919,8 +928,12 @@ contract EcosystemUpgrade is Script {
         vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", addresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", addresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
-        
-        string memory deployedAddresses = vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", addresses.upgradeTimer);
+
+        string memory deployedAddresses = vm.serializeAddress(
+            "deployed_addresses",
+            "l1_governance_upgrade_timer",
+            addresses.upgradeTimer
+        );
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
@@ -946,7 +959,10 @@ contract EcosystemUpgrade is Script {
         uint256[] memory factoryDeps = new uint256[](allDeps.length);
         require(factoryDeps.length <= 64, "Too many deps");
 
-        BytecodePublisher.publishBytecodesInBatches(BytecodesSupplier(config.contracts.bytecodesSupplierAddress), allDeps);
+        BytecodePublisher.publishBytecodesInBatches(
+            BytecodesSupplier(config.contracts.bytecodesSupplierAddress),
+            allDeps
+        );
 
         for (uint256 i = 0; i < allDeps.length; i++) {
             bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(allDeps[i]);
@@ -1459,14 +1475,17 @@ contract EcosystemUpgrade is Script {
         allCalls[2] = provideSetNewVersionUpgradeCall();
         allCalls[3] = prepareUnpauseGatewayMigrationsCall();
         allCalls[4] = prepareContractsConfigurationCalls();
-         // TODO not needed?
+        // TODO not needed?
         //allCalls[5] = prepareGovernanceUpgradeTimerCheckCall();
 
         calls = mergeCallsArray(allCalls);
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
-        require(config.contracts.stateTransitionManagerAddress != address(0), "stateTransitionManagerAddress is zero in config");
+        require(
+            config.contracts.stateTransitionManagerAddress != address(0),
+            "stateTransitionManagerAddress is zero in config"
+        );
 
         // Just retrieved it from the contract
         uint256 previousProtocolVersion = getOldProtocolVersion();
@@ -1532,7 +1551,10 @@ contract EcosystemUpgrade is Script {
     }
 
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
-        require(config.contracts.stateTransitionManagerAddress != address(0), "stateTransitionManagerAddress is zero in config");
+        require(
+            config.contracts.stateTransitionManagerAddress != address(0),
+            "stateTransitionManagerAddress is zero in config"
+        );
         calls = new Call[](1);
 
         calls[0] = Call({
@@ -1547,29 +1569,53 @@ contract EcosystemUpgrade is Script {
         // TODO
         calls = new Call[](8);
 
-        calls[0] = _buildCallProxyUpgrade(config.contracts.stateTransitionManagerAddress, addresses.stateTransition.chainTypeManagerImplementation);
-        
-        calls[1] = _buildCallProxyUpgrade(config.contracts.bridgehubProxyAddress, addresses.bridgehub.bridgehubImplementation);
-        
+        calls[0] = _buildCallProxyUpgrade(
+            config.contracts.stateTransitionManagerAddress,
+            addresses.stateTransition.chainTypeManagerImplementation
+        );
+
+        calls[1] = _buildCallProxyUpgrade(
+            config.contracts.bridgehubProxyAddress,
+            addresses.bridgehub.bridgehubImplementation
+        );
+
         // Note, that we do not need to run the initializer
-        calls[2] = _buildCallProxyUpgrade(config.contracts.l1NullifierAddress, addresses.bridges.l1NullifierImplementation);
+        calls[2] = _buildCallProxyUpgrade(
+            config.contracts.l1NullifierAddress,
+            addresses.bridges.l1NullifierImplementation
+        );
 
-        calls[3] = _buildCallProxyUpgrade(config.contracts.legacyErc20BridgeAddress, addresses.bridges.erc20BridgeImplementation);
+        calls[3] = _buildCallProxyUpgrade(
+            config.contracts.legacyErc20BridgeAddress,
+            addresses.bridges.erc20BridgeImplementation
+        );
 
-        calls[4] = _buildCallProxyUpgrade(config.contracts.l1AssetRouterProxyAddress, addresses.bridges.l1AssetRouterImplementation);
+        calls[4] = _buildCallProxyUpgrade(
+            config.contracts.l1AssetRouterProxyAddress,
+            addresses.bridges.l1AssetRouterImplementation
+        );
 
-        calls[5] = _buildCallProxyUpgrade(config.contracts.l1NativeTokenVaultProxy, addresses.vaults.l1NativeTokenVaultImplementation);
+        calls[5] = _buildCallProxyUpgrade(
+            config.contracts.l1NativeTokenVaultProxy,
+            addresses.vaults.l1NativeTokenVaultImplementation
+        );
 
-        calls[6] = _buildCallProxyUpgrade(config.contracts.ctmDeploymentTrackerProxy, addresses.bridgehub.ctmDeploymentTrackerImplementation);
+        calls[6] = _buildCallProxyUpgrade(
+            config.contracts.ctmDeploymentTrackerProxy,
+            addresses.bridgehub.ctmDeploymentTrackerImplementation
+        );
 
-        calls[7] = _buildCallProxyUpgrade(config.contracts.messageRootProxy, addresses.bridgehub.messageRootImplementation);
+        calls[7] = _buildCallProxyUpgrade(
+            config.contracts.messageRootProxy,
+            addresses.bridgehub.messageRootImplementation
+        );
     }
 
     /// @notice Additional calls to configure contracts
     function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
-        // TODO not neeeded?
+        // TODO not needed?
         calls[0] = Call({
             target: config.contracts.stateTransitionManagerAddress,
             // Making the old protocol version no longer invalid
@@ -1591,35 +1637,34 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-
-    function _buildCallProxyUpgrade(address proxyAddress, address newImplementationAddress) internal virtual returns(Call memory call) {
-        require(config.contracts.transparentProxyAdmin != address(0), 'transparentProxyAdmin not configured');
+    function _buildCallProxyUpgrade(
+        address proxyAddress,
+        address newImplementationAddress
+    ) internal virtual returns (Call memory call) {
+        require(config.contracts.transparentProxyAdmin != address(0), "transparentProxyAdmin not configured");
 
         call = Call({
             target: config.contracts.transparentProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
-                (
-                    ITransparentUpgradeableProxy(payable(proxyAddress)),
-                    newImplementationAddress
-                )
+                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
             ),
             value: 0
         });
     }
 
-    function _buildCallProxyUpgradeAndCall(address proxyAddress, address newImplementationAddress, bytes memory data) internal virtual returns(Call memory call) {
-        require(config.contracts.transparentProxyAdmin != address(0), 'transparentProxyAdmin not configured');
+    function _buildCallProxyUpgradeAndCall(
+        address proxyAddress,
+        address newImplementationAddress,
+        bytes memory data
+    ) internal virtual returns (Call memory call) {
+        require(config.contracts.transparentProxyAdmin != address(0), "transparentProxyAdmin not configured");
 
         call = Call({
             target: config.contracts.transparentProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgradeAndCall,
-                (
-                    ITransparentUpgradeableProxy(payable(proxyAddress)),
-                    newImplementationAddress,
-                    data
-                )
+                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress, data)
             ),
             value: 0
         });
