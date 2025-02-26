@@ -155,7 +155,6 @@ contract EcosystemUpgrade is Script {
     // solhint-disable-next-line gas-struct-packing
     struct L1NativeTokenVaultAddresses {
         address l1NativeTokenVaultImplementation;
-        address l1NativeTokenVaultProxy;
     }
 
     struct DataAvailabilityDeployedAddresses {
@@ -237,6 +236,7 @@ contract EcosystemUpgrade is Script {
         uint256 newProtocolVersion;
         uint256 oldProtocolVersion;
         address l1LegacySharedBridge;
+        address l1NativeTokenVaultProxy;
     }
 
     struct TokensConfig {
@@ -307,7 +307,6 @@ contract EcosystemUpgrade is Script {
         deployBridgedStandardERC20Implementation();
         deployBridgedTokenBeacon();
         deployL1NativeTokenVaultImplementation();
-        deployL1NativeTokenVaultProxy();
         deployErc20BridgeImplementation();
 
         deployChainTypeManagerContract();
@@ -577,10 +576,14 @@ contract EcosystemUpgrade is Script {
 
         config.contracts.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
+
         config.ownerAddress = Bridgehub(config.contracts.bridgehubProxyAddress).owner();
         config.contracts.stateTransitionManagerAddress = IBridgehub(config.contracts.bridgehubProxyAddress)
             .chainTypeManager(config.eraChainId);
-        config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
+        config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge(); // TODO old?
+
+        config.contracts.l1NativeTokenVaultProxy = address(L1AssetRouter(config.contracts.oldSharedBridgeProxyAddress).nativeTokenVault());
+
         config.contracts.eraDiamondProxy = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
             .getHyperchain(config.eraChainId);
         config.contracts.legacyErc20BridgeAddress = address(
@@ -915,13 +918,8 @@ contract EcosystemUpgrade is Script {
         vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", addresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", addresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
-        vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", addresses.upgradeTimer);
-
-        string memory deployedAddresses = vm.serializeAddress(
-            "deployed_addresses",
-            "native_token_vault_addr",
-            addresses.vaults.l1NativeTokenVaultProxy
-        );
+        
+        string memory deployedAddresses = vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", addresses.upgradeTimer);
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
@@ -1395,7 +1393,7 @@ contract EcosystemUpgrade is Script {
             abi.encode(
                 config.contracts.oldSharedBridgeProxyAddress,
                 addresses.bridges.sharedBridgeProxy,
-                addresses.vaults.l1NativeTokenVaultProxy,
+                config.contracts.l1NativeTokenVaultProxy,
                 config.eraChainId
             )
         );
@@ -1406,7 +1404,7 @@ contract EcosystemUpgrade is Script {
             abi.encode(
                 config.contracts.oldSharedBridgeProxyAddress,
                 addresses.bridges.sharedBridgeProxy,
-                addresses.vaults.l1NativeTokenVaultProxy,
+                config.contracts.l1NativeTokenVaultProxy,
                 config.eraChainId
             ),
             "Erc20BridgeImplementation"
@@ -1462,45 +1460,6 @@ contract EcosystemUpgrade is Script {
             "L1NativeTokenVaultImplementation"
         );
         addresses.vaults.l1NativeTokenVaultImplementation = contractAddress;
-    }
-
-    function deployL1NativeTokenVaultProxy() internal virtual {
-        bytes memory initCalldata = abi.encodeCall(
-            L1NativeTokenVault.initialize,
-            (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-        );
-        bytes memory bytecode = abi.encodePacked(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                addresses.vaults.l1NativeTokenVaultImplementation,
-                config.contracts.transparentProxyAdmin,
-                initCalldata
-            )
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "TransparentUpgradeableProxy",
-            abi.encode(
-                addresses.vaults.l1NativeTokenVaultImplementation,
-                config.contracts.transparentProxyAdmin,
-                initCalldata
-            ),
-            "L1NativeTokenVaultProxy:"
-        );
-        addresses.vaults.l1NativeTokenVaultProxy = contractAddress;
-
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.sharedBridgeProxy);
-        IL1Nullifier l1Nullifier = IL1Nullifier(config.contracts.oldSharedBridgeProxyAddress);
-
-        if (address(sharedBridge.nativeTokenVault()) != addresses.vaults.l1NativeTokenVaultProxy) {
-            vm.broadcast(msg.sender);
-            sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
-        }
-
-        // Permissionless
-        vm.broadcast(msg.sender);
-        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function deployGovernanceUpgradeTimer() internal virtual {
@@ -1675,22 +1634,24 @@ contract EcosystemUpgrade is Script {
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         // TODO
-        calls = new Call[](4);
+        calls = new Call[](5);
 
         calls[0] = _buildCallProxyUpgrade(config.contracts.stateTransitionManagerAddress, addresses.stateTransition.chainTypeManagerImplementation);
         
-        calls[1] = _buildCallProxyUpgradeAndCall(config.contracts.bridgehubProxyAddress, addresses.bridgehub.bridgehubImplementation, abi.encodeCall(Bridgehub.initializeV2, ()));
+        calls[1] = _buildCallProxyUpgrade(config.contracts.bridgehubProxyAddress, addresses.bridgehub.bridgehubImplementation);
         
         // Note, that we do not need to run the initializer
         calls[2] = _buildCallProxyUpgrade(config.contracts.oldSharedBridgeProxyAddress, addresses.bridges.l1NullifierImplementation);
         
 
         calls[3] = _buildCallProxyUpgrade(config.contracts.legacyErc20BridgeAddress, addresses.bridges.erc20BridgeImplementation);
+
+        calls[4] = _buildCallProxyUpgrade(config.contracts.l1NativeTokenVaultProxy, addresses.vaults.l1NativeTokenVaultImplementation);
     }
 
     /// @notice Additional calls to configure contracts
     function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](4);
+        calls = new Call[](3);
 
         // Now, we need to update the bridgehub
         // TODO
@@ -1707,23 +1668,14 @@ contract EcosystemUpgrade is Script {
             value: 0
         });*/
 
-        // Setting the necessary params for the L1Nullifier contract
+        // TODO not neeeded?
         calls[0] = Call({
             target: config.contracts.oldSharedBridgeProxyAddress,
-            data: abi.encodeCall(
-                L1Nullifier.setL1NativeTokenVault,
-                (L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy)))
-            ),
+            data: abi.encodeCall(L1Nullifier.setL1AssetRouter, (addresses.bridges.sharedBridgeProxy)), // TODO
             value: 0
         });
         // TODO not neeeded?
         calls[1] = Call({
-            target: config.contracts.oldSharedBridgeProxyAddress,
-            data: abi.encodeCall(L1Nullifier.setL1AssetRouter, (addresses.bridges.sharedBridgeProxy)),
-            value: 0
-        });
-        // TODO not neeeded?
-        calls[2] = Call({
             target: config.contracts.stateTransitionManagerAddress,
             // Making the old protocol version no longer invalid
             data: abi.encodeCall(ChainTypeManager.setProtocolVersionDeadline, (getOldProtocolVersion(), 0)),
@@ -1731,7 +1683,7 @@ contract EcosystemUpgrade is Script {
         });
 
         // TODO not neeeded?
-        calls[3] = Call({
+        calls[2] = Call({
             target: addresses.upgradeTimer,
             // Double checking that the deadline has passed.
             data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
