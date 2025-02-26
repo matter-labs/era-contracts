@@ -953,7 +953,7 @@
   },
   {
     "contractName": "l1-contracts/DummyChainTypeManager",
-    "zkBytecodeHash": "0x010006f5ea5793e6c0c40ecf2b81c2d03b591f5fb2d320765b0837adbe7dff4c",
+    "zkBytecodeHash": "0x010006f5a52b24423b73c19ea4e9e26f7ae83a2f7187660623578d58c19f9505",
     "zkBytecodePath": "/l1-contracts/zkout/DummyChainTypeManager.sol/DummyChainTypeManager.json",
     "evmBytecodeHash": "0x00dade6f9481e02a3620ab84a386adf53ed189d86bbe44c5d414fcd787ff795b",
     "evmBytecodePath": "/l1-contracts/out/DummyChainTypeManager.sol/DummyChainTypeManager.json",
@@ -969,7 +969,7 @@
   },
   {
     "contractName": "l1-contracts/DummyChainTypeManagerWBH",
-    "zkBytecodeHash": "0x010006ff4944c6159293a0878ac6cf66477f1d54763f61e32bbec922514f8e39",
+    "zkBytecodeHash": "0x010007019d4cdddf528b717e421bd32116abe5dceffd888617f02c5d4d192d7b",
     "zkBytecodePath": "/l1-contracts/zkout/DummyChainTypeManagerWithBridgeHubAddress.sol/DummyChainTypeManagerWBH.json",
     "evmBytecodeHash": "0xa4cf66d1375082e7338ed80d97540d4c68c7e3fcfe9aeb0637528c13934130f9",
     "evmBytecodePath": "/l1-contracts/out/DummyChainTypeManagerWithBridgeHubAddress.sol/DummyChainTypeManagerWBH.json",
@@ -1265,19 +1265,19 @@
   },
   {
     "contractName": "l1-contracts/L2NativeTokenVault",
-    "zkBytecodeHash": "0x010007e7ced2a9266888fe0d939315421da2089501dbbdcbf9200cf5996feeb7",
+    "zkBytecodeHash": "0x010007f117d150349bf9b8c2889636b21db468f9614fa4d305377c42a1bde44e",
     "zkBytecodePath": "/l1-contracts/zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmBytecodeHash": "0xc7cce85c86cbc199003f9d2bc4032808188b9eb5de6acf2df9cd97c2489e6a6c",
+    "evmBytecodeHash": "0xe37aa73a65e9bc509f647a4df1ed0cefa08bd09604234da0b6a21d20e0985244",
     "evmBytecodePath": "/l1-contracts/out/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmDeployedBytecodeHash": "0xc44804e31be66974746d70760445f07e5bcf53c6eade1bbc8c17da63d31756a1"
+    "evmDeployedBytecodeHash": "0x72f9273a89775e7ac0669e68c886bccc4bdba2bb3bb4f23b2b45fc8cb922932f"
   },
   {
     "contractName": "l1-contracts/L2NativeTokenVaultDev",
-    "zkBytecodeHash": "0x0100065f5fff7d893a11eb285d46685623a615f0d939432f7cdb18a50a6af99a",
+    "zkBytecodeHash": "0x01000669ff08ee8b58619e3bf0b412132852a04ff8212b9fbeeb431c6c7452e8",
     "zkBytecodePath": "/l1-contracts/zkout/L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json",
-    "evmBytecodeHash": "0x2ccca12beef505170c53bb0d5a7c327b6c117d8b8d9561eb7e474f1f4cb99ed9",
+    "evmBytecodeHash": "0x1f09e6509a55d8b11051251590ede30627436134eb8ca3f5b00071974e9dbaae",
     "evmBytecodePath": "/l1-contracts/out/L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json",
-    "evmDeployedBytecodeHash": "0xaaa1405cb5c1854c7ffae42b372337549b11114c669e844a559aaf704731ccae"
+    "evmDeployedBytecodeHash": "0x4b207bc4ae94725a48cae54a636b24bf3ac456b416177988e8a73751e1e98583"
   },
   {
     "contractName": "l1-contracts/L2ProxyAdminDeployer",

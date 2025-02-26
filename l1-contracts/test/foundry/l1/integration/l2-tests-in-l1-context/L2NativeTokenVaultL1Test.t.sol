@@ -34,7 +34,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2NativeTokenVaultTestAbstract} from "./L2NativeTokenVaultTestAbstract.t.sol";
 import {SharedL2ContractL1DeployerUtils} from "./_SharedL2ContractL1DeployerUtils.sol";
 
-contract L2GatewayL1Test is
+contract L2NativeTokenVaultL1Test is
     Test,
     SharedL2ContractL1DeployerUtils,
     SharedL2ContractDeployer,
