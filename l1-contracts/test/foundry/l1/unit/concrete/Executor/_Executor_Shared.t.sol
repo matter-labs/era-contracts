@@ -143,6 +143,7 @@ contract ExecutorTest is Test {
     }
 
     constructor() {
+        vm.chainId(1);
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");

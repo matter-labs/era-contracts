@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_NOT_OLDER_TESTNET, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
@@ -36,8 +36,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
+    /// @notice The amount of time in seconds since unix epoch we allow between the batch timestamp and current timestamp before rejecting the batch
+    uint256 internal immutable BATCH_COMMIT_DEADLINE;
+
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
+        if (block.chainid == 1) {
+            BATCH_COMMIT_DEADLINE = COMMIT_TIMESTAMP_NOT_OLDER;
+        } else {
+            BATCH_COMMIT_DEADLINE = COMMIT_TIMESTAMP_NOT_OLDER_TESTNET;
+        }
     }
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
@@ -129,8 +137,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // - The timestamp of the batch is not too small.
         // - The timestamp of the last L2 block is not too big.
         // New batch timestamp is too small
-        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
-            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+        if (block.timestamp - BATCH_COMMIT_DEADLINE > batchTimestamp) {
+            revert TimeNotReached(batchTimestamp, block.timestamp - BATCH_COMMIT_DEADLINE);
         }
         // The last L2 block timestamp is too big
         if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
