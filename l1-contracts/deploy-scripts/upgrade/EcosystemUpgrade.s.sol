@@ -173,8 +173,7 @@ contract EcosystemUpgrade is Script {
     // solhint-disable-next-line gas-struct-packing
     struct BridgesDeployedAddresses {
         address erc20BridgeImplementation;
-        address sharedBridgeProxy;
-        address sharedBridgeImplementation;
+        address l1AssetRouterImplementation;
         address l1NullifierImplementation;
         address bridgedStandardERC20Implementation;
         address bridgedTokenBeacon;
@@ -227,7 +226,7 @@ contract EcosystemUpgrade is Script {
         address oldValidatorTimelock;
         address legacyErc20BridgeAddress;
         address bridgehubProxyAddress;
-        address oldSharedBridgeProxyAddress;
+        address l1AssetRouterProxyAddress;
         address stateTransitionManagerAddress;
         address transparentProxyAdmin;
         address eraDiamondProxy;
@@ -237,6 +236,7 @@ contract EcosystemUpgrade is Script {
         address l1NativeTokenVaultProxy;
         address ctmDeploymentTrackerProxy;
         address messageRootProxy;
+        address l1NullifierAddress;
     }
 
     struct TokensConfig {
@@ -303,10 +303,10 @@ contract EcosystemUpgrade is Script {
         deployCTMDeploymentTrackerImplementation();
         deployMessageRootContractImplementation();
 
-        deployL1NullifierContracts();
-        deploySharedBridgeContracts();
+        deployL1NullifierImplementation();
+        deployL1AssetRouterImplementation();
         deployBridgedStandardERC20Implementation();
-        deployBridgedTokenBeacon();
+        deployBridgedTokenBeacon(); // TODO unneeded?
         deployL1NativeTokenVaultImplementation();
         deployErc20BridgeImplementation();
 
@@ -324,9 +324,8 @@ contract EcosystemUpgrade is Script {
             addresses.expectedL2Addresses.expectedRollupL2DAValidator
         );
 
-        address[] memory ownershipsToTransfer = new address[](2);
-        ownershipsToTransfer[0] = addresses.bridges.sharedBridgeProxy;
-        ownershipsToTransfer[1] = addresses.daAddresses.rollupDAManager;
+        address[] memory ownershipsToTransfer = new address[](1);
+        ownershipsToTransfer[0] = addresses.daAddresses.rollupDAManager; // TODO
         transferOwnershipsToGovernance(ownershipsToTransfer);
 
         upgradeConfig.ecosystemContractsDeployed = true;
@@ -580,17 +579,19 @@ contract EcosystemUpgrade is Script {
         config.ownerAddress = Bridgehub(config.contracts.bridgehubProxyAddress).owner();
         config.contracts.stateTransitionManagerAddress = IBridgehub(config.contracts.bridgehubProxyAddress)
             .chainTypeManager(config.eraChainId);
-        config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge(); // TODO old?
+        config.contracts.l1AssetRouterProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge(); // TODO old?
 
-        config.contracts.l1NativeTokenVaultProxy = address(L1AssetRouter(config.contracts.oldSharedBridgeProxyAddress).nativeTokenVault());
+        config.contracts.l1NativeTokenVaultProxy = address(L1AssetRouter(config.contracts.l1AssetRouterProxyAddress).nativeTokenVault());
+        config.contracts.l1NullifierAddress = address(L1AssetRouter(config.contracts.l1AssetRouterProxyAddress).L1_NULLIFIER());
 
         config.contracts.ctmDeploymentTrackerProxy = address(Bridgehub(config.contracts.bridgehubProxyAddress).l1CtmDeployer());
         config.contracts.messageRootProxy = address(Bridgehub(config.contracts.bridgehubProxyAddress).messageRoot());
+        
 
         config.contracts.eraDiamondProxy = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
             .getHyperchain(config.eraChainId);
         config.contracts.legacyErc20BridgeAddress = address(
-            L1AssetRouter(config.contracts.oldSharedBridgeProxyAddress).legacyBridge()
+            L1AssetRouter(config.contracts.l1AssetRouterProxyAddress).legacyBridge()
         );
         config.contracts.oldValidatorTimelock = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
             .validatorTimelock();
@@ -735,7 +736,7 @@ contract EcosystemUpgrade is Script {
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
-            l1AssetRouter: addresses.bridges.sharedBridgeProxy,
+            l1AssetRouter: config.contracts.l1AssetRouterProxyAddress,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readBeaconProxyBytecode()
             ),
@@ -796,21 +797,22 @@ contract EcosystemUpgrade is Script {
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress(
             "bridges",
+            "l1_asset_router_implementation_addr",
+            addresses.bridges.l1AssetRouterImplementation
+        );
+        // TODO: legacy name
+        vm.serializeAddress(
+            "bridges",
             "shared_bridge_implementation_addr",
-            addresses.bridges.sharedBridgeImplementation
+            addresses.bridges.l1AssetRouterImplementation
         );
         vm.serializeAddress(
             "bridges",
             "bridged_standard_erc20_impl",
             addresses.bridges.bridgedStandardERC20Implementation
         );
-        vm.serializeAddress("bridges", "bridged_token_beacon", addresses.bridges.bridgedTokenBeacon);
 
-        string memory bridges = vm.serializeAddress(
-            "bridges",
-            "shared_bridge_proxy_addr",
-            addresses.bridges.sharedBridgeProxy
-        );
+        string memory bridges = vm.serializeAddress("bridges", "bridged_token_beacon", addresses.bridges.bridgedTokenBeacon);
 
         vm.serializeUint(
             "contracts_config",
@@ -969,21 +971,6 @@ contract EcosystemUpgrade is Script {
             validatorTimelock.setChainTypeManager(IChainTypeManager(config.contracts.stateTransitionManagerAddress));
         }
         console.log("ChainTypeManager set in ValidatorTimelock");
-    }
-
-    function setL1LegacyBridge() public virtual {
-        if (
-            address(L1AssetRouter(addresses.bridges.sharedBridgeProxy).legacyBridge()) !=
-            config.contracts.legacyErc20BridgeAddress
-        ) {
-            vm.startBroadcast(config.deployerAddress);
-            L1AssetRouter(addresses.bridges.sharedBridgeProxy).setL1Erc20Bridge(
-                L1ERC20Bridge(config.contracts.legacyErc20BridgeAddress)
-            );
-            vm.stopBroadcast();
-        }
-
-        console.log("L1LegacyBridge set in L1AssetRouter");
     }
 
     function _transferOwnershipToGovernance(address target) internal virtual {
@@ -1196,13 +1183,13 @@ contract EcosystemUpgrade is Script {
     function deployCTMDeploymentTrackerImplementation() internal virtual {
         bytes memory ctmDTBytecode = abi.encodePacked(
             type(CTMDeploymentTracker).creationCode,
-            abi.encode(config.contracts.bridgehubProxyAddress, addresses.bridges.sharedBridgeProxy)
+            abi.encode(config.contracts.bridgehubProxyAddress, config.contracts.l1AssetRouterProxyAddress)
         );
         address ctmDTImplementation = deployViaCreate2(ctmDTBytecode);
         notifyAboutDeployment(
             ctmDTImplementation,
             "CTMDeploymentTracker",
-            abi.encode(config.contracts.bridgehubProxyAddress, addresses.bridges.sharedBridgeProxy),
+            abi.encode(config.contracts.bridgehubProxyAddress, config.contracts.l1AssetRouterProxyAddress),
             "CTM Deployment Tracker Implementation"
         );
         addresses.bridgehub.ctmDeploymentTrackerImplementation = ctmDTImplementation;
@@ -1263,16 +1250,6 @@ contract EcosystemUpgrade is Script {
         addresses.stateTransition.chainTypeManagerImplementation = contractAddress;
     }
 
-    function deploySharedBridgeContracts() internal virtual {
-        deploySharedBridgeImplementation();
-        deploySharedBridgeProxy();
-        setL1LegacyBridge();
-    }
-
-    function deployL1NullifierContracts() internal virtual {
-        deployL1NullifierImplementation();
-    }
-
     function deployL1NullifierImplementation() internal virtual {
         bytes memory bytecode = abi.encodePacked(
             type(L1Nullifier).creationCode,
@@ -1289,14 +1266,14 @@ contract EcosystemUpgrade is Script {
         addresses.bridges.l1NullifierImplementation = contractAddress;
     }
 
-    function deploySharedBridgeImplementation() internal virtual {
+    function deployL1AssetRouterImplementation() internal virtual {
         bytes memory bytecode = abi.encodePacked(
             type(L1AssetRouter).creationCode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(
                 config.tokens.tokenWethAddress,
                 config.contracts.bridgehubProxyAddress,
-                config.contracts.oldSharedBridgeProxyAddress,
+                config.contracts.l1NullifierAddress,
                 config.eraChainId,
                 config.contracts.eraDiamondProxy
             )
@@ -1309,45 +1286,21 @@ contract EcosystemUpgrade is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 config.contracts.bridgehubProxyAddress,
-                config.contracts.oldSharedBridgeProxyAddress,
+                config.contracts.l1NullifierAddress,
                 config.eraChainId,
                 config.contracts.eraDiamondProxy
             ),
-            "SharedBridgeImplementation"
+            "L1AssetRouterImplementation"
         );
-        addresses.bridges.sharedBridgeImplementation = contractAddress;
-    }
-
-    function deploySharedBridgeProxy() internal virtual {
-        bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-        bytes memory bytecode = abi.encodePacked(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                addresses.bridges.sharedBridgeImplementation,
-                config.contracts.transparentProxyAdmin,
-                initCalldata
-            )
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "TransparentUpgradeableProxy",
-            abi.encode(
-                addresses.bridges.sharedBridgeImplementation,
-                config.contracts.transparentProxyAdmin,
-                initCalldata
-            ),
-            "SharedBridgeProxy deployed at:"
-        );
-        addresses.bridges.sharedBridgeProxy = contractAddress;
+        addresses.bridges.l1AssetRouterImplementation = contractAddress;
     }
 
     function deployErc20BridgeImplementation() internal virtual {
         bytes memory bytecode = abi.encodePacked(
             type(L1ERC20Bridge).creationCode,
             abi.encode(
-                config.contracts.oldSharedBridgeProxyAddress,
-                addresses.bridges.sharedBridgeProxy,
+                config.contracts.l1NullifierAddress,
+                config.contracts.l1AssetRouterProxyAddress,
                 config.contracts.l1NativeTokenVaultProxy,
                 config.eraChainId
             )
@@ -1357,8 +1310,8 @@ contract EcosystemUpgrade is Script {
             contractAddress,
             "L1ERC20Bridge",
             abi.encode(
-                config.contracts.oldSharedBridgeProxyAddress,
-                addresses.bridges.sharedBridgeProxy,
+                config.contracts.l1NullifierAddress,
+                config.contracts.l1AssetRouterProxyAddress,
                 config.contracts.l1NativeTokenVaultProxy,
                 config.eraChainId
             ),
@@ -1399,8 +1352,8 @@ contract EcosystemUpgrade is Script {
             // solhint-disable-next-line func-named-parameters
             abi.encode(
                 config.tokens.tokenWethAddress,
-                addresses.bridges.sharedBridgeProxy,
-                config.contracts.oldSharedBridgeProxyAddress
+                config.contracts.l1AssetRouterProxyAddress,
+                config.contracts.l1NullifierAddress
             )
         );
         address contractAddress = deployViaCreate2(bytecode);
@@ -1409,8 +1362,8 @@ contract EcosystemUpgrade is Script {
             "L1NativeTokenVault",
             abi.encode(
                 config.tokens.tokenWethAddress,
-                addresses.bridges.sharedBridgeProxy,
-                config.contracts.oldSharedBridgeProxyAddress
+                config.contracts.l1AssetRouterProxyAddress,
+                config.contracts.l1NullifierAddress
             ),
             "L1NativeTokenVaultImplementation"
         );
@@ -1589,27 +1542,29 @@ contract EcosystemUpgrade is Script {
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         // TODO
-        calls = new Call[](7);
+        calls = new Call[](8);
 
         calls[0] = _buildCallProxyUpgrade(config.contracts.stateTransitionManagerAddress, addresses.stateTransition.chainTypeManagerImplementation);
         
         calls[1] = _buildCallProxyUpgrade(config.contracts.bridgehubProxyAddress, addresses.bridgehub.bridgehubImplementation);
         
         // Note, that we do not need to run the initializer
-        calls[2] = _buildCallProxyUpgrade(config.contracts.oldSharedBridgeProxyAddress, addresses.bridges.l1NullifierImplementation);
+        calls[2] = _buildCallProxyUpgrade(config.contracts.l1NullifierAddress, addresses.bridges.l1NullifierImplementation);
 
         calls[3] = _buildCallProxyUpgrade(config.contracts.legacyErc20BridgeAddress, addresses.bridges.erc20BridgeImplementation);
 
-        calls[4] = _buildCallProxyUpgrade(config.contracts.l1NativeTokenVaultProxy, addresses.vaults.l1NativeTokenVaultImplementation);
+        calls[4] = _buildCallProxyUpgrade(config.contracts.l1AssetRouterProxyAddress, addresses.bridges.l1AssetRouterImplementation);
 
-        calls[5] = _buildCallProxyUpgrade(config.contracts.ctmDeploymentTrackerProxy, addresses.bridgehub.ctmDeploymentTrackerImplementation);
+        calls[5] = _buildCallProxyUpgrade(config.contracts.l1NativeTokenVaultProxy, addresses.vaults.l1NativeTokenVaultImplementation);
 
-        calls[6] = _buildCallProxyUpgrade(config.contracts.messageRootProxy, addresses.bridgehub.messageRootImplementation);
+        calls[6] = _buildCallProxyUpgrade(config.contracts.ctmDeploymentTrackerProxy, addresses.bridgehub.ctmDeploymentTrackerImplementation);
+
+        calls[7] = _buildCallProxyUpgrade(config.contracts.messageRootProxy, addresses.bridgehub.messageRootImplementation);
     }
 
     /// @notice Additional calls to configure contracts
     function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](3);
+        calls = new Call[](2);
 
         // Now, we need to update the bridgehub
         // TODO
@@ -1628,12 +1583,6 @@ contract EcosystemUpgrade is Script {
 
         // TODO not neeeded?
         calls[0] = Call({
-            target: config.contracts.oldSharedBridgeProxyAddress,
-            data: abi.encodeCall(L1Nullifier.setL1AssetRouter, (addresses.bridges.sharedBridgeProxy)), // TODO
-            value: 0
-        });
-        // TODO not neeeded?
-        calls[1] = Call({
             target: config.contracts.stateTransitionManagerAddress,
             // Making the old protocol version no longer invalid
             data: abi.encodeCall(ChainTypeManager.setProtocolVersionDeadline, (getOldProtocolVersion(), 0)),
@@ -1641,7 +1590,7 @@ contract EcosystemUpgrade is Script {
         });
 
         // TODO not neeeded?
-        calls[2] = Call({
+        calls[1] = Call({
             target: addresses.upgradeTimer,
             // Double checking that the deadline has passed.
             data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
