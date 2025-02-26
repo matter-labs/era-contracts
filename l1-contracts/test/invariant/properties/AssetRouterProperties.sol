@@ -21,13 +21,13 @@ abstract contract AssetRouterProperties is Test {
     L1AssetRouterActorHandler public l1AssetRouterActorHandler;
 
     function invariant_TotalDepositsEqualTotalSupply() external {
-        address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-
         uint256 totalSupply;
-        if (l2TokenAddress.code.length == 0) {
-            totalSupply = 0;
-        } else {
-            totalSupply = BridgedStandardERC20(l2TokenAddress).totalSupply();
+        for (uint i; i < l1Tokens.length; i++) {
+            address l2Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(l1Tokens[i]);
+        
+            if (l2Token.code.length != 0) {
+                totalSupply += BridgedStandardERC20(l2Token).totalSupply();
+            }
         }
 
         uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits() +

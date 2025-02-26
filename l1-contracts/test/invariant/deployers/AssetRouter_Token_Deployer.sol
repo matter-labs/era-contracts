@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.20;
+
+import {Test, stdStorage, StdStorage} from "forge-std/Test.sol";
+import "forge-std/console.sol";
+
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+
+contract AssetRouter_Token_Deployer is Test {
+    using stdStorage for StdStorage;
+
+    function _deployTokens() internal returns (address[] memory l1Tokens) {
+        l1Tokens = new address[](1);
+
+        address l1Token = makeAddr("unregisteredTokenDeployedBeforeGatewayUpgrade");
+
+        l1Tokens[0] = l1Token;
+
+        address l2SharedBridge = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
+        UpgradeableBeacon beacon = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenBeacon();
+        bytes32 salt = bytes32(uint256(uint160(l1Token)));
+        BeaconProxy proxy = new BeaconProxy{salt: salt}(address(beacon), "");
+
+        console.log(beacon.implementation());
+
+        address l2Token = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenAddress(l1Token);
+        vm.etch(l2Token, address(proxy).code);
+        vm.store(l2Token, 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50, bytes32(uint256(uint160(address(beacon)))));
+
+        stdstore
+            .target(address(l2SharedBridge))
+            .sig("l1TokenAddress(address)")
+            .with_key(l2Token)
+            .checked_write(l1Token);
+
+        uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
+        BridgedStandardERC20(l2Token).bridgeInitialize(DataEncoding.encodeNTVAssetId(l1ChainId, l1Token), l1Token, abi.encode(abi.encode("Token"), abi.encode("T"), abi.encode(18)));
+    }
+}

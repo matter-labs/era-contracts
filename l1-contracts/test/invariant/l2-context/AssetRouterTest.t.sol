@@ -41,6 +41,6 @@ contract AssetRouterTest is
         uint256 _l1ChainId
     ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.deployL2Contracts(_l1ChainId);
-        deployActorHandlers();
+        deployActorHandlers(new address[](0));
     }
 }

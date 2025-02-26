@@ -14,7 +14,10 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 
 abstract contract AssetRouter_ActorHandler_Deployer is AssetRouterProperties {
-    function deployActorHandlers() internal {
+    function deployActorHandlers(address[] memory _l1Tokens) internal {
+        for (uint256 i; i < _l1Tokens.length; i++) {
+            l1Tokens.push(_l1Tokens[i]);
+        }
         l1Tokens.push(L1_TOKEN_ADDRESS);
         l1Tokens.push(ETH_TOKEN_ADDRESS);
         // address ethL2Address = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(ETH_TOKEN_ADDRESS);
@@ -22,7 +25,7 @@ abstract contract AssetRouter_ActorHandler_Deployer is AssetRouterProperties {
 
         userActorHandlers.push(new UserActorHandler());
         legacyBridgeActorHandler = new LegacyBridgeActorHandler(userActorHandlers, l1Tokens);
-        l1AssetRouterActorHandler = new L1AssetRouterActorHandler(userActorHandlers);
+        l1AssetRouterActorHandler = new L1AssetRouterActorHandler(userActorHandlers, l1Tokens);
         for (uint256 i; i < userActorHandlers.length; i++) {
             targetContract(address(userActorHandlers[i]));
         }

@@ -14,26 +14,44 @@ import {UserActorHandler} from "./UserActorHandler.sol";
 // forge 0.0.2 (27360d4 2024-12-02T00:28:35.872943000Z)
 contract L1AssetRouterActorHandler is Test {
     UserActorHandler[] public receivers;
+    address[] public l1Tokens;
 
     uint256 public ghost_totalDeposits;
 
     error ReceiversArrayIsEmpty();
+    error ArrayIsEmpty();
 
-    constructor(UserActorHandler[] memory _receivers) {
+    constructor(UserActorHandler[] memory _receivers, address[] memory _l1Tokens) {
         if (_receivers.length == 0) {
             revert ReceiversArrayIsEmpty();
         }
         receivers = _receivers;
+
+        if (_l1Tokens.length == 0) {
+            revert ArrayIsEmpty();
+        }
+        l1Tokens = _l1Tokens;
     }
 
-    function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
+    function finalizeDeposit(uint256 _amount, address _sender, uint256 _l1TokenIndex, uint256 _receiverIndex) public {
         _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
+        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
 
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
+        address l1Token = l1Tokens[l1TokenIndex];
+
+        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
+        uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
+        bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
+
+        if (DataEncoding.encodeNTVAssetId(l1ChainId, l1Token) == baseTokenAssetId) {
+            return;
+        }
+
+        l2AssetRouter.finalizeDeposit({
             _l1Sender: _sender,
             _l2Receiver: address(receivers[receiverIndex]),
-            _l1Token: L1_TOKEN_ADDRESS,
+            _l1Token: l1Token,
             _amount: _amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
