@@ -13,8 +13,8 @@ import {Test} from "forge-std/Test.sol";
 
 string constant ECOSYSTEM_INPUT = "/upgrade-envs/stage-proofs.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs.toml";
-string constant CHAIN_INPUT = "/upgrade-envs/stage-era.toml";
-string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-era.toml";
+string constant CHAIN_INPUT = "/upgrade-envs/stage-proofs-era.toml";
+string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs-era.toml";
 
 contract UpgradeTest is Test {
     EcosystemUpgrade ecosystemUpgrade;
@@ -42,6 +42,10 @@ contract UpgradeTest is Test {
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
 
         console.log("Starting ecosystem upgrade stage 2!");
+
+        if (ecosystemUpgrade.getGovernanceUpgradeInitialDelay() != 0) {
+            vm.warp(block.timestamp + ecosystemUpgrade.getGovernanceUpgradeInitialDelay());
+        }
 
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
 

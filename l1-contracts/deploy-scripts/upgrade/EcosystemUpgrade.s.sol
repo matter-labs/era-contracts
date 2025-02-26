@@ -662,7 +662,7 @@ contract EcosystemUpgrade is Script {
         upgradeConfig.expectedL2AddressesInitialized = true;
     }
 
-    function getInitialDelay() external view virtual returns (uint256) {
+    function getGovernanceUpgradeInitialDelay() external view virtual returns (uint256) {
         return config.governanceUpgradeTimerInitialDelay;
     }
 
@@ -1453,13 +1453,14 @@ contract EcosystemUpgrade is Script {
 
     /// @notice The second step of upgrade. By default it is actual upgrade
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](6);
+        Call[][] memory allCalls = new Call[][](5);
         allCalls[0] = prepareUpgradeProxiesCalls();
         allCalls[1] = prepareNewChainCreationParamsCall();
         allCalls[2] = provideSetNewVersionUpgradeCall();
         allCalls[3] = prepareUnpauseGatewayMigrationsCall();
         allCalls[4] = prepareContractsConfigurationCalls();
-        allCalls[5] = prepareGovernanceUpgradeTimerCheckCall(); // TODO not needed?
+         // TODO not needed?
+        //allCalls[5] = prepareGovernanceUpgradeTimerCheckCall();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1566,36 +1567,13 @@ contract EcosystemUpgrade is Script {
 
     /// @notice Additional calls to configure contracts
     function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](2);
-
-        // Now, we need to update the bridgehub
-        // TODO
-        /*calls[5] = Call({
-            target: config.contracts.bridgehubProxyAddress,
-            data: abi.encodeCall(
-                Bridgehub.setAddresses,
-                (
-                    addresses.bridges.sharedBridgeProxy,
-                    CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-                    MessageRoot(addresses.bridgehub.messageRootProxy)
-                )
-            ),
-            value: 0
-        });*/
+        calls = new Call[](1);
 
         // TODO not neeeded?
         calls[0] = Call({
             target: config.contracts.stateTransitionManagerAddress,
             // Making the old protocol version no longer invalid
             data: abi.encodeCall(ChainTypeManager.setProtocolVersionDeadline, (getOldProtocolVersion(), 0)),
-            value: 0
-        });
-
-        // TODO not neeeded?
-        calls[1] = Call({
-            target: addresses.upgradeTimer,
-            // Double checking that the deadline has passed.
-            data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
             value: 0
         });
     }
