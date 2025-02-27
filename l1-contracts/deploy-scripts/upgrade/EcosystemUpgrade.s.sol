@@ -124,6 +124,7 @@ struct StateTransitionDeployedAddresses {
 contract EcosystemUpgrade is Script {
     using stdToml for string;
 
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     // solhint-disable-next-line gas-struct-packing
@@ -194,7 +195,7 @@ contract EcosystemUpgrade is Script {
         uint256 governanceUpgradeTimerInitialDelay;
         ContractsConfig contracts;
         TokensConfig tokens;
-        GatewayContractsConfig gatewayContracts;
+        Gateway gateway;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -241,13 +242,11 @@ contract EcosystemUpgrade is Script {
         address ctmDeploymentTrackerProxy;
         address messageRootProxy;
         address l1NullifierAddress;
-        address chainTypeManagerOnGatewayAddress;
     }
 
-    // TODO read
-    struct GatewayContractsConfig {
-        StateTransitionDeployedAddresses stateTransition;
-        address blobVersionedHashRetriever;
+    struct Gateway {
+        StateTransitionDeployedAddresses gatewayStateTransition;
+        address chainTypeManagerOnGatewayAddress;
         bytes facetCutsData;
         bytes additionalForceDeployments;
     }
@@ -431,13 +430,15 @@ contract EcosystemUpgrade is Script {
 
         bytes memory gatewaySpecificUpgraderInput;
         if (!isOnGateway) {
-
-            IL2ContractDeployer.ForceDeployment[] memory gatewaySpecificForceDeployments = abi.decode(config.gatewayContracts.additionalForceDeployments, (IL2ContractDeployer.ForceDeployment[]));
+            IL2ContractDeployer.ForceDeployment[] memory gatewaySpecificForceDeployments = abi.decode(
+                config.gateway.additionalForceDeployments,
+                (IL2ContractDeployer.ForceDeployment[])
+            );
             // We need to propagate upgrade on
             gatewaySpecificUpgraderInput = abi.encodeCall(
                 IL2GatewaySpecificUpgrader.upgradeIfGateway,
                 (
-                    config.contracts.chainTypeManagerOnGatewayAddress,
+                    config.gateway.chainTypeManagerOnGatewayAddress,
                     prepareNewChainCreationParamsForGateway(),
                     generateUpgradeCutData({isOnGateway: true}),
                     getOldProtocolVersion(),
@@ -494,14 +495,16 @@ contract EcosystemUpgrade is Script {
     }
 
     /// @notice Generate upgrade cut data
-    function generateUpgradeCutData(bool isOnGateway) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
+    function generateUpgradeCutData(
+        bool isOnGateway
+    ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
-        
+
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
         if (isOnGateway) {
-            facetCuts = abi.decode(config.gatewayContracts.facetCutsData, (Diamond.FacetCut[]));
+            facetCuts = abi.decode(config.gateway.facetCutsData, (Diamond.FacetCut[]));
         } else {
             facetCuts = getFacetCuts();
         }
@@ -553,8 +556,12 @@ contract EcosystemUpgrade is Script {
             additionalForceDeployments
         );
 
-        address verifierAddress = isOnGateway ? config.gatewayContracts.stateTransition.verifier : addresses.stateTransition.verifier;
-        address defaultUpgradeAddress = isOnGateway ? config.gatewayContracts.stateTransition.defaultUpgrade : addresses.stateTransition.defaultUpgrade;
+        address verifierAddress = isOnGateway
+            ? config.gateway.gatewayStateTransition.verifier
+            : addresses.stateTransition.verifier;
+        address defaultUpgradeAddress = isOnGateway
+            ? config.gateway.gatewayStateTransition.defaultUpgrade
+            : addresses.stateTransition.defaultUpgrade;
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments, isOnGateway),
@@ -660,17 +667,48 @@ contract EcosystemUpgrade is Script {
 
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
 
-        config.contracts.chainTypeManagerOnGatewayAddress = toml.readAddress(
-            "$.contracts.chain_type_manager_on_gateway_addr"
-        );
-
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         config.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
 
-        config.gatewayContracts.facetCutsData = abi.encode(new Diamond.DiamondCutData[](0)); // TODO
-        config.gatewayContracts.additionalForceDeployments = abi.encode(new IL2ContractDeployer.ForceDeployment[](0)); // TODO
+        config.gateway.facetCutsData = abi.encode(new Diamond.DiamondCutData[](0)); // TODO
+        config.gateway.additionalForceDeployments = abi.encode(new IL2ContractDeployer.ForceDeployment[](0)); // TODO
+
+        config.gateway.gatewayStateTransition.chainTypeManagerImplementation = toml.readAddress(
+            "$.gateway.gateway_state_transition.chain_type_manager_implementation_addr"
+        );
+        config.gateway.gatewayStateTransition.verifier = toml.readAddress(
+            "$.gateway.gateway_state_transition.verifier_addr"
+        );
+        config.gateway.gatewayStateTransition.adminFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.admin_facet_addr"
+        );
+        config.gateway.gatewayStateTransition.mailboxFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.mailbox_facet_addr"
+        );
+        config.gateway.gatewayStateTransition.executorFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.executor_facet_addr"
+        );
+        config.gateway.gatewayStateTransition.gettersFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.getters_facet_addr"
+        );
+        config.gateway.gatewayStateTransition.diamondInit = toml.readAddress(
+            "$.gateway.gateway_state_transition.diamond_init_addr"
+        );
+        config.gateway.gatewayStateTransition.genesisUpgrade = toml.readAddress(
+            "$.gateway.gateway_state_transition.genesis_upgrade_addr"
+        );
+        config.gateway.gatewayStateTransition.defaultUpgrade = toml.readAddress(
+            "$.gateway.gateway_state_transition.default_upgrade_addr"
+        );
+        config.gateway.gatewayStateTransition.validatorTimelock = toml.readAddress(
+            "$.gateway.gateway_state_transition.validator_timelock_addr"
+        );
+
+        config.gateway.chainTypeManagerOnGatewayAddress = toml.readAddress(
+            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
+        );
     }
 
     function initializeOldData() internal virtual {
@@ -745,11 +783,11 @@ contract EcosystemUpgrade is Script {
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
-    function prepareDiamondCutData(bool isOnGateway) internal virtual returns(Diamond.DiamondCutData memory) {
+    function prepareDiamondCutData(bool isOnGateway) internal virtual returns (Diamond.DiamondCutData memory) {
         Diamond.FacetCut[] memory facetCuts;
 
         if (isOnGateway) {
-            abi.decode(config.gatewayContracts.facetCutsData, (Diamond.FacetCut[]));
+            abi.decode(config.gateway.facetCutsData, (Diamond.FacetCut[]));
         } else {
             facetCuts = getFacetCuts();
         }
@@ -769,9 +807,10 @@ contract EcosystemUpgrade is Script {
             minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
         });
 
-        address verifierAddress = isOnGateway ? config.gatewayContracts.stateTransition.verifier : addresses.stateTransition.verifier;
-        // TODO
-        address blobVersionedHashRetrieverAddress = isOnGateway ? config.gatewayContracts.blobVersionedHashRetriever : addresses.blobVersionedHashRetriever;
+        address verifierAddress = isOnGateway
+            ? config.gateway.gatewayStateTransition.verifier
+            : addresses.stateTransition.verifier;
+        address blobVersionedHashRetrieverAddress = isOnGateway ? ADDRESS_ONE : addresses.blobVersionedHashRetriever; // Not needed on Gateway
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(verifierAddress),
             verifierParams: verifierParams,
@@ -783,7 +822,9 @@ contract EcosystemUpgrade is Script {
             blobVersionedHashRetriever: blobVersionedHashRetrieverAddress
         });
 
-        address diamondInitAddress = isOnGateway ? config.gatewayContracts.stateTransition.diamondInit : addresses.stateTransition.diamondInit;
+        address diamondInitAddress = isOnGateway
+            ? config.gateway.gatewayStateTransition.diamondInit
+            : addresses.stateTransition.diamondInit;
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: diamondInitAddress,
@@ -824,7 +865,7 @@ contract EcosystemUpgrade is Script {
         Diamond.DiamondCutData memory diamondCut = prepareDiamondCutData({isOnGateway: true});
 
         chainCreationParams = ChainCreationParams({
-            genesisUpgrade: config.gatewayContracts.stateTransition.genesisUpgrade,
+            genesisUpgrade: config.gateway.gatewayStateTransition.genesisUpgrade,
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
