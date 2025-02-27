@@ -242,12 +242,6 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL1("L2WrappedBaseToken.sol", "L2WrappedBaseToken");
     }
 
-    /// @notice Reads the bytecode of the L2GatewaySpecificUpgrader contract.
-    /// @return The bytecode of the L2GatewaySpecificUpgrader contract.
-    function readL2GatewaySpecificUpgrader() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL1("L2GatewaySpecificUpgrader.sol", "L2GatewaySpecificUpgrader");
-    }
-
     /// @notice Reads the bytecode of the TimestampAsserter contract.
     /// @return The bytecode of the TimestampAsserter contract.
     function readTimestampAsserterBytecode() internal view returns (bytes memory) {

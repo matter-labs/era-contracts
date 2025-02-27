@@ -25,9 +25,9 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 32;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 6;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -254,6 +254,13 @@ library SystemContractsProcessing {
             lang: Language.Solidity,
             isPrecompile: false
         });
+        systemContracts[31] = SystemContract({
+            addr: L2_GATEWAY_SPECIFIC_UPGRADER,
+            codeName: "L2GatewaySpecificUpgrader",
+            lang: Language.Solidity,
+            isPrecompile: false
+        });
+
         return systemContracts;
     }
 
@@ -341,7 +348,6 @@ library SystemContractsProcessing {
         result[2] = L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode();
         result[3] = L2ContractsBytecodesLib.readMessageRootBytecode();
         result[4] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
-        result[5] = L2ContractsBytecodesLib.readL2GatewaySpecificUpgrader();
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -385,13 +391,6 @@ library SystemContractsProcessing {
         forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
             newAddress: L2_WETH_IMPL_ADDRESS,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[5] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[5]),
-            newAddress: L2_GATEWAY_SPECIFIC_UPGRADER,
             callConstructor: false,
             value: 0,
             input: ""
