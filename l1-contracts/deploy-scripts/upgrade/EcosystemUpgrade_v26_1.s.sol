@@ -280,9 +280,7 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         initializeConfig(configPath);
         instantiateCreate2Factory();
-
-        generatedData.forceDeploymentsData = prepareForceDeploymentsData();
-
+        
         deployGenesisUpgrade();
 
         saveOutput(outputPath);
@@ -445,79 +443,11 @@ contract EcosystemUpgrade_v26_1 is Script {
         addresses.create2Factory = contractAddress;
     }
 
-    function deployDefaultUpgrade() internal {
-        address contractAddress = deployViaCreate2(type(DefaultUpgrade).creationCode);
-        notifyAboutDeployment(contractAddress, "DefaultUpgrade", hex"");
-        addresses.stateTransition.defaultUpgrade = contractAddress;
-    }
-
     function deployGenesisUpgrade() internal {
         bytes memory bytecode = abi.encodePacked(type(L1GenesisUpgrade).creationCode);
         address contractAddress = deployViaCreate2(bytecode);
         notifyAboutDeployment(contractAddress, "L1GenesisUpgrade", hex"");
         addresses.stateTransition.genesisUpgrade = contractAddress;
-    }
-
-    function deployStateTransitionDiamondFacets() internal {
-        address executorFacet = deployViaCreate2(
-            abi.encodePacked(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId))
-        );
-        notifyAboutDeployment(executorFacet, "ExecutorFacet", abi.encode(config.l1ChainId));
-        addresses.stateTransition.executorFacet = executorFacet;
-
-        address adminFacet = deployViaCreate2(
-            abi.encodePacked(
-                type(AdminFacet).creationCode,
-                abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager)
-            )
-        );
-        notifyAboutDeployment(
-            adminFacet,
-            "AdminFacet",
-            abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager)
-        );
-        addresses.stateTransition.adminFacet = adminFacet;
-
-        address mailboxFacet = deployViaCreate2(
-            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId, config.l1ChainId))
-        );
-        notifyAboutDeployment(mailboxFacet, "MailboxFacet", abi.encode(config.eraChainId, config.l1ChainId));
-        addresses.stateTransition.mailboxFacet = mailboxFacet;
-
-        address gettersFacet = deployViaCreate2(type(GettersFacet).creationCode);
-        notifyAboutDeployment(gettersFacet, "GettersFacet", hex"");
-        addresses.stateTransition.gettersFacet = gettersFacet;
-
-        address diamondInit = deployViaCreate2(type(DiamondInit).creationCode);
-        notifyAboutDeployment(diamondInit, "DiamondInit", hex"");
-        addresses.stateTransition.diamondInit = diamondInit;
-    }
-
-    function initializeExpectedL2Addresses() internal {
-        address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.protocolUpgradeHandlerProxyAddress);
-
-        addresses.expectedL2Addresses = ExpectedL2Addresses({
-            expectedRollupL2DAValidator: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                cachedBytecodeHashes.rollupL2DAValidatorBytecodeHash,
-                hex""
-            ),
-            expectedValidiumL2DAValidator: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                cachedBytecodeHashes.validiumL2DAValidatorBytecodeHash,
-                hex""
-            ),
-            l2SharedBridgeLegacyImpl: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                cachedBytecodeHashes.sharedL2LegacyBridgeBytecodeHash,
-                hex""
-            ),
-            l2BridgedStandardERC20Impl: Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                cachedBytecodeHashes.erc20StandardImplBytecodeHash,
-                hex""
-            )
-        });
     }
 
     function prepareForceDeploymentsData() public view returns (bytes memory) {
