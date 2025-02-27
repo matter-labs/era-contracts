@@ -163,19 +163,20 @@ describe("L2BaseToken tests", () => {
   describe("decimals", () => {
     it("correct decimals", async () => {
       const decimals = await L2BaseToken.decimals();
-      expect(decimals).to.equal(8);
+      expect(decimals).to.equal(18);
     });
   });
 
   describe("withdraw", () => {
     it("event, balance, totalsupply", async () => {
+      const minimumBTC = 10_000_000_000;
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
       const btcAddress = ethers.utils.hexlify(
         ethers.utils.toUtf8Bytes("bc1qy82gaw2htfd5sslplpgmz4ktf9y3k7pac2226k0wljlmw3atfw5qwm4av4")
       );
       const message: string = ethers.utils.solidityPack(
         ["bytes4", "bytes", "uint256"],
-        [mailboxIface.getSighash("finalizeEthWithdrawal"), btcAddress, amountToWithdraw]
+        [mailboxIface.getSighash("finalizeEthWithdrawal"), btcAddress, amountToWithdraw.div(minimumBTC)]
       );
 
       await setResult("L1Messenger", "sendToL1", [message], {
