@@ -31,10 +31,10 @@ contract L2StandardERC20V25 is ERC20PermitUpgradeable, ERC1967Upgrade {
     uint8 private decimals_;
 
     /// @dev Address of the L2 bridge that is used as trustee who can mint/burn tokens
-    address public  l2Bridge;
+    address public l2Bridge;
 
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
-    address public  l1Address;
+    address public l1Address;
 
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
@@ -147,7 +147,7 @@ contract L2StandardERC20V25 is ERC20PermitUpgradeable, ERC1967Upgrade {
     /// @param _to The account that will receive the created tokens.
     /// @param _amount The amount that will be created.
     /// @notice Should be called by bridge after depositing tokens from L1.
-    function bridgeMint(address _to, uint256 _amount) external  onlyBridge {
+    function bridgeMint(address _to, uint256 _amount) external onlyBridge {
         _mint(_to, _amount);
     }
 
@@ -155,7 +155,7 @@ contract L2StandardERC20V25 is ERC20PermitUpgradeable, ERC1967Upgrade {
     /// @param _from The account from which tokens will be burned.
     /// @param _amount The amount that will be burned.
     /// @notice Should be called by bridge before withdrawing tokens to L1.
-    function bridgeBurn(address _from, uint256 _amount) external  onlyBridge {
+    function bridgeBurn(address _from, uint256 _amount) external onlyBridge {
         _burn(_from, _amount);
     }
 

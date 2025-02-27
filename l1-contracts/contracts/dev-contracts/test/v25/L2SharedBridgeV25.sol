@@ -30,11 +30,11 @@ contract L2SharedBridgeV25 is Initializable {
     bytes32 internal l2TokenProxyBytecodeHash;
 
     /// @dev A mapping l2 token address => l1 token address
-    mapping(address l2TokenAddress => address l1TokenAddress) public  l1TokenAddress;
+    mapping(address l2TokenAddress => address l1TokenAddress) public l1TokenAddress;
 
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
-    address public  l1Bridge;
+    address public l1Bridge;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -96,7 +96,7 @@ contract L2SharedBridgeV25 is Initializable {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external  {
+    ) external {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         if (
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
@@ -138,7 +138,7 @@ contract L2SharedBridgeV25 is Initializable {
     /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external  {
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         if (_amount == 0) {
             revert AmountMustBeGreaterThanZero();
         }
@@ -155,17 +155,13 @@ contract L2SharedBridgeV25 is Initializable {
     }
 
     /// @dev Encode the message for l2ToL1log sent with withdraw initialization
-    function _getL1WithdrawMessage(
-        address,
-        address,
-        uint256
-    ) internal pure returns (bytes memory) {
+    function _getL1WithdrawMessage(address, address, uint256) internal pure returns (bytes memory) {
         // For the ease of porting the code for the testing purposes.
         revert("Unimplemented in this copied version");
     }
 
     /// @return Address of an L2 token counterpart
-    function l2TokenAddress(address _l1Token) public view  returns (address) {
+    function l2TokenAddress(address _l1Token) public view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
         return

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import { SystemContractsCaller, CalldataForwardingMode} from "../common/libraries/SystemContractsCaller.sol";
+import {SystemContractsCaller, CalldataForwardingMode} from "../common/libraries/SystemContractsCaller.sol";
 
 address constant MIMIC_CALL_CALL_ADDRESS = address((1 << 16) - 5);
 
