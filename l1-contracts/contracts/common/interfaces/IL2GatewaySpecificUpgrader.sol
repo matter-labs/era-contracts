@@ -20,5 +20,5 @@ interface IL2GatewaySpecificUpgrader {
         uint256 oldProtocolVersionDeadline,
         uint256 newProtocolVersion,
         IL2ContractDeployer.ForceDeployment[] calldata
-    ) external payable;
+    ) external;
 }

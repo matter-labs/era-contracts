@@ -200,7 +200,7 @@ contract EcosystemUpgrade is Script {
 
     // solhint-disable-next-line gas-struct-packing
     struct GeneratedData {
-        bytes forceDeploymentsData;
+        bytes fixedForceDeploymentsData;
         bytes diamondCutData;
         bytes upgradeCutData;
     }
@@ -259,7 +259,7 @@ contract EcosystemUpgrade is Script {
     struct EcosystemUpgradeConfig {
         bool initialized;
         bool expectedL2AddressesInitialized;
-        bool forceDeploymentDataGenerated;
+        bool fixedForceDeploymentsDataGenerated;
         bool diamondCutPrepared;
         bool upgradeCutPrepared;
         bool factoryDepsPublished;
@@ -354,7 +354,7 @@ contract EcosystemUpgrade is Script {
         require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
 
         // Important, this must come after the initializeExpectedL2Addresses
-        generateForceDeploymentData();
+        generateFixedForceDeploymentsData();
         prepareDiamondCutData({isOnGateway: false});
         generateUpgradeCutData({isOnGateway: false});
         console.log("UpgradeCutGenerated");
@@ -551,6 +551,8 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
 
+        // TODO: do we update *all* fixed force deployments?
+
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
             baseForceDeployments,
             additionalForceDeployments
@@ -728,13 +730,12 @@ contract EcosystemUpgrade is Script {
         config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
     }
 
-    function generateForceDeploymentData() internal virtual {
+    function generateFixedForceDeploymentsData() internal virtual {
         require(upgradeConfig.expectedL2AddressesInitialized, "Expected L2 addresses not initialized");
-        FixedForceDeploymentsData memory forceDeploymentsData = prepareForceDeploymentsData();
+        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
 
-        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
-
-        upgradeConfig.forceDeploymentDataGenerated = true;
+        generatedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
+        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
     function initializeExpectedL2Addresses() internal virtual {
@@ -840,7 +841,7 @@ contract EcosystemUpgrade is Script {
     }
 
     function prepareNewChainCreationParams() internal virtual returns (ChainCreationParams memory chainCreationParams) {
-        require(upgradeConfig.forceDeploymentDataGenerated, "Force deployment data not generated");
+        require(upgradeConfig.fixedForceDeploymentsDataGenerated, "Force deployment data not generated");
         require(upgradeConfig.diamondCutPrepared, "Diamond cut not prepared");
 
         Diamond.DiamondCutData memory diamondCut = abi.decode(generatedData.diamondCutData, (Diamond.DiamondCutData));
@@ -851,7 +852,7 @@ contract EcosystemUpgrade is Script {
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: generatedData.forceDeploymentsData
+            forceDeploymentsData: generatedData.fixedForceDeploymentsData
         });
     }
 
@@ -860,7 +861,7 @@ contract EcosystemUpgrade is Script {
         virtual
         returns (ChainCreationParams memory chainCreationParams)
     {
-        require(upgradeConfig.forceDeploymentDataGenerated, "Force deployment data not generated");
+        require(upgradeConfig.fixedForceDeploymentsDataGenerated, "Force deployment data not generated");
 
         Diamond.DiamondCutData memory diamondCut = prepareDiamondCutData({isOnGateway: true});
 
@@ -870,15 +871,15 @@ contract EcosystemUpgrade is Script {
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: generatedData.forceDeploymentsData
+            forceDeploymentsData: generatedData.fixedForceDeploymentsData
         });
     }
 
-    function prepareForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
+    function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
         data = FixedForceDeploymentsData({
-            l1ChainId: config.l1ChainId,
+            l1ChainId: config.l1ChainId, // TODO: what should be used if it is on Gateway?
             eraChainId: config.eraChainId,
             l1AssetRouter: config.contracts.l1AssetRouterProxyAddress,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
@@ -1021,7 +1022,7 @@ contract EcosystemUpgrade is Script {
         );
         vm.serializeBytes("contracts_config", "diamond_cut_data", generatedData.diamondCutData);
 
-        vm.serializeBytes("contracts_config", "force_deployments_data", generatedData.forceDeploymentsData);
+        vm.serializeBytes("contracts_config", "force_deployments_data", generatedData.fixedForceDeploymentsData);
 
         vm.serializeUint("contracts_config", "new_protocol_version", config.contracts.newProtocolVersion);
 

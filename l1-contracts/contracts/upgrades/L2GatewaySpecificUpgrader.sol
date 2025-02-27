@@ -39,7 +39,7 @@ contract L2GatewaySpecificUpgrader is IL2GatewaySpecificUpgrader {
         uint256 oldProtocolVersionDeadline,
         uint256 newProtocolVersion,
         IL2ContractDeployer.ForceDeployment[] calldata additionalForceDeployments
-    ) public payable onlyForceDeployer {
+    ) public onlyForceDeployer {
         if (block.chainid != GATEWAY_CHAIN_ID) return; // Do nothing
 
         IChainTypeManager(ctmAddress).setChainCreationParams(chainCreationParams);
