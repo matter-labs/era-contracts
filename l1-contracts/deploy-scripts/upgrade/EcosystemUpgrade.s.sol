@@ -194,12 +194,14 @@ contract EcosystemUpgrade is Script {
         uint256 governanceUpgradeTimerInitialDelay;
         ContractsConfig contracts;
         TokensConfig tokens;
+        GatewayContractsConfig gatewayContracts;
     }
 
     // solhint-disable-next-line gas-struct-packing
     struct GeneratedData {
         bytes forceDeploymentsData;
         bytes diamondCutData;
+        bytes upgradeCutData;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -242,6 +244,13 @@ contract EcosystemUpgrade is Script {
         address chainTypeManagerOnGatewayAddress;
     }
 
+    // TODO read
+    struct GatewayContractsConfig {
+        StateTransitionDeployedAddresses stateTransition;
+        address blobVersionedHashRetriever;
+        bytes facetCutsData;
+    }
+
     struct TokensConfig {
         address tokenWethAddress;
     }
@@ -252,6 +261,7 @@ contract EcosystemUpgrade is Script {
         bool expectedL2AddressesInitialized;
         bool forceDeploymentDataGenerated;
         bool diamondCutPrepared;
+        bool upgradeCutPrepared;
         bool factoryDepsPublished;
         bool ecosystemContractsDeployed;
         string outputPath;
@@ -280,8 +290,11 @@ contract EcosystemUpgrade is Script {
     /// @notice Full default upgrade preparation flow
     function prepareEcosystemUpgrade() public virtual {
         deployEcosystemContracts();
+        console.log("Ecosystem contracts are deployed!");
         publishBytecodes();
+        console.log("Bytecodes published!");
         generateUpgradeData();
+        console.log("Upgrade data generated!");
     }
 
     /// @notice Deploy everything that should be deployed
@@ -342,8 +355,9 @@ contract EcosystemUpgrade is Script {
 
         // Important, this must come after the initializeExpectedL2Addresses
         generateForceDeploymentData();
-        prepareDiamondCutData();
-
+        prepareDiamondCutData({isOnGateway: false});
+        generateUpgradeCutData({isOnGateway: false});
+        console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
 
@@ -422,7 +436,7 @@ contract EcosystemUpgrade is Script {
                 (
                     config.contracts.chainTypeManagerOnGatewayAddress,
                     prepareNewChainCreationParamsForGateway(),
-                    generateUpgradeCutDataForGateway(),
+                    generateUpgradeCutData({isOnGateway: true}),
                     getOldProtocolVersion(),
                     getOldProtocolDeadline(),
                     getNewProtocolVersion()
@@ -476,10 +490,18 @@ contract EcosystemUpgrade is Script {
     }
 
     /// @notice Generate upgrade cut data
-    function generateUpgradeCutData() public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
+    function generateUpgradeCutData(bool isOnGateway) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
+        
+        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
-        Diamond.FacetCut[] memory facetCuts = mergeFacets(getFacetCutsForDeletion(), getFacetCuts());
+        Diamond.FacetCut[] memory facetCuts;
+        if (isOnGateway) {
+            facetCuts = abi.decode(config.gatewayContracts.facetCutsData, (Diamond.FacetCut[]));
+        } else {
+            facetCuts = getFacetCuts();
+        }
+        facetCuts = mergeFacets(getFacetCutsForDeletion(), facetCuts);
 
         VerifierParams memory verifierParams = VerifierParams({
             recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
@@ -522,19 +544,20 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
 
-        // TODO: generateForceDeploymentData
-
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
             baseForceDeployments,
             additionalForceDeployments
         );
 
+        address verifierAddress = isOnGateway ? config.gatewayContracts.stateTransition.verifier : addresses.stateTransition.verifier;
+        address defaultUpgradeAddress = isOnGateway ? config.gatewayContracts.stateTransition.defaultUpgrade : addresses.stateTransition.defaultUpgrade;
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments, false),
+            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments, isOnGateway),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
             evmEmulatorHash: config.contracts.evmEmulatorHash,
-            verifier: addresses.stateTransition.verifier,
+            verifier: verifierAddress,
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
@@ -544,13 +567,14 @@ contract EcosystemUpgrade is Script {
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: addresses.stateTransition.defaultUpgrade,
+            initAddress: defaultUpgradeAddress,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
-    }
 
-    function generateUpgradeCutDataForGateway() public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        // TODO
+        if (!isOnGateway) {
+            generatedData.upgradeCutData = abi.encode(upgradeCutData);
+            upgradeConfig.upgradeCutPrepared = true;
+        }
     }
 
     function getEcosystemAdmin() external virtual returns (address) {
@@ -640,6 +664,8 @@ contract EcosystemUpgrade is Script {
         config.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
+
+        config.gatewayContracts.facetCutsData = abi.encode(new Diamond.DiamondCutData[](0)); // TODO
     }
 
     function initializeOldData() internal virtual {
@@ -714,8 +740,14 @@ contract EcosystemUpgrade is Script {
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
-    function prepareDiamondCutData() internal virtual {
-        Diamond.FacetCut[] memory facetCuts = getFacetCuts();
+    function prepareDiamondCutData(bool isOnGateway) internal virtual returns(Diamond.DiamondCutData memory) {
+        Diamond.FacetCut[] memory facetCuts;
+
+        if (isOnGateway) {
+            abi.decode(config.gatewayContracts.facetCutsData, (Diamond.FacetCut[]));
+        } else {
+            facetCuts = getFacetCuts();
+        }
 
         VerifierParams memory verifierParams = VerifierParams({
             recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
@@ -732,24 +764,33 @@ contract EcosystemUpgrade is Script {
             minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
         });
 
+        address verifierAddress = isOnGateway ? config.gatewayContracts.stateTransition.verifier : addresses.stateTransition.verifier;
+        // TODO
+        address blobVersionedHashRetrieverAddress = isOnGateway ? config.gatewayContracts.blobVersionedHashRetriever : addresses.blobVersionedHashRetriever;
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(addresses.stateTransition.verifier),
+            verifier: IVerifier(verifierAddress),
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
             l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
-            blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
+            blobVersionedHashRetriever: blobVersionedHashRetrieverAddress
         });
 
+        address diamondInitAddress = isOnGateway ? config.gatewayContracts.stateTransition.diamondInit : addresses.stateTransition.diamondInit;
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: addresses.stateTransition.diamondInit,
+            initAddress: diamondInitAddress,
             initCalldata: abi.encode(initializeData)
         });
-        generatedData.diamondCutData = abi.encode(diamondCut);
-        upgradeConfig.diamondCutPrepared = true;
+
+        if (!isOnGateway) {
+            generatedData.diamondCutData = abi.encode(diamondCut);
+            upgradeConfig.diamondCutPrepared = true;
+        }
+
+        return (diamondCut);
     }
 
     function prepareNewChainCreationParams() internal virtual returns (ChainCreationParams memory chainCreationParams) {
@@ -773,7 +814,18 @@ contract EcosystemUpgrade is Script {
         virtual
         returns (ChainCreationParams memory chainCreationParams)
     {
-        // TODO
+        require(upgradeConfig.forceDeploymentDataGenerated, "Force deployment data not generated");
+
+        Diamond.DiamondCutData memory diamondCut = prepareDiamondCutData({isOnGateway: true});
+
+        chainCreationParams = ChainCreationParams({
+            genesisUpgrade: config.gatewayContracts.stateTransition.genesisUpgrade,
+            genesisBatchHash: config.contracts.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+            diamondCut: diamondCut,
+            forceDeploymentsData: generatedData.forceDeploymentsData
+        });
     }
 
     function prepareForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
@@ -983,7 +1035,7 @@ contract EcosystemUpgrade is Script {
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
 
-        vm.serializeBytes("root", "chain_upgrade_diamond_cut", abi.encode(generateUpgradeCutData()));
+        vm.serializeBytes("root", "chain_upgrade_diamond_cut", generatedData.upgradeCutData);
 
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
@@ -1529,11 +1581,12 @@ contract EcosystemUpgrade is Script {
         uint256 previousProtocolVersion = getOldProtocolVersion();
         uint256 deadline = getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(generatedData.upgradeCutData, (Diamond.DiamondCutData));
         Call memory ctmCall = Call({
             target: config.contracts.stateTransitionManagerAddress,
             data: abi.encodeCall(
                 ChainTypeManager.setNewVersionUpgrade,
-                (generateUpgradeCutData(), previousProtocolVersion, deadline, newProtocolVersion)
+                (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
             ),
             value: 0
         });
