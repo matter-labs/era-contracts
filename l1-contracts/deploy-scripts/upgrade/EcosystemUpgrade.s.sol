@@ -417,17 +417,23 @@ contract EcosystemUpgrade is Script {
         bytes memory gatewaySpecificUpgraderInput;
         if (!isOnGateway) {
             // We need to propagate upgrade on
-            gatewaySpecificUpgraderInput = abi.encodeCall(IL2GatewaySpecificUpgrader.upgradeIfGateway, (
-                config.contracts.chainTypeManagerOnGatewayAddress,
-                prepareNewChainCreationParamsForGateway(),
-                generateUpgradeCutDataForGateway(),
-                getOldProtocolVersion(),
-                getOldProtocolDeadline(),
-                getNewProtocolVersion()
-            ));
+            gatewaySpecificUpgraderInput = abi.encodeCall(
+                IL2GatewaySpecificUpgrader.upgradeIfGateway,
+                (
+                    config.contracts.chainTypeManagerOnGatewayAddress,
+                    prepareNewChainCreationParamsForGateway(),
+                    generateUpgradeCutDataForGateway(),
+                    getOldProtocolVersion(),
+                    getOldProtocolDeadline(),
+                    getNewProtocolVersion()
+                )
+            );
         }
 
-        bytes memory data = abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (forceDeployments, L2_GATEWAY_SPECIFIC_UPGRADER, gatewaySpecificUpgraderInput));
+        bytes memory data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgrade,
+            (forceDeployments, L2_GATEWAY_SPECIFIC_UPGRADER, gatewaySpecificUpgraderInput)
+        );
 
         transaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
@@ -626,7 +632,9 @@ contract EcosystemUpgrade is Script {
 
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
 
-        config.contracts.chainTypeManagerOnGatewayAddress = toml.readAddress("$.contracts.chain_type_manager_on_gateway_addr");
+        config.contracts.chainTypeManagerOnGatewayAddress = toml.readAddress(
+            "$.contracts.chain_type_manager_on_gateway_addr"
+        );
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         config.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
@@ -760,7 +768,11 @@ contract EcosystemUpgrade is Script {
         });
     }
 
-    function prepareNewChainCreationParamsForGateway() internal virtual returns (ChainCreationParams memory chainCreationParams) {
+    function prepareNewChainCreationParamsForGateway()
+        internal
+        virtual
+        returns (ChainCreationParams memory chainCreationParams)
+    {
         // TODO
     }
 

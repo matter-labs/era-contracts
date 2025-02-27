@@ -16,7 +16,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
  * @dev Should be deployed only on Gateway.
  */
 contract L2GatewaySpecificUpgrader is IL2GatewaySpecificUpgrader {
-    
     /// @notice Ensures that only the `FORCE_DEPLOYER` can call the function.
     /// @dev Note that it is vital to put this modifier at the start of *each* function,
     /// since even temporary anauthorized access can be dangerous.
