@@ -280,7 +280,7 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         initializeConfig(configPath);
         instantiateCreate2Factory();
-        
+
         deployGenesisUpgrade();
 
         saveOutput(outputPath);
