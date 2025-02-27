@@ -83,13 +83,19 @@ struct DeployedAddresses {
     BridgesDeployedAddresses bridges;
     L1NativeTokenVaultAddresses vaults;
     DataAvailabilityDeployedAddresses daAddresses;
+    ExtContracts extContracts;
     address transparentProxyAdmin;
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-    address blobVersionedHashRetriever;
     address validatorTimelock;
     address create2Factory;
+}
+
+// This struct is necessary because of the bug in solidity compiler, that doesn't allow big structures in public api
+struct ExtContracts {
+    address serverNotifier;
+    address blobVersionedHashRetriever;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -485,7 +491,7 @@ contract DeployUtils is Script {
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
-            blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
+            blobVersionedHashRetriever: addresses.extContracts.blobVersionedHashRetriever
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

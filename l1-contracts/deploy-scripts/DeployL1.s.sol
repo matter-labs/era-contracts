@@ -58,6 +58,7 @@ import {ValidiumL1DAValidator} from "contracts/state-transition/data-availabilit
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -128,6 +129,7 @@ contract DeployL1Script is Script, DeployUtils {
         deployChainTypeManagerContract();
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
+        deployServerNotifier();
 
         updateOwners();
 
@@ -156,6 +158,26 @@ contract DeployL1Script is Script, DeployUtils {
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
                 hex""
             );
+    }
+
+    function deployServerNotifier() public {
+        bytes memory bytecode = type(ServerNotifier).creationCode;
+        address contractAddressImpl = deployViaCreate2(bytecode, "");
+
+        console.log("ServerNotifier Impl deployed at:", contractAddressImpl);
+
+        bytes memory initCalldata = abi.encodeCall(
+            ServerNotifier.initialize,
+            (addresses.transparentProxyAdmin, addresses.stateTransition.chainTypeManagerProxy)
+        );
+        address contractAddress = deployViaCreate2(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
+        );
+        console.log("ServerNotifier deployed at:", contractAddress);
+        addresses.extContracts.serverNotifier = contractAddress;
+        vm.broadcast();
+        ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).setServerNotifier(contractAddress);
     }
 
     function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
@@ -272,7 +294,7 @@ contract DeployL1Script is Script, DeployUtils {
         bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
         address contractAddress = deployViaCreate2(bytecode, "");
         console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
-        addresses.blobVersionedHashRetriever = contractAddress;
+        addresses.extContracts.blobVersionedHashRetriever = contractAddress;
     }
 
     function registerChainTypeManager() internal {
@@ -671,8 +693,9 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress(
             "deployed_addresses",
             "blob_versioned_hash_retriever_addr",
-            addresses.blobVersionedHashRetriever
+            addresses.extContracts.blobVersionedHashRetriever
         );
+        vm.serializeAddress("deployed_addresses", "server_notifier", addresses.extContracts.serverNotifier);
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 

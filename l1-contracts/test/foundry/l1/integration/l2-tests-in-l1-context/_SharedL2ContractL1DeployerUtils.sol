@@ -119,7 +119,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.sharedBridgeProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
-        addresses.blobVersionedHashRetriever = address(0x1);
+        addresses.extContracts.blobVersionedHashRetriever = address(0x1);
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();

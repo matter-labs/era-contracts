@@ -46,6 +46,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import "../contracts/governance/ServerNotifier.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -182,6 +183,38 @@ contract GatewayPreparation is Script {
         });
 
         saveOutput(output);
+    }
+
+    function notifyServerMigrationToGateway(
+        address serverNotifier,
+        address chainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
+        ServerNotifier notifier = ServerNotifier(serverNotifier);
+        Utils.adminExecute(
+            chainAdmin,
+            accessControlRestriction,
+            serverNotifier,
+            abi.encodeCall(ServerNotifier.migrateToGateway, (chainId)),
+            0
+        );
+    }
+
+    function notifyServerMigrationFromGateway(
+        address serverNotifier,
+        address chainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
+        ServerNotifier notifier = ServerNotifier(serverNotifier);
+        Utils.adminExecute(
+            chainAdmin,
+            accessControlRestriction,
+            serverNotifier,
+            abi.encodeCall(ServerNotifier.migrateFromGateway, (chainId)),
+            0
+        );
     }
 
     /// @dev Requires the sender to be the owner of the contract
