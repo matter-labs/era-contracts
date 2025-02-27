@@ -6,6 +6,7 @@ import {Utils, L2_WETH_IMPL_ADDRESS, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRE
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {L2_GATEWAY_SPECIFIC_UPGRADER} from "contracts/common/L2ContractAddresses.sol";
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -26,7 +27,7 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 6;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -340,6 +341,7 @@ library SystemContractsProcessing {
         result[2] = L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode();
         result[3] = L2ContractsBytecodesLib.readMessageRootBytecode();
         result[4] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
+        result[5] = L2ContractsBytecodesLib.readL2GatewaySpecificUpgrader();
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -383,6 +385,13 @@ library SystemContractsProcessing {
         forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
             newAddress: L2_WETH_IMPL_ADDRESS,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[5] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[5]),
+            newAddress: L2_GATEWAY_SPECIFIC_UPGRADER,
             callConstructor: false,
             value: 0,
             input: ""

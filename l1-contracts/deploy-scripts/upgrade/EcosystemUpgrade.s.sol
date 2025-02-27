@@ -66,7 +66,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_GATEWAY_SPECIFIC_UPGRADER} from "contracts/common/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
@@ -77,6 +77,7 @@ import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
+import {IL2GatewaySpecificUpgrader} from "contracts/common/interfaces/IL2GatewaySpecificUpgrader.sol";
 
 interface IBridgehub {
     function chainTypeManager(uint256 chainId) external returns (address);
@@ -238,6 +239,7 @@ contract EcosystemUpgrade is Script {
         address ctmDeploymentTrackerProxy;
         address messageRootProxy;
         address l1NullifierAddress;
+        address chainTypeManagerOnGatewayAddress;
     }
 
     struct TokensConfig {
@@ -404,21 +406,33 @@ contract EcosystemUpgrade is Script {
 
     /// @notice Build L1 -> L2 upgrade tx
     function _composeUpgradeTx(
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
+        bool isOnGateway
     ) internal virtual returns (L2CanonicalTransaction memory transaction) {
         // Sanity check
         for (uint256 i; i < forceDeployments.length; i++) {
             require(isHashInFactoryDeps[forceDeployments[i].bytecodeHash], "Bytecode hash not in factory deps");
         }
 
-        bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
+        bytes memory gatewaySpecificUpgraderInput;
+        if (!isOnGateway) {
+            // We need to propagate upgrade on
+            gatewaySpecificUpgraderInput = abi.encodeCall(IL2GatewaySpecificUpgrader.upgradeIfGateway, (
+                config.contracts.chainTypeManagerOnGatewayAddress,
+                prepareNewChainCreationParamsForGateway(),
+                generateUpgradeCutDataForGateway(),
+                getOldProtocolVersion(),
+                getOldProtocolDeadline(),
+                getNewProtocolVersion()
+            ));
+        }
+
+        bytes memory data = abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (forceDeployments, L2_GATEWAY_SPECIFIC_UPGRADER, gatewaySpecificUpgraderInput));
 
         transaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            // Note, that we actually do force deployments to the ContractDeployer and not complex upgrader.
-            // The implementation of the ComplexUpgrader will be deployed during one of the force deployments.
-            to: uint256(uint160(address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR))),
+            to: uint256(uint160(address(L2_COMPLEX_UPGRADER_ADDR))),
             // TODO: dont use hardcoded values
             gasLimit: 72_000_000,
             gasPerPubdataByteLimit: 800,
@@ -502,13 +516,15 @@ contract EcosystemUpgrade is Script {
             input: ""
         });
 
+        // TODO: generateForceDeploymentData
+
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
             baseForceDeployments,
             additionalForceDeployments
         );
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
+            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments, false),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
             evmEmulatorHash: config.contracts.evmEmulatorHash,
@@ -525,6 +541,10 @@ contract EcosystemUpgrade is Script {
             initAddress: addresses.stateTransition.defaultUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
+    }
+
+    function generateUpgradeCutDataForGateway() public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
+        // TODO
     }
 
     function getEcosystemAdmin() external virtual returns (address) {
@@ -605,6 +625,8 @@ contract EcosystemUpgrade is Script {
             .validatorTimelock();
 
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
+
+        config.contracts.chainTypeManagerOnGatewayAddress = toml.readAddress("$.contracts.chain_type_manager_on_gateway_addr");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         config.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
@@ -736,6 +758,10 @@ contract EcosystemUpgrade is Script {
             diamondCut: diamondCut,
             forceDeploymentsData: generatedData.forceDeploymentsData
         });
+    }
+
+    function prepareNewChainCreationParamsForGateway() internal virtual returns (ChainCreationParams memory chainCreationParams) {
+        // TODO
     }
 
     function prepareForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
