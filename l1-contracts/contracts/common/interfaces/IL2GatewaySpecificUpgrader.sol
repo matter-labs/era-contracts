@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {ChainCreationParams} from "../../state-transition/IChainTypeManager.sol";
+import {IL2ContractDeployer} from "../../common/interfaces/IL2ContractDeployer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /**
@@ -13,10 +14,11 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 interface IL2GatewaySpecificUpgrader {
     function upgradeIfGateway(
         address ctmAddress,
-        ChainCreationParams memory chainCreationParams,
-        Diamond.DiamondCutData memory upgradeCutData,
+        ChainCreationParams calldata chainCreationParams,
+        Diamond.DiamondCutData calldata upgradeCutData,
         uint256 oldProtocolVersion,
         uint256 oldProtocolVersionDeadline,
-        uint256 newProtocolVersion
+        uint256 newProtocolVersion,
+        IL2ContractDeployer.ForceDeployment[] calldata
     ) external payable;
 }

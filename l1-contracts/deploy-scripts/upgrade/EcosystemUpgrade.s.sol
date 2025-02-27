@@ -249,6 +249,7 @@ contract EcosystemUpgrade is Script {
         StateTransitionDeployedAddresses stateTransition;
         address blobVersionedHashRetriever;
         bytes facetCutsData;
+        bytes additionalForceDeployments;
     }
 
     struct TokensConfig {
@@ -430,6 +431,8 @@ contract EcosystemUpgrade is Script {
 
         bytes memory gatewaySpecificUpgraderInput;
         if (!isOnGateway) {
+
+            IL2ContractDeployer.ForceDeployment[] memory gatewaySpecificForceDeployments = abi.decode(config.gatewayContracts.additionalForceDeployments, (IL2ContractDeployer.ForceDeployment[]));
             // We need to propagate upgrade on
             gatewaySpecificUpgraderInput = abi.encodeCall(
                 IL2GatewaySpecificUpgrader.upgradeIfGateway,
@@ -439,7 +442,8 @@ contract EcosystemUpgrade is Script {
                     generateUpgradeCutData({isOnGateway: true}),
                     getOldProtocolVersion(),
                     getOldProtocolDeadline(),
-                    getNewProtocolVersion()
+                    getNewProtocolVersion(),
+                    gatewaySpecificForceDeployments
                 )
             );
         }
@@ -666,6 +670,7 @@ contract EcosystemUpgrade is Script {
         config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
 
         config.gatewayContracts.facetCutsData = abi.encode(new Diamond.DiamondCutData[](0)); // TODO
+        config.gatewayContracts.additionalForceDeployments = abi.encode(new IL2ContractDeployer.ForceDeployment[](0)); // TODO
     }
 
     function initializeOldData() internal virtual {

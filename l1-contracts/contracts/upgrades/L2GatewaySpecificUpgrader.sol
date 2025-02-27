@@ -3,8 +3,9 @@
 pragma solidity 0.8.24;
 
 import {IL2GatewaySpecificUpgrader} from "../common/interfaces/IL2GatewaySpecificUpgrader.sol";
+import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IChainTypeManager, ChainCreationParams} from "../state-transition/IChainTypeManager.sol";
-import {L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_FORCE_DEPLOYER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 import {GATEWAY_CHAIN_ID} from "../common/Config.sol";
 import {Unauthorized, InvalidProtocolVersion} from "../common/L1ContractErrors.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -32,11 +33,12 @@ contract L2GatewaySpecificUpgrader is IL2GatewaySpecificUpgrader {
     /// provided by the delegated contract.
     function upgradeIfGateway(
         address ctmAddress,
-        ChainCreationParams memory chainCreationParams,
-        Diamond.DiamondCutData memory upgradeCutData,
+        ChainCreationParams calldata chainCreationParams,
+        Diamond.DiamondCutData calldata upgradeCutData,
         uint256 oldProtocolVersion,
         uint256 oldProtocolVersionDeadline,
-        uint256 newProtocolVersion
+        uint256 newProtocolVersion,
+        IL2ContractDeployer.ForceDeployment[] calldata additionalForceDeployments
     ) public payable onlyForceDeployer {
         if (block.chainid != GATEWAY_CHAIN_ID) return; // Do nothing
 
@@ -48,5 +50,7 @@ contract L2GatewaySpecificUpgrader is IL2GatewaySpecificUpgrader {
             oldProtocolVersionDeadline,
             newProtocolVersion
         );
+
+        IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(additionalForceDeployments);
     }
 }
