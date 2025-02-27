@@ -90,7 +90,12 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             isPatchOnly
         );
 
-        txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
+        if (s.settlementLayer == address(0)) {
+            // We are executing upgrade on the settlement layer for this chain.
+            // So include actual chain upgrate tx.
+            // Otherwise execute only "inactive" part of the upgrade.
+            txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
+        }
 
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
