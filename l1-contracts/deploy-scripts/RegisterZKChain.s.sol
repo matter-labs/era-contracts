@@ -128,7 +128,6 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
-        addChainToServerNotifier();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -274,30 +273,6 @@ contract RegisterZKChainScript is Script {
         );
         vm.broadcast();
         L1NullifierDev(config.l1Nullifier).setL2LegacySharedBridge(config.chainChainId, bridgeAddress);
-    }
-
-    function addChainToServerNotifier() internal {
-        //        if (config.serverNotifier != address(0)) {
-
-        //                console.logAddress(config.serverNotifier);
-        //                console.logAddress(output.chainAdmin);
-        //                console.logUint(config.chainChainId);
-        vm.broadcast();
-        ServerNotifier(config.serverNotifier).addChain(output.chainAdmin, config.chainChainId);
-        console.log(
-            "Network added to Server notifier added :",
-            config.serverNotifier,
-            output.chainAdmin,
-            config.chainChainId
-        );
-
-        //            Utils.adminExecute(
-        //                Ownable(config.serverNotifier).owner(),
-        //                address(0),
-        //                config.serverNotifier,
-        //                abi.encodeCall(ServerNotifier.addChain, (output.chainAdmin, config.chainChainId)),
-        //                0
-        //            );
     }
 
     function registerAssetIdOnBridgehub() internal {

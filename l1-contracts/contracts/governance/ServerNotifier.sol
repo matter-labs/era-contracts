@@ -2,15 +2,26 @@
 pragma solidity ^0.8.0;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ZeroAddress} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, Unauthorized} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 
 contract ServerNotifier is Ownable2Step, ReentrancyGuard {
-    mapping(address chainAdmin => uint256 chainId) public registeredChains;
+    IChainTypeManager public chainTypeManager;
 
     event MigrateToGateway(uint256 indexed chainId);
+    event MigrateFromGateway(uint256 indexed chainId);
 
-    function initialize(address _admin) public reentrancyGuardInitializer {
+    /// @notice Checks if the caller is the admin of the chain.
+    modifier onlyChainAdmin(uint256 _chainId) {
+        if (msg.sender != chainTypeManager.getChainAdmin(_chainId)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    function initialize(address _admin, address _chainTypeManager) public reentrancyGuardInitializer {
+        chainTypeManager = IChainTypeManager(_chainTypeManager);
         if (_admin == address(0)) {
             revert ZeroAddress();
         }
@@ -18,21 +29,11 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard {
         _transferOwnership(_admin);
     }
 
-    function addChain(address _chainAdmin, uint256 _chainId) public {
-        registeredChains[_chainAdmin] = _chainId;
+    function migrateToGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
+        emit MigrateToGateway(_chainId);
     }
 
-    function removeChainAdmin() public {
-        registeredChains[msg.sender] = 0;
-    }
-
-    function removeChainAdmin(address _chainAdmin) public onlyOwner {
-        registeredChains[_chainAdmin] = 0;
-    }
-
-    function migrateToGateway() public {
-        uint256 chainId = registeredChains[msg.sender];
-        require(chainId != 0, "No chain registered gateway");
-        emit MigrateToGateway(chainId);
+    function migrateFromGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
+        emit MigrateFromGateway(_chainId);
     }
 }

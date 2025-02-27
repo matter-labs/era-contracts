@@ -185,13 +185,34 @@ contract GatewayPreparation is Script {
         saveOutput(output);
     }
 
-    function notifyServer(address serverNotifier, address chainAdmin, address accessControlRestriction) public {
+    function notifyServerMigrationToGateway(
+        address serverNotifier,
+        address chainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
         ServerNotifier notifier = ServerNotifier(serverNotifier);
         Utils.adminExecute(
             chainAdmin,
             accessControlRestriction,
             serverNotifier,
-            abi.encodeCall(ServerNotifier.migrateToGateway, ()),
+            abi.encodeCall(ServerNotifier.migrateToGateway, (chainId)),
+            0
+        );
+    }
+
+    function notifyServerMigrationFromGateway(
+        address serverNotifier,
+        address chainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
+        ServerNotifier notifier = ServerNotifier(serverNotifier);
+        Utils.adminExecute(
+            chainAdmin,
+            accessControlRestriction,
+            serverNotifier,
+            abi.encodeCall(ServerNotifier.migrateFromGateway, (chainId)),
             0
         );
     }
