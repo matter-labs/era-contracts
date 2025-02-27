@@ -37,17 +37,21 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
         )
     {}
 
-    /// @notice copied from L1NTV for L1 compilation
+    /// @notice overrides L2NativeTokenVault for compilation in the L1 context
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _l1Token
     ) public view override(L2NativeTokenVault) returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
-        return
-            Create2.computeAddress(
-                salt,
-                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, "")))
-            );
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _originChainId == L1_CHAIN_ID) {
+            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
+        } else {
+            bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
+            return
+                Create2.computeAddress(
+                    salt,
+                    keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, "")))
+                );
+        }
     }
 
     function deployBridgedStandardERC20(address _owner) external {

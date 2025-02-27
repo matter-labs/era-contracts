@@ -33,7 +33,7 @@ contract L1AssetRouterActorHandler is Test {
         l1Tokens = _l1Tokens;
     }
 
-    function finalizeDeposit(uint256 _amount, address _sender, uint256 _l1TokenIndex, uint256 _receiverIndex) public {
+    function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _l1TokenIndex) public {
         _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
         uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
@@ -59,22 +59,32 @@ contract L1AssetRouterActorHandler is Test {
         ghost_totalDeposits += _amount;
     }
 
-    function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex) public {
-        uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
+    function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _l1TokenIndex) public {
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
+        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
+
+        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
+        uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
+        address l1Token = l1Tokens[l1TokenIndex];
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
+        bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
+
         bytes memory data = DataEncoding.encodeBridgeMintData({
             _originalCaller: _sender,
             _remoteReceiver: address(receivers[receiverIndex]),
-            _originToken: L1_TOKEN_ADDRESS,
+            _originToken: l1Token,
             _amount: amount,
             _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
+        if (assetId == baseTokenAssetId) {
+            return;
+        }
+
         // the 1st parameter is unused by `L2AssetRouter`
         // https://github.com/matter-labs/era-contracts/blob/ac11ba99e3f2c3365a162f587b17e35b92dc4f24/l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol#L132
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit(0, assetId, data);
+        l2AssetRouter.finalizeDeposit(0, assetId, data);
 
         ghost_totalDeposits += amount;
     }
