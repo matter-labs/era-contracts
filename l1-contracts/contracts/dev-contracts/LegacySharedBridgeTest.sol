@@ -10,7 +10,8 @@ import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openze
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {SystemContractsHelper} from "./SystemContractsHelper.sol";
 import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
-
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {BridgedStandardERC20} from "../bridge/BridgedStandardERC20.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
@@ -21,6 +22,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_DEPLOYER_SYSTEM_CON
 contract LegacySharedBridgeTest {
     address l2TokenAddress;
     address l2LegacySharedBridgeAddress;
+    address aliasedL1SharedBridge;
 
     function _getBytecodeHash(address _addr) internal view returns (bytes32 result) {
         assembly {
@@ -29,6 +31,7 @@ contract LegacySharedBridgeTest {
     }
 
     function resetLegacyParams(
+        uint256 l1ChainId,
         address legacyL1Token,
         address l1SharedBridge,
         bytes32 beaconProxyBytecodeHash
@@ -38,7 +41,6 @@ contract LegacySharedBridgeTest {
         // Using dummy era chain id to ensure all the necessary contracts will be deployed
         // during initialization.
 
-        uint256 dummyL1ChainId = 1;
         uint256 dummyEraChainId = 2;
 
         L2SharedBridgeV25 impl = new L2SharedBridgeV25(dummyEraChainId);
@@ -72,7 +74,7 @@ contract LegacySharedBridgeTest {
         );
         require(success, "Failed to finalize legacy bridging");
 
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(dummyL1ChainId, ETH_TOKEN_ADDRESS);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(l1ChainId, ETH_TOKEN_ADDRESS);
 
         // Now, we need to ensure that the L2NativeTokenVault/L2AssetRouter are aware of the new bridge.
         IContractDeployer.ForceDeployment[] memory forceDeployments = new IContractDeployer.ForceDeployment[](2);
@@ -89,7 +91,7 @@ contract LegacySharedBridgeTest {
             value: 0,
             // solhint-disable-next-line func-named-parameters
             input: abi.encode(
-                dummyL1ChainId,
+                l1ChainId,
                 dummyEraChainId,
                 // In the real upgrade, the L1 asset router differs from the old L1 shared bridge, but
                 // in this case, it is okay.
@@ -108,8 +110,8 @@ contract LegacySharedBridgeTest {
             value: 0,
             // solhint-disable-next-line func-named-parameters
             input: abi.encode(
-                dummyL1ChainId,
-                dummyL1ChainId,
+                l1ChainId,
+                address(this),
                 beaconProxyBytecodeHash,
                 address(proxy),
                 address(L2SharedBridgeV25(address(proxy)).l2TokenBeacon()),
@@ -124,9 +126,14 @@ contract LegacySharedBridgeTest {
         // Saving the result for future usage in the test.
         l2TokenAddress = L2SharedBridgeV25(address(proxy)).l2TokenAddress(legacyL1Token);
         l2LegacySharedBridgeAddress = address(proxy);
+        aliasedL1SharedBridge = AddressAliasHelper.applyL1ToL2Alias(l1SharedBridge);
 
         // Now, we also need to upgrade the legacy bridge to the v26 version
         L2SharedBridgeLegacy newImpl = new L2SharedBridgeLegacy();
         admin.upgrade(ITransparentUpgradeableProxy(address(proxy)), address(newImpl));
+
+        BridgedStandardERC20 bridgedERC20Impl = new BridgedStandardERC20();
+        UpgradeableBeacon beacon = L2SharedBridgeLegacy(address(proxy)).l2TokenBeacon();
+        beacon.upgradeTo(address(bridgedERC20Impl));
     }
 }
