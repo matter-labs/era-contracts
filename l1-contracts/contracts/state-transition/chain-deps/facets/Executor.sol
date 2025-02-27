@@ -67,28 +67,28 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         //     _operatorDAInput: _newBatch.operatorDAInput,
         //     _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         // });
-        //
-        // if (_previousBatch.batchHash != logOutput.previousBatchHash) {
-        //     revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
-        // }
-        // // Check that the priority operation hash in the L2 logs is as expected
-        // if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
-        //     revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
-        // }
-        // // Check that the number of processed priority operations is as expected
-        // if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
-        //     revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
-        // }
-
-        // // Check the timestamp of the new batch
-        // _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
         L1DAValidatorOutput memory daOutput;
-        daOutput.stateDiffHash = logOutput.stateDiffHash;
+        daOutput.stateDiffHash = bytes32(_newBatch.operatorDAInput);
         daOutput.blobsOpeningCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         daOutput.blobsLinearHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         ///
         /// DEBUG SUPPORT END
         ///
+
+        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+        }
+        // Check that the priority operation hash in the L2 logs is as expected
+        if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
+            revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
+        }
+        // Check that the number of processed priority operations is as expected
+        if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
+            revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
+        }
+
+        // Check the timestamp of the new batch
+        _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
         bytes32 commitment = _createBatchCommitment(
