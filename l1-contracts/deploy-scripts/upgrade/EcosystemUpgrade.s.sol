@@ -439,7 +439,7 @@ contract EcosystemUpgrade is Script {
                 IL2GatewaySpecificUpgrader.upgradeIfGateway,
                 (
                     config.gateway.chainTypeManagerOnGatewayAddress,
-                    prepareNewChainCreationParamsForGateway(),
+                    prepareNewChainCreationParams({isOnGateway: true}),
                     generateUpgradeCutData({isOnGateway: true}),
                     getOldProtocolVersion(),
                     getOldProtocolDeadline(),
@@ -840,33 +840,25 @@ contract EcosystemUpgrade is Script {
         return (diamondCut);
     }
 
-    function prepareNewChainCreationParams() internal virtual returns (ChainCreationParams memory chainCreationParams) {
-        require(upgradeConfig.fixedForceDeploymentsDataGenerated, "Force deployment data not generated");
-        require(upgradeConfig.diamondCutPrepared, "Diamond cut not prepared");
-
-        Diamond.DiamondCutData memory diamondCut = abi.decode(generatedData.diamondCutData, (Diamond.DiamondCutData));
-
-        chainCreationParams = ChainCreationParams({
-            genesisUpgrade: addresses.stateTransition.genesisUpgrade,
-            genesisBatchHash: config.contracts.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            forceDeploymentsData: generatedData.fixedForceDeploymentsData
-        });
-    }
-
-    function prepareNewChainCreationParamsForGateway()
-        internal
-        virtual
-        returns (ChainCreationParams memory chainCreationParams)
-    {
+    function prepareNewChainCreationParams(
+        bool isOnGateway
+    ) internal virtual returns (ChainCreationParams memory chainCreationParams) {
         require(upgradeConfig.fixedForceDeploymentsDataGenerated, "Force deployment data not generated");
 
-        Diamond.DiamondCutData memory diamondCut = prepareDiamondCutData({isOnGateway: true});
+        Diamond.DiamondCutData memory diamondCut;
+        address genesisUpgradeAddress;
+
+        if (!isOnGateway) {
+            require(upgradeConfig.diamondCutPrepared, "Diamond cut not prepared");
+            diamondCut = abi.decode(generatedData.diamondCutData, (Diamond.DiamondCutData));
+            genesisUpgradeAddress = addresses.stateTransition.genesisUpgrade;
+        } else {
+            diamondCut = prepareDiamondCutData({isOnGateway: true});
+            genesisUpgradeAddress = config.gateway.gatewayStateTransition.genesisUpgrade;
+        }
 
         chainCreationParams = ChainCreationParams({
-            genesisUpgrade: config.gateway.gatewayStateTransition.genesisUpgrade,
+            genesisUpgrade: genesisUpgradeAddress,
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
@@ -1207,10 +1199,11 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployBytecodesSupplier() internal virtual {
-        address contractAddress = deployViaCreate2(type(BytecodesSupplier).creationCode);
-        console.log("BytecodesSupplier deployed at:", contractAddress);
-        notifyAboutDeployment(contractAddress, "BytecodesSupplier", hex"");
-        addresses.bytecodesSupplier = contractAddress;
+        addresses.bytecodesSupplier = deployViaCreate2AndNotify(
+            type(BytecodesSupplier).creationCode,
+            abi.encode(),
+            "BytecodesSupplier"
+        );
     }
 
     function deployDualVerifier() internal virtual {
@@ -1225,42 +1218,43 @@ contract EcosystemUpgrade is Script {
             code = type(DualVerifier).creationCode;
             contractName = "DualVerifier";
         }
-        code = abi.encodePacked(code, abi.encode(verifierFflonk, verifierPlonk));
-        address contractAddress = deployViaCreate2(code);
-        notifyAboutDeployment(contractAddress, contractName, abi.encode(verifierFflonk, verifierPlonk));
-        addresses.stateTransition.verifier = contractAddress;
+
+        addresses.stateTransition.verifier = deployViaCreate2AndNotify(
+            code,
+            abi.encode(verifierFflonk, verifierPlonk),
+            contractName
+        );
     }
 
     function deployVerifierFflonk() internal virtual returns (address contractAddress) {
-        bytes memory code = type(VerifierFflonk).creationCode;
-        contractAddress = deployViaCreate2(code);
-        notifyAboutDeployment(contractAddress, "VerifierFflonk", hex"");
+        contractAddress = deployViaCreate2AndNotify(type(VerifierFflonk).creationCode, abi.encode(), "VerifierFflonk");
     }
 
     function deployVerifierPlonk() internal virtual returns (address contractAddress) {
-        bytes memory code = type(VerifierPlonk).creationCode;
-        contractAddress = deployViaCreate2(code);
-        notifyAboutDeployment(contractAddress, "VerifierPlonk", hex"");
+        contractAddress = deployViaCreate2AndNotify(type(VerifierPlonk).creationCode, abi.encode(), "VerifierPlonk");
     }
     function deployDefaultUpgrade() internal virtual {
-        address contractAddress = deployViaCreate2(type(DefaultUpgrade).creationCode);
-        notifyAboutDeployment(contractAddress, "DefaultUpgrade", hex"");
-        addresses.stateTransition.defaultUpgrade = contractAddress;
+        addresses.stateTransition.defaultUpgrade = deployViaCreate2AndNotify(
+            type(DefaultUpgrade).creationCode,
+            abi.encode(),
+            "DefaultUpgrade"
+        );
     }
 
     function deployGenesisUpgrade() internal virtual {
-        bytes memory bytecode = abi.encodePacked(type(L1GenesisUpgrade).creationCode);
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(contractAddress, "L1GenesisUpgrade", hex"");
-        addresses.stateTransition.genesisUpgrade = contractAddress;
+        addresses.stateTransition.genesisUpgrade = deployViaCreate2AndNotify(
+            type(L1GenesisUpgrade).creationCode,
+            abi.encode(),
+            "L1GenesisUpgrade"
+        );
     }
 
     function deployGatewayUpgrade() internal virtual {
-        bytes memory bytecode = abi.encodePacked(type(GatewayUpgrade).creationCode);
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(contractAddress, "GatewayUpgrade", hex"");
-
-        addresses.gatewayUpgrade = contractAddress;
+        addresses.gatewayUpgrade = deployViaCreate2AndNotify(
+            type(GatewayUpgrade).creationCode,
+            abi.encode(),
+            "GatewayUpgrade"
+        );
     }
 
     function deployDAValidators() internal virtual {
@@ -1285,69 +1279,54 @@ contract EcosystemUpgrade is Script {
         }
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        address rollupDAValidator = deployViaCreate2(Utils.readRollupDAValidatorBytecode());
-        notifyAboutDeployment(rollupDAValidator, "RollupL1DAValidator", hex"");
-        addresses.daAddresses.l1RollupDAValidator = rollupDAValidator;
+        addresses.daAddresses.l1RollupDAValidator = deployViaCreate2AndNotify(
+            Utils.readRollupDAValidatorBytecode(),
+            abi.encode(),
+            "RollupL1DAValidator"
+        );
 
-        address validiumDAValidator = deployViaCreate2(type(ValidiumL1DAValidator).creationCode);
-        notifyAboutDeployment(validiumDAValidator, "ValidiumL1DAValidator", hex"");
-        addresses.daAddresses.l1ValidiumDAValidator = validiumDAValidator;
+        addresses.daAddresses.l1ValidiumDAValidator = deployViaCreate2AndNotify(
+            type(ValidiumL1DAValidator).creationCode,
+            abi.encode(),
+            "ValidiumL1DAValidator"
+        );
     }
 
     function deployValidatorTimelock() internal virtual {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-        bytes memory bytecode = abi.encodePacked(
+
+        addresses.validatorTimelock = deployViaCreate2AndNotify(
             type(ValidatorTimelock).creationCode,
-            abi.encode(config.deployerAddress, executionDelay)
+            abi.encode(config.deployerAddress, executionDelay),
+            "ValidatorTimelock"
         );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(contractAddress, "ValidatorTimelock", abi.encode(config.deployerAddress, executionDelay));
-        addresses.validatorTimelock = contractAddress;
     }
 
     function deployBridgehubImplementation() internal virtual {
-        bytes memory bridgeHubBytecode = abi.encodePacked(
+        addresses.bridgehub.bridgehubImplementation = deployViaCreate2AndNotify(
             type(Bridgehub).creationCode,
-            abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains)
-        );
-        address bridgehubImplementation = deployViaCreate2(bridgeHubBytecode);
-        notifyAboutDeployment(
-            bridgehubImplementation,
-            "Bridgehub",
             abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains),
+            "Bridgehub",
             "Bridgehub Implementation"
         );
-        addresses.bridgehub.bridgehubImplementation = bridgehubImplementation;
     }
 
     function deployMessageRootContractImplementation() internal virtual {
-        bytes memory messageRootBytecode = abi.encodePacked(
+        addresses.bridgehub.messageRootImplementation = deployViaCreate2AndNotify(
             type(MessageRoot).creationCode,
-            abi.encode(config.contracts.bridgehubProxyAddress)
-        );
-        address messageRootImplementation = deployViaCreate2(messageRootBytecode);
-        notifyAboutDeployment(
-            messageRootImplementation,
-            "MessageRoot",
             abi.encode(config.contracts.bridgehubProxyAddress),
+            "MessageRoot",
             "Message Root Implementation"
         );
-        addresses.bridgehub.messageRootImplementation = messageRootImplementation;
     }
 
     function deployCTMDeploymentTrackerImplementation() internal virtual {
-        bytes memory ctmDTBytecode = abi.encodePacked(
+        addresses.bridgehub.ctmDeploymentTrackerImplementation = deployViaCreate2AndNotify(
             type(CTMDeploymentTracker).creationCode,
-            abi.encode(config.contracts.bridgehubProxyAddress, config.contracts.l1AssetRouterProxyAddress)
-        );
-        address ctmDTImplementation = deployViaCreate2(ctmDTBytecode);
-        notifyAboutDeployment(
-            ctmDTImplementation,
-            "CTMDeploymentTracker",
             abi.encode(config.contracts.bridgehubProxyAddress, config.contracts.l1AssetRouterProxyAddress),
+            "CTMDeploymentTracker",
             "CTM Deployment Tracker Implementation"
         );
-        addresses.bridgehub.ctmDeploymentTrackerImplementation = ctmDTImplementation;
     }
 
     function deployChainTypeManagerContract() internal virtual {
@@ -1356,73 +1335,58 @@ contract EcosystemUpgrade is Script {
     }
 
     function deployStateTransitionDiamondFacets() internal virtual {
-        address executorFacet = deployViaCreate2(
-            abi.encodePacked(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId))
+        addresses.stateTransition.executorFacet = deployViaCreate2AndNotify(
+            type(ExecutorFacet).creationCode,
+            abi.encode(config.l1ChainId),
+            "ExecutorFacet"
         );
-        notifyAboutDeployment(executorFacet, "ExecutorFacet", abi.encode(config.l1ChainId));
-        addresses.stateTransition.executorFacet = executorFacet;
 
-        address adminFacet = deployViaCreate2(
-            abi.encodePacked(
-                type(AdminFacet).creationCode,
-                abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager)
-            )
+        addresses.stateTransition.adminFacet = deployViaCreate2AndNotify(
+            type(AdminFacet).creationCode,
+            abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager),
+            "AdminFacet"
         );
-        notifyAboutDeployment(
-            adminFacet,
-            "AdminFacet",
-            abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager)
+
+        addresses.stateTransition.mailboxFacet = deployViaCreate2AndNotify(
+            type(MailboxFacet).creationCode,
+            abi.encode(config.eraChainId, config.l1ChainId),
+            "MailboxFacet"
         );
-        addresses.stateTransition.adminFacet = adminFacet;
 
-        address mailboxFacet = deployViaCreate2(
-            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId, config.l1ChainId))
+        addresses.stateTransition.gettersFacet = deployViaCreate2AndNotify(
+            type(GettersFacet).creationCode,
+            abi.encode(),
+            "GettersFacet"
         );
-        notifyAboutDeployment(mailboxFacet, "MailboxFacet", abi.encode(config.eraChainId, config.l1ChainId));
-        addresses.stateTransition.mailboxFacet = mailboxFacet;
 
-        address gettersFacet = deployViaCreate2(type(GettersFacet).creationCode);
-        notifyAboutDeployment(gettersFacet, "GettersFacet", hex"");
-        addresses.stateTransition.gettersFacet = gettersFacet;
-
-        address diamondInit = deployViaCreate2(type(DiamondInit).creationCode);
-        notifyAboutDeployment(diamondInit, "DiamondInit", hex"");
-        addresses.stateTransition.diamondInit = diamondInit;
+        addresses.stateTransition.diamondInit = deployViaCreate2AndNotify(
+            type(DiamondInit).creationCode,
+            abi.encode(),
+            "DiamondInit"
+        );
     }
 
     function deployChainTypeManagerImplementation() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.stateTransition.chainTypeManagerImplementation = deployViaCreate2AndNotify(
             type(ChainTypeManager).creationCode,
-            abi.encode(config.contracts.bridgehubProxyAddress)
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "ChainTypeManager",
             abi.encode(config.contracts.bridgehubProxyAddress),
+            "ChainTypeManager",
             "ChainTypeManagerImplementation"
         );
-        addresses.stateTransition.chainTypeManagerImplementation = contractAddress;
     }
 
     function deployL1NullifierImplementation() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.bridges.l1NullifierImplementation = deployViaCreate2AndNotify(
             type(L1Nullifier).creationCode,
             // solhint-disable-next-line func-named-parameters
-            abi.encode(config.contracts.bridgehubProxyAddress, config.eraChainId, config.contracts.eraDiamondProxy)
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "L1Nullifier",
             abi.encode(config.contracts.bridgehubProxyAddress, config.eraChainId, config.contracts.eraDiamondProxy),
+            "L1Nullifier",
             "L1NullifierImplementation"
         );
-        addresses.bridges.l1NullifierImplementation = contractAddress;
     }
 
     function deployL1AssetRouterImplementation() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.bridges.l1AssetRouterImplementation = deployViaCreate2AndNotify(
             type(L1AssetRouter).creationCode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(
@@ -1431,98 +1395,54 @@ contract EcosystemUpgrade is Script {
                 config.contracts.l1NullifierAddress,
                 config.eraChainId,
                 config.contracts.eraDiamondProxy
-            )
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "L1AssetRouter",
-            // solhint-disable-next-line func-named-parameters
-            abi.encode(
-                config.tokens.tokenWethAddress,
-                config.contracts.bridgehubProxyAddress,
-                config.contracts.l1NullifierAddress,
-                config.eraChainId,
-                config.contracts.eraDiamondProxy
             ),
+            "L1AssetRouter",
             "L1AssetRouterImplementation"
         );
-        addresses.bridges.l1AssetRouterImplementation = contractAddress;
     }
 
     function deployErc20BridgeImplementation() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.bridges.erc20BridgeImplementation = deployViaCreate2AndNotify(
             type(L1ERC20Bridge).creationCode,
             abi.encode(
                 config.contracts.l1NullifierAddress,
                 config.contracts.l1AssetRouterProxyAddress,
                 config.contracts.l1NativeTokenVaultProxy,
                 config.eraChainId
-            )
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "L1ERC20Bridge",
-            abi.encode(
-                config.contracts.l1NullifierAddress,
-                config.contracts.l1AssetRouterProxyAddress,
-                config.contracts.l1NativeTokenVaultProxy,
-                config.eraChainId
             ),
+            "L1ERC20Bridge",
             "Erc20BridgeImplementation"
         );
-        addresses.bridges.erc20BridgeImplementation = contractAddress;
     }
 
     function deployBridgedStandardERC20Implementation() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.bridges.bridgedStandardERC20Implementation = deployViaCreate2AndNotify(
             type(BridgedStandardERC20).creationCode,
-            // solhint-disable-next-line func-named-parameters
-            abi.encode()
+            abi.encode(),
+            "BridgedStandardERC20"
         );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(contractAddress, "BridgedStandardERC20", hex"");
-        addresses.bridges.bridgedStandardERC20Implementation = contractAddress;
     }
 
     function deployBridgedTokenBeacon() internal virtual {
-        bytes memory initCode = abi.encodePacked(
+        addresses.bridges.bridgedTokenBeacon = deployViaCreate2AndNotify(
             type(UpgradeableBeacon).creationCode,
-            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation),
+            "UpgradeableBeacon"
         );
-
-        address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
-        notifyAboutDeployment(
-            beacon,
-            "UpgradeableBeacon",
-            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
-        );
-        addresses.bridges.bridgedTokenBeacon = beacon;
     }
 
     function deployL1NativeTokenVaultImplementation() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.vaults.l1NativeTokenVaultImplementation = deployViaCreate2AndNotify(
             type(L1NativeTokenVault).creationCode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(
                 config.tokens.tokenWethAddress,
                 config.contracts.l1AssetRouterProxyAddress,
                 config.contracts.l1NullifierAddress
-            )
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            contractAddress,
-            "L1NativeTokenVault",
-            abi.encode(
-                config.tokens.tokenWethAddress,
-                config.contracts.l1AssetRouterProxyAddress,
-                config.contracts.l1NullifierAddress
             ),
+            "L1NativeTokenVault",
             "L1NativeTokenVaultImplementation"
         );
-        addresses.vaults.l1NativeTokenVaultImplementation = contractAddress;
     }
 
     function deployGovernanceUpgradeTimer() internal virtual {
@@ -1534,45 +1454,30 @@ contract EcosystemUpgrade is Script {
         // using the same as bridgehub is just as fine.
         address bridgehubAdmin = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
 
-        bytes memory bytecode = abi.encodePacked(
+        addresses.upgradeTimer = deployViaCreate2AndNotify(
             type(GovernanceUpgradeTimer).creationCode,
-            abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, config.ecosystemAdminAddress)
-        );
-
-        addresses.upgradeTimer = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            addresses.upgradeTimer,
-            "GovernanceUpgradeTimer",
-            abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, config.ecosystemAdminAddress)
+            abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, config.ecosystemAdminAddress),
+            "GovernanceUpgradeTimer"
         );
     }
 
     function deployL2WrappedBaseTokenStore() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.l2WrappedBaseTokenStore = deployViaCreate2AndNotify(
             type(L2WrappedBaseTokenStore).creationCode,
             // We set a temoprary admin there. This is needed for easier/quicker setting of
             // wrapped base tokens. The ownership MUST be transferred to a trusted admin before the
             // decentralized upgrade voting starts.
-            abi.encode(config.ownerAddress, msg.sender)
-        );
-
-        addresses.l2WrappedBaseTokenStore = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            addresses.l2WrappedBaseTokenStore,
-            "L2WrappedBaseTokenStore",
-            abi.encode(config.ownerAddress, msg.sender)
+            abi.encode(config.ownerAddress, msg.sender),
+            "L2WrappedBaseTokenStore"
         );
     }
 
     function deployTransitionaryOwner() internal virtual {
-        bytes memory bytecode = abi.encodePacked(
+        addresses.transitionaryOwner = deployViaCreate2AndNotify(
             type(TransitionaryOwner).creationCode,
-            abi.encode(config.ownerAddress)
+            abi.encode(config.ownerAddress),
+            "TransitionaryOwner"
         );
-
-        addresses.transitionaryOwner = deployViaCreate2(bytecode);
-
-        notifyAboutDeployment(addresses.transitionaryOwner, "TransitionaryOwner", abi.encode(config.ownerAddress));
     }
 
     ////////////////////////////// Preparing calls /////////////////////////////////
@@ -1697,7 +1602,10 @@ contract EcosystemUpgrade is Script {
 
         calls[0] = Call({
             target: config.contracts.stateTransitionManagerAddress,
-            data: abi.encodeCall(ChainTypeManager.setChainCreationParams, (prepareNewChainCreationParams())),
+            data: abi.encodeCall(
+                ChainTypeManager.setChainCreationParams,
+                (prepareNewChainCreationParams({isOnGateway: false}))
+            ),
             value: 0
         });
     }
@@ -1809,6 +1717,29 @@ contract EcosystemUpgrade is Script {
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////
+
+    function deployViaCreate2AndNotify(
+        bytes memory _creationCode,
+        bytes memory _constructorParamsEncoded,
+        string memory contractName
+    ) internal returns (address deployedAddress) {
+        bytes memory bytecode = abi.encodePacked(_creationCode, _constructorParamsEncoded);
+
+        deployedAddress = deployViaCreate2(bytecode);
+        notifyAboutDeployment(deployedAddress, contractName, _constructorParamsEncoded);
+    }
+
+    function deployViaCreate2AndNotify(
+        bytes memory _creationCode,
+        bytes memory _constructorParamsEncoded,
+        string memory contractName,
+        string memory displayName
+    ) internal returns (address deployedAddress) {
+        bytes memory bytecode = abi.encodePacked(_creationCode, _constructorParamsEncoded);
+
+        deployedAddress = deployViaCreate2(bytecode);
+        notifyAboutDeployment(deployedAddress, contractName, _constructorParamsEncoded, displayName);
+    }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.contracts.create2FactorySalt, addresses.create2Factory);
