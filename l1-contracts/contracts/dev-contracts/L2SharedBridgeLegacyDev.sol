@@ -68,10 +68,4 @@ contract L2SharedBridgeLegacyDev is L2SharedBridgeLegacy {
                 keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(l2TokenBeacon, "")))
             );
     }
-
-    function sendMessageToL1(
-        bytes calldata /* _message */
-    ) external virtual override onlyAssetRouter returns (bytes32) {
-        // There is no `L1Messenger` in the L1 context
-    }
 }

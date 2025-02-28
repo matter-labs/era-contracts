@@ -21,9 +21,10 @@ abstract contract AssetRouter_ActorHandler_Deployer is AssetRouterProperties {
         l1Tokens.push(L1_TOKEN_ADDRESS);
         l1Tokens.push(ETH_TOKEN_ADDRESS);
 
-        userActorHandlers.push(new UserActorHandler());
+        userActorHandlers.push(new UserActorHandler(l1Tokens));
         legacyBridgeActorHandler = new LegacyBridgeActorHandler(userActorHandlers, l1Tokens);
         l1AssetRouterActorHandler = new L1AssetRouterActorHandler(userActorHandlers, l1Tokens);
+
         for (uint256 i; i < userActorHandlers.length; i++) {
             targetContract(address(userActorHandlers[i]));
         }

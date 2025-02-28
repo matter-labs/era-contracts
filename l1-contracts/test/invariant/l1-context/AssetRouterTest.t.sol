@@ -8,7 +8,8 @@ import {console} from "forge-std/console.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {IL1Messenger} from "contracts/common/interfaces/IL1Messenger.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {L2SharedBridgeLegacyDev} from "contracts/dev-contracts/L2SharedBridgeLegacyDev.sol";
 
@@ -42,11 +43,18 @@ contract AssetRouterTest is
 
         vm.label(L2_ASSET_ROUTER_ADDR, "L2AssetRouter");
         vm.label(L2_NATIVE_TOKEN_VAULT_ADDR, "L2NativeTokenVault");
+        vm.label(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "L1Messenger");
 
         address[] memory deployedL1Tokens = _deployTokens();
         deployActorHandlers(deployedL1Tokens);
 
         assertEq(l1Tokens.length, 3);
+
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(IL1Messenger.sendToL1.selector),
+            abi.encode(1337)
+        );
     }
 
     function deployL2SharedBridgeLegacy(
