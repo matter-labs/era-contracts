@@ -276,7 +276,7 @@ contract DeployL1Script is Script, DeployUtils {
     function deployCTMDeploymentTracker() internal {
         address ctmDTImplementation = deployViaCreate2(
             type(CTMDeploymentTracker).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.sharedBridgeProxy)
+            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy)
         );
         console.log("CTM Deployment Tracker Implementation deployed at:", ctmDTImplementation);
         addresses.bridgehub.ctmDeploymentTrackerImplementation = ctmDTImplementation;
@@ -307,7 +307,7 @@ contract DeployL1Script is Script, DeployUtils {
         bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         console.log("ChainTypeManager registered");
         CTMDeploymentTracker ctmDT = CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         sharedBridge.setAssetDeploymentTracker(
             bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
             address(ctmDT)
@@ -404,17 +404,17 @@ contract DeployL1Script is Script, DeployUtils {
             )
         );
         console.log("SharedBridgeImplementation deployed at:", contractAddress);
-        addresses.bridges.sharedBridgeImplementation = contractAddress;
+        addresses.bridges.l1AssetRouterImplementation = contractAddress;
     }
 
     function deploySharedBridgeProxy() internal {
         bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
         address contractAddress = deployViaCreate2(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
+            abi.encode(addresses.bridges.l1AssetRouterImplementation, addresses.transparentProxyAdmin, initCalldata)
         );
         console.log("SharedBridgeProxy deployed at:", contractAddress);
-        addresses.bridges.sharedBridgeProxy = contractAddress;
+        addresses.bridges.l1AssetRouterProxy = contractAddress;
     }
 
     function setBridgehubParams() internal {
@@ -422,7 +422,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         bridgehub.setAddresses(
-            addresses.bridges.sharedBridgeProxy,
+            addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy)
         );
@@ -435,7 +435,7 @@ contract DeployL1Script is Script, DeployUtils {
             type(L1ERC20Bridge).creationCode,
             abi.encode(
                 addresses.bridges.l1NullifierProxy,
-                addresses.bridges.sharedBridgeProxy,
+                addresses.bridges.l1AssetRouterProxy,
                 addresses.vaults.l1NativeTokenVaultProxy,
                 config.eraChainId
             )
@@ -455,7 +455,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function updateSharedBridge() internal {
-        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         vm.broadcast(msg.sender);
         sharedBridge.setL1Erc20Bridge(L1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
         console.log("SharedBridge updated with ERC20Bridge address");
@@ -488,7 +488,7 @@ contract DeployL1Script is Script, DeployUtils {
             // solhint-disable-next-line func-named-parameters
             abi.encode(
                 config.tokens.tokenWethAddress,
-                addresses.bridges.sharedBridgeProxy,
+                addresses.bridges.l1AssetRouterProxy,
                 addresses.bridges.l1NullifierProxy
             )
         );
@@ -508,16 +508,16 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("L1NativeTokenVaultProxy deployed at:", contractAddress);
         addresses.vaults.l1NativeTokenVaultProxy = contractAddress;
 
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
-        // Ownable ownable = Ownable(addresses.bridges.sharedBridgeProxy);
+        // Ownable ownable = Ownable(addresses.bridges.l1AssetRouterProxy);
 
         vm.broadcast(msg.sender);
         sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
-        l1Nullifier.setL1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        l1Nullifier.setL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
 
         vm.broadcast(msg.sender);
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
@@ -533,7 +533,7 @@ contract DeployL1Script is Script, DeployUtils {
         bridgehub.transferOwnership(addresses.governance);
         bridgehub.setPendingAdmin(addresses.chainAdmin);
 
-        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         sharedBridge.transferOwnership(addresses.governance);
 
         ChainTypeManager ctm = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
@@ -632,12 +632,12 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress(
             "bridges",
             "shared_bridge_implementation_addr",
-            addresses.bridges.sharedBridgeImplementation
+            addresses.bridges.l1AssetRouterImplementation
         );
         string memory bridges = vm.serializeAddress(
             "bridges",
             "shared_bridge_proxy_addr",
-            addresses.bridges.sharedBridgeProxy
+            addresses.bridges.l1AssetRouterProxy
         );
 
         vm.serializeUint(
@@ -768,7 +768,7 @@ contract DeployL1Script is Script, DeployUtils {
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
-            l1AssetRouter: addresses.bridges.sharedBridgeProxy,
+            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readBeaconProxyBytecode()
             ),
