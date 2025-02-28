@@ -3,8 +3,8 @@ name: Slither scanner
 on: pull_request
 
 jobs:
-  slither-l1:
-    name: Slither check for L1 contracts
+  slither:
+    name: Slither check
     runs-on: ubuntu-latest
 
     steps:
@@ -54,7 +54,12 @@ jobs:
           rm -rf ./l1-contracts/contracts/dev-contracts/test/L2PlonkVerifierRecursiveTest.sol
           rm -rf ./l1-contracts/contracts/state-transition/chain-deps/GatewayCTMDeployer.sol
 
-      - name: Run Slither
-        working-directory: l1-contracts
+      - name: Run Slither for L1 contracts
+        working-directory: ./l1-contracts
         run: |
           slither --config ./slither.config.json .
+
+      - name: Run Slither for L2 contracts
+        working-directory: ./l2-contracts
+        run: |
+          slither --config ./slither.config.json --skip-assembly .
