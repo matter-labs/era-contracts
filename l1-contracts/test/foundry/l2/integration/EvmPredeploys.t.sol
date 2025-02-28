@@ -16,8 +16,11 @@ contract EvmPredeploys is Test {
     }
 
     function test_shouldDeployPredeploysIfEvmEmulatorEnabled() public {
-        AllowedBytecodeTypes mode = IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR)
-            .allowedBytecodeTypesToDeploy();
+        bytes memory data = abi.encodeCall(IL2ContractDeployer.allowedBytecodeTypesToDeploy, ());
+        (bool res, bytes memory returnData) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
+        if (!res) return; // Chain is too old
+
+        AllowedBytecodeTypes mode = abi.decode(returnData, (AllowedBytecodeTypes));
         if (mode == AllowedBytecodeTypes.EraVm) {
             // EVM emulation is not enabled
             return;
