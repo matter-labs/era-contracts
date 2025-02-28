@@ -36,7 +36,7 @@ case "$CONTEXT" in
 
     forge test --match-path 'test/invariant/l2-context/*' --zksync
     ;;
-  *) 
+  *)
     echo "error: CONTEXT environment variable must be set to either 'L1' or 'L2'" >&2
     exit 1
     ;;

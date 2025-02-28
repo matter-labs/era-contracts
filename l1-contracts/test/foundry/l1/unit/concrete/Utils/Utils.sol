@@ -262,7 +262,8 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](31);
+        bytes4[] memory selectors = new bytes4[](33);
+
         selectors[0] = GettersFacet.getVerifier.selector;
         selectors[1] = GettersFacet.getAdmin.selector;
         selectors[2] = GettersFacet.getPendingAdmin.selector;
@@ -294,6 +295,9 @@ library Utils {
         selectors[28] = GettersFacet.getProtocolVersion.selector;
         selectors[29] = GettersFacet.getPriorityTreeRoot.selector;
         selectors[30] = GettersFacet.getChainId.selector;
+        selectors[31] = GettersFacet.baseTokenGasPriceMultiplierDenominator.selector;
+        selectors[32] = GettersFacet.baseTokenGasPriceMultiplierNominator.selector;
+
         return selectors;
     }
 
@@ -311,7 +315,8 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](39);
+        bytes4[] memory selectors = new bytes4[](42);
+
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
@@ -351,6 +356,9 @@ library Utils {
         selectors[36] = UtilsFacet.util_setTotalBatchesExecuted.selector;
         selectors[37] = UtilsFacet.util_setL2LogsRootHash.selector;
         selectors[38] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
+        selectors[39] = UtilsFacet.util_setTotalBatchesCommitted.selector;
+        selectors[40] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
+        selectors[41] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
 
         return selectors;
     }
