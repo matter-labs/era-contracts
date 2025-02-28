@@ -3,12 +3,14 @@
 pragma solidity 0.8.24;
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
 import {BridgedStandardERC20} from "../bridge/BridgedStandardERC20.sol";
-
 import {L2SharedBridgeLegacy} from "../bridge/L2SharedBridgeLegacy.sol";
 import {InvalidCaller, ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../common/L1ContractErrors.sol";
 
+/// @dev `L2SharedBridgeLegacy` contract for tests in the L1 context
 contract L2SharedBridgeLegacyDev is L2SharedBridgeLegacy {
     constructor() L2SharedBridgeLegacy() {}
 
@@ -47,5 +49,26 @@ contract L2SharedBridgeLegacyDev is L2SharedBridgeLegacy {
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         }
+    }
+
+    function deployBeaconProxy(bytes32 _salt) external virtual override onlyNTV returns (address proxy) {
+        return Create2.deploy(
+            0,
+            _salt,
+            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(address(l2TokenBeacon), ""))
+        );
+    }
+
+    function _calculateCreate2TokenAddress(address _l1Token) internal virtual override view returns (address) {
+        bytes32 salt = _getCreate2Salt(_l1Token);
+        return
+            Create2.computeAddress(
+                salt,
+                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(l2TokenBeacon, "")))
+            );
+    }
+
+    function sendMessageToL1(bytes calldata /* _message */) external virtual override onlyAssetRouter returns (bytes32) {
+        // There is no `L1Messenger` in the L1 context
     }
 }

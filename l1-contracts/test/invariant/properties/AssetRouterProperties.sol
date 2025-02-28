@@ -31,7 +31,7 @@ abstract contract AssetRouterProperties is Test {
         }
 
         uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits() +
-            legacyBridgeActorHandler.ghost_totalDeposits();
+            legacyBridgeActorHandler.ghost_totalDeposits() - legacyBridgeActorHandler.ghost_totalWithdrawals();
         for (uint256 i; i < userActorHandlers.length; i++) {
             totalDepositAmount -= userActorHandlers[i].ghost_totalWithdrawalAmount();
         }

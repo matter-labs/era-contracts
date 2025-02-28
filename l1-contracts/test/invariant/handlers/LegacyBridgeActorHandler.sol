@@ -3,9 +3,10 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 
 import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
@@ -63,13 +64,15 @@ contract LegacyBridgeActorHandler is Test {
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         uint256 userIndex = bound(_userIndex, 0, users.length - 1);
         uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
+
+        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        IL2SharedBridgeLegacy sharedBridge = IL2SharedBridgeLegacy(l2AssetRouter.L2_LEGACY_SHARED_BRIDGE());
         address l1Token = l1Tokens[l1TokenIndex];
         address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(l1Token);
 
-        address sharedBridge = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
-        if (IL2SharedBridgeLegacy(sharedBridge).l1TokenAddress(l2Token) == address(0)) {
-            return;
-        }
+        vm.assume(sharedBridge.l1TokenAddress(l2Token) != address(0));
+        vm.assume(l2NativeTokenVault.assetId(l2Token) != bytes32(0));
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge({
             _l1Receiver: _l1Receiver,

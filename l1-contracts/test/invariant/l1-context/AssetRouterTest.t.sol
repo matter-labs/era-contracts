@@ -3,9 +3,14 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
+
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
+import {L2SharedBridgeLegacyDev} from "contracts/dev-contracts/L2SharedBridgeLegacyDev.sol";
 
 import {AssetRouter_ActorHandler_Deployer} from "../deployers/AssetRouter_ActorHandler_Deployer.sol";
 import {AssetRouter_Token_Deployer} from "../deployers/AssetRouter_Token_Deployer.sol";
@@ -42,5 +47,29 @@ contract AssetRouterTest is
         deployActorHandlers(deployedL1Tokens);
 
         assertEq(l1Tokens.length, 3);
+    }
+
+    function deployL2SharedBridgeLegacy(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _aliasedOwner,
+        address _l1SharedBridge,
+        bytes32 _l2TokenProxyBytecodeHash
+    ) internal virtual override returns (address) {
+        L2SharedBridgeLegacyDev bridge = new L2SharedBridgeLegacyDev();
+        console.log("bridge", address(bridge));
+        address proxyAdmin = address(0x1);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(bridge),
+            proxyAdmin,
+            abi.encodeCall(
+                L2SharedBridgeLegacy.initialize,
+                (_l1SharedBridge,
+                _l2TokenProxyBytecodeHash,
+                _aliasedOwner)
+            )
+        );
+        console.log("proxy", address(proxy));
+        return address(proxy);
     }
 }
