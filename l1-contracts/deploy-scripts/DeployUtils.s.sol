@@ -58,6 +58,7 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -190,7 +191,7 @@ contract DeployUtils is Script {
     GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
 
-    function initializeConfig(string memory configPath) internal {
+    function initializeConfig(string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
@@ -272,24 +273,6 @@ contract DeployUtils is Script {
         addresses.create2Factory = contractAddress;
     }
 
-    function deployViaCreate2(
-        bytes memory creationCode,
-        bytes memory constructorArgs
-    ) internal virtual returns (address) {
-        return
-            Utils.deployViaCreate2(
-                abi.encodePacked(creationCode, constructorArgs),
-                config.contracts.create2FactorySalt,
-                addresses.create2Factory
-            );
-    }
-
-    function deployBytecodesSupplier() internal {
-        address contractAddress = deployViaCreate2(type(BytecodesSupplier).creationCode, "");
-        console.log("BytecodesSupplier deployed at:", contractAddress);
-        addresses.stateTransition.bytecodesSupplier = contractAddress;
-    }
-
     function deployTransparentProxyAdmin() internal {
         vm.startBroadcast();
         ProxyAdmin proxyAdmin = new ProxyAdmin();
@@ -300,31 +283,11 @@ contract DeployUtils is Script {
     }
 
     function deployStateTransitionDiamondFacets() internal {
-        address executorFacet = deployViaCreate2(type(ExecutorFacet).creationCode, abi.encode(config.l1ChainId));
-        console.log("ExecutorFacet deployed at:", executorFacet);
-        addresses.stateTransition.executorFacet = executorFacet;
-
-        address adminFacet = deployViaCreate2(
-            type(AdminFacet).creationCode,
-            abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager)
-        );
-        console.log("AdminFacet deployed at:", adminFacet);
-        addresses.stateTransition.adminFacet = adminFacet;
-
-        address mailboxFacet = deployViaCreate2(
-            type(MailboxFacet).creationCode,
-            abi.encode(config.eraChainId, config.l1ChainId)
-        );
-        console.log("MailboxFacet deployed at:", mailboxFacet);
-        addresses.stateTransition.mailboxFacet = mailboxFacet;
-
-        address gettersFacet = deployViaCreate2(type(GettersFacet).creationCode, "");
-        console.log("GettersFacet deployed at:", gettersFacet);
-        addresses.stateTransition.gettersFacet = gettersFacet;
-
-        address diamondInit = deployViaCreate2(type(DiamondInit).creationCode, "");
-        console.log("DiamondInit deployed at:", diamondInit);
-        addresses.stateTransition.diamondInit = diamondInit;
+        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet");
+        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet");
+        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet");
+        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet");
+        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit");
     }
 
     function getChainTypeManagerInitializeData() internal returns (ChainTypeManagerInitializeData memory) {
@@ -422,24 +385,32 @@ contract DeployUtils is Script {
             });
     }
 
+    ////////////////////////////// Contract deployment modes /////////////////////////////////
+
     function deploySimpleContract(string memory contractName) internal returns (address contractAddress) {
-        contractAddress = deployViaCreate2(getCreationCode(contractName), getCreationCalldata(contractName));
-        console.log(contractName, "deployed at:", contractAddress);
+        contractAddress = deployViaCreate2AndNotify(getCreationCode(contractName), getCreationCalldata(contractName), contractName);
+    }
+
+    function deployWithCreate2AndOwner(string memory contractName, address owner) internal returns (address contractAddress) {
+        contractAddress = create2WithDeterministicOwnerAndNotify(getCreationCode(contractName), getCreationCalldata(contractName), owner, contractName, string.concat(contractName, " Implementation"));
+
     }
 
     function deployTuppWithContract(
         string memory contractName
     ) internal virtual returns (address implementation, address proxy) {
-        implementation = deployViaCreate2(getCreationCode(contractName), getCreationCalldata(contractName));
-        console.log(contractName, "implementation deployed at:", implementation);
+        implementation = deployViaCreate2AndNotify(getCreationCode(contractName), getCreationCalldata(contractName), contractName, string.concat(contractName, " Implementation"));
 
-        proxy = deployViaCreate2(
+        proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, addresses.transparentProxyAdmin, getInitializeCalldata(contractName))
+            abi.encode(implementation, addresses.transparentProxyAdmin, getInitializeCalldata(contractName)),
+            contractName,
+            string.concat(contractName, " Proxy")
         );
-        console.log(contractName, "proxy deployed at:", proxy);
         return (implementation, proxy);
     }
+
+    ////////////////////////////// GetContract data  /////////////////////////////////
 
     function getCreationCode(string memory contractName) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "Verifier")) {
@@ -469,6 +440,18 @@ contract DeployUtils is Script {
             return type(ChainAdmin).creationCode;
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             return type(ChainTypeManager).creationCode;
+        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return type(BytecodesSupplier).creationCode;
+        } else if (compareStrings(contractName, "ExecutorFacet")) {
+            return type(ExecutorFacet).creationCode;
+        } else if (compareStrings(contractName, "AdminFacet")) {
+            return type(AdminFacet).creationCode;
+        } else if (compareStrings(contractName, "MailboxFacet")) {
+            return type(MailboxFacet).creationCode;
+        } else if (compareStrings(contractName, "GettersFacet")) {
+            return type(GettersFacet).creationCode;
+        } else if (compareStrings(contractName, "DiamondInit")) {
+            return type(DiamondInit).creationCode;
         } else {
             revert(string.concat("Contract ", contractName, " creation code not set"));
         }
@@ -504,6 +487,18 @@ contract DeployUtils is Script {
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ExecutorFacet")) {
+            return abi.encode(config.l1ChainId);
+        } else if (compareStrings(contractName, "AdminFacet")) {
+            return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
+        } else if (compareStrings(contractName, "MailboxFacet")) {
+            return abi.encode(config.eraChainId, config.l1ChainId);
+        } else if (compareStrings(contractName, "GettersFacet")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "DiamondInit")) {
+            return abi.encode();
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }
@@ -515,6 +510,96 @@ contract DeployUtils is Script {
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
+    }
+
+    ////////////////////////////// Create2 utils /////////////////////////////////
+
+    function deployViaCreate2AndNotify(
+        bytes memory _creationCode,
+        bytes memory _constructorParamsEncoded,
+        string memory contractName
+    ) internal returns (address deployedAddress) {
+        deployedAddress = deployViaCreate2AndNotify(_creationCode, _constructorParamsEncoded, contractName, contractName);
+    }
+
+    function deployViaCreate2AndNotify(
+        bytes memory _creationCode,
+        bytes memory _constructorParamsEncoded,
+        string memory contractName,
+        string memory displayName
+    ) internal returns (address deployedAddress) {
+        bytes memory bytecode = abi.encodePacked(_creationCode, _constructorParamsEncoded);
+
+        deployedAddress = deployViaCreate2(bytecode);
+        notifyAboutDeployment(deployedAddress, contractName, _constructorParamsEncoded, displayName);
+    }
+
+    function create2WithDeterministicOwnerAndNotify(bytes memory initCode, bytes memory constructorParams, address owner, string memory contractName, string memory displayName) internal returns (address contractAddress) {
+        contractAddress = create2WithDeterministicOwner(abi.encodePacked(initCode, constructorParams), owner);
+        notifyAboutDeployment(contractAddress, contractName, constructorParams, displayName);
+    }
+
+    function create2WithDeterministicOwner(bytes memory initCode, address owner) internal returns (address) {
+        bytes memory creatorInitCode = abi.encodePacked(
+            type(Create2AndTransfer).creationCode,
+            abi.encode(initCode, config.contracts.create2FactorySalt, owner)
+        );
+
+        address deployerAddr = deployViaCreate2(creatorInitCode);
+
+        return Create2AndTransfer(deployerAddr).deployedAddress();
+    }
+
+    function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
+        return Utils.deployViaCreate2(_bytecode, config.contracts.create2FactorySalt, addresses.create2Factory);
+    }
+
+    function deployViaCreate2(
+        bytes memory creationCode,
+        bytes memory constructorArgs
+    ) internal virtual returns (address) {
+        return
+            Utils.deployViaCreate2(
+                abi.encodePacked(creationCode, constructorArgs),
+                config.contracts.create2FactorySalt,
+                addresses.create2Factory
+            );
+    }
+
+    ////////////////////////////// Misc utils /////////////////////////////////
+    
+    function notifyAboutDeployment(
+        address contractAddr,
+        string memory contractName,
+        bytes memory constructorParams
+    ) internal {
+        notifyAboutDeployment(contractAddr, contractName, constructorParams, contractName);
+    }
+
+    function notifyAboutDeployment(
+        address contractAddr,
+        string memory contractName,
+        bytes memory constructorParams,
+        string memory displayName
+    ) internal {
+        string memory basicMessage = string.concat(displayName, " has been deployed at ", vm.toString(contractAddr));
+        console.log(basicMessage);
+
+        string memory forgeMessage;
+        if (constructorParams.length == 0) {
+            forgeMessage = string.concat("forge verify-contract ", vm.toString(contractAddr), " ", contractName);
+        } else {
+            forgeMessage = string.concat(
+                "forge verify-contract ",
+                vm.toString(contractAddr),
+                " ",
+                contractName,
+                " --constructor-args ",
+                vm.toString(constructorParams)
+            );
+        }
+
+        console.log(forgeMessage);
     }
 
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {

@@ -69,7 +69,7 @@ contract DeployL1Script is Script, DeployUtils {
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 
-    function run() public {
+    function run() public virtual {
         console.log("Deploying L1 contracts");
 
         runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
@@ -98,7 +98,7 @@ contract DeployL1Script is Script, DeployUtils {
         instantiateCreate2Factory();
         deployIfNeededMulticall3();
 
-        deployBytecodesSupplier();
+        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
 
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
@@ -205,6 +205,42 @@ contract DeployL1Script is Script, DeployUtils {
             );
     }
 
+
+    // function deployDAValidators() internal virtual {
+    //     // Note, that here we use the `msg.sender` address, while the final owner should be the decentralized governance.
+    //     // The ownership will be transferred later.
+    //     address rollupDAManager = address(
+    //         create2WithDeterministicOwner(type(RollupDAManager).creationCode, msg.sender)
+    //     );
+    //     addresses.daAddresses.rollupDAManager = rollupDAManager;
+    //     notifyAboutDeployment(rollupDAManager, "RollupDAManager", hex"");
+
+    //     if (RollupDAManager(rollupDAManager).owner() != address(msg.sender)) {
+    //         if (RollupDAManager(rollupDAManager).pendingOwner() == address(msg.sender)) {
+    //             vm.broadcast(msg.sender);
+    //             RollupDAManager(rollupDAManager).acceptOwnership();
+    //         } else {
+    //             require(
+    //                 RollupDAManager(rollupDAManager).owner() == config.ownerAddress,
+    //                 "Ownership was not set correctly"
+    //             );
+    //         }
+    //     }
+
+    //     // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
+    //     addresses.daAddresses.l1RollupDAValidator = deployViaCreate2AndNotify(
+    //         Utils.readRollupDAValidatorBytecode(),
+    //         abi.encode(),
+    //         "RollupL1DAValidator"
+    //     );
+
+    //     addresses.daAddresses.noDAValidiumL1DAValidator = deployViaCreate2AndNotify(
+    //         type(ValidiumL1DAValidator).creationCode,
+    //         abi.encode(),
+    //         "ValidiumL1DAValidator"
+    //     );
+    // }
+
     function deployDAValidators() internal {
         vm.broadcast(msg.sender);
         address rollupDAManager = address(new RollupDAManager());
@@ -269,10 +305,12 @@ contract DeployL1Script is Script, DeployUtils {
         );
     }
 
-    function setChainTypeManagerInValidatorTimelock() internal {
+    function setChainTypeManagerInValidatorTimelock() public virtual {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-        vm.broadcast(msg.sender);
-        validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
+        if (address(validatorTimelock.chainTypeManager()) != addresses.stateTransition.chainTypeManagerProxy) {
+            vm.broadcast(msg.sender);
+            validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
+        }   
         console.log("ChainTypeManager set in ValidatorTimelock");
     }
 
@@ -328,14 +366,18 @@ contract DeployL1Script is Script, DeployUtils {
     // }
 
     function deployBridgedTokenBeacon() internal {
-        /// Note we cannot use create2 as the deployer is the owner.
-        vm.broadcast();
-        UpgradeableBeacon beacon = new UpgradeableBeacon(addresses.bridges.bridgedStandardERC20Implementation);
-        address contractAddress = address(beacon);
-        vm.broadcast();
-        beacon.transferOwnership(config.ownerAddress);
-        console.log("BridgedTokenBeacon deployed at:", contractAddress);
-        addresses.bridges.bridgedTokenBeacon = contractAddress;
+        bytes memory initCode = abi.encodePacked(
+            type(UpgradeableBeacon).creationCode,
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        );
+
+        address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
+        notifyAboutDeployment(
+            beacon,
+            "UpgradeableBeacon",
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        );
+        addresses.bridges.bridgedTokenBeacon = beacon;
     }
 
     function setL1NativeTokenVaultParams() internal {
@@ -514,7 +556,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.writeToml(toml, outputPath);
     }
 
-    function saveOutput(string memory outputPath) internal {
+    function saveOutput(string memory outputPath) internal virtual {
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
         vm.serializeAddress(
