@@ -618,8 +618,15 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         newConfig.gateway.chainTypeManagerOnGatewayAddress = toml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
-    }
-
+            
+        /////
+        /////
+        /////
+        /////
+        /////
+          }
+    ///////
+/////////
     function initializeOldData() internal virtual {
         newConfig.contracts.newProtocolVersion = getNewProtocolVersion();
         newConfig.contracts.oldProtocolVersion = getOldProtocolVersion();
