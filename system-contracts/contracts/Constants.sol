@@ -192,6 +192,3 @@ uint8 constant ERA_VM_BYTECODE_FLAG = 1;
 uint8 constant EVM_BYTECODE_FLAG = 2;
 
 address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
-
-/// @dev The id of Gateway chain
-uint256 constant GATEWAY_CHAIN_ID = 0; // Unknown for now

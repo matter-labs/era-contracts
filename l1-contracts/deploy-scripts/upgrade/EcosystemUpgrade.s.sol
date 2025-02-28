@@ -614,6 +614,8 @@ contract EcosystemUpgrade is Script {
         config.gateway.chainTypeManagerOnGatewayAddress = toml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
+
+        config.gateway.chainId = toml.readUint("$.gateway.chain_id");
     }
 
     function initializeOldData() internal virtual {
@@ -1417,6 +1419,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
+        if (config.gateway.chainId == 0) return calls; // Gateway is unknown
+
         Call[][] memory allCalls = new Call[][](2);
 
         uint256 l2GasLimit = 2000000; // TODO constant or config
@@ -1447,6 +1451,8 @@ contract EcosystemUpgrade is Script {
     }
 
     function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
+        if (config.gateway.chainId == 0) return calls; // Gateway is unknown
+
         Call[][] memory allCalls = new Call[][](4);
 
         uint256 l2GasLimit = 2000000; // TODO constant or config
