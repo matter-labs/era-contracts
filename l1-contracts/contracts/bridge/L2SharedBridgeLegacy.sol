@@ -157,7 +157,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart.
-    function _calculateCreate2TokenAddress(address _l1Token) internal view returns (address) {
+    function _calculateCreate2TokenAddress(address _l1Token) internal virtual view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
@@ -172,7 +172,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @dev Deploy the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
     /// for the code of the proxy.
-    function deployBeaconProxy(bytes32 salt) external onlyNTV returns (address proxy) {
+    function deployBeaconProxy(bytes32 salt) external virtual onlyNTV returns (address proxy) {
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
@@ -190,7 +190,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         proxy = abi.decode(returndata, (address));
     }
 
-    function sendMessageToL1(bytes calldata _message) external override onlyAssetRouter returns (bytes32) {
+    function sendMessageToL1(bytes calldata _message) external virtual onlyAssetRouter returns (bytes32) {
         // slither-disable-next-line unused-return
         return L2ContractHelper.sendMessageToL1(_message);
     }
