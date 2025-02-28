@@ -106,6 +106,7 @@ struct DataAvailabilityDeployedAddresses {
     address rollupDAManager;
     address l1RollupDAValidator;
     address noDAValidiumL1DAValidator;
+    address availBridge;
     address availL1DAValidator;
 }
 
@@ -273,15 +274,6 @@ contract DeployUtils is Script {
         addresses.create2Factory = contractAddress;
     }
 
-    function deployTransparentProxyAdmin() internal {
-        vm.startBroadcast();
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-        proxyAdmin.transferOwnership(addresses.governance);
-        vm.stopBroadcast();
-        console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
-        addresses.transparentProxyAdmin = address(proxyAdmin);
-    }
-
     function deployStateTransitionDiamondFacets() internal {
         addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet");
         addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet");
@@ -388,18 +380,35 @@ contract DeployUtils is Script {
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
     function deploySimpleContract(string memory contractName) internal returns (address contractAddress) {
-        contractAddress = deployViaCreate2AndNotify(getCreationCode(contractName), getCreationCalldata(contractName), contractName);
+        contractAddress = deployViaCreate2AndNotify(
+            getCreationCode(contractName),
+            getCreationCalldata(contractName),
+            contractName
+        );
     }
 
-    function deployWithCreate2AndOwner(string memory contractName, address owner) internal returns (address contractAddress) {
-        contractAddress = create2WithDeterministicOwnerAndNotify(getCreationCode(contractName), getCreationCalldata(contractName), owner, contractName, string.concat(contractName, " Implementation"));
-
+    function deployWithCreate2AndOwner(
+        string memory contractName,
+        address owner
+    ) internal returns (address contractAddress) {
+        contractAddress = deployWithOwnerAndNotify(
+            getCreationCode(contractName),
+            getCreationCalldata(contractName),
+            owner,
+            contractName,
+            string.concat(contractName, " Implementation")
+        );
     }
 
     function deployTuppWithContract(
         string memory contractName
     ) internal virtual returns (address implementation, address proxy) {
-        implementation = deployViaCreate2AndNotify(getCreationCode(contractName), getCreationCalldata(contractName), contractName, string.concat(contractName, " Implementation"));
+        implementation = deployViaCreate2AndNotify(
+            getCreationCode(contractName),
+            getCreationCalldata(contractName),
+            contractName,
+            string.concat(contractName, " Implementation")
+        );
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
@@ -442,6 +451,8 @@ contract DeployUtils is Script {
             return type(ChainTypeManager).creationCode;
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return type(BytecodesSupplier).creationCode;
+        } else if (compareStrings(contractName, "ProxyAdmin")) {
+            return type(ProxyAdmin).creationCode;
         } else if (compareStrings(contractName, "ExecutorFacet")) {
             return type(ExecutorFacet).creationCode;
         } else if (compareStrings(contractName, "AdminFacet")) {
@@ -489,6 +500,8 @@ contract DeployUtils is Script {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ProxyAdmin")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "ExecutorFacet")) {
             return abi.encode(config.l1ChainId);
         } else if (compareStrings(contractName, "AdminFacet")) {
@@ -512,6 +525,14 @@ contract DeployUtils is Script {
         }
     }
 
+    function getDeployedContractName(string memory contractName) internal view virtual returns (string memory) {
+        if (compareStrings(contractName, "BridgedTokenBeacon")) {
+            return "UpgradeableBeacon";
+        } else {
+            return contractName;
+        }
+    }
+
     ////////////////////////////// Create2 utils /////////////////////////////////
 
     function deployViaCreate2AndNotify(
@@ -519,7 +540,12 @@ contract DeployUtils is Script {
         bytes memory _constructorParamsEncoded,
         string memory contractName
     ) internal returns (address deployedAddress) {
-        deployedAddress = deployViaCreate2AndNotify(_creationCode, _constructorParamsEncoded, contractName, contractName);
+        deployedAddress = deployViaCreate2AndNotify(
+            _creationCode,
+            _constructorParamsEncoded,
+            contractName,
+            contractName
+        );
     }
 
     function deployViaCreate2AndNotify(
@@ -534,7 +560,13 @@ contract DeployUtils is Script {
         notifyAboutDeployment(deployedAddress, contractName, _constructorParamsEncoded, displayName);
     }
 
-    function create2WithDeterministicOwnerAndNotify(bytes memory initCode, bytes memory constructorParams, address owner, string memory contractName, string memory displayName) internal returns (address contractAddress) {
+    function deployWithOwnerAndNotify(
+        bytes memory initCode,
+        bytes memory constructorParams,
+        address owner,
+        string memory contractName,
+        string memory displayName
+    ) internal returns (address contractAddress) {
         contractAddress = create2WithDeterministicOwner(abi.encodePacked(initCode, constructorParams), owner);
         notifyAboutDeployment(contractAddress, contractName, constructorParams, displayName);
     }
@@ -567,7 +599,7 @@ contract DeployUtils is Script {
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////
-    
+
     function notifyAboutDeployment(
         address contractAddr,
         string memory contractName,
@@ -586,14 +618,20 @@ contract DeployUtils is Script {
         console.log(basicMessage);
 
         string memory forgeMessage;
+        string memory deployedContractName = getDeployedContractName(contractName);
         if (constructorParams.length == 0) {
-            forgeMessage = string.concat("forge verify-contract ", vm.toString(contractAddr), " ", contractName);
+            forgeMessage = string.concat(
+                "forge verify-contract ",
+                vm.toString(contractAddr),
+                " ",
+                deployedContractName
+            );
         } else {
             forgeMessage = string.concat(
                 "forge verify-contract ",
                 vm.toString(contractAddr),
                 " ",
-                contractName,
+                deployedContractName,
                 " --constructor-args ",
                 vm.toString(constructorParams)
             );

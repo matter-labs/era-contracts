@@ -100,9 +100,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
 
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
-        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier");
+        deployVerifiers();
 
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
@@ -114,7 +112,8 @@ contract DeployL1Script is Script, DeployUtils {
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
-        deployTransparentProxyAdmin();
+
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
             "Bridgehub"
         );
@@ -129,7 +128,7 @@ contract DeployL1Script is Script, DeployUtils {
             "L1AssetRouter"
         );
         (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20");
-        deployBridgedTokenBeacon();
+        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner("BridgedTokenBeacon", config.ownerAddress);
         (
             addresses.vaults.l1NativeTokenVaultImplementation,
             addresses.vaults.l1NativeTokenVaultProxy
@@ -149,7 +148,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         initializeGeneratedData();
 
-        deployBlobVersionedHashRetriever();
+        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever");
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,
@@ -205,79 +204,43 @@ contract DeployL1Script is Script, DeployUtils {
             );
     }
 
-
-    // function deployDAValidators() internal virtual {
-    //     // Note, that here we use the `msg.sender` address, while the final owner should be the decentralized governance.
-    //     // The ownership will be transferred later.
-    //     address rollupDAManager = address(
-    //         create2WithDeterministicOwner(type(RollupDAManager).creationCode, msg.sender)
-    //     );
-    //     addresses.daAddresses.rollupDAManager = rollupDAManager;
-    //     notifyAboutDeployment(rollupDAManager, "RollupDAManager", hex"");
-
-    //     if (RollupDAManager(rollupDAManager).owner() != address(msg.sender)) {
-    //         if (RollupDAManager(rollupDAManager).pendingOwner() == address(msg.sender)) {
-    //             vm.broadcast(msg.sender);
-    //             RollupDAManager(rollupDAManager).acceptOwnership();
-    //         } else {
-    //             require(
-    //                 RollupDAManager(rollupDAManager).owner() == config.ownerAddress,
-    //                 "Ownership was not set correctly"
-    //             );
-    //         }
-    //     }
-
-    //     // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-    //     addresses.daAddresses.l1RollupDAValidator = deployViaCreate2AndNotify(
-    //         Utils.readRollupDAValidatorBytecode(),
-    //         abi.encode(),
-    //         "RollupL1DAValidator"
-    //     );
-
-    //     addresses.daAddresses.noDAValidiumL1DAValidator = deployViaCreate2AndNotify(
-    //         type(ValidiumL1DAValidator).creationCode,
-    //         abi.encode(),
-    //         "ValidiumL1DAValidator"
-    //     );
-    // }
+    function deployVerifiers() internal {
+        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
+        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
+        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier");
+    }
 
     function deployDAValidators() internal {
-        vm.broadcast(msg.sender);
-        address rollupDAManager = address(new RollupDAManager());
-        addresses.daAddresses.rollupDAManager = rollupDAManager;
+        addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender);
+        updateRollupDAManager();
 
-        address rollupDAValidator = deployViaCreate2(Utils.readRollupDAValidatorBytecode(), "");
-        console.log("L1RollupDAValidator deployed at:", rollupDAValidator);
-        addresses.daAddresses.l1RollupDAValidator = rollupDAValidator;
+        // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
+        addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator");
 
-        addresses.daAddresses.noDAValidiumL1DAValidator = deployViaCreate2(
-            type(ValidiumL1DAValidator).creationCode,
-            ""
-        );
-        console.log("L1NoDAValidiumDAValidator deployed at:", addresses.daAddresses.noDAValidiumL1DAValidator);
+        addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator");
 
         if (config.contracts.availL1DAValidator == address(0)) {
-            address availBridge = deployViaCreate2(Utils.readDummyAvailBridgeBytecode(), "");
-            addresses.daAddresses.availL1DAValidator = deployViaCreate2(
-                Utils.readAvailL1DAValidatorBytecode(),
-                abi.encode(availBridge)
-            );
-            console.log("AvailL1DAValidator deployed at:", addresses.daAddresses.availL1DAValidator);
+            addresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge");
+            addresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator");
         } else {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
-
         vm.startBroadcast(msg.sender);
-        RollupDAManager(rollupDAManager).updateDAPair(address(rollupDAValidator), getRollupL2ValidatorAddress(), true);
+        RollupDAManager rollupDAManager = RollupDAManager(addresses.daAddresses.rollupDAManager);
+        rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2ValidatorAddress(), true);
         vm.stopBroadcast();
     }
 
-    function deployBlobVersionedHashRetriever() internal {
-        // solc contracts/state-transition/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
-        bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-        address contractAddress = deployViaCreate2(bytecode, "");
-        console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
-        addresses.blobVersionedHashRetriever = contractAddress;
+    function updateRollupDAManager() internal virtual {
+        RollupDAManager rollupDAManager = RollupDAManager(addresses.daAddresses.rollupDAManager);
+        if (rollupDAManager.owner() != address(msg.sender)) {
+            if (rollupDAManager.pendingOwner() == address(msg.sender)) {
+                vm.broadcast(msg.sender);
+                rollupDAManager.acceptOwnership();
+            } else {
+                require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
+            }
+        }
     }
 
     function registerChainTypeManager() internal {
@@ -310,7 +273,7 @@ contract DeployL1Script is Script, DeployUtils {
         if (address(validatorTimelock.chainTypeManager()) != addresses.stateTransition.chainTypeManagerProxy) {
             vm.broadcast(msg.sender);
             validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
-        }   
+        }
         console.log("ChainTypeManager set in ValidatorTimelock");
     }
 
@@ -355,31 +318,6 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("SharedBridge updated with ERC20Bridge address");
     }
 
-    // function deployBridgedStandardERC20Implementation() internal {
-    //     address contractAddress = deployViaCreate2(
-    //         type(BridgedStandardERC20).creationCode,
-    //         // solhint-disable-next-line func-named-parameters
-    //         abi.encode()
-    //     );
-    //     console.log("BridgedStandardERC20Implementation deployed at:", contractAddress);
-    //     addresses.bridges.bridgedStandardERC20Implementation = contractAddress;
-    // }
-
-    function deployBridgedTokenBeacon() internal {
-        bytes memory initCode = abi.encodePacked(
-            type(UpgradeableBeacon).creationCode,
-            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
-        );
-
-        address beacon = create2WithDeterministicOwner(initCode, config.ownerAddress);
-        notifyAboutDeployment(
-            beacon,
-            "UpgradeableBeacon",
-            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
-        );
-        addresses.bridges.bridgedTokenBeacon = beacon;
-    }
-
     function setL1NativeTokenVaultParams() internal {
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
@@ -418,6 +356,20 @@ contract DeployL1Script is Script, DeployUtils {
             return type(L1NativeTokenVault).creationCode;
         } else if (compareStrings(contractName, "BridgedStandardERC20")) {
             return type(BridgedStandardERC20).creationCode;
+        } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+            return type(UpgradeableBeacon).creationCode;
+        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+            return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+        } else if (compareStrings(contractName, "RollupDAManager")) {
+            return type(RollupDAManager).creationCode;
+        } else if (compareStrings(contractName, "RollupL1DAValidator")) {
+            return Utils.readRollupDAValidatorBytecode();
+        } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+            return type(ValidiumL1DAValidator).creationCode;
+        } else if (compareStrings(contractName, "AvailL1DAValidator")) {
+            return Utils.readAvailL1DAValidatorBytecode();
+        } else if (compareStrings(contractName, "DummyAvailBridge")) {
+            return Utils.readDummyAvailBridgeBytecode();
         } else {
             return super.getCreationCode(contractName);
         }
@@ -465,6 +417,20 @@ contract DeployL1Script is Script, DeployUtils {
                 );
         } else if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+            return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
+        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "RollupDAManager")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "RollupL1DAValidator")) {
+            return abi.encode(addresses.daAddresses.l1RollupDAValidator);
+        } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "AvailL1DAValidator")) {
+            return abi.encode(addresses.daAddresses.availBridge);
+        } else if (compareStrings(contractName, "DummyAvailBridge")) {
+            return abi.encode();
         } else {
             return super.getCreationCalldata(contractName);
         }
@@ -497,6 +463,16 @@ contract DeployL1Script is Script, DeployUtils {
                 );
         } else {
             return super.getInitializeCalldata(contractName);
+        }
+    }
+
+    function getDeployedContractName(
+        string memory contractName
+    ) internal view virtual override returns (string memory) {
+        if (compareStrings(contractName, "BridgedTokenBeacon")) {
+            return "UpgradeableBeacon";
+        } else {
+            return super.getDeployedContractName(contractName);
         }
     }
 
