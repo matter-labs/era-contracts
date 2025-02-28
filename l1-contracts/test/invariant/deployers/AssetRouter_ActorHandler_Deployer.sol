@@ -6,9 +6,7 @@ import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
 import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {LegacyBridgeActorHandler} from "../handlers/LegacyBridgeActorHandler.sol";
 import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
-import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
 
-import {ETH_TOKEN_ADDRESS} from "../../../contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -18,8 +16,6 @@ abstract contract AssetRouter_ActorHandler_Deployer is AssetRouterProperties {
         for (uint256 i; i < _l1Tokens.length; i++) {
             l1Tokens.push(_l1Tokens[i]);
         }
-        l1Tokens.push(L1_TOKEN_ADDRESS);
-        l1Tokens.push(ETH_TOKEN_ADDRESS);
 
         userActorHandlers.push(new UserActorHandler(l1Tokens));
         legacyBridgeActorHandler = new LegacyBridgeActorHandler(userActorHandlers, l1Tokens);

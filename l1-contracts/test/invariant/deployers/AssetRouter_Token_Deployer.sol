@@ -14,6 +14,9 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+
+import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
 
 contract AssetRouter_Token_Deployer is Test {
     using stdStorage for StdStorage;
@@ -32,10 +35,15 @@ contract AssetRouter_Token_Deployer is Test {
         // - Deployed/undeployed token
         // - Native/bridged token
         // - Base/non-base token
-        l1Tokens = new address[](1);
+        l1Tokens = new address[](3);
         // legacy, unregistered, deployed, bridged, non-base
         address l1Token = makeAddr("legacyUnregisteredBridged L1 token");
         l1Tokens[0] = l1Token;
+        l1Tokens[1] = L1_TOKEN_ADDRESS;
+        l1Tokens[2] = ETH_TOKEN_ADDRESS;
+
+        vm.label(L1_TOKEN_ADDRESS, "random L1 token");
+        vm.label(ETH_TOKEN_ADDRESS, "ETH L1 token");
 
         UpgradeableBeacon beacon = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenBeacon();
         bytes32 salt = bytes32(uint256(uint160(l1Token)));
