@@ -914,7 +914,7 @@ contract EcosystemUpgrade is Script {
         );
         vm.serializeAddress(
             "state_transition",
-            "chaint_type_manager_implementation_addr",
+            "chain_type_manager_implementation_addr",
             addresses.stateTransition.chainTypeManagerImplementation
         );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
