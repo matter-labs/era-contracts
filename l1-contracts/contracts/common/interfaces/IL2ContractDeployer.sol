@@ -29,7 +29,6 @@ interface IL2ContractDeployer {
         bytes input;
     }
 
-
     /// @notice Returns what types of bytecode are allowed to be deployed on this chain
     function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode);
 
