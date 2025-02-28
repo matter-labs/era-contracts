@@ -37,17 +37,21 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
         )
     {}
 
-    /// @notice copied from L1NTV for L1 compilation
+    /// @notice overrides L2NativeTokenVault for compilation in the L1 context
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _l1Token
     ) public view override(L2NativeTokenVault) returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
-        return
-            Create2.computeAddress(
-                salt,
-                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, "")))
-            );
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _originChainId == L1_CHAIN_ID) {
+            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
+        } else {
+            bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
+            return
+                Create2.computeAddress(
+                    salt,
+                    keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, "")))
+                );
+        }
     }
 
     function deployBridgedStandardERC20(address _owner) external {
@@ -66,13 +70,22 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
         // test
     }
 
-    function _deployBeaconProxy(bytes32 _salt, uint256) internal virtual override returns (BeaconProxy proxy) {
-        // Use CREATE2 to deploy the BeaconProxy
-        address proxyAddress = Create2.deploy(
-            0,
-            _salt,
-            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
-        );
-        return BeaconProxy(payable(proxyAddress));
+    function _deployBeaconProxy(
+        bytes32 _salt,
+        uint256 _tokenOriginChainId
+    ) internal virtual override returns (BeaconProxy proxy) {
+        address proxyAddress;
+
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0) || _tokenOriginChainId != L1_CHAIN_ID) {
+            proxyAddress = Create2.deploy(
+                0,
+                _salt,
+                abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
+            );
+        } else {
+            proxyAddress = L2_LEGACY_SHARED_BRIDGE.deployBeaconProxy(_salt);
+        }
+
+        proxy = BeaconProxy(payable(proxyAddress));
     }
 }

@@ -212,7 +212,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
         address _aliasedOwner,
         address _l1SharedBridge,
         bytes32 _l2TokenProxyBytecodeHash
-    ) internal returns (address) {
+    ) internal virtual returns (address) {
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
 
         L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
