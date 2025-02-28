@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Echo 
+        run: cat l1-contracts/deploy-scripts/upgrade/EcosystemUpgrade.s.sol  
+
       - name: Build da contracts
         working-directory: da-contracts
         run: |
