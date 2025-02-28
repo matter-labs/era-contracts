@@ -123,10 +123,14 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
-        deployGenesisUpgrade();
-        deployVerifier();
-        deployValidatorTimelock();
-        deployChainTypeManagerContract();
+        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
+        addresses.stateTransition.verifier = deploySimpleContract("Verifier");
+        addresses.validatorTimelock = deploySimpleContract("ValidatorTimelock");
+        deployStateTransitionDiamondFacets();
+        (
+            addresses.stateTransition.chainTypeManagerImplementation,
+            addresses.stateTransition.chainTypeManagerProxy
+        ) = deployTuppWithContract("ChainTypeManager");
     }
 
     // add this to be excluded from coverage report

@@ -290,106 +290,6 @@ contract DeployUtils is Script {
         addresses.stateTransition.bytecodesSupplier = contractAddress;
     }
 
-    function deployVerifier() internal {
-        address verifierFflonk = deployVerifierFflonk();
-        address verifierPlonk = deployVerifierPlonk();
-        bytes memory code;
-        if (config.testnetVerifier) {
-            code = type(TestnetVerifier).creationCode;
-        } else {
-            code = type(DualVerifier).creationCode;
-        }
-        address contractAddress = deployViaCreate2(code, abi.encode(verifierFflonk, verifierPlonk));
-        console.log("Dual verifier deployed at:", contractAddress);
-        addresses.stateTransition.verifier = contractAddress;
-    }
-
-    function deployVerifierFflonk() internal returns (address contractAddress) {
-        bytes memory code = type(VerifierFflonk).creationCode;
-        contractAddress = deployViaCreate2(code, hex"");
-        console.log("FFLONK verifier deployed at:", contractAddress);
-    }
-
-    function deployVerifierPlonk() internal returns (address contractAddress) {
-        bytes memory code = type(VerifierPlonk).creationCode;
-        contractAddress = deployViaCreate2(code, hex"");
-        console.log("Plonk verifier deployed at:", contractAddress);
-    }
-
-    function deployDefaultUpgrade() internal {
-        address contractAddress = deployViaCreate2(type(DefaultUpgrade).creationCode, "");
-        console.log("DefaultUpgrade deployed at:", contractAddress);
-        addresses.stateTransition.defaultUpgrade = contractAddress;
-    }
-
-    function deployGenesisUpgrade() internal {
-        address contractAddress = deployViaCreate2(type(L1GenesisUpgrade).creationCode, "");
-        console.log("GenesisUpgrade deployed at:", contractAddress);
-        addresses.stateTransition.genesisUpgrade = contractAddress;
-    }
-
-    function deployValidatorTimelock() internal {
-        uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-        address contractAddress = deployViaCreate2(
-            type(ValidatorTimelock).creationCode,
-            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
-        );
-        console.log("ValidatorTimelock deployed at:", contractAddress);
-        addresses.validatorTimelock = contractAddress;
-    }
-
-    function deployGovernance() internal {
-        address contractAddress = deployViaCreate2(
-            type(Governance).creationCode,
-            abi.encode(
-                config.ownerAddress,
-                config.contracts.governanceSecurityCouncilAddress,
-                config.contracts.governanceMinDelay
-            )
-        );
-        console.log("Governance deployed at:", contractAddress);
-        addresses.governance = contractAddress;
-    }
-
-    function deployChainAdmin() internal {
-        // TODO(EVM-924): provide an option to deploy a non-single owner ChainAdmin.
-        (address chainAdmin, address accessControlRestriction) = deployChainAdminOwnable();
-
-        addresses.accessControlRestrictionAddress = accessControlRestriction;
-        addresses.chainAdmin = chainAdmin;
-    }
-
-    function deployChainAdminOwnable() internal returns (address chainAdmin, address accessControlRestriction) {
-        chainAdmin = deployViaCreate2(
-            type(ChainAdminOwnable).creationCode,
-            abi.encode(config.ownerAddress, address(0))
-        );
-        // The single owner chainAdmin does not have a separate control restriction contract.
-        // We set to it to zero explicitly so that it is clear to the reader.
-        accessControlRestriction = address(0);
-
-        console.log("ChainAdminOwnable deployed at:", accessControlRestriction);
-    }
-
-    // TODO(EVM-924): this function is unused
-    function deployChainAdminWithRestrictions()
-        internal
-        returns (address chainAdmin, address accessControlRestriction)
-    {
-        accessControlRestriction = deployViaCreate2(
-            type(AccessControlRestriction).creationCode,
-            abi.encode(uint256(0), config.ownerAddress)
-        );
-
-        console.log("Access control restriction deployed at:", accessControlRestriction);
-        address[] memory restrictions = new address[](1);
-        restrictions[0] = accessControlRestriction;
-        addresses.accessControlRestrictionAddress = accessControlRestriction;
-
-        chainAdmin = deployViaCreate2(type(ChainAdmin).creationCode, abi.encode(restrictions));
-        console.log("ChainAdmin deployed at:", chainAdmin);
-    }
-
     function deployTransparentProxyAdmin() internal {
         vm.startBroadcast();
         ProxyAdmin proxyAdmin = new ProxyAdmin();
@@ -397,12 +297,6 @@ contract DeployUtils is Script {
         vm.stopBroadcast();
         console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
         addresses.transparentProxyAdmin = address(proxyAdmin);
-    }
-
-    function deployChainTypeManagerContract() internal {
-        deployStateTransitionDiamondFacets();
-        deployChainTypeManagerImplementation();
-        deployChainTypeManagerProxy();
     }
 
     function deployStateTransitionDiamondFacets() internal {
@@ -433,54 +327,48 @@ contract DeployUtils is Script {
         addresses.stateTransition.diamondInit = diamondInit;
     }
 
-    function deployChainTypeManagerImplementation() internal {
-        bytes memory bytecode = type(ChainTypeManager).creationCode;
-        bytes memory constructorArgs = abi.encode(addresses.bridgehub.bridgehubProxy);
-        address contractAddress = deployViaCreate2(bytecode, constructorArgs);
-        console.log("ChainTypeManagerImplementation deployed at:", contractAddress);
-        addresses.stateTransition.chainTypeManagerImplementation = contractAddress;
-    }
-
-    function deployChainTypeManagerProxy() internal {
+    function getChainTypeManagerInitializeData() internal returns (ChainTypeManagerInitializeData memory) {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");
         string memory toml = vm.readFile(inputPath);
 
-        bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");
-        bytes memory gettersFacetSelectors = toml.readBytes("$.getters_facet_selectors");
-        bytes memory mailboxFacetSelectors = toml.readBytes("$.mailbox_facet_selectors");
-        bytes memory executorFacetSelectors = toml.readBytes("$.executor_facet_selectors");
-
-        bytes4[] memory adminFacetSelectorsArray = abi.decode(adminFacetSelectors, (bytes4[]));
-        bytes4[] memory gettersFacetSelectorsArray = abi.decode(gettersFacetSelectors, (bytes4[]));
-        bytes4[] memory mailboxFacetSelectorsArray = abi.decode(mailboxFacetSelectors, (bytes4[]));
-        bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
-
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: adminFacetSelectorsArray
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: addresses.stateTransition.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: gettersFacetSelectorsArray
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: addresses.stateTransition.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: mailboxFacetSelectorsArray
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: addresses.stateTransition.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: executorFacetSelectorsArray
-        });
+        {
+            bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");
+            bytes memory gettersFacetSelectors = toml.readBytes("$.getters_facet_selectors");
+            bytes memory mailboxFacetSelectors = toml.readBytes("$.mailbox_facet_selectors");
+            bytes memory executorFacetSelectors = toml.readBytes("$.executor_facet_selectors");
+
+            bytes4[] memory adminFacetSelectorsArray = abi.decode(adminFacetSelectors, (bytes4[]));
+            bytes4[] memory gettersFacetSelectorsArray = abi.decode(gettersFacetSelectors, (bytes4[]));
+            bytes4[] memory mailboxFacetSelectorsArray = abi.decode(mailboxFacetSelectors, (bytes4[]));
+            bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
+
+            facetCuts[0] = Diamond.FacetCut({
+                facet: addresses.stateTransition.adminFacet,
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: adminFacetSelectorsArray
+            });
+            facetCuts[1] = Diamond.FacetCut({
+                facet: addresses.stateTransition.gettersFacet,
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: gettersFacetSelectorsArray
+            });
+            facetCuts[2] = Diamond.FacetCut({
+                facet: addresses.stateTransition.mailboxFacet,
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: mailboxFacetSelectorsArray
+            });
+            facetCuts[3] = Diamond.FacetCut({
+                facet: addresses.stateTransition.executorFacet,
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: executorFacetSelectorsArray
+            });
+        }
 
         VerifierParams memory verifierParams = VerifierParams({
             recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
@@ -525,23 +413,112 @@ contract DeployUtils is Script {
             forceDeploymentsData: generatedData.forceDeploymentsData
         });
 
-        ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: msg.sender,
-            validatorTimelock: addresses.validatorTimelock,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: config.contracts.latestProtocolVersion
-        });
+        return
+            ChainTypeManagerInitializeData({
+                owner: msg.sender,
+                validatorTimelock: addresses.validatorTimelock,
+                chainCreationParams: chainCreationParams,
+                protocolVersion: config.contracts.latestProtocolVersion
+            });
+    }
 
-        address contractAddress = deployViaCreate2(
+    function deploySimpleContract(string memory contractName) internal returns (address contractAddress) {
+        contractAddress = deployViaCreate2(getCreationCode(contractName), getCreationCalldata(contractName));
+        console.log(contractName, "deployed at:", contractAddress);
+    }
+
+    function deployTuppWithContract(
+        string memory contractName
+    ) internal virtual returns (address implementation, address proxy) {
+        implementation = deployViaCreate2(getCreationCode(contractName), getCreationCalldata(contractName));
+        console.log(contractName, "implementation deployed at:", implementation);
+
+        proxy = deployViaCreate2(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                addresses.stateTransition.chainTypeManagerImplementation,
-                addresses.transparentProxyAdmin,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
-            )
+            abi.encode(implementation, addresses.transparentProxyAdmin, getInitializeCalldata(contractName))
         );
-        console.log("ChainTypeManagerProxy deployed at:", contractAddress);
-        addresses.stateTransition.chainTypeManagerProxy = contractAddress;
+        console.log(contractName, "proxy deployed at:", proxy);
+        return (implementation, proxy);
+    }
+
+    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory) {
+        if (compareStrings(contractName, "Verifier")) {
+            if (config.testnetVerifier) {
+                return type(TestnetVerifier).creationCode;
+            } else {
+                return type(DualVerifier).creationCode;
+            }
+        } else if (compareStrings(contractName, "VerifierFflonk")) {
+            return type(VerifierFflonk).creationCode;
+        } else if (compareStrings(contractName, "VerifierPlonk")) {
+            return type(VerifierPlonk).creationCode;
+        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            return type(DefaultUpgrade).creationCode;
+        } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+            return type(L1GenesisUpgrade).creationCode;
+        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            return type(ValidatorTimelock).creationCode;
+        } else if (compareStrings(contractName, "Governance")) {
+            return type(Governance).creationCode;
+        } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+            return type(ChainAdminOwnable).creationCode;
+        } else if (compareStrings(contractName, "AccessControlRestriction")) {
+            // TODO(EVM-924): this function is unused
+            return type(AccessControlRestriction).creationCode;
+        } else if (compareStrings(contractName, "ChainAdmin")) {
+            return type(ChainAdmin).creationCode;
+        } else if (compareStrings(contractName, "ChainTypeManager")) {
+            return type(ChainTypeManager).creationCode;
+        } else {
+            revert(string.concat("Contract ", contractName, " creation code not set"));
+        }
+    }
+    function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory) {
+        if (compareStrings(contractName, "Verifier")) {
+            return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+        } else if (compareStrings(contractName, "VerifierFflonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "VerifierPlonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
+            return abi.encode(config.deployerAddress, executionDelay, config.eraChainId);
+        } else if (compareStrings(contractName, "Governance")) {
+            return
+                abi.encode(
+                    config.ownerAddress,
+                    config.contracts.governanceSecurityCouncilAddress,
+                    config.contracts.governanceMinDelay
+                );
+        } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+            return abi.encode(config.ownerAddress, address(0));
+        } else if (compareStrings(contractName, "AccessControlRestriction")) {
+            return abi.encode(uint256(0), config.ownerAddress);
+        } else if (compareStrings(contractName, "ChainAdmin")) {
+            address[] memory restrictions = new address[](1);
+            restrictions[0] = addresses.accessControlRestrictionAddress;
+            return abi.encode(restrictions);
+        } else if (compareStrings(contractName, "ChainTypeManager")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else {
+            revert(string.concat("Contract ", contractName, " creation calldata not set"));
+        }
+    }
+
+    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory) {
+        if (compareStrings(contractName, "ChainTypeManager")) {
+            return abi.encodeCall(ChainTypeManager.initialize, getChainTypeManagerInitializeData());
+        } else {
+            revert(string.concat("Contract ", contractName, " initialize calldata not set"));
+        }
+    }
+
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
     function test() internal virtual {}

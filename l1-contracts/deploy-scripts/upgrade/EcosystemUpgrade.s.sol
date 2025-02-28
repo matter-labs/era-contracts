@@ -88,7 +88,6 @@ interface IBridgehub {
     function unpauseMigration() external;
 }
 
-
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract EcosystemUpgrade is Script {
@@ -113,7 +112,6 @@ contract EcosystemUpgrade is Script {
         address l2SharedBridgeLegacyImpl;
         address l2BridgedStandardERC20Impl;
     }
-
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {

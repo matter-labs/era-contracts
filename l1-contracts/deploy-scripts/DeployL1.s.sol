@@ -100,36 +100,61 @@ contract DeployL1Script is Script, DeployUtils {
 
         deployBytecodesSupplier();
 
-        deployVerifier();
+        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
+        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
+        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier");
 
-        deployDefaultUpgrade();
-        deployGenesisUpgrade();
+        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
+        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
         deployDAValidators();
-        deployValidatorTimelock();
+        (addresses.validatorTimelock) = deploySimpleContract("ValidatorTimelock");
 
-        deployGovernance();
-        deployChainAdmin();
+        (addresses.governance) = deploySimpleContract("Governance");
+        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
+        // The single owner chainAdmin does not have a separate control restriction contract.
+        // We set to it to zero explicitly so that it is clear to the reader.
+        addresses.accessControlRestrictionAddress = address(0);
         deployTransparentProxyAdmin();
-        deployBridgehubContract();
-        deployMessageRootContract();
+        (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
+            "Bridgehub"
+        );
+        (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
+            "MessageRoot"
+        );
 
-        deployL1NullifierContracts();
-        deploySharedBridgeContracts();
-        deployBridgedStandardERC20Implementation();
+        (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
+            "L1Nullifier"
+        );
+        (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
+            "L1AssetRouter"
+        );
+        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20");
         deployBridgedTokenBeacon();
-        deployL1NativeTokenVaultImplementation();
-        deployL1NativeTokenVaultProxy();
-        deployErc20BridgeImplementation();
-        deployErc20BridgeProxy();
+        (
+            addresses.vaults.l1NativeTokenVaultImplementation,
+            addresses.vaults.l1NativeTokenVaultProxy
+        ) = deployTuppWithContract("L1NativeTokenVault");
+        setL1NativeTokenVaultParams();
+
+        (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
+            "L1ERC20Bridge"
+        );
         updateSharedBridge();
         // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
-        deployCTMDeploymentTracker();
+        (
+            addresses.bridgehub.ctmDeploymentTrackerImplementation,
+            addresses.bridgehub.ctmDeploymentTrackerProxy
+        ) = deployTuppWithContract("CTMDeploymentTracker");
         setBridgehubParams();
 
         initializeGeneratedData();
 
         deployBlobVersionedHashRetriever();
-        deployChainTypeManagerContract();
+        deployStateTransitionDiamondFacets();
+        (
+            addresses.stateTransition.chainTypeManagerImplementation,
+            addresses.stateTransition.chainTypeManagerProxy
+        ) = deployTuppWithContract("ChainTypeManager");
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
 
@@ -211,88 +236,6 @@ contract DeployL1Script is Script, DeployUtils {
         vm.stopBroadcast();
     }
 
-    function deployChainRegistrar() internal {
-        bytes memory bytecodeImplementation = abi.encodePacked(type(ChainRegistrar).creationCode);
-        address chainRegistrarImplementation = deployViaCreate2(bytecodeImplementation, "");
-        console.log("Chain Registrar implementation deployed at:", chainRegistrarImplementation);
-
-        bytes memory bytecode = abi.encodePacked(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                chainRegistrarImplementation,
-                addresses.transparentProxyAdmin,
-                abi.encodeCall(
-                    ChainRegistrar.initialize,
-                    (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
-                )
-            )
-        );
-
-        address chainRegistrar = deployViaCreate2(bytecode, "");
-        console.log("Chain Registrar deployed at:", chainRegistrar);
-        addresses.chainRegistrar = chainRegistrar;
-    }
-
-    function deployBridgehubContract() internal {
-        address bridgehubImplementation = deployViaCreate2(
-            type(Bridgehub).creationCode,
-            abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains))
-        );
-        console.log("Bridgehub Implementation deployed at:", bridgehubImplementation);
-        addresses.bridgehub.bridgehubImplementation = bridgehubImplementation;
-
-        address bridgehubProxy = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                bridgehubImplementation,
-                addresses.transparentProxyAdmin,
-                abi.encodeCall(Bridgehub.initialize, (config.deployerAddress))
-            )
-        );
-        console.log("Bridgehub Proxy deployed at:", bridgehubProxy);
-        addresses.bridgehub.bridgehubProxy = bridgehubProxy;
-    }
-
-    function deployMessageRootContract() internal {
-        address messageRootImplementation = deployViaCreate2(
-            type(MessageRoot).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy)
-        );
-        console.log("MessageRoot Implementation deployed at:", messageRootImplementation);
-        addresses.bridgehub.messageRootImplementation = messageRootImplementation;
-
-        address messageRootProxy = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                messageRootImplementation,
-                addresses.transparentProxyAdmin,
-                abi.encodeCall(MessageRoot.initialize, ())
-            )
-        );
-        console.log("Message Root Proxy deployed at:", messageRootProxy);
-        addresses.bridgehub.messageRootProxy = messageRootProxy;
-    }
-
-    function deployCTMDeploymentTracker() internal {
-        address ctmDTImplementation = deployViaCreate2(
-            type(CTMDeploymentTracker).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy)
-        );
-        console.log("CTM Deployment Tracker Implementation deployed at:", ctmDTImplementation);
-        addresses.bridgehub.ctmDeploymentTrackerImplementation = ctmDTImplementation;
-
-        address ctmDTProxy = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(
-                ctmDTImplementation,
-                addresses.transparentProxyAdmin,
-                abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress))
-            )
-        );
-        console.log("CTM Deployment Tracker Proxy deployed at:", ctmDTProxy);
-        addresses.bridgehub.ctmDeploymentTrackerProxy = ctmDTProxy;
-    }
-
     function deployBlobVersionedHashRetriever() internal {
         // solc contracts/state-transition/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
         bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
@@ -354,69 +297,6 @@ contract DeployL1Script is Script, DeployUtils {
         addresses.stateTransition.diamondProxy = contractAddress;
     }
 
-    function deploySharedBridgeContracts() internal {
-        deploySharedBridgeImplementation();
-        deploySharedBridgeProxy();
-    }
-
-    function deployL1NullifierContracts() internal {
-        deployL1NullifierImplementation();
-        deployL1NullifierProxy();
-    }
-
-    function deployL1NullifierImplementation() internal {
-        bytes memory bytecode;
-        if (config.supportL2LegacySharedBridgeTest) {
-            bytecode = type(L1NullifierDev).creationCode;
-        } else {
-            bytecode = type(L1Nullifier).creationCode;
-        }
-
-        address contractAddress = deployViaCreate2(
-            bytecode,
-            // solhint-disable-next-line func-named-parameters
-            abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.stateTransition.diamondProxy)
-        );
-        console.log("L1NullifierImplementation deployed at:", contractAddress);
-        addresses.bridges.l1NullifierImplementation = contractAddress;
-    }
-
-    function deployL1NullifierProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
-        address contractAddress = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.bridges.l1NullifierImplementation, addresses.transparentProxyAdmin, initCalldata)
-        );
-        console.log("L1NullifierProxy deployed at:", contractAddress);
-        addresses.bridges.l1NullifierProxy = contractAddress;
-    }
-
-    function deploySharedBridgeImplementation() internal {
-        address contractAddress = deployViaCreate2(
-            type(L1AssetRouter).creationCode,
-            // solhint-disable-next-line func-named-parameters
-            abi.encode(
-                config.tokens.tokenWethAddress,
-                addresses.bridgehub.bridgehubProxy,
-                addresses.bridges.l1NullifierProxy,
-                config.eraChainId,
-                addresses.stateTransition.diamondProxy
-            )
-        );
-        console.log("SharedBridgeImplementation deployed at:", contractAddress);
-        addresses.bridges.l1AssetRouterImplementation = contractAddress;
-    }
-
-    function deploySharedBridgeProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-        address contractAddress = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.bridges.l1AssetRouterImplementation, addresses.transparentProxyAdmin, initCalldata)
-        );
-        console.log("SharedBridgeProxy deployed at:", contractAddress);
-        addresses.bridges.l1AssetRouterProxy = contractAddress;
-    }
-
     function setBridgehubParams() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
@@ -430,30 +310,6 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("SharedBridge registered");
     }
 
-    function deployErc20BridgeImplementation() internal {
-        address contractAddress = deployViaCreate2(
-            type(L1ERC20Bridge).creationCode,
-            abi.encode(
-                addresses.bridges.l1NullifierProxy,
-                addresses.bridges.l1AssetRouterProxy,
-                addresses.vaults.l1NativeTokenVaultProxy,
-                config.eraChainId
-            )
-        );
-        console.log("Erc20BridgeImplementation deployed at:", contractAddress);
-        addresses.bridges.erc20BridgeImplementation = contractAddress;
-    }
-
-    function deployErc20BridgeProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1ERC20Bridge.initialize, ());
-        address contractAddress = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.bridges.erc20BridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
-        );
-        console.log("Erc20BridgeProxy deployed at:", contractAddress);
-        addresses.bridges.erc20BridgeProxy = contractAddress;
-    }
-
     function updateSharedBridge() internal {
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         vm.broadcast(msg.sender);
@@ -461,15 +317,15 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("SharedBridge updated with ERC20Bridge address");
     }
 
-    function deployBridgedStandardERC20Implementation() internal {
-        address contractAddress = deployViaCreate2(
-            type(BridgedStandardERC20).creationCode,
-            // solhint-disable-next-line func-named-parameters
-            abi.encode()
-        );
-        console.log("BridgedStandardERC20Implementation deployed at:", contractAddress);
-        addresses.bridges.bridgedStandardERC20Implementation = contractAddress;
-    }
+    // function deployBridgedStandardERC20Implementation() internal {
+    //     address contractAddress = deployViaCreate2(
+    //         type(BridgedStandardERC20).creationCode,
+    //         // solhint-disable-next-line func-named-parameters
+    //         abi.encode()
+    //     );
+    //     console.log("BridgedStandardERC20Implementation deployed at:", contractAddress);
+    //     addresses.bridges.bridgedStandardERC20Implementation = contractAddress;
+    // }
 
     function deployBridgedTokenBeacon() internal {
         /// Note we cannot use create2 as the deployer is the owner.
@@ -482,36 +338,10 @@ contract DeployL1Script is Script, DeployUtils {
         addresses.bridges.bridgedTokenBeacon = contractAddress;
     }
 
-    function deployL1NativeTokenVaultImplementation() internal {
-        address contractAddress = deployViaCreate2(
-            type(L1NativeTokenVault).creationCode,
-            // solhint-disable-next-line func-named-parameters
-            abi.encode(
-                config.tokens.tokenWethAddress,
-                addresses.bridges.l1AssetRouterProxy,
-                addresses.bridges.l1NullifierProxy
-            )
-        );
-        console.log("L1NativeTokenVaultImplementation deployed at:", contractAddress);
-        addresses.vaults.l1NativeTokenVaultImplementation = contractAddress;
-    }
-
-    function deployL1NativeTokenVaultProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(
-            L1NativeTokenVault.initialize,
-            (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-        );
-        address contractAddress = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.vaults.l1NativeTokenVaultImplementation, addresses.transparentProxyAdmin, initCalldata)
-        );
-        console.log("L1NativeTokenVaultProxy deployed at:", contractAddress);
-        addresses.vaults.l1NativeTokenVaultProxy = contractAddress;
-
+    function setL1NativeTokenVaultParams() internal {
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
         // Ownable ownable = Ownable(addresses.bridges.l1AssetRouterProxy);
-
         vm.broadcast(msg.sender);
         sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
@@ -521,6 +351,111 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.broadcast(msg.sender);
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
+    }
+
+    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "ChainRegistrar")) {
+            return type(ChainRegistrar).creationCode;
+        } else if (compareStrings(contractName, "Bridgehub")) {
+            return type(Bridgehub).creationCode;
+        } else if (compareStrings(contractName, "MessageRoot")) {
+            return type(MessageRoot).creationCode;
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return type(CTMDeploymentTracker).creationCode;
+        } else if (compareStrings(contractName, "L1Nullifier")) {
+            if (config.supportL2LegacySharedBridgeTest) {
+                return type(L1NullifierDev).creationCode;
+            } else {
+                return type(L1Nullifier).creationCode;
+            }
+        } else if (compareStrings(contractName, "L1AssetRouter")) {
+            return type(L1AssetRouter).creationCode;
+        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+            return type(L1ERC20Bridge).creationCode;
+        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+            return type(L1NativeTokenVault).creationCode;
+        } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+            return type(BridgedStandardERC20).creationCode;
+        } else {
+            return super.getCreationCode(contractName);
+        }
+    }
+
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "ChainRegistrar")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "Bridgehub")) {
+            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
+        } else if (compareStrings(contractName, "MessageRoot")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
+        } else if (compareStrings(contractName, "L1Nullifier")) {
+            return
+                abi.encode(
+                    addresses.bridgehub.bridgehubProxy,
+                    config.eraChainId,
+                    addresses.stateTransition.diamondProxy
+                );
+        } else if (compareStrings(contractName, "L1AssetRouter")) {
+            return
+                abi.encode(
+                    config.tokens.tokenWethAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1NullifierProxy,
+                    config.eraChainId,
+                    addresses.stateTransition.diamondProxy
+                );
+        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+            return
+                abi.encode(
+                    addresses.bridges.l1NullifierProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.vaults.l1NativeTokenVaultProxy,
+                    config.eraChainId
+                );
+        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+            return
+                abi.encode(
+                    config.tokens.tokenWethAddress,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridges.l1NullifierProxy
+                );
+        } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+            return abi.encode();
+        } else {
+            return super.getCreationCalldata(contractName);
+        }
+    }
+
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "ChainRegistrar")) {
+            return
+                abi.encodeCall(
+                    ChainRegistrar.initialize,
+                    (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
+                );
+        } else if (compareStrings(contractName, "Bridgehub")) {
+            return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "MessageRoot")) {
+            return abi.encodeCall(MessageRoot.initialize, ());
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1Nullifier")) {
+            return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+        } else if (compareStrings(contractName, "L1AssetRouter")) {
+            return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+            return abi.encodeCall(L1ERC20Bridge.initialize, ());
+        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+            return
+                abi.encodeCall(
+                    L1NativeTokenVault.initialize,
+                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                );
+        } else {
+            return super.getInitializeCalldata(contractName);
+        }
     }
 
     function updateOwners() internal {
