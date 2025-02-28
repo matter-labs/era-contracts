@@ -67,8 +67,6 @@ import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploym
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-
     function run() public virtual {
         console.log("Deploying L1 contracts");
 

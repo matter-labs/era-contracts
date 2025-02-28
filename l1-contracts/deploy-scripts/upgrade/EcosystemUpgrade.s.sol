@@ -9,7 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Utils, PrepareL1L2TransactionParams, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, StateTransitionDeployedAddresses} from "../Utils.sol";
+import {Utils, PrepareL1L2TransactionParams, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, StateTransitionDeployedAddresses, ADDRESS_ONE} from "../Utils.sol";
 import {L2TransactionRequestDirect, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
@@ -241,7 +241,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub");
         addresses.bridgehub.ctmDeploymentTrackerImplementation = deploySimpleContract("CTMDeploymentTracker");
-        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRootContract");
+        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot");
 
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier");
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter");

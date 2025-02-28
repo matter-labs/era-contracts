@@ -91,6 +91,8 @@ struct PrepareL1L2TransactionParams {
     address l1SharedBridgeProxy;
 }
 
+address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -100,7 +102,6 @@ library Utils {
     bytes internal constant CREATE2_FACTORY_BYTECODE =
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
 
     /**
