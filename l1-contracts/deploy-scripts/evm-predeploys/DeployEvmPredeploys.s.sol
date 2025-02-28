@@ -15,6 +15,7 @@ interface IEvmPredeploysManager {
 
 string constant DATA_PATH = "/deploy-scripts/evm-predeploys/evm-predeploy-datas/";
 
+/// @notice Scripts that is used to deploy predefined EVM contracts on ZK Chains with EVM emulation support
 contract DeployEvmPredeploys is Script {
     using stdToml for string;
 
