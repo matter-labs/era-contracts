@@ -64,6 +64,8 @@ struct StateTransitionDeployedAddresses {
     address chainTypeManagerProxy;
     address chainTypeManagerImplementation;
     address verifier;
+    address verifierFflonk;
+    address verifierPlonk;
     address adminFacet;
     address mailboxFacet;
     address executorFacet;

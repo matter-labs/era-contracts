@@ -117,16 +117,20 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-        addresses.bridges.sharedBridgeProxy = L2_ASSET_ROUTER_ADDR;
+        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
         addresses.blobVersionedHashRetriever = address(0x1);
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
-        deployGenesisUpgrade();
-        deployVerifier();
-        deployValidatorTimelock();
-        deployChainTypeManagerContract();
+        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
+        addresses.stateTransition.verifier = deploySimpleContract("Verifier");
+        addresses.validatorTimelock = deploySimpleContract("ValidatorTimelock");
+        deployStateTransitionDiamondFacets();
+        (
+            addresses.stateTransition.chainTypeManagerImplementation,
+            addresses.stateTransition.chainTypeManagerProxy
+        ) = deployTuppWithContract("ChainTypeManager");
     }
 
     // add this to be excluded from coverage report

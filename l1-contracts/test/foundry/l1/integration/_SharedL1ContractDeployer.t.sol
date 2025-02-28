@@ -64,7 +64,7 @@ contract L1ContractDeployer is Test {
             addresses.ecosystemAddresses.bridgehub.ctmDeploymentTrackerProxy
         );
 
-        addresses.sharedBridge = L1AssetRouter(addresses.ecosystemAddresses.bridges.sharedBridgeProxy);
+        addresses.sharedBridge = L1AssetRouter(addresses.ecosystemAddresses.bridges.l1AssetRouterProxy);
         addresses.l1Nullifier = L1Nullifier(addresses.ecosystemAddresses.bridges.l1NullifierProxy);
         addresses.l1NativeTokenVault = L1NativeTokenVault(
             payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)
