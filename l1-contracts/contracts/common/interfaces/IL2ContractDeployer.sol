@@ -29,6 +29,9 @@ interface IL2ContractDeployer {
         bytes input;
     }
 
+    /// @notice Returns what types of bytecode are allowed to be deployed on this chain
+    function allowedBytecodeTypesToDeploy() external view returns (AllowedBytecodeTypes mode);
+
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external;
 
