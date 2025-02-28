@@ -13,7 +13,7 @@ sed -e 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/fals
     "$FILE_TO_PREPROCESS" > "$TEMP"
 mv "$TEMP" "$FILE_TO_PREPROCESS"
 
-case "$WHERE" in
+case "$CONTEXT" in
   "L1")
     if [[ -n "$FOUNDRY_PROFILE" ]]; then
       :
@@ -37,7 +37,7 @@ case "$WHERE" in
     forge test --match-path 'test/invariant/l2-context/*' --zksync
     ;;
   *) 
-    echo "error: WHERE environment variable must be set to either 'L1' or 'L2'" >&2
+    echo "error: CONTEXT environment variable must be set to either 'L1' or 'L2'" >&2
     exit 1
     ;;
 esac
