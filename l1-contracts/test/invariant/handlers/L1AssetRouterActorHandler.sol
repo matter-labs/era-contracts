@@ -35,29 +35,30 @@ contract L1AssetRouterActorHandler is Test {
     }
 
     function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _l1TokenIndex) public {
-        _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
         uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
+        uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
 
         address l1Token = l1Tokens[l1TokenIndex];
 
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
         uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
 
-        if (DataEncoding.encodeNTVAssetId(l1ChainId, l1Token) == baseTokenAssetId) {
-            return;
-        }
+        vm.assume(assetId != baseTokenAssetId);
+
+        console.log("l1Token", l1Token);
 
         l2AssetRouter.finalizeDeposit({
             _l1Sender: _sender,
             _l2Receiver: address(receivers[receiverIndex]),
             _l1Token: l1Token,
-            _amount: _amount,
+            _amount: amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
-        ghost_totalDeposits += _amount;
+        ghost_totalDeposits += amount;
     }
 
     function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _l1TokenIndex) public {
@@ -71,8 +72,6 @@ contract L1AssetRouterActorHandler is Test {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
 
-        console.log("l1Token", l1Token);
-
         bytes memory data = DataEncoding.encodeBridgeMintData({
             _originalCaller: _sender,
             _remoteReceiver: address(receivers[receiverIndex]),
@@ -81,9 +80,9 @@ contract L1AssetRouterActorHandler is Test {
             _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
-        if (assetId == baseTokenAssetId) {
-            return;
-        }
+        vm.assume(assetId != baseTokenAssetId);
+
+        console.log("l1Token", l1Token);
 
         // the 1st parameter is unused by `L2AssetRouter`
         // https://github.com/matter-labs/era-contracts/blob/ac11ba99e3f2c3365a162f587b17e35b92dc4f24/l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol#L132
