@@ -68,7 +68,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_GATEWAY_SPECIFIC_UPGRADER} from "contracts/common/L2ContractAddresses.sol";
+import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
@@ -79,10 +79,8 @@ import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
-import {IL2GatewaySpecificUpgrader} from "contracts/common/interfaces/IL2GatewaySpecificUpgrader.sol";
 
 import {FixedForceDeploymentsData, DeployedAddresses} from "../DeployUtils.s.sol";
-
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -350,44 +348,19 @@ contract EcosystemUpgrade is Script {
 
     /// @notice Build L1 -> L2 upgrade tx
     function _composeUpgradeTx(
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
-        bool isOnGateway
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments
     ) internal virtual returns (L2CanonicalTransaction memory transaction) {
         // Sanity check
         for (uint256 i; i < forceDeployments.length; i++) {
             require(isHashInFactoryDeps[forceDeployments[i].bytecodeHash], "Bytecode hash not in factory deps");
         }
 
-        bytes memory gatewaySpecificUpgraderInput;
-        if (!isOnGateway) {
-            IL2ContractDeployer.ForceDeployment[] memory gatewaySpecificForceDeployments = abi.decode(
-                config.gateway.additionalForceDeployments,
-                (IL2ContractDeployer.ForceDeployment[])
-            );
-            // We need to propagate upgrade on
-            gatewaySpecificUpgraderInput = abi.encodeCall(
-                IL2GatewaySpecificUpgrader.upgradeIfGateway,
-                (
-                    config.gateway.chainTypeManagerOnGatewayAddress,
-                    prepareNewChainCreationParams({isOnGateway: true}),
-                    generateUpgradeCutData({isOnGateway: true}),
-                    getOldProtocolVersion(),
-                    getOldProtocolDeadline(),
-                    getNewProtocolVersion(),
-                    gatewaySpecificForceDeployments
-                )
-            );
-        }
-
-        bytes memory data = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgrade,
-            (forceDeployments, L2_GATEWAY_SPECIFIC_UPGRADER, gatewaySpecificUpgraderInput)
-        );
+        bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
 
         transaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(address(L2_COMPLEX_UPGRADER_ADDR))),
+            to: uint256(uint160(address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR))),
             // TODO: dont use hardcoded values
             gasLimit: 72_000_000,
             gasPerPubdataByteLimit: 800,
@@ -496,7 +469,7 @@ contract EcosystemUpgrade is Script {
             : addresses.stateTransition.defaultUpgrade;
 
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments, isOnGateway),
+            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
             evmEmulatorHash: config.contracts.evmEmulatorHash,
