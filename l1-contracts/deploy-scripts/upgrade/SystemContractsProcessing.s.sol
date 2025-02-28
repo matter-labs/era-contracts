@@ -6,6 +6,7 @@ import {Utils, L2_WETH_IMPL_ADDRESS, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRE
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {L2_GATEWAY_SPECIFIC_UPGRADER} from "contracts/common/L2ContractAddresses.sol";
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -24,7 +25,7 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 32;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
 
@@ -253,6 +254,13 @@ library SystemContractsProcessing {
             lang: Language.Solidity,
             isPrecompile: false
         });
+        systemContracts[31] = SystemContract({
+            addr: L2_GATEWAY_SPECIFIC_UPGRADER,
+            codeName: "L2GatewaySpecificUpgrader",
+            lang: Language.Solidity,
+            isPrecompile: false
+        });
+
         return systemContracts;
     }
 

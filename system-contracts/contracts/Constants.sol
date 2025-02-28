@@ -116,6 +116,8 @@ address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
 
 address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
+address constant GATEWAY_SPECIFIC_UPGRADER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x08);
+
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
@@ -192,3 +194,6 @@ uint8 constant ERA_VM_BYTECODE_FLAG = 1;
 uint8 constant EVM_BYTECODE_FLAG = 2;
 
 address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+
+/// @dev The id of Gateway chain
+uint256 constant GATEWAY_CHAIN_ID = 0; // Unknown for now

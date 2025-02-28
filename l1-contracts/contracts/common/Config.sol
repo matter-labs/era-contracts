@@ -164,3 +164,6 @@ struct ZKChainCommitment {
 
 /// @dev Used as the `msg.sender` for system service transactions.
 address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
+
+/// @dev The id of Gateway chain
+uint256 constant GATEWAY_CHAIN_ID = 0; // Not known yet

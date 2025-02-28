@@ -9,6 +9,10 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
 contract EnableEvmEmulator is Script {
+    function run() external {
+        chainAllowEvmEmulation(vm.envAddress("CHAIN_ADMIN_ADDRESS"), vm.envAddress("CHAIN_DIAMOND_PROXY_ADDRESS"));
+    }
+
     function governanceAllowEvmEmulation(address governor, address target) public {
         IAdmin adminContract = IAdmin(target);
         Utils.executeUpgrade({
