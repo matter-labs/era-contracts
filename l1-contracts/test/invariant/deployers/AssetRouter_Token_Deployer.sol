@@ -26,8 +26,15 @@ contract AssetRouter_Token_Deployer is Test {
         assertEq(l1ChainId, l2NativeTokenVault.L1_CHAIN_ID());
         assertNotEq(l2SharedBridge, address(0));
 
+        // Each token has one of each 5 attributes:
+        // - Legacy/non-legacy token (legacy deployed by the SharedBridge and is registered in L2SharedBridgeLegacy)
+        // - Registered/unregistered token (registered in L2NativeTokenVault)
+        // - Deployed/undeployed token
+        // - Native/bridged token
+        // - Base/non-base token
         l1Tokens = new address[](1);
-        address l1Token = makeAddr("unregisteredTokenDeployedBeforeGatewayUpgrade");
+        // legacy, unregistered, deployed, bridged, non-base
+        address l1Token = makeAddr("legacyUnregisteredBridged L1 token");
         l1Tokens[0] = l1Token;
 
         UpgradeableBeacon beacon = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenBeacon();
@@ -35,6 +42,7 @@ contract AssetRouter_Token_Deployer is Test {
         BeaconProxy proxy = new BeaconProxy{salt: salt}(address(beacon), "");
 
         address l2Token = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenAddress(l1Token);
+        vm.label(l2Token, "legacyUnregisteredBridged L2 token");
         vm.etch(l2Token, address(proxy).code);
         vm.store(l2Token, 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50, bytes32(uint256(uint160(address(beacon)))));
 

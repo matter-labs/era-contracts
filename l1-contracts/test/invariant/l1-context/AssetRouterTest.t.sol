@@ -4,12 +4,9 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2Utils} from "test/foundry/l2/integration/L2Utils.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
-import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {AssetRouter_ActorHandler_Deployer} from "../deployers/AssetRouter_ActorHandler_Deployer.sol";
 import {AssetRouter_Token_Deployer} from "../deployers/AssetRouter_Token_Deployer.sol";
 import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
@@ -37,6 +34,9 @@ contract AssetRouterTest is
         uint256 _l1ChainId
     ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.deployL2Contracts(_l1ChainId);
+
+        vm.label(L2_ASSET_ROUTER_ADDR, "L2AssetRouter");
+        vm.label(L2_NATIVE_TOKEN_VAULT_ADDR, "L2NativeTokenVault");
 
         address[] memory deployedL1Tokens = _deployTokens();
         deployActorHandlers(deployedL1Tokens);

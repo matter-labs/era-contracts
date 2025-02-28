@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -69,6 +70,8 @@ contract L1AssetRouterActorHandler is Test {
         address l1Token = l1Tokens[l1TokenIndex];
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
+
+        console.log("l1Token", l1Token);
 
         bytes memory data = DataEncoding.encodeBridgeMintData({
             _originalCaller: _sender,
