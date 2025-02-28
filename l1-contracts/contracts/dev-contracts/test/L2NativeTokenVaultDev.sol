@@ -70,7 +70,10 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
         // test
     }
 
-    function _deployBeaconProxy(bytes32 _salt, uint256 _tokenOriginChainId) internal virtual override returns (BeaconProxy proxy) {
+    function _deployBeaconProxy(
+        bytes32 _salt,
+        uint256 _tokenOriginChainId
+    ) internal virtual override returns (BeaconProxy proxy) {
         address proxyAddress;
 
         if (address(L2_LEGACY_SHARED_BRIDGE) == address(0) || _tokenOriginChainId != L1_CHAIN_ID) {

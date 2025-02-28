@@ -157,7 +157,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart.
-    function _calculateCreate2TokenAddress(address _l1Token) internal virtual view returns (address) {
+    function _calculateCreate2TokenAddress(address _l1Token) internal view virtual returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
         return

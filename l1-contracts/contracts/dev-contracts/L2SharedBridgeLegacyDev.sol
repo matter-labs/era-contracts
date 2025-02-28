@@ -52,14 +52,15 @@ contract L2SharedBridgeLegacyDev is L2SharedBridgeLegacy {
     }
 
     function deployBeaconProxy(bytes32 _salt) external virtual override onlyNTV returns (address proxy) {
-        return Create2.deploy(
-            0,
-            _salt,
-            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(address(l2TokenBeacon), ""))
-        );
+        return
+            Create2.deploy(
+                0,
+                _salt,
+                abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(address(l2TokenBeacon), ""))
+            );
     }
 
-    function _calculateCreate2TokenAddress(address _l1Token) internal virtual override view returns (address) {
+    function _calculateCreate2TokenAddress(address _l1Token) internal view virtual override returns (address) {
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             Create2.computeAddress(
@@ -68,7 +69,9 @@ contract L2SharedBridgeLegacyDev is L2SharedBridgeLegacy {
             );
     }
 
-    function sendMessageToL1(bytes calldata /* _message */) external virtual override onlyAssetRouter returns (bytes32) {
+    function sendMessageToL1(
+        bytes calldata /* _message */
+    ) external virtual override onlyAssetRouter returns (bytes32) {
         // There is no `L1Messenger` in the L1 context
     }
 }

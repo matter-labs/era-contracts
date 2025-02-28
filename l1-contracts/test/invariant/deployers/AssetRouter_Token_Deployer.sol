@@ -45,21 +45,29 @@ contract AssetRouter_Token_Deployer is Test {
         vm.label(l2Token, "legacyUnregisteredBridged L2 token");
         vm.etch(l2Token, address(proxy).code);
         // slot - https://github.com/Openzeppelin/openzeppelin-contracts/blob/dc44c9f1a4c3b10af99492eed84f83ed244203f6/contracts/proxy/ERC1967/ERC1967Upgrade.sol#L123
-        vm.store(l2Token, 0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50, bytes32(uint256(uint160(address(beacon)))));
+        vm.store(
+            l2Token,
+            0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50,
+            bytes32(uint256(uint160(address(beacon))))
+        );
 
-        stdstore
-            .target(l2SharedBridge)
-            .sig("l1TokenAddress(address)")
-            .with_key(l2Token)
-            .checked_write(l1Token);
+        stdstore.target(l2SharedBridge).sig("l1TokenAddress(address)").with_key(l2Token).checked_write(l1Token);
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         vm.prank(address(l2NativeTokenVault));
-        BridgedStandardERC20(l2Token).bridgeInitialize(assetId, l1Token, abi.encode(abi.encode("Token"), abi.encode("T"), abi.encode(18)));
+        BridgedStandardERC20(l2Token).bridgeInitialize(
+            assetId,
+            l1Token,
+            abi.encode(abi.encode("Token"), abi.encode("T"), abi.encode(18))
+        );
 
         // asserting because once `L2NativeTokenVaultDev`'s and `L2NativeTokenVault`'s implementations
         // of `calculateCreate2TokenAddress` returned different addresses
-        assertEq(l2Token, l2NativeTokenVault.calculateCreate2TokenAddress(l1ChainId, l1Token), "SharedBridge and L2NativeTokenVault address calculation differs");
+        assertEq(
+            l2Token,
+            l2NativeTokenVault.calculateCreate2TokenAddress(l1ChainId, l1Token),
+            "SharedBridge and L2NativeTokenVault address calculation differs"
+        );
 
         assertEq(l2NativeTokenVault.originChainId(assetId), 0);
     }

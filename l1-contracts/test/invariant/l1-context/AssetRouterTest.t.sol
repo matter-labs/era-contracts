@@ -62,12 +62,7 @@ contract AssetRouterTest is
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(bridge),
             proxyAdmin,
-            abi.encodeCall(
-                L2SharedBridgeLegacy.initialize,
-                (_l1SharedBridge,
-                _l2TokenProxyBytecodeHash,
-                _aliasedOwner)
-            )
+            abi.encodeCall(L2SharedBridgeLegacy.initialize, (_l1SharedBridge, _l2TokenProxyBytecodeHash, _aliasedOwner))
         );
         console.log("proxy", address(proxy));
         return address(proxy);
