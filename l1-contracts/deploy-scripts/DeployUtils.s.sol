@@ -122,8 +122,8 @@ struct BridgehubDeployedAddresses {
 struct BridgesDeployedAddresses {
     address erc20BridgeImplementation;
     address erc20BridgeProxy;
-    address sharedBridgeImplementation;
-    address sharedBridgeProxy;
+    address l1AssetRouterImplementation;
+    address l1AssetRouterProxy;
     address l1NullifierImplementation;
     address l1NullifierProxy;
     address bridgedStandardERC20Implementation;

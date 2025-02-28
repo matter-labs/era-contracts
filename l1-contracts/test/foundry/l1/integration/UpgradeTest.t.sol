@@ -16,7 +16,7 @@ string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/sc
 string constant CHAIN_INPUT = "/upgrade-envs/stage-proofs-era.toml";
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs-era.toml";
 
-contract UpgradeTest is Test {
+contract UpgradeIntegrationTest is Test {
     EcosystemUpgrade ecosystemUpgrade;
     ChainUpgrade chainUpgrade;
 
