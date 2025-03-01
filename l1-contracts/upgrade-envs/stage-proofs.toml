@@ -30,6 +30,9 @@ l1_bytecodes_supplier_addr = "0xD7Dc68e7e9ED4b6970c4D9a2D58591a622A24330"
 [tokens]
 token_weth_address = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"
 
+[gateway]
+chain_id = 0
+
 [gateway.gateway_state_transition]
 chain_type_manager_proxy_addr = "0x0000000000000000000000000000000000000000"
 chain_type_manager_implementation_addr = "0x0000000000000000000000000000000000000000"
