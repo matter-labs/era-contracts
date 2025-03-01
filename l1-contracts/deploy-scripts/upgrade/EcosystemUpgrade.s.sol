@@ -1145,7 +1145,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        if (config.gateway.chainId == 0) return calls; // Gateway is unknown
+        if (newConfig.gateway.chainId == 0) return calls; // Gateway is unknown
 
         Call[][] memory allCalls = new Call[][](2);
 
@@ -1177,7 +1177,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        if (config.gateway.chainId == 0) return calls; // Gateway is unknown
+        if (newConfig.gateway.chainId == 0) return calls; // Gateway is unknown
 
         Call[][] memory allCalls = new Call[][](4);
 
