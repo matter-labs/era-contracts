@@ -1825,9 +1825,9 @@
   },
   {
     "contractName": "da-contracts/AvailL1DAValidator",
-    "evmBytecodeHash": "0xa1e74a3af577978f617e1a236bd9cb08bd6ddb34cb8b22ffb8819447bb331c49",
+    "evmBytecodeHash": "0xb5e934c55f6bc510e5046b121468a8ccf7d9afb77830c78ac41f10438e9e9850",
     "evmBytecodePath": "/da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json",
-    "evmDeployedBytecodeHash": "0x2f5b45fa3176b3b9e64d62f9c718313b433efc7c5fbd45aed46b6368ee26fb5b",
+    "evmDeployedBytecodeHash": "0xec4f23b0cea195abcf8d9b0503143be63100cfe585c24314df99887483fff493",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
