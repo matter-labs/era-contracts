@@ -6,8 +6,6 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {L2SharedBridgeV25} from "./test/v25/L2SharedBridgeV25.sol";
 import {L2SharedBridgeLegacy} from "../bridge/L2SharedBridgeLegacy.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {SystemContractsHelper} from "./SystemContractsHelper.sol";
 import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
@@ -21,12 +19,43 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_DEPLOYER_SYSTEM_CON
 /// to this implementation
 contract LegacySharedBridgeTest {
     address l2TokenAddress;
-    address l2LegacySharedBridgeAddress;
     address aliasedL1SharedBridge;
-
+    
     function _getBytecodeHash(address _addr) internal view returns (bytes32 result) {
         assembly {
             result := extcodehash(_addr)
+        }
+    }
+
+    // Unfortunately we can not import `TransparentUpgradeableProxy` as for some reason it would modify the
+    // bytecode hash of the Bridgehub. This will be fixed in the future versions of the foundry-zksync.
+    // This is why this function uses `abi.encodeWithSignature`
+    function _forceUpgradeProxy(address proxy, address upgradeTo, bytes memory data) internal {
+        // We assume that the admin of the proxy has address 0.
+        address admin = address(0);
+
+        if (data.length == 0) {
+            (bool success, ) = SystemContractsHelper.mimicCall(
+                proxy,
+                admin,
+                // Unfortunately we can not import `Tr
+                abi.encodeWithSignature(
+                    "upgradeTo(address)",
+                    upgradeTo
+                )
+            );
+            require(success, "Failed to finalize legacy bridging");
+        } else {
+            (bool success, ) = SystemContractsHelper.mimicCall(
+                proxy,
+                admin,
+                abi.encodeWithSignature(
+                    "upgradeToAndCall(address,bytes)",
+                    upgradeTo,
+                    data
+                )
+            );
+            require(success, "Failed to finalize legacy bridging");
         }
     }
 
@@ -34,7 +63,8 @@ contract LegacySharedBridgeTest {
         uint256 l1ChainId,
         address legacyL1Token,
         address l1SharedBridge,
-        bytes32 beaconProxyBytecodeHash
+        bytes32 beaconProxyBytecodeHash,
+        address l2SharedProxyProxyAddr
     ) external {
         // We need to firstly deploy the legacy bridge.
         //
@@ -45,11 +75,9 @@ contract LegacySharedBridgeTest {
 
         L2SharedBridgeV25 impl = new L2SharedBridgeV25(dummyEraChainId);
 
-        ProxyAdmin admin = new ProxyAdmin();
-
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+        _forceUpgradeProxy(
+            l2SharedProxyProxyAddr,
             address(impl),
-            address(admin),
             abi.encodeCall(
                 L2SharedBridgeV25.initialize,
                 (l1SharedBridge, address(0), beaconProxyBytecodeHash, address(this))
@@ -58,7 +86,7 @@ contract LegacySharedBridgeTest {
 
         // Now, we need to try and deposit it
         (bool success, ) = SystemContractsHelper.mimicCall(
-            address(proxy),
+            l2SharedProxyProxyAddr,
             AddressAliasHelper.applyL1ToL2Alias(l1SharedBridge),
             abi.encodeCall(
                 L2SharedBridgeV25.finalizeDeposit,
@@ -96,7 +124,7 @@ contract LegacySharedBridgeTest {
                 // In the real upgrade, the L1 asset router differs from the old L1 shared bridge, but
                 // in this case, it is okay.
                 l1SharedBridge,
-                address(proxy),
+                l2SharedProxyProxyAddr,
                 baseTokenAssetId,
                 address(this)
             )
@@ -113,8 +141,8 @@ contract LegacySharedBridgeTest {
                 l1ChainId,
                 address(this),
                 beaconProxyBytecodeHash,
-                address(proxy),
-                address(L2SharedBridgeV25(address(proxy)).l2TokenBeacon()),
+                l2SharedProxyProxyAddr,
+                address(L2SharedBridgeV25(l2SharedProxyProxyAddr).l2TokenBeacon()),
                 true,
                 address(0),
                 baseTokenAssetId
@@ -124,16 +152,15 @@ contract LegacySharedBridgeTest {
         IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
 
         // Saving the result for future usage in the test.
-        l2TokenAddress = L2SharedBridgeV25(address(proxy)).l2TokenAddress(legacyL1Token);
-        l2LegacySharedBridgeAddress = address(proxy);
+        l2TokenAddress = L2SharedBridgeV25(l2SharedProxyProxyAddr).l2TokenAddress(legacyL1Token);
         aliasedL1SharedBridge = AddressAliasHelper.applyL1ToL2Alias(l1SharedBridge);
 
         // Now, we also need to upgrade the legacy bridge to the v26 version
         L2SharedBridgeLegacy newImpl = new L2SharedBridgeLegacy();
-        admin.upgrade(ITransparentUpgradeableProxy(address(proxy)), address(newImpl));
+        _forceUpgradeProxy(l2SharedProxyProxyAddr, address(newImpl), bytes(""));
 
         BridgedStandardERC20 bridgedERC20Impl = new BridgedStandardERC20();
-        UpgradeableBeacon beacon = L2SharedBridgeLegacy(address(proxy)).l2TokenBeacon();
+        UpgradeableBeacon beacon = L2SharedBridgeLegacy(l2SharedProxyProxyAddr).l2TokenBeacon();
         beacon.upgradeTo(address(bridgedERC20Impl));
     }
 }
