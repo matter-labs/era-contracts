@@ -20,7 +20,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_DEPLOYER_SYSTEM_CON
 contract LegacySharedBridgeTest {
     address l2TokenAddress;
     address aliasedL1SharedBridge;
-    
+
     function _getBytecodeHash(address _addr) internal view returns (bytes32 result) {
         assembly {
             result := extcodehash(_addr)
@@ -39,21 +39,14 @@ contract LegacySharedBridgeTest {
                 proxy,
                 admin,
                 // Unfortunately we can not import `Tr
-                abi.encodeWithSignature(
-                    "upgradeTo(address)",
-                    upgradeTo
-                )
+                abi.encodeWithSignature("upgradeTo(address)", upgradeTo)
             );
             require(success, "Failed to finalize legacy bridging");
         } else {
             (bool success, ) = SystemContractsHelper.mimicCall(
                 proxy,
                 admin,
-                abi.encodeWithSignature(
-                    "upgradeToAndCall(address,bytes)",
-                    upgradeTo,
-                    data
-                )
+                abi.encodeWithSignature("upgradeToAndCall(address,bytes)", upgradeTo, data)
             );
             require(success, "Failed to finalize legacy bridging");
         }
