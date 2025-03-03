@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {L2Message, L2Log} from "contracts/common/Messaging.sol";

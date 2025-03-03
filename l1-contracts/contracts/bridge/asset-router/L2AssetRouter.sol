@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
