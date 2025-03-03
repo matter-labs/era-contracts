@@ -34,9 +34,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2NativeTokenVaultTestAbstract} from "./L2NativeTokenVaultTestAbstract.t.sol";
 import {SharedL2ContractL1DeployerUtils} from "./_SharedL2ContractL1DeployerUtils.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
 
 contract L2NativeTokenVaultL1Test is
     Test,
@@ -60,7 +58,7 @@ contract L2NativeTokenVaultL1Test is
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (Diamond.FacetCut[] memory) {
+    ) internal override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (FacetCut[] memory) {
         return super.getFacetCuts(stateTransition);
     }
 

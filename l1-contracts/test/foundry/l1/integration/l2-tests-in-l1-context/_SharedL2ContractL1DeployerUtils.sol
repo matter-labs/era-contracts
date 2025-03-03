@@ -15,6 +15,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployL1ScriptAbstract} from "deploy-scripts/DeployL1Abstract.s.sol";
 
 import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
@@ -27,10 +28,8 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 
 struct SystemContractsArgs {
@@ -140,35 +139,35 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils, DeployL1IntegrationScri
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual override(DeployL1Script, DeployUtils) {}
+    function test() internal virtual override(DeployL1ScriptAbstract, DeployUtils) {}
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override(DeployUtils, DeployL1IntegrationScript) returns (Diamond.FacetCut[] memory) {
+    ) internal virtual override(DeployUtils, DeployL1IntegrationScript) returns (FacetCut[] memory) {
         return super.getFacetCuts(stateTransition);
     }
 
     function getDeployedContractName(
         string memory contractName
-    ) internal view virtual override(DeployUtils, DeployL1Script) returns (string memory) {
+    ) internal view virtual override(DeployUtils, DeployL1ScriptAbstract) returns (string memory) {
         return super.getDeployedContractName(contractName);
     }
 
     function getCreationCode(
         string memory contractName
-    ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
+    ) internal view virtual override(DeployUtils, DeployL1ScriptAbstract) returns (bytes memory) {
         return super.getCreationCode(contractName);
     }
 
     function getCreationCalldata(
         string memory contractName
-    ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
+    ) internal view virtual override(DeployUtils, DeployL1ScriptAbstract) returns (bytes memory) {
         return super.getCreationCalldata(contractName);
     }
 
     function getInitializeCalldata(
         string memory contractName
-    ) internal virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
+    ) internal virtual override(DeployUtils, DeployL1ScriptAbstract) returns (bytes memory) {
         return super.getInitializeCalldata(contractName);
     }
 }

@@ -6,20 +6,20 @@ pragma solidity 0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-contract DeployL1IntegrationScript is Script, DeployL1Script {
+import {DeployL1ScriptAbstract} from "deploy-scripts/DeployL1Abstract.s.sol";
+import {StateTransitionDeployedAddresses, FacetCut, Action} from "deploy-scripts/Utils.sol";
+
+contract DeployL1IntegrationScript is Script, DeployL1ScriptAbstract {
     using stdToml for string;
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (FacetCut[] memory facetCuts) {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");
         string memory toml = vm.readFile(inputPath);
 
-        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts = new FacetCut[](4);
         {
             bytes memory adminFacetSelectors = toml.readBytes("$.admin_facet_selectors");
             bytes memory gettersFacetSelectors = toml.readBytes("$.getters_facet_selectors");
@@ -31,27 +31,27 @@ contract DeployL1IntegrationScript is Script, DeployL1Script {
             bytes4[] memory mailboxFacetSelectorsArray = abi.decode(mailboxFacetSelectors, (bytes4[]));
             bytes4[] memory executorFacetSelectorsArray = abi.decode(executorFacetSelectors, (bytes4[]));
 
-            facetCuts[0] = Diamond.FacetCut({
+            facetCuts[0] = FacetCut({
                 facet: addresses.stateTransition.adminFacet,
-                action: Diamond.Action.Add,
+                action: Action.Add,
                 isFreezable: false,
                 selectors: adminFacetSelectorsArray
             });
-            facetCuts[1] = Diamond.FacetCut({
+            facetCuts[1] = FacetCut({
                 facet: addresses.stateTransition.gettersFacet,
-                action: Diamond.Action.Add,
+                action: Action.Add,
                 isFreezable: false,
                 selectors: gettersFacetSelectorsArray
             });
-            facetCuts[2] = Diamond.FacetCut({
+            facetCuts[2] = FacetCut({
                 facet: addresses.stateTransition.mailboxFacet,
-                action: Diamond.Action.Add,
+                action: Action.Add,
                 isFreezable: true,
                 selectors: mailboxFacetSelectorsArray
             });
-            facetCuts[3] = Diamond.FacetCut({
+            facetCuts[3] = FacetCut({
                 facet: addresses.stateTransition.executorFacet,
-                action: Diamond.Action.Add,
+                action: Action.Add,
                 isFreezable: true,
                 selectors: executorFacetSelectorsArray
             });

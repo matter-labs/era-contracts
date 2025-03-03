@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
+
+import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
@@ -22,7 +24,7 @@ import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
 import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -90,6 +92,30 @@ struct PrepareL1L2TransactionParams {
     uint256 chainId;
     address bridgehubAddress;
     address l1SharedBridgeProxy;
+}
+
+struct SelectorToFacet {
+    address facetAddress;
+    uint16 selectorPosition;
+    bool isFreezable;
+}
+
+struct FacetToSelectors {
+    bytes4[] selectors;
+    uint16 facetPosition;
+}
+
+struct FacetCut {
+    address facet;
+    Action action;
+    bool isFreezable;
+    bytes4[] selectors;
+}
+
+enum Action {
+    Add,
+    Replace,
+    Remove
 }
 
 address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
@@ -1086,7 +1112,7 @@ library Utils {
         // If `_accessControlRestriction` is not provided, we expect that this ChainAdmin is Ownable
         address adminOwner = _accessControlRestriction == address(0)
             ? Ownable(_admin).owner()
-            : AccessControlRestriction(_accessControlRestriction).defaultAdmin();
+            : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});

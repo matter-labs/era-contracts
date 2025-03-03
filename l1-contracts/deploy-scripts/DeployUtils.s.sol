@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -8,7 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, FacetCut, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
@@ -283,12 +283,25 @@ abstract contract DeployUtils is Script {
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
+    ) internal virtual returns (FacetCut[] memory facetCuts);
+
+    function formatFacetCuts(FacetCut[] memory facetCutsUnformatted) internal returns (Diamond.FacetCut[] memory facetCuts) {
+        facetCuts = new Diamond.FacetCut[](facetCutsUnformatted.length);
+        for (uint256 i = 0; i < facetCutsUnformatted.length; i++) {
+            facetCuts[i] = Diamond.FacetCut({
+                facet: facetCutsUnformatted[i].facet,
+                action: Diamond.Action(uint8(facetCutsUnformatted[i].action)),
+                isFreezable: facetCutsUnformatted[i].isFreezable,
+                selectors: facetCutsUnformatted[i].selectors
+            });
+        }
+    }
 
     function getDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        Diamond.FacetCut[] memory facetCuts = getFacetCuts(stateTransition);
+        FacetCut[] memory facetCutsUnformatted = getFacetCuts(stateTransition);
+        Diamond.FacetCut[] memory facetCuts = formatFacetCuts(facetCutsUnformatted);
 
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 

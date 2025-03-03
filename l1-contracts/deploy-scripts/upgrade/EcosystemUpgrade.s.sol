@@ -323,7 +323,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getFacetCuts(stateTransition);
+        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
         facetCuts = mergeFacets(getFacetCutsForDeletion(), facetCuts);
 
         VerifierParams memory verifierParams = getVerifierParams();
@@ -333,11 +333,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         // Additional force deployments after Gateway
         IL2ContractDeployer.ForceDeployment[]
-            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](4);
-        additionalForceDeployments[0] = getForceDeployment("L2LegacySharedBridge");
-        additionalForceDeployments[1] = getForceDeployment("L2StandardERC20");
-        additionalForceDeployments[2] = getForceDeployment("RollupL2DAValidator");
-        additionalForceDeployments[3] = getForceDeployment("NoDAL2DAValidator");
+            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+        // add additional force deployments here
+        // additionalForceDeployments[0] = getForceDeployment("L2LegacySharedBridge");
 
         // TODO: do we update *all* fixed force deployments?
 

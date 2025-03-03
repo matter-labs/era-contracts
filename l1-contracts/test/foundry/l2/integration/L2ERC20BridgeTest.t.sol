@@ -18,10 +18,8 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployL1IntegrationScript} from "../../l1/integration/deploy-scripts/DeployL1Integration.s.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
@@ -49,13 +47,13 @@ contract L2Erc20Test is Test, L2Erc20TestAbstract, SharedL2ContractL2DeployerUti
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public override(SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer) {
+    ) public override(SharedL2ContractL2DeployerUtils, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (Diamond.FacetCut[] memory) {
+    ) internal override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (FacetCut[] memory) {
         return super.getFacetCuts(stateTransition);
     }
 
