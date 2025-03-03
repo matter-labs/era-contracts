@@ -64,7 +64,7 @@ import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.s
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
-contract DeployL1Script is Script, DeployUtils {
+abstract contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
     function run() public virtual {
