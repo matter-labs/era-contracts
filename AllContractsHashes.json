@@ -1089,11 +1089,11 @@
   },
   {
     "contractName": "l1-contracts/L2NativeTokenVault",
-    "zkBytecodeHash": "0x010007e7ced2a9266888fe0d939315421da2089501dbbdcbf9200cf5996feeb7",
+    "zkBytecodeHash": "0x010007f117d150349bf9b8c2889636b21db468f9614fa4d305377c42a1bde44e",
     "zkBytecodePath": "/l1-contracts/zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmBytecodeHash": "0xc7cce85c86cbc199003f9d2bc4032808188b9eb5de6acf2df9cd97c2489e6a6c",
+    "evmBytecodeHash": "0xe37aa73a65e9bc509f647a4df1ed0cefa08bd09604234da0b6a21d20e0985244",
     "evmBytecodePath": "/l1-contracts/out/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmDeployedBytecodeHash": "0xc44804e31be66974746d70760445f07e5bcf53c6eade1bbc8c17da63d31756a1"
+    "evmDeployedBytecodeHash": "0x72f9273a89775e7ac0669e68c886bccc4bdba2bb3bb4f23b2b45fc8cb922932f"
   },
   {
     "contractName": "l1-contracts/L2ProxyAdminDeployer",
@@ -1634,7 +1634,7 @@
   {
     "contractName": "bootloader_test.yul",
     "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/contracts-preprocessed/bootloader/bootloader_test.yul.json",
-    "zkBytecodeHash": "0x0100042fff8f39a7c274851e8a2cb1881bfdc2bef524a00510aa1a294422477b",
+    "zkBytecodeHash": "0x010003cb3dab59cd3cf6a76d88dbc917147df803dda0683dbda9ee310e0bdc75",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
