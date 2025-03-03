@@ -76,6 +76,7 @@ struct StateTransitionDeployedAddresses {
     address validatorTimelock;
     address diamondProxy;
     address bytecodesSupplier;
+    bool isOnGateway;
 }
 
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error

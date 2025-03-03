@@ -57,7 +57,7 @@ contract UpgradeIntegrationTest is Test {
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
         chainUpgrade.upgradeChain(
             ecosystemUpgrade.getOldProtocolVersion(),
-            ecosystemUpgrade.generateUpgradeCutData({isOnGateway: false})
+            ecosystemUpgrade.generateUpgradeCutData(ecosystemUpgrade.getAddresses().stateTransition)
         );
 
         // TODO: here we should include tests that depoists work for upgraded chains

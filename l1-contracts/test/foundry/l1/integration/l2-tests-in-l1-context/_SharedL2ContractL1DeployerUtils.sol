@@ -125,7 +125,7 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
         instantiateCreate2Factory();
         addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
         addresses.stateTransition.verifier = deploySimpleContract("Verifier");
-        addresses.validatorTimelock = deploySimpleContract("ValidatorTimelock");
+        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock");
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,

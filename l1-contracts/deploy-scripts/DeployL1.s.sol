@@ -103,7 +103,7 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
         deployDAValidators();
-        (addresses.validatorTimelock) = deploySimpleContract("ValidatorTimelock");
+        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock");
 
         (addresses.governance) = deploySimpleContract("Governance");
         (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
@@ -267,7 +267,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function setChainTypeManagerInValidatorTimelock() public virtual {
-        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.stateTransition.validatorTimelock);
         if (address(validatorTimelock.chainTypeManager()) != addresses.stateTransition.chainTypeManagerProxy) {
             vm.broadcast(msg.sender);
             validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
@@ -477,7 +477,7 @@ contract DeployL1Script is Script, DeployUtils {
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.stateTransition.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
@@ -653,7 +653,11 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 
-        vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "validator_timelock_addr",
+            addresses.stateTransition.validatorTimelock
+        );
         vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
         vm.serializeAddress(
             "deployed_addresses",
