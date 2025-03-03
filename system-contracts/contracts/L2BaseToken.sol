@@ -83,19 +83,6 @@ contract L2BaseToken is IBaseToken, ISystemContract {
         emit Withdrawal(msg.sender, _l1Receiver, amount);
     }
 
-    /// @notice Initiate the withdrawal of the base token, with the sent message. The funds will be available to claim on L1 `finalizeEthWithdrawal` method.
-    /// @param _l1Receiver The address on L1 to receive the funds.
-    /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
-    function withdrawWithMessage(address _l1Receiver, bytes memory _additionalData) external payable override {
-        uint256 amount = _burnMsgValue();
-
-        // Send the L2 log, a user could use it as proof of the withdrawal
-        bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
-        L1_MESSENGER_CONTRACT.sendToL1(message);
-
-        emit WithdrawalWithMessage(msg.sender, _l1Receiver, amount, _additionalData);
-    }
-
     /// @dev The function burn the sent `msg.value`.
     /// NOTE: Since this contract holds the mapping of all ether balances of the system,
     /// the sent `msg.value` is added to the `this` balance before the call.

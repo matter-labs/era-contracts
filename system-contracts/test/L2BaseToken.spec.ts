@@ -201,43 +201,5 @@ describe("L2BaseToken tests", () => {
       expect(balanceAfterWithdrawal).to.equal(balanceBeforeWithdrawal.sub(amountToWithdraw));
       expect(totalSupplyAfter).to.equal(totalSupplyBefore.sub(amountToWithdraw));
     });
-
-    it("event, balance, totalsupply, withdrawWithMessage", async () => {
-      const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
-      const additionalData: string = ethers.utils.defaultAbiCoder.encode(["string"], ["additional data"]);
-      const message: string = ethers.utils.solidityPack(
-        ["bytes4", "address", "uint256", "address", "bytes"],
-        [
-          mailboxIface.getSighash("finalizeEthWithdrawal"),
-          wallets[1].address,
-          amountToWithdraw,
-          richWallet.address,
-          additionalData,
-        ]
-      );
-
-      await setResult("L1Messenger", "sendToL1", [message], {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(message)]),
-      });
-
-      // Consistency reasons - won't crash if test order reverse
-      const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
-      await (await L2BaseToken.connect(bootloaderAccount).mint(L2BaseToken.address, amountToMint)).wait();
-
-      const totalSupplyBefore = await L2BaseToken.totalSupply();
-      const balanceBeforeWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
-      await expect(
-        L2BaseToken.connect(richWallet).withdrawWithMessage(wallets[1].address, additionalData, {
-          value: amountToWithdraw,
-        })
-      )
-        .to.emit(L2BaseToken, "WithdrawalWithMessage")
-        .withArgs(richWallet.address, wallets[1].address, amountToWithdraw, additionalData);
-      const totalSupplyAfter = await L2BaseToken.totalSupply();
-      const balanceAfterWithdrawal: BigNumber = await L2BaseToken.balanceOf(L2BaseToken.address);
-      expect(balanceAfterWithdrawal).to.equal(balanceBeforeWithdrawal.sub(amountToWithdraw));
-      expect(totalSupplyAfter).to.equal(totalSupplyBefore.sub(amountToWithdraw));
-    });
   });
 });
