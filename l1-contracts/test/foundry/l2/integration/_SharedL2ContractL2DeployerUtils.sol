@@ -21,6 +21,12 @@ import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} fro
 import {L2Utils} from "./L2Utils.sol";
 import {SharedL2ContractL1DeployerUtils, SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
 
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DeployL1IntegrationScript} from "../../l1/integration/deploy-scripts/DeployL1Integration.s.sol";
+
 contract SharedL2ContractL2DeployerUtils is DeployUtils, SharedL2ContractL1DeployerUtils {
     using stdToml for string;
 
@@ -38,4 +44,34 @@ contract SharedL2ContractL2DeployerUtils is DeployUtils, SharedL2ContractL1Deplo
 
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
+
+    function getFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (Diamond.FacetCut[] memory) {
+        return super.getFacetCuts(stateTransition);
+    }
+
+    function getDeployedContractName(
+        string memory contractName
+    ) internal view virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (string memory) {
+        return super.getDeployedContractName(contractName);
+    }
+
+    function getCreationCode(
+        string memory contractName
+    ) internal view virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (bytes memory) {
+        return super.getCreationCode(contractName);
+    }
+
+    function getCreationCalldata(
+        string memory contractName
+    ) internal view virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (bytes memory) {
+        return super.getCreationCalldata(contractName);
+    }
+
+    function getInitializeCalldata(
+        string memory contractName
+    ) internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName);
+    }
 }

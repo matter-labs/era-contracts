@@ -27,6 +27,12 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
+
 struct SystemContractsArgs {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -39,7 +45,7 @@ struct SystemContractsArgs {
     address l1CtmDeployer;
 }
 
-contract SharedL2ContractL1DeployerUtils is DeployUtils {
+contract SharedL2ContractL1DeployerUtils is DeployUtils, DeployL1IntegrationScript {
     using stdToml for string;
     using stdStorage for StdStorage;
 
@@ -134,5 +140,35 @@ contract SharedL2ContractL1DeployerUtils is DeployUtils {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual override {}
+    function test() internal virtual override(DeployL1Script, DeployUtils) {}
+
+    function getFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override(DeployUtils, DeployL1IntegrationScript) returns (Diamond.FacetCut[] memory) {
+        return super.getFacetCuts(stateTransition);
+    }
+
+    function getDeployedContractName(
+        string memory contractName
+    ) internal view virtual override(DeployUtils, DeployL1Script) returns (string memory) {
+        return super.getDeployedContractName(contractName);
+    }
+
+    function getCreationCode(
+        string memory contractName
+    ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
+        return super.getCreationCode(contractName);
+    }
+
+    function getCreationCalldata(
+        string memory contractName
+    ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
+        return super.getCreationCalldata(contractName);
+    }
+
+    function getInitializeCalldata(
+        string memory contractName
+    ) internal virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName);
+    }
 }

@@ -34,6 +34,10 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2Erc20TestAbstract} from "./L2Erc20TestAbstract.t.sol";
 import {SharedL2ContractL1DeployerUtils} from "./_SharedL2ContractL1DeployerUtils.sol";
 
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+
 contract L2Erc20L1Test is Test, SharedL2ContractL1DeployerUtils, SharedL2ContractDeployer, L2Erc20TestAbstract {
     function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
 
@@ -47,5 +51,35 @@ contract L2Erc20L1Test is Test, SharedL2ContractL1DeployerUtils, SharedL2Contrac
         uint256 _l1ChainId
     ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.deployL2Contracts(_l1ChainId);
+    }
+
+    function getFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (Diamond.FacetCut[] memory) {
+        return super.getFacetCuts(stateTransition);
+    }
+
+    function getDeployedContractName(
+        string memory contractName
+    ) internal view override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (string memory) {
+        return super.getDeployedContractName(contractName);
+    }
+
+    function getCreationCode(
+        string memory contractName
+    ) internal view override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (bytes memory) {
+        return super.getCreationCode(contractName);
+    }
+
+    function getCreationCalldata(
+        string memory contractName
+    ) internal view override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (bytes memory) {
+        return super.getCreationCalldata(contractName);
+    }
+
+    function getInitializeCalldata(
+        string memory contractName
+    ) internal override(DeployUtils, SharedL2ContractL1DeployerUtils) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName);
     }
 }

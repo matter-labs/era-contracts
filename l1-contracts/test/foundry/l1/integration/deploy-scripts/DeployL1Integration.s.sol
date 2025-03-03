@@ -14,7 +14,7 @@ contract DeployL1IntegrationScript is Script, DeployL1Script {
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override returns (Diamond.FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(root, "/script-out/diamond-selectors.toml");
         string memory toml = vm.readFile(inputPath);
