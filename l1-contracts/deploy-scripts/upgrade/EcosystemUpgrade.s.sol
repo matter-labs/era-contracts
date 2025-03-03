@@ -371,14 +371,17 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         }
     }
 
-    function getForceDeployment(string memory contractName) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        return IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode(contractName)),
-            newAddress: getExpectedL2Address(contractName),
-            callConstructor: true,
-            value: 0,
-            input: "" // todo add constructor args here?
-        });
+    function getForceDeployment(
+        string memory contractName
+    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
+        return
+            IL2ContractDeployer.ForceDeployment({
+                bytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode(contractName)),
+                newAddress: getExpectedL2Address(contractName),
+                callConstructor: true,
+                value: 0,
+                input: "" // todo add constructor args here?
+            });
     }
 
     function getEcosystemAdmin() external virtual returns (address) {
@@ -445,8 +448,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     function setAddressesBasedOnBridgehub() internal virtual {
         config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy)
-            .chainTypeManager(config.eraChainId);
+        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
@@ -462,8 +464,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
         );
 
-        addresses.bridgehub.ctmDeploymentTrackerProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer());
-        
+        addresses.bridgehub.ctmDeploymentTrackerProxy = address(
+            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
+        );
 
         addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 
@@ -472,7 +475,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
         newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
-        
+
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
     }
 
@@ -489,7 +492,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         upgradeAddresses.expectedL2Addresses = ExpectedL2Addresses({
             expectedRollupL2DAValidator: getExpectedL2Address("RollupL2DAValidator"),
-            expectedValidiumL2DAValidator: getExpectedL2Address("NoDAL2DAValidator"), 
+            expectedValidiumL2DAValidator: getExpectedL2Address("NoDAL2DAValidator"),
             l2SharedBridgeLegacyImpl: getExpectedL2Address("L2LegacySharedBridge"),
             l2BridgedStandardERC20Impl: getExpectedL2Address("L2StandardERC20")
         });
@@ -498,11 +501,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(
-            bytes32(0), // todo add salt here?
-            L2ContractHelper.hashL2Bytecode(getCreationCode(contractName)),
-            hex"" // todo add constructor args here?
-        );
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0), // todo add salt here?
+                L2ContractHelper.hashL2Bytecode(getCreationCode(contractName)),
+                hex"" // todo add constructor args here?
+            );
     }
 
     function getGovernanceUpgradeInitialDelay() external view virtual returns (uint256) {
