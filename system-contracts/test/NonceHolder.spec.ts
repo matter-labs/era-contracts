@@ -6,7 +6,7 @@ import {
   TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
   TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
 } from "./shared/constants";
-import { prepareEnvironment, setResult } from "./shared/mocks";
+import { prepareEnvironment } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { ethers, network } from "hardhat";
 import { BigNumber } from "ethers";
