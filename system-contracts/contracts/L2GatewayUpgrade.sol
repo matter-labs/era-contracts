@@ -9,8 +9,6 @@ import {L2GenesisUpgradeHelper as L2GatewayUpgradeHelper} from "./L2GatewayUpgra
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
-import {WRAPPED_BASE_TOKEN_IMPL_ADDRESS} from "./Constants.sol";
 
 /// @dev Storage slot with the admin of the contract used for EIP1967 proxies (e.g., TUP, BeaconProxy, etc.).
 bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
@@ -70,24 +68,6 @@ contract L2GatewayUpgrade {
                 // We are sure that `impl` is deployed, since it is supposed to be included
                 // as part of the "usual" force deployments array.
                 fixedForceDeploymentsData.l2BridgedStandardERC20Impl
-            );
-        }
-
-        if (additionalForceDeploymentsData.predeployedL2WethAddress != address(0)) {
-            // Query the old data to avoid accidentally overwriting it.
-            string memory name = IERC20Metadata(additionalForceDeploymentsData.predeployedL2WethAddress).name();
-            string memory symbol = IERC20Metadata(additionalForceDeploymentsData.predeployedL2WethAddress).symbol();
-
-            // Force upgrade the TransparentUpgradeableProxy for the predeployed L2 WETH.
-            forceUpgradeTransparentProxy(
-                additionalForceDeploymentsData.predeployedL2WethAddress,
-                WRAPPED_BASE_TOKEN_IMPL_ADDRESS,
-                L2GatewayUpgradeHelper.getWethInitData(
-                    name,
-                    symbol,
-                    additionalForceDeploymentsData.baseTokenL1Address,
-                    additionalForceDeploymentsData.baseTokenAssetId
-                )
             );
         }
     }
