@@ -29,6 +29,7 @@ contract DeployL2WrappedBaseToken is Script {
     struct Config {
         uint256 chainId;
         address bridgehubProxy;
+        address proxyAdmin;  // optional, if not set, deployProxyAdmin() will be called
         // Derived:
         address baseToken;
         string wrappedBaseTokenName;
@@ -55,7 +56,9 @@ contract DeployL2WrappedBaseToken is Script {
         initializeConfig();
         loadBytecodes();
 
-        deployProxyAdmin();
+        if (config.proxyAdmin == address(0)) {
+            deployProxyAdmin();
+        }
         deployL2WrappedBaseTokenImplementation();
         deployL2WrappedBaseTokenProxy();
 
@@ -69,6 +72,12 @@ contract DeployL2WrappedBaseToken is Script {
 
         config.chainId = toml.readUint("$.chain_id");
         config.bridgehubProxy = toml.readAddress("$.bridgehub_proxy");
+        if (vm.keyExistsToml(toml, "$.proxy_admin")) {
+            config.proxyAdmin = toml.readAddress("$.proxy_admin");
+            if (config.proxyAdmin != address(0)) {
+                output.proxyAdmin = config.proxyAdmin;
+            }
+        }
         console.log("Chain ID:", config.chainId);
         console.log("Bridgehub proxy:", config.bridgehubProxy);
 
@@ -109,6 +118,15 @@ contract DeployL2WrappedBaseToken is Script {
         bytecodes.proxyAdmin = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/ProxyAdmin.sol/ProxyAdmin.json"
         );
+
+        // Print bytecode hashes
+        console.log("L2WrappedBaseToken bytecode hash:");
+        console.logBytes32(L2ContractHelper.hashL2Bytecode(bytecodes.l2WrappedBaseToken));
+        console.log("TransparentUpgradeableProxy bytecode hash:");
+        console.logBytes32(L2ContractHelper.hashL2Bytecode(bytecodes.transparentUpgradeableProxy));
+        console.log("ProxyAdmin bytecode hash:");
+        console.logBytes32(L2ContractHelper.hashL2Bytecode(bytecodes.proxyAdmin));
+        console.log("--------------------------------");
     }
 
     function deployL2WrappedBaseTokenImplementation() internal {
