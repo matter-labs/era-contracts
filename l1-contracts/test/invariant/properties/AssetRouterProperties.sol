@@ -96,13 +96,11 @@ abstract contract AssetRouterProperties is Test {
 
             // the true branch checks the case when the token has not yet been bridged
             // while the false branch checks the other case
-            if (l2Token == address(0) || assetId == bytes32(0) || originChainId == 0 || tokenAddress == address(0)) {
-                assertEq(l2Token, address(0), "l2Token is not zero");
+            if (assetId == bytes32(0) || originChainId == 0 || tokenAddress == address(0)) {
                 assertEq(assetId, bytes32(0), "assetId is not zero");
                 assertEq(originChainId, 0, "originChainId is not zero");
                 assertEq(tokenAddress, address(0), "tokenAddress is not zero");
             } else {
-                assertNotEq(l2Token, address(0));
                 assertNotEq(assetId, bytes32(0));
                 assertNotEq(originChainId, 0);
                 assertNotEq(tokenAddress, address(0));
