@@ -70,14 +70,19 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit());
         // Deploy ChainTypeManager implementation
-        addresses.stateTransition.chainTypeManagerImplementation = address(new ChainTypeManager(addresses.bridgehub.bridgehubProxy));
+        addresses.stateTransition.chainTypeManagerImplementation = address(
+            new ChainTypeManager(addresses.bridgehub.bridgehubProxy)
+        );
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
         addresses.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy(
                 addresses.stateTransition.chainTypeManagerImplementation,
                 addresses.transparentProxyAdmin,
-                abi.encodeCall(ChainTypeManager.initialize, getChainTypeManagerInitializeData(addresses.stateTransition))
+                abi.encodeCall(
+                    ChainTypeManager.initialize,
+                    getChainTypeManagerInitializeData(addresses.stateTransition)
+                )
             )
         );
     }
