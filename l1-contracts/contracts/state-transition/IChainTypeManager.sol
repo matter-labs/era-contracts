@@ -59,6 +59,9 @@ interface IChainTypeManager {
     /// @notice ValidatorTimelock changed
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
 
+    /// @notice ServerNotifier changed
+    event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
+
     /// @notice chain creation parameters changed
     event NewChainCreationParams(
         address genesisUpgrade,
