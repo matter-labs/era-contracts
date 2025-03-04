@@ -170,7 +170,10 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         uint256 addressAsKey = uint256(uint160(_address));
         (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_nonce);
         // We keep the `nonceValues` check here, until it is confirmed that this mapping has never been used by anyone.
-        return _nonce < getMinNonce(_address) || nonceValue < keyedNonces[addressAsKey][nonceKey] || __DEPRECATED_nonceValues[addressAsKey][_nonce] > 0;
+        return
+            _nonce < getMinNonce(_address) ||
+            nonceValue < keyedNonces[addressAsKey][nonceKey] ||
+            __DEPRECATED_nonceValues[addressAsKey][_nonce] > 0;
     }
 
     /// @notice Checks and reverts based on whether the nonce is used (not used).
