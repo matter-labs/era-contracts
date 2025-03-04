@@ -3,10 +3,9 @@
 pragma solidity 0.8.24;
 
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
-import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
-import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized, InvalidNonceKey} from "./SystemContractErrors.sol";
+import {NonceIncreaseError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized, InvalidNonceKey} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs

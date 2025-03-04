@@ -73,8 +73,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
     /// @notice Updates the nonce ordering of the account. Since only `KeyedSequential`
     /// is supported, currently this method always reverts.
-    /// @param _nonceOrdering The new nonce ordering to use.
-    function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external onlySystemCall {
+    function updateNonceOrdering(AccountNonceOrdering) external onlySystemCall {
         revert InvalidNonceOrderingChange();
         // NOTE: If this method is ever implemented, the `AccountNonceOrderingUpdated` event should be emitted.
     }
