@@ -59,10 +59,4 @@ contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2Deploy
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
-
-    function getFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
-    }
 }

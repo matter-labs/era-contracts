@@ -36,10 +36,4 @@ contract WethTest is Test, L2WethTestAbstract, SharedL2ContractL2Deployer {
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
-
-    function getFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
-    }
 }

@@ -40,10 +40,4 @@ contract L2NativeTokenVaultTest is Test, SharedL2ContractL2Deployer, L2NativeTok
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
-
-    function getFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
-    }
 }

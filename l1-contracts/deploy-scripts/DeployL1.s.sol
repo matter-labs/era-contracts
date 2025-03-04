@@ -351,8 +351,6 @@ contract DeployL1Script is Script, DeployUtils {
         IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
-
-
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
@@ -814,9 +812,7 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "Bridgehub")) {
             return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "MessageRoot")) {
@@ -845,7 +841,7 @@ contract DeployL1Script is Script, DeployUtils {
             return
                 abi.encodeCall(
                     ChainRegistrar.initialize,
-                        (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
+                    (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
                 );
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
