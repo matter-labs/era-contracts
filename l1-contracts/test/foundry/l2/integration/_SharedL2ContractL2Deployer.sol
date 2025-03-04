@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/Utils.sol";
@@ -25,7 +26,6 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-
 // import {DeployL1IntegrationScript} from "../../l1/integration/deploy-scripts/DeployL1Integration.s.sol";
 
 import {StateTransitionDeployedAddresses, FacetCut, ADDRESS_ONE} from "deploy-scripts/Utils.sol";
@@ -69,10 +69,17 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit());
-        (
-            addresses.stateTransition.chainTypeManagerImplementation,
-            addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager");
+        // Deploy ChainTypeManager implementation
+        addresses.stateTransition.chainTypeManagerImplementation = address(new ChainTypeManager(addresses.bridgehub.bridgehubProxy));
+
+        // Deploy TransparentUpgradeableProxy for ChainTypeManager
+        addresses.stateTransition.chainTypeManagerProxy = address(
+            new TransparentUpgradeableProxy(
+                addresses.stateTransition.chainTypeManagerImplementation,
+                addresses.transparentProxyAdmin,
+                abi.encodeCall(ChainTypeManager.initialize, getChainTypeManagerInitializeData(addresses.stateTransition))
+            )
+        );
     }
 
     function deployViaCreate2(
