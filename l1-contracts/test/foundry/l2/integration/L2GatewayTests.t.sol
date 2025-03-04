@@ -27,68 +27,44 @@ import {L2Utils, SystemContractsArgs} from "./L2Utils.sol";
 
 import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
 
-import {DeployL1IntegrationScript} from "../../l1/integration/deploy-scripts/DeployL1Integration.s.sol";
 
-import {SharedL2ContractL2DeployerUtils} from "./_SharedL2ContractL2DeployerUtils.sol";
+import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {SharedL2ContractL1DeployerUtils} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
 import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-in-l1-context/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
 
-contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2DeployerUtils {
+contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2Deployer {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
     // It is a bit easier to use EOA and it is sufficient for the tests.
-    function test() internal virtual override(DeployUtils, SharedL2ContractL2DeployerUtils) {}
+    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
     function initSystemContracts(
         SystemContractsArgs memory _args
-    ) internal override(SharedL2ContractDeployer, SharedL2ContractL2DeployerUtils) {
+    ) internal override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {
         super.initSystemContracts(_args);
     }
 
     function deployViaCreate2(
         bytes memory creationCode,
         bytes memory constructorArgs
-    ) internal override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (address) {
+    ) internal override(DeployUtils, SharedL2ContractL2Deployer) returns (address) {
         return super.deployViaCreate2(creationCode, constructorArgs);
     }
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public override(SharedL2ContractL2DeployerUtils, SharedL2ContractDeployer) {
+    ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (FacetCut[] memory) {
+    ) internal override(DeployIntegrationUtils) returns (FacetCut[] memory) {
         return super.getFacetCuts(stateTransition);
     }
 
-    function getDeployedContractName(
-        string memory contractName
-    ) internal view override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (string memory) {
-        return super.getDeployedContractName(contractName);
-    }
-
-    function getCreationCode(
-        string memory contractName
-    ) internal view override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (bytes memory) {
-        return super.getCreationCode(contractName);
-    }
-
-    function getCreationCalldata(
-        string memory contractName
-    ) internal view override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (bytes memory) {
-        return super.getCreationCalldata(contractName);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal override(DeployUtils, SharedL2ContractL2DeployerUtils) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
-    }
 }

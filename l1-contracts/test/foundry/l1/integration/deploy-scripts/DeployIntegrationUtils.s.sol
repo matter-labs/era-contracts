@@ -6,13 +6,15 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {StateTransitionDeployedAddresses, FacetCut, Action} from "deploy-scripts/Utils.sol";
 
-contract DeployL1IntegrationScript is Script, DeployL1Script {
+abstract contract DeployIntegrationUtils is Script, DeployUtils {
     using stdToml for string;
 
     function test() internal virtual override {}
+
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory);
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition

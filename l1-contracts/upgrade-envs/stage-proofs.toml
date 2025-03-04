@@ -2,6 +2,11 @@ era_chain_id = 271
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 86400
 
+# overrwritten 
+owner_address = "0x0000000000000000000000000000000000000001" 
+support_l2_legacy_shared_bridge_test = false
+old_protocol_version = 0x1a00000000
+
 [contracts]
 max_number_of_chains = 100
 create2_factory_salt = "0x8c8c6108a96a14b59963a18367250dc2042dfe62da8767d72ffddb03f269ffcc"
@@ -26,6 +31,10 @@ bridgehub_proxy_address = "0x7bdf7970f17278a6ff75fdbc671e870b0728ae41"
 transparent_proxy_admin = "0x93aeee8d98fb0873f8ff595fdd534a1f288786d2"
 protocol_upgrade_handler_proxy_address = "0xbd36971e336914167c6bd3a1fc9b0960860ab1c7"
 l1_bytecodes_supplier_addr = "0xD7Dc68e7e9ED4b6970c4D9a2D58591a622A24330"
+
+governance_security_council_address = "0x0000000000000000000000000000000000000000" # unused kl todo
+governance_min_delay = 0 # unused
+latest_protocol_version = 0x1b00000000
 
 [tokens]
 token_weth_address = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9"

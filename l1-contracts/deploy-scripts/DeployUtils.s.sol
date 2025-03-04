@@ -5,59 +5,14 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {StateTransitionDeployedAddresses, FacetCut, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {Governance} from "contracts/governance/Governance.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 struct FixedForceDeploymentsData {
@@ -285,7 +240,9 @@ abstract contract DeployUtils is Script {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (FacetCut[] memory facetCuts);
 
-    function formatFacetCuts(FacetCut[] memory facetCutsUnformatted) internal returns (Diamond.FacetCut[] memory facetCuts) {
+    function formatFacetCuts(
+        FacetCut[] memory facetCutsUnformatted
+    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
         facetCuts = new Diamond.FacetCut[](facetCutsUnformatted.length);
         for (uint256 i = 0; i < facetCutsUnformatted.length; i++) {
             facetCuts[i] = Diamond.FacetCut({
@@ -411,73 +368,96 @@ abstract contract DeployUtils is Script {
 
     function deployTuppWithContract(
         string memory contractName
-    ) internal virtual returns (address implementation, address proxy) {
-        implementation = deployViaCreate2AndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
-            contractName,
-            string.concat(contractName, " Implementation")
-        );
+    ) internal virtual returns (address implementation, address proxy);
 
-        proxy = deployViaCreate2AndNotify(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, addresses.transparentProxyAdmin, getInitializeCalldata(contractName)),
-            contractName,
-            string.concat(contractName, " Proxy")
-        );
-        return (implementation, proxy);
-    }
+    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory);
 
-    ////////////////////////////// GetContract data  /////////////////////////////////
+    // if (compareStgetCreationCodeInnerrings(contractName, "L1GenesisUpgrade")) {
+    // return type(L1GenesisUpgrade).creationCode;
+    // }
+    // else if (compareStrings(contractName, "Verifier")) {
+    //     if (config.testnetVerifier) {
+    //         return type(TestnetVerifier).creationCode;
+    //     } else {
+    //         return type(DualVerifier).creationCode;
+    //     }
+    // } else if (compareStrings(contractName, "ValidatorTimelock")) {
+    //     return type(ValidatorTimelock).creationCode;
+    // } else if (compareStrings(contractName, "ExecutorFacet")) {
+    //     return type(ExecutorFacet).creationCode;
+    // } else if (compareStrings(contractName, "MailboxFacet")) {
+    //     return type(MailboxFacet).creationCode;
+    // } else if (compareStrings(contractName, "AdminFacet")) {
+    //     return type(AdminFacet).creationCode;
+    // } else if (compareStrings(contractName, "GettersFacet")) {
+    //     return type(GettersFacet).creationCode;
+    // } else if (compareStrings(contractName, "DiamondInit")) {
+    //     return type(DiamondInit).creationCode;
+    // } else if (compareStrings(contractName, "ChainTypeManager")) {
+    //     return type(ChainTypeManager).creationCode;
+    // }
+    //      else {
+    //         revert(string.concat("No matching contract 1: ", contractName));
+    //     }
+    // }
 
-    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory) {
-        if (compareStrings(contractName, "Verifier")) {
-            if (config.testnetVerifier) {
-                return type(TestnetVerifier).creationCode;
-            } else {
-                return type(DualVerifier).creationCode;
-            }
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
-            return type(VerifierFflonk).creationCode;
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
-            return type(VerifierPlonk).creationCode;
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
-            return type(DefaultUpgrade).creationCode;
-        } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-            return type(L1GenesisUpgrade).creationCode;
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return type(ValidatorTimelock).creationCode;
-        } else if (compareStrings(contractName, "Governance")) {
-            return type(Governance).creationCode;
-        } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-            return type(ChainAdminOwnable).creationCode;
-        } else if (compareStrings(contractName, "AccessControlRestriction")) {
-            // TODO(EVM-924): this function is unused
-            return type(AccessControlRestriction).creationCode;
-        } else if (compareStrings(contractName, "ChainAdmin")) {
-            return type(ChainAdmin).creationCode;
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return type(ChainTypeManager).creationCode;
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return type(BytecodesSupplier).creationCode;
-        } else if (compareStrings(contractName, "ProxyAdmin")) {
-            return type(ProxyAdmin).creationCode;
-        } else if (compareStrings(contractName, "ExecutorFacet")) {
-            return type(ExecutorFacet).creationCode;
-        } else if (compareStrings(contractName, "AdminFacet")) {
-            return type(AdminFacet).creationCode;
-        } else if (compareStrings(contractName, "MailboxFacet")) {
-            return type(MailboxFacet).creationCode;
-        } else if (compareStrings(contractName, "GettersFacet")) {
-            return type(GettersFacet).creationCode;
-        } else if (compareStrings(contractName, "DiamondInit")) {
-            return type(DiamondInit).creationCode;
-        } else {
-            revert(string.concat("Contract ", contractName, " creation code not set"));
-        }
-    }
     function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory) {
-        if (compareStrings(contractName, "Verifier")) {
+        if (compareStrings(contractName, "ChainRegistrar")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "Bridgehub")) {
+            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
+        } else if (compareStrings(contractName, "MessageRoot")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
+        } else if (compareStrings(contractName, "L1Nullifier")) {
+            return
+                abi.encode(
+                    addresses.bridgehub.bridgehubProxy,
+                    config.eraChainId,
+                    addresses.stateTransition.diamondProxy
+                );
+        } else if (compareStrings(contractName, "L1AssetRouter")) {
+            return
+                abi.encode(
+                    config.tokens.tokenWethAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1NullifierProxy,
+                    config.eraChainId,
+                    addresses.stateTransition.diamondProxy
+                );
+        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+            return
+                abi.encode(
+                    addresses.bridges.l1NullifierProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.vaults.l1NativeTokenVaultProxy,
+                    config.eraChainId
+                );
+        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+            return
+                abi.encode(
+                    config.tokens.tokenWethAddress,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridges.l1NullifierProxy
+                );
+        } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+            return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
+        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "RollupDAManager")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "RollupL1DAValidator")) {
+            return abi.encode(addresses.daAddresses.l1RollupDAValidator);
+        } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "AvailL1DAValidator")) {
+            return abi.encode(addresses.daAddresses.availBridge);
+        } else if (compareStrings(contractName, "DummyAvailBridge")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "Verifier")) {
             return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
         } else if (compareStrings(contractName, "VerifierFflonk")) {
             return abi.encode();
@@ -489,7 +469,7 @@ abstract contract DeployUtils is Script {
             return abi.encode();
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-            return abi.encode(config.deployerAddress, executionDelay, config.eraChainId);
+            return abi.encode(config.deployerAddress, executionDelay);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
@@ -526,17 +506,7 @@ abstract contract DeployUtils is Script {
         }
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory) {
-        if (compareStrings(contractName, "ChainTypeManager")) {
-            return
-                abi.encodeCall(
-                    ChainTypeManager.initialize,
-                    getChainTypeManagerInitializeData(addresses.stateTransition)
-                );
-        } else {
-            revert(string.concat("Contract ", contractName, " initialize calldata not set"));
-        }
-    }
+    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
 
     function getDeployedContractName(string memory contractName) internal view virtual returns (string memory) {
         if (compareStrings(contractName, "BridgedTokenBeacon")) {
