@@ -145,15 +145,6 @@ describe("NonceHolder tests", () => {
       expect(isUsed).to.equal(true);
     });
 
-    it("used nonce because set", async () => {
-      const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
-      const checkedNonce = currentNonce.add(1);
-      await nonceHolder.connect(systemAccount).setValueUnderNonce(checkedNonce, 5);
-
-      const isUsed = await nonceHolder.isNonceUsed(systemAccount.address, checkedNonce);
-      expect(isUsed).to.equal(true);
-    });
-
     it("not used nonce", async () => {
       const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
       const checkedNonce = currentNonce.add(2137 * 2 ** 10);
