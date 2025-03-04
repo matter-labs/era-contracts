@@ -4,44 +4,35 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 
-import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
-import {UserActorHandler} from "./UserActorHandler.sol";
+import {TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
+import {ActorHandler} from "./ActorHandler.sol";
+import {Token} from "../common/Types.sol";
 
 // no cheatcodes here because they won't work with `--zksync`
 // forge 0.0.2 (27360d4 2024-12-02T00:28:35.872943000Z)
-contract L1AssetRouterActorHandler is Test {
-    UserActorHandler[] public receivers;
-    address[] public l1Tokens;
+contract L1AssetRouterActorHandler is ActorHandler {
+    address[] public receivers;
 
     uint256 public ghost_totalDeposits;
 
     error ReceiversArrayIsEmpty();
-    error ArrayIsEmpty();
 
-    constructor(UserActorHandler[] memory _receivers, address[] memory _l1Tokens) {
+    constructor(address[] memory _receivers, Token[] memory _tokens) ActorHandler(_tokens) {
         if (_receivers.length == 0) {
             revert ReceiversArrayIsEmpty();
         }
         receivers = _receivers;
-
-        if (_l1Tokens.length == 0) {
-            revert ArrayIsEmpty();
-        }
-        l1Tokens = _l1Tokens;
     }
 
-    function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _l1TokenIndex) public {
+    function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _tokenIndex) public {
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
-        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
 
-        address l1Token = l1Tokens[l1TokenIndex];
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
 
-        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
         uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
@@ -52,7 +43,7 @@ contract L1AssetRouterActorHandler is Test {
 
         l2AssetRouter.finalizeDeposit({
             _l1Sender: _sender,
-            _l2Receiver: address(receivers[receiverIndex]),
+            _l2Receiver: receivers[receiverIndex],
             _l1Token: l1Token,
             _amount: amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
@@ -61,20 +52,19 @@ contract L1AssetRouterActorHandler is Test {
         ghost_totalDeposits += amount;
     }
 
-    function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _l1TokenIndex) public {
+    function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _tokenIndex) public {
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
-        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
 
-        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
         uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
-        address l1Token = l1Tokens[l1TokenIndex];
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
 
         bytes memory data = DataEncoding.encodeBridgeMintData({
             _originalCaller: _sender,
-            _remoteReceiver: address(receivers[receiverIndex]),
+            _remoteReceiver: receivers[receiverIndex],
             _originToken: l1Token,
             _amount: amount,
             _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)

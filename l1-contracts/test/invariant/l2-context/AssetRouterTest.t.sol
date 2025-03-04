@@ -9,6 +9,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
 import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {AssetRouter_ActorHandler_Deployer} from "../deployers/AssetRouter_ActorHandler_Deployer.sol";
+import {Token} from "../common/Types.sol";
 
 import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
 import {SharedL2ContractL2DeployerUtils, SystemContractsArgs} from "../../foundry/l2/integration/_SharedL2ContractL2DeployerUtils.sol";
@@ -41,6 +42,6 @@ contract AssetRouterTest is
         uint256 _l1ChainId
     ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
         super.deployL2Contracts(_l1ChainId);
-        deployActorHandlers(new address[](0));
+        deployActorHandlers(new Token[](0));
     }
 }

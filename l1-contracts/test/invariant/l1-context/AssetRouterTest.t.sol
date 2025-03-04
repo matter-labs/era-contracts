@@ -16,6 +16,7 @@ import {L2SharedBridgeLegacyDev} from "contracts/dev-contracts/L2SharedBridgeLeg
 import {AssetRouter_ActorHandler_Deployer} from "../deployers/AssetRouter_ActorHandler_Deployer.sol";
 import {AssetRouter_Token_Deployer} from "../deployers/AssetRouter_Token_Deployer.sol";
 import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
+import {Token, ActorHandlerAddresses} from "../common/Types.sol";
 
 import {SharedL2ContractL1DeployerUtils, SystemContractsArgs} from "../../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1DeployerUtils.sol";
 import {SharedL2ContractDeployer} from "../../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
@@ -45,16 +46,18 @@ contract AssetRouterTest is
         vm.label(L2_NATIVE_TOKEN_VAULT_ADDR, "L2NativeTokenVault");
         vm.label(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "L1Messenger");
 
-        address[] memory deployedL1Tokens = _deployTokens();
-        deployActorHandlers(deployedL1Tokens);
+        Token[] memory deployedTokens = _deployTokens();
+        ActorHandlerAddresses memory actorHandlerAddresses = deployActorHandlers(deployedTokens);
 
-        assertEq(l1Tokens.length, 3);
+        assertEq(deployedTokens.length, 3);
 
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(IL1Messenger.sendToL1.selector),
             abi.encode(1337)
         );
+
+        initAssetRouterProperties(deployedTokens, actorHandlerAddresses);
     }
 
     function deployL2SharedBridgeLegacy(

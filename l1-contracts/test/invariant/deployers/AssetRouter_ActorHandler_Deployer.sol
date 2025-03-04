@@ -2,30 +2,25 @@
 
 pragma solidity ^0.8.20;
 
-import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
+import {Test} from "forge-std/Test.sol";
+
 import {UserActorHandler} from "../handlers/UserActorHandler.sol";
 import {LegacyBridgeActorHandler} from "../handlers/LegacyBridgeActorHandler.sol";
 import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
+import {Token, ActorHandlerAddresses} from "../common/Types.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+abstract contract AssetRouter_ActorHandler_Deployer is Test {
+    function deployActorHandlers(Token[] memory _tokens) internal returns (ActorHandlerAddresses memory _actorHandlerAddresses) {
+        _actorHandlerAddresses.userActorHandlers = new address[](1);
+        _actorHandlerAddresses.userActorHandlers[0] = address(new UserActorHandler(_tokens));
+        // legacyBridgeActorHandler = new LegacyBridgeActorHandler(userActorHandlers, l1Tokens);
+        _actorHandlerAddresses.l1AssetRouterActorHandler = address(new L1AssetRouterActorHandler(_actorHandlerAddresses.userActorHandlers, _tokens));
 
-abstract contract AssetRouter_ActorHandler_Deployer is AssetRouterProperties {
-    function deployActorHandlers(address[] memory _l1Tokens) internal {
-        for (uint256 i; i < _l1Tokens.length; i++) {
-            l1Tokens.push(_l1Tokens[i]);
+        for (uint256 i; i < _actorHandlerAddresses.userActorHandlers.length; i++) {
+            targetContract(_actorHandlerAddresses.userActorHandlers[i]);
         }
-
-        userActorHandlers.push(new UserActorHandler(l1Tokens));
-        legacyBridgeActorHandler = new LegacyBridgeActorHandler(userActorHandlers, l1Tokens);
-        l1AssetRouterActorHandler = new L1AssetRouterActorHandler(userActorHandlers, l1Tokens);
-
-        for (uint256 i; i < userActorHandlers.length; i++) {
-            targetContract(address(userActorHandlers[i]));
-        }
-        targetContract(address(legacyBridgeActorHandler));
-        targetContract(address(l1AssetRouterActorHandler));
+        // targetContract(address(legacyBridgeActorHandler));
+        targetContract(_actorHandlerAddresses.l1AssetRouterActorHandler);
 
         address ts = makeAddr("targetSender");
         deal(ts, 10_000 ether);

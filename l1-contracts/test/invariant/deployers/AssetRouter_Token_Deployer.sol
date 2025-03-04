@@ -7,6 +7,7 @@ import "forge-std/console.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -17,11 +18,12 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
+import {Token} from "../common/Types.sol";
 
 contract AssetRouter_Token_Deployer is Test {
     using stdStorage for StdStorage;
 
-    function _deployTokens() internal returns (address[] memory l1Tokens) {
+    function _deployTokens() internal returns (Token[] memory tokens) {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         address l2SharedBridge = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
         uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
@@ -30,20 +32,28 @@ contract AssetRouter_Token_Deployer is Test {
         assertNotEq(l2SharedBridge, address(0));
 
         // Each token has one of each 5 attributes:
-        // - Legacy/non-legacy token (legacy deployed by the SharedBridge and is registered in L2SharedBridgeLegacy)
-        // - Registered/unregistered token (registered in L2NativeTokenVault)
-        // - Deployed/undeployed token
-        // - Native/bridged token
-        // - Base/non-base token
-        l1Tokens = new address[](3);
+        // - registered/unregistered with `L2SharedBridgeLegacy`
+        // - registered/unregistered with `L2NativeTokenVault`
+        // - deployed/undeployed
+        // - bridged/non-bridged
+        // - base/non-base
+        // 
+        // A legacy token is a token that is registered with `L2SharedBridgeLegacy` but not registered with `L2NativeTokenVault`
+        // 
+        // Impossible attribute combinations:
+        // - registered with `L2SharedBridgeLegacy` and non-bridged
+        tokens = new Token[](3);
         // legacy, unregistered, deployed, bridged, non-base
         address l1Token = makeAddr("legacyUnregisteredBridged L1 token");
-        l1Tokens[0] = l1Token;
-        l1Tokens[1] = L1_TOKEN_ADDRESS;
-        l1Tokens[2] = ETH_TOKEN_ADDRESS;
+        tokens[0] = Token({addr: l1Token, bridged: true});
+        tokens[1] = Token({addr: L1_TOKEN_ADDRESS, bridged: true});
+        // l1Tokens[2] = ETH_TOKEN_ADDRESS;
+        address token2 = address(new ERC20("TOKEN2", "T2"));
+        tokens[2] = Token({addr: token2, bridged: false});
 
         vm.label(L1_TOKEN_ADDRESS, "random L1 token");
         vm.label(ETH_TOKEN_ADDRESS, "ETH L1 token");
+        vm.label(token2, "unregistered deployed non-base native L2 token");
 
         UpgradeableBeacon beacon = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenBeacon();
         bytes32 salt = bytes32(uint256(uint160(l1Token)));
