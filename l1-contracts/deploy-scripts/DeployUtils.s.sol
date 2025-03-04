@@ -372,35 +372,6 @@ abstract contract DeployUtils is Script {
 
     function getCreationCode(string memory contractName) internal view virtual returns (bytes memory);
 
-    // if (compareStgetCreationCodeInnerrings(contractName, "L1GenesisUpgrade")) {
-    // return type(L1GenesisUpgrade).creationCode;
-    // }
-    // else if (compareStrings(contractName, "Verifier")) {
-    //     if (config.testnetVerifier) {
-    //         return type(TestnetVerifier).creationCode;
-    //     } else {
-    //         return type(DualVerifier).creationCode;
-    //     }
-    // } else if (compareStrings(contractName, "ValidatorTimelock")) {
-    //     return type(ValidatorTimelock).creationCode;
-    // } else if (compareStrings(contractName, "ExecutorFacet")) {
-    //     return type(ExecutorFacet).creationCode;
-    // } else if (compareStrings(contractName, "MailboxFacet")) {
-    //     return type(MailboxFacet).creationCode;
-    // } else if (compareStrings(contractName, "AdminFacet")) {
-    //     return type(AdminFacet).creationCode;
-    // } else if (compareStrings(contractName, "GettersFacet")) {
-    //     return type(GettersFacet).creationCode;
-    // } else if (compareStrings(contractName, "DiamondInit")) {
-    //     return type(DiamondInit).creationCode;
-    // } else if (compareStrings(contractName, "ChainTypeManager")) {
-    //     return type(ChainTypeManager).creationCode;
-    // }
-    //      else {
-    //         revert(string.concat("No matching contract 1: ", contractName));
-    //     }
-    // }
-
     function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
