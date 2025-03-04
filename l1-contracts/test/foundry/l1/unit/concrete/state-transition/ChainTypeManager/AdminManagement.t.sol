@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
-import {console} from "forge-std/console.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract AdminManagement is ChainTypeManagerTest {
@@ -32,7 +31,9 @@ contract AdminManagement is ChainTypeManagerTest {
         chainContractAddress.setPendingAdmin(newAdmin);
 
         vm.stopPrank();
+
         vm.prank(random);
+
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, random));
         chainContractAddress.acceptAdmin();
     }

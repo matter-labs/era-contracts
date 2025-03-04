@@ -7,8 +7,6 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
     function setUp() public {
         deploy();

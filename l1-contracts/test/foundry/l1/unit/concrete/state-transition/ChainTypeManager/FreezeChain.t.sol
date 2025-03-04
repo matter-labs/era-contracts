@@ -51,6 +51,7 @@ contract freezeChainTest is ChainTypeManagerTest {
 
         GettersFacet gettersFacet = GettersFacet(newChainAddress);
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
+
         assertEq(isChainFrozen, false);
 
         vm.startPrank(governor);
