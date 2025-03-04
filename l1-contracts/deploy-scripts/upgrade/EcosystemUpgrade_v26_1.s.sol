@@ -281,8 +281,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         initializeConfig(configPath);
         instantiateCreate2Factory();
 
-        generatedData.forceDeploymentsData = prepareForceDeploymentsData();
-
         deployGenesisUpgrade();
 
         saveOutput(outputPath);
@@ -443,12 +441,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         }
 
         addresses.create2Factory = contractAddress;
-    }
-
-    function deployDefaultUpgrade() internal {
-        address contractAddress = deployViaCreate2(type(DefaultUpgrade).creationCode);
-        notifyAboutDeployment(contractAddress, "DefaultUpgrade", hex"");
-        addresses.stateTransition.defaultUpgrade = contractAddress;
     }
 
     function deployGenesisUpgrade() internal {
