@@ -75,7 +75,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// is supported, currently this method always reverts.
     /// @param _nonceOrdering The new nonce ordering to use.
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external onlySystemCall {
-        revert InvalidNonceOrderingChange(_nonceOrdering);
+        revert InvalidNonceOrderingChange();
         // NOTE: If this method is ever implemented, the `AccountNonceOrderingUpdated` event should be emitted.
     }
 
