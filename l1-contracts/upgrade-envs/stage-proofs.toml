@@ -2,8 +2,9 @@ era_chain_id = 271
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 86400
 
-# overrwritten 
+# overwritten 
 owner_address = "0x0000000000000000000000000000000000000001" 
+
 support_l2_legacy_shared_bridge_test = false
 old_protocol_version = 0x1a00000000
 
