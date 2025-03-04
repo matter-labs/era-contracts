@@ -71,23 +71,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         emit AccountVersionUpdated(msg.sender, _version);
     }
 
-    /// @notice Updates the nonce ordering of the account. Currently,
-    /// it only allows changes from sequential to arbitrary ordering.
+    /// @notice Updates the nonce ordering of the account. Since only `KeyedSequential`
+    /// is supported, currently this method always reverts.
     /// @param _nonceOrdering The new nonce ordering to use.
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external onlySystemCall {
-        AccountInfo memory currentInfo = accountInfo[msg.sender];
-
-        if (
-            _nonceOrdering != AccountNonceOrdering.Arbitrary ||
-            currentInfo.nonceOrdering != AccountNonceOrdering.KeyedSequential
-        ) {
-            revert InvalidNonceOrderingChange();
-        }
-
-        currentInfo.nonceOrdering = _nonceOrdering;
-        _storeAccountInfo(msg.sender, currentInfo);
-
-        emit AccountNonceOrderingUpdated(msg.sender, _nonceOrdering);
+        revert InvalidNonceOrderingChange(_nonceOrdering);
+        // NOTE: If this method is ever implemented, the `AccountNonceOrderingUpdated` event should be emitted.
     }
 
     /// @notice Calculates the address of a deployed contract via create2
