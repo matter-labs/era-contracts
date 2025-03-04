@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {PriorityTree, PriorityOpsBatchInfo, PriorityTreeCommitment} from "../../state-transition/libraries/PriorityTree.sol";
 

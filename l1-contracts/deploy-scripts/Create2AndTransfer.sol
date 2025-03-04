@@ -2,7 +2,7 @@
 
 import {IOwnable} from "./interfaces/IOwnable.sol";
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 /// @title Create2AndTransfer
 /// @author Matter Labs

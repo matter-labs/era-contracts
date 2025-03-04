@@ -3,7 +3,7 @@
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
 import {PriorityQueue, PriorityOperation} from "../../state-transition/libraries/PriorityQueue.sol";
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 contract TestExecutor is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}

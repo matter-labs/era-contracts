@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
 import {TransactionHelper, Transaction, EIP_712_TX_TYPE, L1_TO_L2_TX_TYPE} from "./libraries/TransactionHelper.sol";

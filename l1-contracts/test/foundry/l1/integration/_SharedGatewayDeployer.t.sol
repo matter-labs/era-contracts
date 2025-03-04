@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {GatewayPreparationForTests} from "./_GatewayPreparationForTests.sol";

@@ -5,7 +5,7 @@ out = "out"
 libs = ["./lib"]
 cache_path = "cache-forge"
 test = "test/foundry"
-solc_version = "0.8.28"
+solc_version = "0.8.24"
 evm_version = "cancun"
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
@@ -45,7 +45,7 @@ optimizer = true
 optimizer_runs = 200
 [profile.default.zksync] 
 enable_eravm_extensions = true
-zksolc = "1.5.11"
+zksolc = "1.5.7"
 
 [profile.invariant_tests_l1context]
 test = "test"

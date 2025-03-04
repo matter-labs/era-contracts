@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IL2ContractDeployer} from "../../common/interfaces/IL2ContractDeployer.sol";
 

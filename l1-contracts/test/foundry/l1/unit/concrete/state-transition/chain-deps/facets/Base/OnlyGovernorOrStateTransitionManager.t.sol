@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {ZKChainBaseTest} from "./_Base_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";

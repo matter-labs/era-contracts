@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
 import {QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
