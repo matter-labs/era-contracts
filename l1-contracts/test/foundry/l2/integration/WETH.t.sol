@@ -42,5 +42,4 @@ contract WethTest is Test, L2WethTestAbstract, SharedL2ContractL2Deployer {
     ) internal override(DeployIntegrationUtils) returns (FacetCut[] memory) {
         return super.getFacetCuts(stateTransition);
     }
-
 }

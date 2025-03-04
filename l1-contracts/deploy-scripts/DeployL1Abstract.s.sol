@@ -346,7 +346,6 @@ abstract contract DeployL1Abstract is Script, DeployUtils {
         console.log("Owners updated");
     }
 
-
     function saveOutput(string memory outputPath) internal virtual {
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);

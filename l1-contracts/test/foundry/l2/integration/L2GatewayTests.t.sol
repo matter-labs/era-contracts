@@ -27,7 +27,6 @@ import {L2Utils, SystemContractsArgs} from "./L2Utils.sol";
 
 import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
 
-
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -66,5 +65,4 @@ contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2Deploy
     ) internal override(DeployIntegrationUtils) returns (FacetCut[] memory) {
         return super.getFacetCuts(stateTransition);
     }
-
 }
