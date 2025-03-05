@@ -860,6 +860,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         Call[][] memory allCalls = new Call[][](2);
 
+        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 l2GasLimit = 2000000; // TODO constant or newConfig
         uint256 l1GasPrice = 100; // TODO constant or newConfig
 
@@ -876,13 +877,13 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](6);
         allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
-        allCalls[3] = prepareUnpauseGatewayMigrationsCall();
+        allCalls[1] = preparePauseGatewayMigrationsCall(); // TODO: after Gateway launch should be done in stage 1 of upgrade
+        allCalls[2] = prepareNewChainCreationParamsCall();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
         allCalls[4] = prepareContractsConfigurationCalls();
-        allCalls[5] = prepareGatewaySpecificStage2GovernanceCalls();
-        // TODO not needed?
-        //allCalls[5] = prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[5] = prepareUnpauseGatewayMigrationsCall();
+        //allCalls[5] = prepareGatewaySpecificStage2GovernanceCalls();
+        //allCalls[6] = prepareGovernanceUpgradeTimerCheckCall(); // May be needed for 2-stage upgrades
 
         calls = mergeCallsArray(allCalls);
     }
@@ -892,6 +893,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         Call[][] memory allCalls = new Call[][](4);
 
+        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 l2GasLimit = 2000000; // TODO constant or newConfig
         uint256 l1GasPrice = 100; // TODO constant or newConfig
 

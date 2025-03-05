@@ -34,18 +34,19 @@ contract UpgradeIntegrationTest is Test {
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
+        // Note: stage1 calls are not used for V27 upgrade. This step will be required after Gateway launch
         (Call[] memory upgradeGovernanceStage1Calls, Call[] memory upgradeGovernanceStage2Calls) = ecosystemUpgrade
             .prepareDefaultGovernanceCalls();
 
-        console.log("Starting ecosystem upgrade stage 1!");
-
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
+        // console.log("Starting ecosystem upgrade stage 1!");
+        // governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
 
         console.log("Starting ecosystem upgrade stage 2!");
 
-        if (ecosystemUpgrade.getGovernanceUpgradeInitialDelay() != 0) {
-            vm.warp(block.timestamp + ecosystemUpgrade.getGovernanceUpgradeInitialDelay());
-        }
+        // Not needed without stage 1
+        // if (ecosystemUpgrade.getGovernanceUpgradeInitialDelay() != 0) {
+        //     vm.warp(block.timestamp + ecosystemUpgrade.getGovernanceUpgradeInitialDelay());
+        // }
 
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
 
