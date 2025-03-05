@@ -10,12 +10,32 @@ import {Token} from "../common/Types.sol";
 import {ActorHandler} from "./ActorHandler.sol";
 
 contract UserActorHandler is ActorHandler {
+    mapping(address => bool) public ghost_tokenRegisteredWithL2NativeTokenVault;
     uint256 public ghost_totalWithdrawalAmount;
     uint256 public ghost_totalFunctionCalls;
 
     constructor(Token[] memory _tokens) ActorHandler(_tokens) {}
 
     function withdraw(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
+
+        uint256 amount;
+        if (ghost_totalFunctionCalls % 10 == 0 && false) {
+            amount = _amount;
+        } else {
+            vm.assume(l2Token.code.length != 0);
+            amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
+        }
+
+        l2AssetRouter.withdraw(_receiver, l2Token, amount);
+
+        ghost_totalWithdrawalAmount += amount;
+        ghost_totalFunctionCalls++;
+    }
+
+    function withdrawV2(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
@@ -56,7 +76,13 @@ contract UserActorHandler is ActorHandler {
         vm.assume(l2SharedBridge.l1TokenAddress(l2Token) != address(0));
         vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
 
+        if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token]) {
+            return;
+        }
+
         l2NativeTokenVault.setLegacyTokenAssetId(l2Token);
+
+        ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
     }
 
     function registerTokenWithVaultV2(uint256 _tokenIndex) external {
@@ -68,7 +94,13 @@ contract UserActorHandler is ActorHandler {
         vm.assume(l2SharedBridge.l1TokenAddress(l2Token) == address(0));
         vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
 
+        if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token]) {
+            return;
+        }
+        
         l2NativeTokenVault.registerToken(l2Token);
+
+        ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
     }
 
     // function registerTokenWithVaultV2(uint256 _tokenIndex) external {

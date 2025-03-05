@@ -38,6 +38,7 @@ contract L1AssetRouterActorHandler is ActorHandler {
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
 
         vm.assume(assetId != baseTokenAssetId);
+        vm.assume(l1Token != address(0));
 
         console.log("l1Token", l1Token);
 
@@ -71,6 +72,7 @@ contract L1AssetRouterActorHandler is ActorHandler {
         });
 
         vm.assume(assetId != baseTokenAssetId);
+        vm.assume(l1Token != address(0));
 
         console.log("l1Token", l1Token);
 
