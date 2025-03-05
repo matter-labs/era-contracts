@@ -260,7 +260,8 @@ library GatewayCTMDeployerHelper {
             owner: _config.aliasedGovernanceAddress,
             validatorTimelock: _deployedContracts.stateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: _config.protocolVersion
+            protocolVersion: _config.protocolVersion,
+            serverNotifier: _deployedContracts.stateTransition.serverNotifier
         });
 
         _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternal(

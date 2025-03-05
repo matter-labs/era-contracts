@@ -46,6 +46,7 @@ contract ChainTypeManagerTest is Test {
     address internal constant sharedBridge = address(0x4040404);
     address internal constant validator = address(0x5050505);
     address internal constant l1Nullifier = address(0x6060606);
+    address internal constant serverNotifier = address(0x7070707);
     address internal newChainAdmin;
     uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
@@ -118,7 +119,8 @@ contract ChainTypeManagerTest is Test {
             owner: address(0),
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
-            protocolVersion: 0
+            protocolVersion: 0,
+            serverNotifier: serverNotifier
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -132,7 +134,8 @@ contract ChainTypeManagerTest is Test {
             owner: governor,
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
-            protocolVersion: 0
+            protocolVersion: 0,
+            serverNotifier: serverNotifier
         });
 
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(

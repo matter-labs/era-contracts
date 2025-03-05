@@ -117,6 +117,8 @@ contract DeployL1Script is Script, DeployUtils {
         deployBridgehubContract();
         deployMessageRootContract();
 
+        deployServerNotifier();
+
         deployL1NullifierContracts();
         deploySharedBridgeContracts();
         deployBridgedStandardERC20Implementation();
@@ -135,7 +137,7 @@ contract DeployL1Script is Script, DeployUtils {
         deployChainTypeManagerContract();
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
-        deployServerNotifier();
+        setChainTypeManagerInServerNotifier();
 
         updateOwners();
 
@@ -168,22 +170,17 @@ contract DeployL1Script is Script, DeployUtils {
 
     function deployServerNotifier() public {
         bytes memory bytecode = type(ServerNotifier).creationCode;
-        address contractAddressImpl = deployViaCreate2(bytecode, "");
+        address contractAddressImpl = deployViaCreate2(bytecode, abi.encode(true));
 
         console.log("ServerNotifier Impl deployed at:", contractAddressImpl);
 
-        bytes memory initCalldata = abi.encodeCall(
-            ServerNotifier.initialize,
-            (addresses.transparentProxyAdmin, addresses.stateTransition.chainTypeManagerProxy)
-        );
+        bytes memory initCalldata = abi.encodeCall(ServerNotifier.initialize, (config.deployerAddress));
         address contractAddress = deployViaCreate2(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
         );
         console.log("ServerNotifier deployed at:", contractAddress);
         addresses.extContracts.serverNotifier = contractAddress;
-        vm.broadcast();
-        ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).setServerNotifier(contractAddress);
     }
 
     function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
@@ -333,6 +330,13 @@ contract DeployL1Script is Script, DeployUtils {
         vm.broadcast(msg.sender);
         validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
         console.log("ChainTypeManager set in ValidatorTimelock");
+    }
+
+    function setChainTypeManagerInServerNotifier() internal {
+        ServerNotifier serverNotifier = ServerNotifier(addresses.extContracts.serverNotifier);
+        vm.broadcast(msg.sender);
+        serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
+        console.log("ChainTypeManager set in ServerNotifier");
     }
 
     function deployDiamondProxy() internal {

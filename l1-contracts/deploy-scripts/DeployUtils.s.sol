@@ -515,7 +515,8 @@ contract DeployUtils is Script {
             owner: msg.sender,
             validatorTimelock: addresses.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: config.contracts.latestProtocolVersion
+            protocolVersion: config.contracts.latestProtocolVersion,
+            serverNotifier: addresses.extContracts.serverNotifier
         });
 
         address contractAddress = deployViaCreate2(

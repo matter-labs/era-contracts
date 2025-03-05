@@ -140,7 +140,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         protocolVersion = _initializeData.protocolVersion;
         _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
         validatorTimelock = _initializeData.validatorTimelock;
-
+        serverNotifierAddress = _initializeData.serverNotifier;
         _setChainCreationParams(_initializeData.chainCreationParams);
     }
 
