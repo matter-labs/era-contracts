@@ -158,6 +158,8 @@ contract GatewayCTMFromL1 is Script {
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
                 chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                 verifier: expectedGatewayContracts.stateTransition.verifier,
+                verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
+                verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk,
                 adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
                 mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
                 executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
@@ -168,7 +170,8 @@ contract GatewayCTMFromL1 is Script {
                 defaultUpgrade: address(0),
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 diamondProxy: address(0),
-                bytecodesSupplier: address(0)
+                bytecodesSupplier: address(0),
+                isOnGateway: true
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
