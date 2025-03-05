@@ -961,7 +961,7 @@
   },
   {
     "contractName": "l1-contracts/DummyChainTypeManager",
-    "zkBytecodeHash": "0x010006f5705d330101be780c3615ba1a038b30847d41ad430bd0112bd6685597",
+    "zkBytecodeHash": "0x010006f5ee8091d676adcf5dcbc8b242612b0a994d6dd15f0981aa3d4e0f037f",
     "zkBytecodePath": "/l1-contracts/zkout/DummyChainTypeManager.sol/DummyChainTypeManager.json",
     "evmBytecodeHash": "0x3df8ba962f05f808076b8468737591f355b716df73074ad20d0f10f921004b8f",
     "evmBytecodePath": "/l1-contracts/out/DummyChainTypeManager.sol/DummyChainTypeManager.json",
@@ -977,7 +977,7 @@
   },
   {
     "contractName": "l1-contracts/DummyChainTypeManagerWBH",
-    "zkBytecodeHash": "0x01000701d914c66f72d99852680ca579c5cc0345bb577b6ffcbe1842a5f11469",
+    "zkBytecodeHash": "0x010006ff1e5c29a3f43f11399265c88c0c5c0d79a13f903a007a88db283e8e82",
     "zkBytecodePath": "/l1-contracts/zkout/DummyChainTypeManagerWithBridgeHubAddress.sol/DummyChainTypeManagerWBH.json",
     "evmBytecodeHash": "0xc2b869ef800fc2a72e9bc78bbeb71df3ac54bc579768bd8c1c8fda8e56ee89cd",
     "evmBytecodePath": "/l1-contracts/out/DummyChainTypeManagerWithBridgeHubAddress.sol/DummyChainTypeManagerWBH.json",
@@ -1153,11 +1153,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x0100032fd540892eacaa777b47f9d8cbc5368ef8c798409e23add97edc398762",
+    "zkBytecodeHash": "0x0100033906b1d5987295b8bbb9c360d114a7e310f7aa61669ab460a52db39bdd",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0x15266640044818d917ba9b877d3c0e21fb24c9755f59a9d4d181ae986b8ee085",
+    "evmBytecodeHash": "0xb09fbfd5c912c72c464aa668b73ddbf36f148f131c8dc6c8762d534c0ccd03d4",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x42fbd38dc7a91aae990c78e1c8e1bf105365c0f04386afe8f2002f4e851f9206"
+    "evmDeployedBytecodeHash": "0x19109ba04a292f6625fb517a8e81e978f6b4f196451aa51c9fa7a900472ec8d9"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
