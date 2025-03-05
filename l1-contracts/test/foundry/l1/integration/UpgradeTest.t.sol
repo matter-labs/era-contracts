@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -57,7 +57,7 @@ contract UpgradeIntegrationTest is Test {
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
         chainUpgrade.upgradeChain(
             ecosystemUpgrade.getOldProtocolVersion(),
-            ecosystemUpgrade.generateUpgradeCutData({isOnGateway: false})
+            ecosystemUpgrade.generateUpgradeCutData(ecosystemUpgrade.getAddresses().stateTransition)
         );
 
         // TODO: here we should include tests that depoists work for upgraded chains

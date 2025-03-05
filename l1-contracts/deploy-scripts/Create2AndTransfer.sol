@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {IOwnable} from "./interfaces/IOwnable.sol";
 
 pragma solidity 0.8.24;
 
@@ -19,7 +19,7 @@ contract Create2AndTransfer {
         }
 
         require(addr != address(0), "Create2: Failed on deploy");
-        Ownable(addr).transferOwnership(owner);
+        IOwnable(addr).transferOwnership(owner);
 
         deployedAddress = addr;
     }

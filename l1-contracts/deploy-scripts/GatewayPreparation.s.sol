@@ -69,7 +69,6 @@ struct Config {
 contract GatewayPreparation is Script {
     using stdToml for string;
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
     address deployerAddress;
