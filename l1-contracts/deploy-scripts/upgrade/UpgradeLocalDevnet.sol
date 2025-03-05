@@ -37,9 +37,9 @@ contract UpgradeLocalDevnet is Script, EcosystemUpgrade {
             Call[] memory upgradeGovernanceStage2Calls
         ) = prepareDefaultGovernanceCalls();
 
-        console.log("Starting ecosystem upgrade stage 1!");
-
-        governanceMulticall(getOwnerAddress(), upgradeGovernanceStage1Calls);
+        // Stage 1 is required after Gateway launch
+        // console.log("Starting ecosystem upgrade stage 1!");
+        // governanceMulticall(getOwnerAddress(), upgradeGovernanceStage1Calls);
 
         console.log("Starting ecosystem upgrade stage 2!");
 
