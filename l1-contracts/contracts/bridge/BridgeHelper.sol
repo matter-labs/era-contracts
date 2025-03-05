@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -11,7 +9,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Helper library for working with L2 contracts on L1.
+ * @notice Helper library for working with native tokens on both L1 and L2.
  */
 library BridgeHelper {
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
@@ -25,10 +23,23 @@ library BridgeHelper {
             symbol = abi.encode("ETH");
             decimals = abi.encode(uint8(18));
         } else {
+            bool success;
             /// note this also works on the L2 for the base token.
-            (, name) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-            (, symbol) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-            (, decimals) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
+            (success, name) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
+            if (!success) {
+                // We ignore the revert data
+                name = hex"";
+            }
+            (success, symbol) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
+            if (!success) {
+                // We ignore the revert data
+                symbol = hex"";
+            }
+            (success, decimals) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
+            if (!success) {
+                // We ignore the revert data
+                decimals = hex"";
+            }
         }
         return
             DataEncoding.encodeTokenData({_chainId: _originChainId, _name: name, _symbol: symbol, _decimals: decimals});

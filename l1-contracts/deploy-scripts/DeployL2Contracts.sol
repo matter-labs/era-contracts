@@ -9,6 +9,9 @@ import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Call} from "contracts/governance/Common.sol";
 // import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 contract DeployL2Script is Script {
@@ -16,6 +19,12 @@ contract DeployL2Script is Script {
 
     Config internal config;
     DeployedContrats internal deployed;
+
+    enum DAValidatorType {
+        Rollup,
+        NoDA,
+        Avail
+    }
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
@@ -25,7 +34,7 @@ contract DeployL2Script is Script {
         address bridgehubAddress;
         address governance;
         address erc20BridgeProxy;
-        bool validiumMode;
+        DAValidatorType validatorType;
         address consensusRegistryOwner;
     }
 
@@ -35,19 +44,40 @@ contract DeployL2Script is Script {
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
         address multicall3;
+        address timestampAsserter;
     }
 
     function run() public {
+        initializeConfig();
+
         deploy(false);
     }
 
+    function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) internal {
+        IGovernance governance = IGovernance(governanceAddr);
+        Ownable2Step ownable = Ownable2Step(governanceAddr);
+
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: bytes32(0)
+        });
+
+        vm.startPrank(ownable.owner());
+        governance.scheduleTransparent(operation, 0);
+        // We assume that the total value is 0
+        governance.execute{value: 0}(operation);
+        vm.stopPrank();
+    }
+
     function runWithLegacyBridge() public {
+        initializeConfig();
         deploy(true);
     }
 
     function deploy(bool legacyBridge) public {
-        initializeConfig();
-
         // Note, that it is important that the first transaction is for setting the L2 DA validator
         deployL2DaValidator();
 
@@ -55,21 +85,7 @@ contract DeployL2Script is Script {
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
         deployMulticall3();
-
-        saveOutput();
-    }
-
-    function runDeployLegacySharedBridge() public {
-        deploySharedBridge(true);
-    }
-
-    function runDeploySharedBridge() public {
-        deploySharedBridge(false);
-    }
-
-    // TODO(EVM-745): port legacy contract tests to new contracts
-    function deploySharedBridge(bool legacyBridge) internal {
-        initializeConfig();
+        deployTimestampAsserter();
 
         saveOutput();
     }
@@ -91,11 +107,26 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployMulticall3() public {
+        initializeConfig();
+
+        deployMulticall3();
+
+        saveOutput();
+    }
+
+    function runDeployTimestampAsserter() public {
+        initializeConfig();
+
+        deployTimestampAsserter();
+
+        saveOutput();
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
         string memory toml = vm.readFile(path);
-        config.validiumMode = toml.readBool("$.validium_mode");
         config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.governance = toml.readAddress("$.governance");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
@@ -103,6 +134,10 @@ contract DeployL2Script is Script {
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
+
+        uint256 validatorTypeUint = toml.readUint("$.da_validator_type");
+        require(validatorTypeUint < 3, "Invalid DA validator type");
+        config.validatorType = DAValidatorType(validatorTypeUint);
     }
 
     function saveOutput() internal {
@@ -110,6 +145,7 @@ contract DeployL2Script is Script {
         vm.serializeAddress("root", "multicall3", deployed.multicall3);
         vm.serializeAddress("root", "consensus_registry_implementation", deployed.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", deployed.consensusRegistryProxy);
+        vm.serializeAddress("root", "timestamp_asserter", deployed.timestampAsserter);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", deployed.forceDeployUpgraderAddress);
 
         string memory root = vm.projectRoot();
@@ -119,13 +155,17 @@ contract DeployL2Script is Script {
 
     function deployL2DaValidator() internal {
         bytes memory bytecode;
-        if (config.validiumMode) {
-            bytecode = L2ContractsBytecodesLib.readValidiumL2DAValidatorBytecode();
-        } else {
+        if (config.validatorType == DAValidatorType.Rollup) {
             bytecode = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
+        } else if (config.validatorType == DAValidatorType.NoDA) {
+            bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+        } else if (config.validatorType == DAValidatorType.Avail) {
+            bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
+        } else {
+            revert("Invalid DA validator type");
         }
 
-        deployed.l2DaValidatorAddress = Utils.deployThroughL1({
+        deployed.l2DaValidatorAddress = Utils.deployThroughL1Deterministic({
             bytecode: bytecode,
             constructorargs: bytes(""),
             create2salt: "",
@@ -175,6 +215,19 @@ contract DeployL2Script is Script {
         deployed.multicall3 = Utils.deployThroughL1({
             bytecode: L2ContractsBytecodesLib.readMulticall3Bytecode(),
             constructorargs: constructorData,
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deployTimestampAsserter() internal {
+        deployed.timestampAsserter = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readTimestampAsserterBytecode(),
+            constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: new bytes[](0),

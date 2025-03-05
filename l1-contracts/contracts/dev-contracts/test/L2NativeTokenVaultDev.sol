@@ -12,6 +12,8 @@ import {NativeTokenVault} from "contracts/bridge/ntv/NativeTokenVault.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
+/// @author Matter Labs
+/// @notice This is used for fast debugging of the L2NTV by running it in L1 context, i.e. normal foundry instead of foundry --zksync.
 contract L2NativeTokenVaultDev is L2NativeTokenVault {
     constructor(
         uint256 _l1ChainId,
@@ -57,14 +59,14 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
 
         tokenBeacon.transferOwnership(owner());
         bridgedTokenBeacon = IBeacon(address(tokenBeacon));
-        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), l2TokenProxyBytecodeHash);
+        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), L2_TOKEN_PROXY_BYTECODE_HASH);
     }
 
     function test() external pure {
         // test
     }
 
-    function _deployBeaconProxy(bytes32 _salt) internal virtual override returns (BeaconProxy proxy) {
+    function _deployBeaconProxy(bytes32 _salt, uint256) internal virtual override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(
             0,

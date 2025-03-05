@@ -37,6 +37,13 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -57,6 +64,8 @@ struct Config {
 }
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
+/// @dev IMPORTANT: this script is not intended to be used in production.
+/// TODO(EVM-925): support secure gateway deployment.
 contract GatewayPreparation is Script {
     using stdToml for string;
 
@@ -68,6 +77,7 @@ contract GatewayPreparation is Script {
 
     struct Output {
         bytes32 governanceL2TxHash;
+        address l2ChainAdminAddress;
         address gatewayTransactionFiltererImplementation;
         address gatewayTransactionFiltererProxy;
     }
@@ -121,14 +131,38 @@ contract GatewayPreparation is Script {
             output.gatewayTransactionFiltererImplementation
         );
         vm.serializeAddress("root", "gateway_transaction_filterer_proxy", output.gatewayTransactionFiltererProxy);
+        vm.serializeAddress("root", "l2_chain_admin_address", output.l2ChainAdminAddress);
         string memory toml = vm.serializeBytes32("root", "governance_l2_tx_hash", output.governanceL2TxHash);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-preparation-l1.toml");
         vm.writeToml(toml, path);
     }
 
+    function saveOutput(address l2ChainAdminAddress) internal {
+        Output memory output = Output({
+            governanceL2TxHash: bytes32(0),
+            l2ChainAdminAddress: l2ChainAdminAddress,
+            gatewayTransactionFiltererImplementation: address(0),
+            gatewayTransactionFiltererProxy: address(0)
+        });
+
+        saveOutput(output);
+    }
+
     function saveOutput(bytes32 governanceL2TxHash) internal {
         Output memory output = Output({
             governanceL2TxHash: governanceL2TxHash,
+            l2ChainAdminAddress: address(0),
+            gatewayTransactionFiltererImplementation: address(0),
+            gatewayTransactionFiltererProxy: address(0)
+        });
+
+        saveOutput(output);
+    }
+
+    function saveOutput() internal {
+        Output memory output = Output({
+            governanceL2TxHash: bytes32(0),
+            l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: address(0),
             gatewayTransactionFiltererProxy: address(0)
         });
@@ -142,6 +176,7 @@ contract GatewayPreparation is Script {
     ) internal {
         Output memory output = Output({
             governanceL2TxHash: bytes32(0),
+            l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: gatewayTransactionFiltererImplementation,
             gatewayTransactionFiltererProxy: gatewayTransactionFiltererProxy
         });
@@ -198,6 +233,31 @@ contract GatewayPreparation is Script {
     function governanceSetCTMAssetHandler(bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
+        L1AssetRouter sharedBridge = L1AssetRouter(config.sharedBridgeProxy);
+        bytes memory data = abi.encodeCall(
+            sharedBridge.setAssetDeploymentTracker,
+            (bytes32(uint256(uint160(config.chainTypeManagerProxy))), address(config.ctmDeploymentTracker))
+        );
+        Utils.executeUpgrade({
+            _governor: config.governance,
+            _salt: bytes32(0),
+            _target: address(config.sharedBridgeProxy),
+            _data: data,
+            _value: 0,
+            _delay: 0
+        });
+
+        ICTMDeploymentTracker tracker = ICTMDeploymentTracker(config.ctmDeploymentTracker);
+        data = abi.encodeCall(tracker.registerCTMAssetOnL1, (config.chainTypeManagerProxy));
+        Utils.executeUpgrade({
+            _governor: config.governance,
+            _salt: bytes32(0),
+            _target: address(config.ctmDeploymentTracker),
+            _data: data,
+            _value: 0,
+            _delay: 0
+        });
+
         bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
 
         // This should be equivalent to `config.chainTypeManagerProxy`, but we just double checking to ensure that
@@ -250,8 +310,31 @@ contract GatewayPreparation is Script {
         saveOutput(l2TxHash);
     }
 
+    function deployL2ChainAdmin() public {
+        initializeConfig();
+
+        // TODO(EVM-925): it is deployed without any restrictions.
+        address l2ChainAdminAddress = Utils.deployThroughL1({
+            bytecode: L2ContractsBytecodesLib.readChainAdminBytecode(),
+            constructorargs: abi.encode(new address[](0)),
+            create2salt: bytes32(0),
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy
+        });
+
+        saveOutput(l2ChainAdminAddress);
+    }
+
     /// @dev Calling this function requires private key to the admin of the chain
-    function migrateChainToGateway(address chainAdmin, address accessControlRestriction, uint256 chainId) public {
+    function migrateChainToGateway(
+        address chainAdmin,
+        address l2ChainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
         initializeConfig();
 
         IBridgehub bridgehubContract = IBridgehub(config.bridgehub);
@@ -280,9 +363,6 @@ contract GatewayPreparation is Script {
         }
 
         console.log("Chain Admin address:", chainAdmin);
-
-        // TODO(EVM-746): Use L2-based chain admin contract
-        address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
 
         bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
 
@@ -324,6 +404,7 @@ contract GatewayPreparation is Script {
     function startMigrateChainFromGateway(
         address chainAdmin,
         address accessControlRestriction,
+        address l2ChainAdmin,
         uint256 chainId
     ) public {
         initializeConfig();
@@ -346,8 +427,18 @@ contract GatewayPreparation is Script {
 
         bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
-        bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
-        // vm.startBroadcast();
+
+        bytes memory l2Calldata;
+
+        {
+            bytes memory data = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+
+            Call[] memory calls = new Call[](1);
+            calls[0] = Call({target: L2_ASSET_ROUTER_ADDR, value: 0, data: data});
+
+            l2Calldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
+        }
+        // TODO(EVM-925): this should migrate to use L2 transactions directly
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
@@ -355,7 +446,7 @@ contract GatewayPreparation is Script {
             l2Calldata,
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            L2_ASSET_ROUTER_ADDR,
+            l2ChainAdmin,
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
@@ -375,26 +466,21 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        // TODO(EVM-746): Use L2-based chain admin contract
-        // address l2ChainAdmin = AddressAliasHelper.applyL1ToL2Alias(chainAdmin);
-
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-        {
-            IBridgehub bridgehub = IBridgehub(config.bridgehub);
-            bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
-            vm.broadcast();
-            l1Nullifier.finalizeDeposit(
-                FinalizeL1DepositParams({
-                    chainId: gatewayChainId,
-                    l2BatchNumber: l2BatchNumber,
-                    l2MessageIndex: l2MessageIndex,
-                    l2Sender: L2_ASSET_ROUTER_ADDR,
-                    l2TxNumberInBatch: l2TxNumberInBatch,
-                    message: message,
-                    merkleProof: merkleProof
-                })
-            );
-        }
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        vm.broadcast();
+        l1Nullifier.finalizeDeposit(
+            FinalizeL1DepositParams({
+                chainId: gatewayChainId,
+                l2BatchNumber: l2BatchNumber,
+                l2MessageIndex: l2MessageIndex,
+                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2TxNumberInBatch: l2TxNumberInBatch,
+                message: message,
+                merkleProof: merkleProof
+            })
+        );
     }
 
     /// @dev Calling this function requires private key to the admin of the chain
@@ -404,7 +490,8 @@ contract GatewayPreparation is Script {
         uint256 chainId,
         address l1DAValidator,
         address l2DAValidator,
-        address chainDiamondProxyOnGateway
+        address chainDiamondProxyOnGateway,
+        address chainAdminOnGateway
     ) public {
         initializeConfig();
 
@@ -414,10 +501,10 @@ contract GatewayPreparation is Script {
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
-            data,
+            _callL2AdminCalldata(data, chainDiamondProxyOnGateway),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            chainDiamondProxyOnGateway,
+            chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
@@ -431,7 +518,8 @@ contract GatewayPreparation is Script {
         address accessControlRestriction,
         uint256 chainId,
         address validatorAddress,
-        address gatewayValidatorTimelock
+        address gatewayValidatorTimelock,
+        address chainAdminOnGateway
     ) public {
         initializeConfig();
 
@@ -441,16 +529,22 @@ contract GatewayPreparation is Script {
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
-            data,
+            _callL2AdminCalldata(data, gatewayValidatorTimelock),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            gatewayValidatorTimelock,
+            chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy
         );
 
         saveOutput(l2TxHash);
+    }
+
+    function _callL2AdminCalldata(bytes memory _data, address _target) private returns (bytes memory adminCalldata) {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: 0, data: _data});
+        adminCalldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
@@ -531,5 +625,28 @@ contract GatewayPreparation is Script {
             _data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (addr)),
             _value: 0
         });
+    }
+
+    function executeGovernanceTxs() public {
+        saveOutput();
+    }
+
+    function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) internal {
+        IGovernance governance = IGovernance(governanceAddr);
+        Ownable2Step ownable = Ownable2Step(governanceAddr);
+
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: bytes32(0)
+        });
+
+        vm.startPrank(ownable.owner());
+        governance.scheduleTransparent(operation, 0);
+        // We assume that the total value is 0
+        governance.execute{value: 0}(operation);
+        vm.stopPrank();
     }
 }

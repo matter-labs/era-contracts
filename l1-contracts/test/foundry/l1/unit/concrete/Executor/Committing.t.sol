@@ -10,8 +10,10 @@ import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/c
 import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {BLS_MODULUS} from "da-contracts/DAUtils.sol";
-import {TimeNotReached, BatchNumberMismatch, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, PubdataCommitmentsEmpty, L2TimestampTooBig, EmptyBlobVersionHash, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs, InvalidPubdataLength, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "contracts/common/L1ContractErrors.sol";
+import {BLS_MODULUS} from "../../../da-contracts-imports/DAUtils.sol";
+import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
+import {PubdataCommitmentsEmpty, BlobHashCommitmentError, OperatorDAInputTooSmall, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, NonEmptyBlobVersionHash} from "../../../da-contracts-imports/DAContractsErrors.sol";
+import {TimeNotReached, BatchNumberMismatch, L2TimestampTooBig, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs} from "contracts/common/L1ContractErrors.sol";
 
 contract CommittingTest is ExecutorTest {
     bytes32[] defaultBlobVersionedHashes;
@@ -658,7 +660,9 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert("too small");
+        vm.expectRevert(
+            abi.encodeWithSelector(OperatorDAInputTooSmall.selector, operatorDAInput.length, BLOB_DATA_OFFSET)
+        );
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray

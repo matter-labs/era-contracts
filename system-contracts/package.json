@@ -15,14 +15,14 @@
     "fast-glob": "^3.3.2",
     "hardhat": "=2.22.2",
     "preprocess": "^3.2.0",
-    "zksync-ethers": "^5.9.0",
-    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@4.9.5",
-    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@4.9.5"
+    "zksync-ethers": "^5.9.0"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.2.0",
-    "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
+    "@matterlabs/hardhat-zksync-node": "^1.2.0",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
+    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@4.9.5",
+    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@4.9.5",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@typechain/ethers-v5": "^2.0.0",
     "@types/chai": "^4.2.21",
@@ -53,11 +53,10 @@
   },
   "scripts": {
     "build": "yarn build:system-contracts && yarn build:bootloader",
+    "build:foundry": "yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
     "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",
-    "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
-    "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "clean": "yarn clean:bootloader && yarn clean:system-contracts",
     "clean:bootloader": "rm -rf ./bootloader/build ./bootloader/tests/artifacts",
     "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean",
@@ -65,12 +64,13 @@
     "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
     "copy:typechain": "mkdir -p ../l2-contracts/typechain && cp ./typechain/ContractDeployerFactory.ts ../l2-contracts/typechain/",
+    "generate-bootloader-artifacts": "yarn build:foundry && ts-node scripts/generate-bootloader-artifacts.ts",
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-no-build": "hardhat test --network zkSyncTestNode",
-    "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
+    "test-node": "hardhat node-zksync --tag 0.1.0-alpha.29",
     "test:bootloader": "cd bootloader/test_infra && cargo run"
   }
 }

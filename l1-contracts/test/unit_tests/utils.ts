@@ -47,9 +47,12 @@ export function randomAddress() {
 export enum SYSTEM_LOG_KEYS {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
   PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-  PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
+  // Note, that it is important that `PREV_BATCH_HASH_KEY` has position
+  // `4` since it is the same as it was in the previous protocol version and
+  // it is the only one that is emitted before the system contracts are upgraded.
+  PREV_BATCH_HASH_KEY,
   L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
   USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
@@ -225,12 +228,6 @@ export function createSystemLogs(
     ),
     constructL2Log(
       true,
-      L2_SYSTEM_CONTEXT_ADDRESS,
-      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
-    ),
-    constructL2Log(
-      true,
       L2_BOOTLOADER_ADDRESS,
       SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
       chainedPriorityTxHashKey ? chainedPriorityTxHashKey.toString() : EMPTY_STRING_KECCAK
@@ -241,7 +238,12 @@ export function createSystemLogs(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
-
+    constructL2Log(
+      true,
+      L2_SYSTEM_CONTEXT_ADDRESS,
+      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
+    ),
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,

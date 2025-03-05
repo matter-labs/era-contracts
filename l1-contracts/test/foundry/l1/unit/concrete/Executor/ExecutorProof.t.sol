@@ -12,13 +12,16 @@ import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-i
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
+    constructor() ExecutorFacet(block.chainid) {}
+
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
     ) external view returns (bytes32) {
-        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
+        (, , bytes32 commitment) = _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
+        return commitment;
     }
 
     function getBatchProofPublicInput(
@@ -113,13 +116,13 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0x81e46ea22cdb4a0a6cb30b6c02170394703e9bdd101275d542a7c6c23c789898,
+            0xc83d94049ae723b98705c52a4fdcd767b7818ccd229aa1738ac71dce0d4ff317,
             "nextCommitment computation failed"
         );
 
         bytes32 prevCommitment = 0x6ebf945305689a8c3ac993df7f002d41d311a762cd6bf39bb054ead8d1f54404;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0x7C854720CBA105B9E34DA6A28770B93AD384C1BF98C497CCBFA4DADB, "getBatchProofPublicInput");
+        assertEq(result, 0xbe1803fdbeb40f12f953296979313339ac1d8289731a1e0dd3bcd39b, "getBatchProofPublicInput");
     }
 
     // add this to be excluded from coverage report

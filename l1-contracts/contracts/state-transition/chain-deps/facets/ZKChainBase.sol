@@ -6,7 +6,7 @@ import {ZKChainStorage} from "../ZKChainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, NotSettlementLayer} from "../../../common/L1ContractErrors.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -62,11 +62,36 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    modifier onlySettlementLayer() {
+        if (s.settlementLayer != address(0)) {
+            revert NotSettlementLayer();
+        }
+        _;
+    }
+
+    /// @notice Returns whether the priority queue is still active, i.e.
+    /// the chain has not processed all transactions from it
+    function _isPriorityQueueActive() internal view returns (bool) {
+        return s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex;
+    }
+
+    /// @notice Ensures that the queue is deactivated. Should be invoked
+    /// whenever the chain migrates to another settlement layer.
+    function _forceDeactivateQueue() internal {
+        // We double check whether it is still active mainly to prevent
+        // overriding `tail`/`head` on L1 deployment.
+        if (_isPriorityQueueActive()) {
+            uint256 startIndex = s.priorityTree.startIndex;
+            s.priorityQueue.head = startIndex;
+            s.priorityQueue.tail = startIndex;
+        }
+    }
+
     function _getTotalPriorityTxs() internal view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getTotalPriorityTxs();
-        } else {
+        if (_isPriorityQueueActive()) {
             return s.priorityQueue.getTotalPriorityTxs();
+        } else {
+            return s.priorityTree.getTotalPriorityTxs();
         }
     }
 }

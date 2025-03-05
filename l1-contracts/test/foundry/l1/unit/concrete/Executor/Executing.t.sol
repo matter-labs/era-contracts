@@ -16,7 +16,33 @@ contract ExecutingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
     bytes32[] blobVersionedHashes;
 
+    bytes32[] priorityOpsHashes;
+    bytes32 correctRollingHash;
+
+    function appendPriorityOps() internal {
+        for (uint256 i = 0; i < priorityOpsHashes.length; i++) {
+            executor.appendPriorityOp(priorityOpsHashes[i]);
+        }
+    }
+
+    function generatePriorityOps() internal {
+        bytes32[] memory hashes = new bytes32[](2);
+        hashes[0] = keccak256("hash1");
+        hashes[1] = keccak256("hash2");
+
+        bytes32 rollingHash = keccak256("");
+
+        for (uint256 i = 0; i < hashes.length; i++) {
+            rollingHash = keccak256(bytes.concat(rollingHash, hashes[i]));
+        }
+
+        correctRollingHash = rollingHash;
+        priorityOpsHashes = hashes;
+    }
+
     function setUp() public {
+        generatePriorityOps();
+
         bytes1 source = bytes1(0x01);
         bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
 
@@ -50,7 +76,7 @@ contract ExecutingTest is ExecutorTest {
         vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
 
         // This currently only uses the legacy priority queue, not the priority tree.
-        executor.setPriorityTreeStartIndex(100);
+        executor.setPriorityTreeStartIndex(1);
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
@@ -61,12 +87,26 @@ contract ExecutingTest is ExecutorTest {
             uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
+        correctL2Logs[uint256(uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY))] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
+            correctRollingHash
+        );
+        correctL2Logs[uint256(uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY))] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+            bytes32(priorityOpsHashes.length)
+        );
 
         bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
 
         newCommitBatchInfo.systemLogs = l2Logs;
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
         newCommitBatchInfo.operatorDAInput = operatorDAInput;
+        newCommitBatchInfo.priorityOperationsHash = correctRollingHash;
+        newCommitBatchInfo.numberOfLayer1Txs = priorityOpsHashes.length;
 
         IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         commitBatchInfoArray[0] = newCommitBatchInfo;
@@ -85,8 +125,8 @@ contract ExecutingTest is ExecutorTest {
             batchNumber: 1,
             batchHash: entries[0].topics[2],
             indexRepeatedStorageChanges: 0,
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
+            numberOfLayer1Txs: priorityOpsHashes.length,
+            priorityOperationsHash: correctRollingHash,
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
@@ -105,6 +145,8 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongBatchNumber() public {
+        appendPriorityOps();
+
         IExecutor.StoredBatchInfo memory wrongNewStoredBatchInfo = newStoredBatchInfo;
         wrongNewStoredBatchInfo.batchNumber = 10; // Correct is 1
 
@@ -121,6 +163,8 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
+        appendPriorityOps();
+
         IExecutor.StoredBatchInfo memory wrongNewStoredBatchInfo = newStoredBatchInfo;
         wrongNewStoredBatchInfo.timestamp = 0; // incorrect timestamp
 
@@ -143,6 +187,8 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
+        appendPriorityOps();
+
         vm.prank(validator);
         executor.revertBatchesSharedBridge(0, 0);
 
@@ -237,6 +283,8 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
+        appendPriorityOps();
+
         vm.prank(validator);
         executor.revertBatchesSharedBridge(0, 0);
 
@@ -336,6 +384,8 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
+        appendPriorityOps();
+
         // solhint-disable-next-line func-named-parameters
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
@@ -370,6 +420,8 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_ShouldExecuteBatchesuccessfully() public {
+        appendPriorityOps();
+
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
@@ -382,5 +434,11 @@ contract ExecutingTest is ExecutorTest {
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
         assertEq(totalBlocksExecuted, 1);
+
+        bool isPriorityQueueActive = getters.isPriorityQueueActive();
+        assertFalse(isPriorityQueueActive);
+
+        uint256 processed = getters.getFirstUnprocessedPriorityTx();
+        assertEq(processed, 2);
     }
 }

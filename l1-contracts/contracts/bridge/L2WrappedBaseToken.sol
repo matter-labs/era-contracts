@@ -33,8 +33,8 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// @dev Address of the native token vault.
     address public override nativeTokenVault;
 
-    /// @dev The assetId of the token. The wrapped token does not have its own assetId.
-    bytes32 public override assetId;
+    /// @dev The assetId of the base token. The wrapped token does not have its own assetId.
+    bytes32 public baseTokenAssetId;
 
     modifier onlyBridge() {
         if (msg.sender != l2Bridge) {
@@ -62,13 +62,13 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// @param _l2Bridge Address of the L2 bridge
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
-    function initializeV2(
+    function initializeV3(
         string calldata name_,
         string calldata symbol_,
         address _l2Bridge,
         address _l1Address,
         bytes32 _baseTokenAssetId
-    ) external reinitializer(2) {
+    ) external reinitializer(3) {
         if (_l2Bridge == address(0)) {
             revert ZeroAddress();
         }
@@ -82,7 +82,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
         nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
-        assetId = _baseTokenAssetId;
+        baseTokenAssetId = _baseTokenAssetId;
 
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(name_, symbol_);
@@ -143,5 +143,9 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
 
     function originToken() external view override returns (address) {
         return l1Address;
+    }
+
+    function assetId() external view override returns (bytes32) {
+        return baseTokenAssetId;
     }
 }

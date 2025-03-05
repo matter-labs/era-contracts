@@ -35,7 +35,7 @@ contract L1Erc20BridgeTest is Test {
     constructor() {
         randomSigner = makeAddr("randomSigner");
         dummyL2DepositTxHash = Utils.randomBytes32("dummyL2DepositTxHash");
-        sharedBridgeAddress = makeAddr("sharedBridgeAddress");
+        sharedBridgeAddress = address(new DummySharedBridge(dummyL2DepositTxHash));
         alice = makeAddr("alice");
         l1NullifierAddress = makeAddr("l1NullifierAddress");
 
@@ -47,12 +47,7 @@ contract L1Erc20BridgeTest is Test {
         );
 
         address weth = makeAddr("weth");
-        L1NativeTokenVault ntv = new L1NativeTokenVault(
-            weth,
-            sharedBridgeAddress,
-            eraChainId,
-            IL1Nullifier(l1NullifierAddress)
-        );
+        L1NativeTokenVault ntv = new L1NativeTokenVault(weth, sharedBridgeAddress, IL1Nullifier(l1NullifierAddress));
 
         vm.store(address(bridge), bytes32(uint256(212)), bytes32(0));
 

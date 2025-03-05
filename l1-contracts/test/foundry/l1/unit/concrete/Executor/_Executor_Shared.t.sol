@@ -26,10 +26,10 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -50,7 +50,7 @@ contract ExecutorTest is Test {
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
-    RollupL1DAValidator internal rollupL1DAValidator;
+    address internal rollupL1DAValidator;
     MessageRoot internal messageRoot;
 
     uint256 eraChainId;
@@ -76,17 +76,18 @@ contract ExecutorTest is Test {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](5);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = executor.commitBatchesSharedBridge.selector;
         selectors[1] = executor.proveBatchesSharedBridge.selector;
         selectors[2] = executor.executeBatchesSharedBridge.selector;
         selectors[3] = executor.revertBatchesSharedBridge.selector;
         selectors[4] = executor.setPriorityTreeStartIndex.selector;
+        selectors[5] = executor.appendPriorityOp.selector;
         return selectors;
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](28);
+        bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getAdmin.selector;
         selectors[2] = getters.getPendingAdmin.selector;
@@ -115,6 +116,7 @@ contract ExecutorTest is Test {
         selectors[25] = getters.getTotalBatchesCommitted.selector;
         selectors[26] = getters.getTotalBatchesVerified.selector;
         selectors[27] = getters.storedBlockHash.selector;
+        selectors[28] = getters.isPriorityQueueActive.selector;
         return selectors;
     }
 
@@ -160,9 +162,9 @@ contract ExecutorTest is Test {
 
         eraChainId = 9;
 
-        rollupL1DAValidator = new RollupL1DAValidator();
+        rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
-        admin = new AdminFacet(block.chainid);
+        admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
         mailbox = new MailboxFacet(eraChainId, block.chainid);

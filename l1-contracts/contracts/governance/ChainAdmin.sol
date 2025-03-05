@@ -6,7 +6,8 @@ pragma solidity 0.8.24;
 
 import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
-import {IRestriction} from "./IRestriction.sol";
+import {Restriction} from "./restriction/Restriction.sol";
+import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 import {Call} from "./Common.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts-v4/utils/structs/EnumerableSet.sol";
@@ -15,10 +16,20 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The contract is designed to hold the `admin` role in ZKSync Chain (State Transition) contracts.
-/// The owner of the contract can perform any external calls and also save the information needed for
-/// the blockchain node to accept the protocol upgrade.
+/// @dev Note, that it does not implement any form of access control by default, but instead utilizes
+/// so called "restrictions": contracts that implement the `IRestriction` interface and ensure that
+/// particular restrictions are ensured for the contract, including access control, security invariants, etc.
+/// @dev This is a new EXPERIMENTAL version of the `ChainAdmin` implementation. While chains may opt into using it,
+/// using the old `ChainAdminOwnable` is recommended.
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
+    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
+    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
+
+    /// @notice The set of active restrictions.
+    EnumerableSet.AddressSet internal activeRestrictions;
 
     /// @notice Ensures that only the `ChainAdmin` contract itself can call the function.
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
@@ -37,13 +48,6 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
             }
         }
     }
-
-    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
-    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
-    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
-
-    /// @notice The set of active restrictions.
-    EnumerableSet.AddressSet internal activeRestrictions;
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() public view returns (address[] memory) {
@@ -105,21 +109,23 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
     receive() external payable {}
 
-    /// @notice Function that returns the current admin can perform the call.
-    /// @dev By default it always returns true, but can be overridden in derived contracts.
-    function _validateCall(Call calldata _call) internal view {
+    /// @notice Function that ensures that the current admin can perform the call.
+    /// @dev Reverts in case the call can not be performed. Successfully executes otherwise
+    function _validateCall(Call calldata _call) private view {
         address[] memory restrictions = getRestrictions();
 
         unchecked {
             for (uint256 i = 0; i < restrictions.length; ++i) {
-                IRestriction(restrictions[i]).validateCall(_call, msg.sender);
+                Restriction(restrictions[i]).validateCall(_call, msg.sender);
             }
         }
     }
 
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
-    function _addRestriction(address _restriction) internal {
+    function _addRestriction(address _restriction) private {
+        RestrictionValidator.validateRestriction(_restriction);
+
         if (!activeRestrictions.add(_restriction)) {
             revert RestrictionWasAlreadyPresent(_restriction);
         }

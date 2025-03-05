@@ -16,8 +16,13 @@ jobs:
         with:
           submodules: true
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -28,18 +33,14 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build hardhat artifacts
-        run: yarn l1 build
-
       - name: Build artifacts
-        working-directory: ./l1-contracts
-        run: forge build
+        run: yarn l1 build:foundry
 
       - name: Build system-contract artifacts
-        run: yarn sc build
+        run: yarn sc build:foundry
 
       - name: Build l2 artifacts
-        run: yarn l2 build
+        run: yarn l2 build:foundry
 
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
@@ -50,16 +51,12 @@ jobs:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/cache
+            l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/artifacts-zk
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            system-contracts/artifacts-zk
-            system-contracts/bootloader/build
-            system-contracts/cache-zk
-            system-contracts/contracts-preprocessed
-            system-contracts/typechain
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
   scripts:
     runs-on: ubuntu-latest
@@ -77,16 +74,12 @@ jobs:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/cache
+            l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/artifacts-zk
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            system-contracts/artifacts-zk
-            system-contracts/bootloader/build
-            system-contracts/cache-zk
-            system-contracts/contracts-preprocessed
-            system-contracts/typechain
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1

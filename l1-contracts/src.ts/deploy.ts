@@ -211,8 +211,6 @@ export class Deployer {
       messageRootBytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
       l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
       l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
-      l2BridgeProxyOwnerAddress: ethers.constants.AddressZero,
-      l2BridgedStandardERC20ProxyOwnerAddress: ethers.constants.AddressZero,
     };
 
     return ethers.utils.defaultAbiCoder.encode([FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING], [fixedForceDeploymentsData]);
@@ -383,7 +381,7 @@ export class Deployer {
       // @ts-ignore
       // TODO try to make it work with zksync ethers
       const zkWal = this.deployWallet as ZkWallet;
-      // FIXME: this is a hack
+      // TODO: this is a hack
       const tmpContractFactory = await hardhat.ethers.getContractFactory(
         "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
         {
@@ -568,7 +566,7 @@ export class Deployer {
   public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const contractAddress = await this.deployViaCreate2(
       "AdminFacet",
-      [await this.getL1ChainId()],
+      [await this.getL1ChainId(), ethers.constants.AddressZero],
       create2Salt,
       ethTxOptions
     );
@@ -598,7 +596,12 @@ export class Deployer {
   }
 
   public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const contractAddress = await this.deployViaCreate2("ExecutorFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "ExecutorFacet",
+      [await this.getL1ChainId()],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
       console.log(`CONTRACTS_EXECUTOR_FACET_ADDR=${contractAddress}`);
@@ -936,12 +939,11 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
-      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, eraChainId, this.addresses.Bridges.L1NullifierProxy],
+      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.L1NullifierProxy],
       create2Salt,
       ethTxOptions
     );
@@ -1710,10 +1712,9 @@ export class Deployer {
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, executionDelay, eraChainId],
+      [this.ownerAddress, executionDelay],
       create2Salt,
       ethTxOptions
     );

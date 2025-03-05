@@ -5,101 +5,307 @@ pragma solidity 0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-
-import {EcosystemUpgrade} from "deploy-scripts/upgrade/EcosystemUpgrade.s.sol";
-import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
-import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 
-string constant ECOSYSTEM_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-config/mainnet.toml";
-string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet.toml";
-string constant CHAIN_INPUT = "/test/foundry/l1/integration/upgrade-envs/script-config/mainnet-era.toml";
-string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-era.toml";
+import {EcosystemUpgrade_v26_1} from "deploy-scripts/upgrade/EcosystemUpgrade_v26_1.s.sol";
+import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-contract UpgradeTest is Test {
-    EcosystemUpgrade generateUpgradeData;
-    ChainUpgrade chainUpgrade;
+string constant ECOSYSTEM_INPUT = "/upgrade-envs/v0.26.1-gateway-patch/stage-proofs.toml";
+string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs.toml";
+string constant CHAIN_INPUT = "/upgrade-envs/v0.26.1-gateway-patch/stage-proofs-era.toml";
+string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-proofs-era.toml";
 
-    function setUp() public {
-        generateUpgradeData = new EcosystemUpgrade();
+/// @dev This interface is used to call the legacy Bridgehub createNewChain
+interface BridgehubLegacy {
+    function createNewChain(
+        uint256 _chainId,
+        address _stateTransitionManager,
+        address _baseToken,
+        uint256 _salt,
+        address _admin,
+        bytes calldata _initData
+    ) external;
+}
+
+/**
+ * @title UpgradeTestAbstract
+ * @dev This abstract contract defines internal virtual methods that must be implemented
+ * to provide the necessary upgrade data. This allows one implementation to generate data locally,
+ * and another to read it from file.
+ */
+abstract contract UpgradeTestAbstract is Test {
+    EcosystemUpgrade_v26_1 internal generateUpgradeData;
+    ChainUpgrade internal chainUpgrade;
+
+    function _setUp() internal {
+        generateUpgradeData = new EcosystemUpgrade_v26_1();
         chainUpgrade = new ChainUpgrade();
     }
 
-    function test_MainnetFork() public {
-        console.log("Preparing ecosystem contracts");
-        // Firstly, we deploy all the contracts.
-        generateUpgradeData.prepareEcosystemContracts(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
+    // --- Virtual functions for EcosystemUpgrade_v26_1 data -----------------------
 
-        // For chain, we have deployed the DA validator contracts
-        // and also updated the chain admin.
-        // IMPORTANT: for erc20-based chains with token multiplier setter
-        // this should be coordinated with the server.
-        console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
+    function _getEcosystemAdmin() internal view virtual returns (address);
+    function _getBridgehub() internal view virtual returns (address);
+    function _getChainTypeManager() internal view virtual returns (address);
+    function _getDiamondCutData() internal view virtual returns (bytes memory);
+    function _prepareForceDeploymentsData() internal view virtual returns (bytes memory);
+    function _getUpgradeCalls() internal virtual returns (Call[] memory);
+    function _getProtocolUpgradeHandlerAddress() internal view virtual returns (address);
+    function _getOldProtocolVersion() internal view virtual returns (uint256);
 
-        console.log("Starting stage1 of the upgrade!");
-        // Now, some time has passed and we are ready to start the upgrade of the
-        // ecosystem.
-        // Stage 1 of the upgrade:
-        // - accept all the ownerships of the contracts
-        // - set the new upgrade data for chains + update validator timelock.
-        Call[] memory stage1Calls = mergeCalls(
-            generateUpgradeData.provideAcceptOwnershipCalls(),
-            generateUpgradeData.provideSetNewVersionUpgradeCall()
+    // --- Virtual functions for chain upgrade management -----------------------
+
+    function _prepareEcosystemContracts() internal virtual;
+
+    function _prepareChain() internal virtual;
+
+    function _upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory chainUpgradeInfo) internal virtual;
+
+    // --- Shared internal helper functions -------------------------------------
+
+    /// @dev Creates a new chain. In the legacy case, we expect a revert.
+    function _createNewChain(uint256 chainId) internal {
+        address ecosystemAdmin = _getEcosystemAdmin();
+        // When using the new interface, we need to provide an asset id.
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        address ctm = _getChainTypeManager();
+
+        Bridgehub bh = Bridgehub(_getBridgehub());
+        vm.startBroadcast(ecosystemAdmin);
+        bh.createNewChain(
+            chainId,
+            ctm,
+            ethAssetId,
+            uint256(keccak256(abi.encodePacked(chainId))),
+            ecosystemAdmin,
+            abi.encode(_getDiamondCutData(), _prepareForceDeploymentsData()),
+            new bytes[](0)
         );
-
-        governanceMulticall(generateUpgradeData.getOwnerAddress(), stage1Calls);
-
-        console.log("Stage1 is done, now all the chains have to upgrade to the new version");
-
-        console.log("Upgrading Era");
-
-        // Now, the admin of the Era needs to call the upgrade function.
-        // Note, that the step below also updated ValidatorTimelock so the server needs to be ready for that.
-        // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
-        chainUpgrade.upgradeChain(
-            generateUpgradeData.getOldProtocolVersion(),
-            generateUpgradeData.getChainUpgradeInfo()
-        );
-
-        // TODO: here we should include tests that depoists work for upgraded chains
-        // including era specific deposit/withdraw functions
-        // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
-
-        vm.warp(generateUpgradeData.getOldProtocolDeadline());
-
-        console.log("Starting stage2 of the upgrade!");
-        governanceMulticall(generateUpgradeData.getOwnerAddress(), generateUpgradeData.getStage2UpgradeCalls());
-
-        // TODO: here we should have tests that the bridging works for the previously deployed chains
-        // and that it does not work for those that did not upgrade.
-        // TODO: test that creation of new chains works under new conditions.
-        // TODO: if not hard, include test for deploying a gateway and migrating Era to it.
-    }
-
-    /// @dev This is a contract that is used for additional visibility of transactions
-    /// that the decentralized governance should do.
-    function governanceMulticall(address governanceAddr, Call[] memory calls) internal {
-        // How the governance is implemented is out of scope here
-        vm.startBroadcast(governanceAddr);
-
-        for (uint256 i = 0; i < calls.length; i++) {
-            Call memory call = calls[i];
-
-            (bool success, bytes memory data) = payable(call.target).call{value: call.value}(call.data);
-            require(success, "Multicall failed");
-        }
-
         vm.stopBroadcast();
     }
 
-    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
-        result = new Call[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
+    /// @dev Executes a series of governance calls.
+    function _governanceMulticall(address governanceAddr, Call[] memory calls) internal {
+        vm.startBroadcast(governanceAddr);
+        for (uint256 i = 0; i < calls.length; i++) {
+            Call memory call = calls[i];
+            (bool success, ) = payable(call.target).call{value: call.value}(call.data);
+            require(success, "Multicall failed");
         }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
+        vm.stopBroadcast();
+    }
+
+    function _forceMoveOwnership(address _contract, address _to, bool _twoStep) internal {
+        address owner = Ownable2StepUpgradeable(_contract).owner();
+        if (owner == _to) {
+            // It is already an owner, there is nothing to do.
+            return;
         }
+
+        vm.broadcast(owner);
+        Ownable2StepUpgradeable(_contract).transferOwnership(_to);
+
+        if (_twoStep) {
+            vm.broadcast(_to);
+            Ownable2StepUpgradeable(_contract).acceptOwnership();
+        }
+    }
+
+    function _prepareEcosystemOwner() internal {
+        // This data is generated before the protocol upgrade handler has received the ownership for the contracts.
+        // Thus, we manually set it as its owner.
+        address newProtocolUpgradeHandler = generateUpgradeData.getProtocolUpgradeHandlerAddress();
+
+        _forceMoveOwnership(generateUpgradeData.getTransparentProxyAdmin(), newProtocolUpgradeHandler, false);
+        _forceMoveOwnership(generateUpgradeData.getBridgehub(), newProtocolUpgradeHandler, true);
+        _forceMoveOwnership(generateUpgradeData.getChainTypeManager(), newProtocolUpgradeHandler, true);
+    }
+
+    function _mainnetForkTestImpl() internal {
+        console.log("Preparing ecosystem contracts");
+        _prepareEcosystemContracts();
+
+        console.log("Preparing chain for the upgrade");
+        _prepareChain();
+
+        console.log("Setting up ownership");
+        _prepareEcosystemOwner();
+
+        console.log("Posting the governance upgrade!");
+        Call[] memory stage1Calls = _getUpgradeCalls();
+        _governanceMulticall(_getProtocolUpgradeHandlerAddress(), stage1Calls);
+
+        console.log("Stage1 is done, now all the chains have to upgrade to the new version");
+        console.log("Upgrading Era");
+
+        // Creating new chains should work
+        _createNewChain(101101);
+    }
+}
+
+/**
+ * @title UpgradeTestScriptBased
+ * @dev This implementation of UpgradeTestAbstract generates the upgrade data
+ * locally by instantiating EcosystemUpgrade_v26_1 and ChainUpgrade.
+ */
+contract UpgradeTestScriptBased is UpgradeTestAbstract {
+    function setUp() public {
+        _setUp();
+    }
+
+    // --- Implementation of virtual functions that forward to generateUpgradeData ---
+
+    function _getEcosystemAdmin() internal view override returns (address) {
+        return generateUpgradeData.getEcosystemAdmin();
+    }
+
+    function _getBridgehub() internal view override returns (address) {
+        return generateUpgradeData.getBridgehub();
+    }
+
+    function _getChainTypeManager() internal view override returns (address) {
+        return generateUpgradeData.getChainTypeManager();
+    }
+
+    function _getDiamondCutData() internal view override returns (bytes memory) {
+        return generateUpgradeData.getDiamondCutData();
+    }
+
+    function _prepareForceDeploymentsData() internal view override returns (bytes memory) {
+        return generateUpgradeData.prepareForceDeploymentsData();
+    }
+
+    function _getUpgradeCalls() internal override returns (Call[] memory) {
+        return generateUpgradeData.getUpgradeCalls();
+    }
+
+    function _getProtocolUpgradeHandlerAddress() internal view override returns (address) {
+        return generateUpgradeData.getProtocolUpgradeHandlerAddress();
+    }
+
+    function _getOldProtocolVersion() internal view override returns (uint256) {
+        return generateUpgradeData.getOldProtocolVersion();
+    }
+
+    // --- Implementation of virtual functions for preparing upgrades --------
+
+    function _prepareEcosystemContracts() internal override {
+        generateUpgradeData.prepareEcosystemContracts(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT);
+    }
+
+    function _prepareChain() internal override {
+        chainUpgrade.prepareChain(
+            vm.envString("ECOSYSTEM_INPUT"),
+            ECOSYSTEM_OUTPUT,
+            vm.envString("CHAIN_INPUT"),
+            CHAIN_OUTPUT
+        );
+    }
+
+    function _upgradeChain(
+        uint256 oldProtocolVersion,
+        Diamond.DiamondCutData memory chainUpgradeInfo
+    ) internal override {
+        chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
+    }
+
+    function test_StageProofsForkScriptBased() public {
+        _mainnetForkTestImpl();
+    }
+}
+
+/**
+ * @title UpgradeTestFileBased
+ * @dev This implementation of UpgradeTestAbstract reads the upgrade data from a file
+ */
+contract UpgradeTestFileBased is UpgradeTestAbstract {
+    using stdToml for string;
+
+    string internal outputFile;
+    function setUp() public {
+        _setUp();
+        string memory root = vm.projectRoot();
+        outputFile = string.concat(root, vm.envString("UPGRADE_OUTPUT"));
+    }
+
+    // --- Implementation of virtual functions that forward to generateUpgradeData ---
+
+    function _getEcosystemAdmin() internal view override returns (address) {
+        return generateUpgradeData.getEcosystemAdmin();
+    }
+
+    function _getBridgehub() internal view override returns (address) {
+        return generateUpgradeData.getBridgehub();
+    }
+
+    function _getChainTypeManager() internal view override returns (address) {
+        return generateUpgradeData.getChainTypeManager();
+    }
+
+    function _getDiamondCutData() internal view override returns (bytes memory) {
+        string memory toml = vm.readFile(outputFile);
+        return toml.readBytes("$.contracts_config.diamond_cut_data");
+    }
+
+    function _prepareForceDeploymentsData() internal view override returns (bytes memory) {
+        string memory toml = vm.readFile(outputFile);
+        return toml.readBytes("$.contracts_config.force_deployments_data");
+    }
+
+    function _getUpgradeCalls() internal override returns (Call[] memory) {
+        string memory toml = vm.readFile(outputFile);
+        return abi.decode(toml.readBytes("$.governance_upgrade_calls"), (Call[]));
+    }
+
+    function _getProtocolUpgradeHandlerAddress() internal view override returns (address) {
+        return generateUpgradeData.getProtocolUpgradeHandlerAddress();
+    }
+
+    function _getOldProtocolVersion() internal view override returns (uint256) {
+        return generateUpgradeData.getOldProtocolVersion();
+    }
+
+    // --- Implementation of virtual functions for preparing upgrades --------
+
+    function _prepareEcosystemContracts() internal override {
+        generateUpgradeData.testInitialize(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT);
+    }
+
+    function _prepareChain() internal override {
+        chainUpgrade.prepareChain(
+            vm.envString("ECOSYSTEM_INPUT"),
+            ECOSYSTEM_OUTPUT,
+            vm.envString("CHAIN_INPUT"),
+            CHAIN_OUTPUT
+        );
+    }
+
+    function _upgradeChain(
+        uint256 oldProtocolVersion,
+        Diamond.DiamondCutData memory chainUpgradeInfo
+    ) internal override {
+        chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
+    }
+
+    function test_StageProofsForkFileBased() public {
+        _mainnetForkTestImpl();
+
+        // We should also double check that at least emergency upgrades work.
+        address puh = generateUpgradeData.getProtocolUpgradeHandlerAddress();
+        address emergencyUpgradeBoard = IProtocolUpgradeHandler(puh).emergencyUpgradeBoard();
+
+        IProtocolUpgradeHandler.Call[] memory calls = new IProtocolUpgradeHandler.Call[](1);
+        vm.startBroadcast(emergencyUpgradeBoard);
+        IProtocolUpgradeHandler(puh).executeEmergencyUpgrade(
+            IProtocolUpgradeHandler.UpgradeProposal({calls: calls, executor: emergencyUpgradeBoard, salt: bytes32(0)})
+        );
+        vm.stopBroadcast();
     }
 }

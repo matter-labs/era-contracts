@@ -89,8 +89,8 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, _tokenAddress);
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _originalCaller: ETH_TOKEN_ADDRESS,
-            _l2Receiver: address(this),
-            _l1Token: ETH_TOKEN_ADDRESS,
+            _remoteReceiver: address(this),
+            _originToken: ETH_TOKEN_ADDRESS,
             _amount: 100,
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });
@@ -169,7 +169,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         depositToL1(ETH_TOKEN_ADDRESS);
         bytes memory secondBridgeCalldata = bytes.concat(
             NEW_ENCODING_VERSION,
-            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
         bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(

@@ -34,6 +34,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
@@ -55,7 +56,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
-        require(users.length == 0, "Addresses already generated");
+        if (users.length != 0) {
+            revert AddressesAlreadyGenerated();
+        }
 
         for (uint256 i = 0; i < TEST_USERS_COUNT; i++) {
             address newAddress = makeAddr(string(abi.encode("account", i)));
@@ -102,6 +105,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     // This is a method to simplify porting the tests for now.
     // Here we rely that the first restriction is the AccessControlRestriction
+    // TODO(EVM-924): this function is not used.
     function _extractAccessControlRestriction(address admin) internal returns (address) {
         return ChainAdmin(payable(admin)).getRestrictions()[0];
     }
@@ -123,32 +127,20 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         require(bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
         gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
     }
 
     function test_startMessageToL3() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         IBridgehub bridgehub = IBridgehub(bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
@@ -165,11 +157,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
 
         // Setup
         IBridgehub bridgehub = IBridgehub(bridgehub);
@@ -244,11 +232,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(
-            migratingChain.getAdmin(),
-            _extractAccessControlRestriction(migratingChain.getAdmin()),
-            migratingChainId
-        );
+        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         migrateBackChain();
     }
 

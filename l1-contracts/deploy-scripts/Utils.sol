@@ -16,7 +16,31 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {EIP712Utils} from "./EIP712Utils.sol";
+import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
+import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
+import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
+import {IMultisig} from "./interfaces/IMultisig.sol";
+import {ISafe} from "./interfaces/ISafe.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+
+/// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
+bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
+    "ExecuteEmergencyUpgradeGuardians(bytes32 id)"
+);
+
+/// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the Security Council.
+bytes32 constant EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256(
+    "ExecuteEmergencyUpgradeSecurityCouncil(bytes32 id)"
+);
+
+/// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the ZK Foundation.
+bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
+    "ExecuteEmergencyUpgradeZKFoundation(bytes32 id)"
+);
+
+/// @dev EIP-712 TypeHash for protocol upgrades approval by the Security Council.
+bytes32 constant APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256("ApproveUpgradeSecurityCouncil(bytes32 id)");
 
 /// @dev The offset from which the built-in, but user space contracts are located.
 uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
@@ -26,8 +50,11 @@ address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03);
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
 address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
+address constant L2_WETH_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
 address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
+
+uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
@@ -43,6 +70,7 @@ struct StateTransitionDeployedAddresses {
     address defaultUpgrade;
     address validatorTimelock;
     address diamondProxy;
+    address bytecodesSupplier;
 }
 
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error
@@ -160,7 +188,11 @@ library Utils {
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
+        return
+            readZKFoundryBytecodeSystemContracts(
+                "proved_batch.yul/contracts-preprocessed/bootloader",
+                "proved_batch.yul"
+            );
     }
 
     /**
@@ -169,7 +201,6 @@ library Utils {
     function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
-        console.log(path);
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
         return bytecode;
@@ -179,18 +210,33 @@ library Utils {
      * @dev Returns the bytecode of a given system contract.
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
-            string.concat(
-                "../system-contracts/artifacts-zk/contracts-preprocessed/",
-                filename,
-                ".sol/",
-                filename,
-                ".json"
-            )
+        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
+    }
+
+    /**
+     * @dev Returns the bytecode of a given system contract.
+     */
+    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat(
+            "/../system-contracts/zkout/",
+            filename,
+            ".yul/contracts-preprocessed/precompiles/",
+            filename,
+            ".yul.json"
         );
-        bytes memory bytecode = vm.parseJson(file, "$.bytecode");
-        return bytecode;
+
+        // It is the only exceptional case
+        if (keccak256(abi.encodePacked(filename)) == keccak256(abi.encodePacked("EventWriter"))) {
+            path = string.concat(
+                "/../system-contracts/zkout/",
+                filename,
+                ".yul/contracts-preprocessed/",
+                filename,
+                ".yul.json"
+            );
+        }
+
+        return readFoundryBytecode(path);
     }
 
     /**
@@ -204,8 +250,8 @@ library Utils {
             child := create(0, add(bytecode, 0x20), mload(bytecode))
         }
         vm.stopBroadcast();
-        require(child != address(0), "Failed to deploy Create2Factory");
-        require(child.code.length > 0, "Failed to deploy Create2Factory");
+        require(child != address(0), "Failed to deploy create2factory");
+        require(child.code.length > 0, "Failed to deploy create2factory");
         return child;
     }
 
@@ -775,6 +821,41 @@ library Utils {
         return bytecode;
     }
 
+    function readFoundryBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
+        return readFoundryBytecode(path);
+    }
+
+    function readZKFoundryBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
+    function readZKFoundryBytecodeL2(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l2-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
+    function readZKFoundryBytecodeSystemContracts(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryBytecode(path);
+        return bytecode;
+    }
+
     /**
      * @dev Read hardhat bytecodes
      */
@@ -814,6 +895,201 @@ library Utils {
         vm.stopBroadcast();
     }
 
+    function getGuardiansEmergencySignatures(
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        bytes32 _emergencyUpgradeBoardDigest,
+        bytes32 _upgradeId
+    ) internal returns (bytes memory fullSignatures) {
+        address[] memory guardiansMembers = new address[](8);
+        {
+            IMultisig guardians = IMultisig(_protocolUpgradeHandler.guardians());
+            for (uint256 i = 0; i < 8; i++) {
+                guardiansMembers[i] = guardians.members(i);
+            }
+        }
+        bytes[] memory guardiansRawSignatures = new bytes[](8);
+        for (uint256 i = 0; i < 8; i++) {
+            bytes32 safeDigest;
+            {
+                bytes32 guardiansDigest = EIP712Utils.buildDigest(
+                    _emergencyUpgradeBoardDigest,
+                    keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH, _upgradeId))
+                );
+                safeDigest = ISafe(guardiansMembers[i]).getMessageHash(abi.encode(guardiansDigest));
+            }
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+            guardiansRawSignatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        fullSignatures = abi.encode(guardiansMembers, guardiansRawSignatures);
+    }
+
+    function getSecurityCouncilEmergencySignatures(
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        bytes32 _emergencyUpgradeBoardDigest,
+        bytes32 _upgradeId
+    ) internal returns (bytes memory fullSignatures) {
+        address[] memory securityCouncilMembers = new address[](SECURITY_COUNCIL_SIZE);
+        {
+            IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
+            for (uint256 i = 0; i < SECURITY_COUNCIL_SIZE; i++) {
+                securityCouncilMembers[i] = securityCouncil.members(i);
+            }
+        }
+        bytes[] memory securityCouncilRawSignatures = new bytes[](SECURITY_COUNCIL_SIZE);
+        for (uint256 i = 0; i < securityCouncilMembers.length; i++) {
+            bytes32 safeDigest;
+            {
+                bytes32 securityCouncilDigest = EIP712Utils.buildDigest(
+                    _emergencyUpgradeBoardDigest,
+                    keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH, _upgradeId))
+                );
+                safeDigest = ISafe(securityCouncilMembers[i]).getMessageHash(abi.encode(securityCouncilDigest));
+            }
+            {
+                (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+                securityCouncilRawSignatures[i] = abi.encodePacked(r, s, v);
+            }
+        }
+        fullSignatures = abi.encode(securityCouncilMembers, securityCouncilRawSignatures);
+    }
+
+    function getZKFoundationEmergencySignature(
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        bytes32 _emergencyUpgradeBoardDigest,
+        bytes32 _upgradeId
+    ) internal returns (bytes memory fullSignatures) {
+        ISafe zkFoundation;
+        IEmergencyUpgrageBoard emergencyUpgradeBoard = IEmergencyUpgrageBoard(
+            _protocolUpgradeHandler.emergencyUpgradeBoard()
+        );
+        zkFoundation = ISafe(emergencyUpgradeBoard.ZK_FOUNDATION_SAFE());
+
+        bytes32 zkFoundationDigest = EIP712Utils.buildDigest(
+            _emergencyUpgradeBoardDigest,
+            keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, _upgradeId))
+        );
+        bytes32 safeDigest = ISafe(zkFoundation).getMessageHash(abi.encode(zkFoundationDigest));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+        fullSignatures = abi.encodePacked(r, s, v);
+    }
+
+    function executeEmergencyProtocolUpgrade(
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler.Call[] memory _calls,
+        bytes32 _salt
+    ) internal returns (bytes memory) {
+        bytes32 upgradeId;
+        bytes32 emergencyUpgradeBoardDigest;
+        {
+            address emergencyUpgradeBoard = _protocolUpgradeHandler.emergencyUpgradeBoard();
+            IProtocolUpgradeHandler.UpgradeProposal memory upgradeProposal = IProtocolUpgradeHandler.UpgradeProposal({
+                calls: _calls,
+                salt: _salt,
+                executor: emergencyUpgradeBoard
+            });
+            upgradeId = keccak256(abi.encode(upgradeProposal));
+            emergencyUpgradeBoardDigest = EIP712Utils.buildDomainHash(
+                emergencyUpgradeBoard,
+                "EmergencyUpgradeBoard",
+                "1"
+            );
+        }
+
+        bytes memory guardiansSignatures = getGuardiansEmergencySignatures(
+            _governorWallet,
+            _protocolUpgradeHandler,
+            emergencyUpgradeBoardDigest,
+            upgradeId
+        );
+
+        bytes memory securityCouncilSignatures = getSecurityCouncilEmergencySignatures(
+            _governorWallet,
+            _protocolUpgradeHandler,
+            emergencyUpgradeBoardDigest,
+            upgradeId
+        );
+
+        bytes memory zkFoundationSignature = getZKFoundationEmergencySignature(
+            _governorWallet,
+            _protocolUpgradeHandler,
+            emergencyUpgradeBoardDigest,
+            upgradeId
+        );
+
+        {
+            vm.startBroadcast();
+            IEmergencyUpgrageBoard emergencyUpgradeBoard = IEmergencyUpgrageBoard(
+                _protocolUpgradeHandler.emergencyUpgradeBoard()
+            );
+            // solhint-disable-next-line func-named-parameters
+            emergencyUpgradeBoard.executeEmergencyUpgrade(
+                _calls,
+                _salt,
+                guardiansSignatures,
+                securityCouncilSignatures,
+                zkFoundationSignature
+            );
+            vm.stopBroadcast();
+        }
+    }
+
+    // Signs and approves the upgrade by the security council.
+    // It works only on staging env, since the `_governorWallet` must be the wallet
+    // that is the sole owner of the Gnosis wallets that constitute the security council.
+    function securityCouncilApproveUpgrade(
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        Vm.Wallet memory _governorWallet,
+        bytes32 upgradeId
+    ) internal {
+        address securityCouncilAddr = _protocolUpgradeHandler.securityCouncil();
+        bytes32 securityCouncilDigest;
+        {
+            securityCouncilDigest = EIP712Utils.buildDomainHash(securityCouncilAddr, "SecurityCouncil", "1");
+        }
+
+        bytes[] memory securityCouncilRawSignatures = new bytes[](SECURITY_COUNCIL_SIZE);
+        address[] memory securityCouncilMembers = new address[](12);
+        {
+            {
+                IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
+                for (uint256 i = 0; i < 12; i++) {
+                    securityCouncilMembers[i] = securityCouncil.members(i);
+                }
+            }
+            for (uint256 i = 0; i < securityCouncilMembers.length; i++) {
+                bytes32 safeDigest;
+                {
+                    bytes32 digest = EIP712Utils.buildDigest(
+                        securityCouncilDigest,
+                        keccak256(abi.encode(APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH, upgradeId))
+                    );
+                    safeDigest = ISafe(securityCouncilMembers[i]).getMessageHash(abi.encode(digest));
+                }
+                {
+                    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+                    securityCouncilRawSignatures[i] = abi.encodePacked(r, s, v);
+                }
+            }
+        }
+
+        {
+            vm.startBroadcast(msg.sender);
+            ISecurityCouncil(securityCouncilAddr).approveUpgradeSecurityCouncil(
+                upgradeId,
+                securityCouncilMembers,
+                securityCouncilRawSignatures
+            );
+            vm.stopBroadcast();
+        }
+    }
+
     function adminExecute(
         address _admin,
         address _accessControlRestriction,
@@ -821,18 +1097,29 @@ library Utils {
         bytes memory _data,
         uint256 _value
     ) internal {
-        address defaultAdmin = AccessControlRestriction(_accessControlRestriction).defaultAdmin();
+        // If `_accessControlRestriction` is not provided, we expect that this ChainAdmin is Ownable
+        address adminOwner = _accessControlRestriction == address(0)
+            ? Ownable(_admin).owner()
+            : AccessControlRestriction(_accessControlRestriction).defaultAdmin();
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
 
-        vm.startBroadcast(defaultAdmin);
+        vm.startBroadcast(adminOwner);
         IChainAdmin(_admin).multicall{value: _value}(calls, true);
         vm.stopBroadcast();
     }
 
     function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
+    }
+
+    function readAvailL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json");
+    }
+
+    function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
     }
 
     // add this to be excluded from coverage report

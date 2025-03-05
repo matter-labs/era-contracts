@@ -6,17 +6,18 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1AssetRouterTestBase is L1AssetRouterTest {
@@ -107,7 +108,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.mockCall(
             address(nativeTokenVault),
             abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
-            abi.encode(address(0))
+            abi.encode(address(token))
         );
         vm.prank(bridgehubAddress);
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
@@ -205,7 +206,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_bridgeRecoverFailedTransfer_Eth() public {
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
@@ -291,20 +292,16 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
         vm.mockCall(
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
-                chainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
+            abi.encodeCall(
+                IBridgehub.proveL2MessageInclusion,
+                (chainId, l2BatchNumber, l2MessageIndex, l2ToL1Message, merkleProof)
             ),
             abi.encode(true)
         );
@@ -337,7 +334,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
@@ -426,7 +423,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         //alt base token
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_ASSET_ROUTER_ADDR,
+            sender: l2LegacySharedBridgeAddr,
             data: message
         });
 
@@ -478,5 +475,32 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
         assertEq(endBalanceNtv - startBalanceNtv, amount);
         assertEq(endEthBalanceNtv - startEthBalanceNtv, amount);
+    }
+
+    function test_bridgehubDeposit_Eth_storesCorrectTxHash() public {
+        _setBaseTokenAssetId(tokenAssetId);
+        vm.prank(bridgehubAddress);
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encode(tokenAssetId)
+        );
+        // solhint-disable-next-line func-named-parameters
+        L2TransactionRequestTwoBridgesInner memory request = sharedBridge.bridgehubDeposit{value: amount}(
+            chainId,
+            alice,
+            0,
+            abi.encode(ETH_TOKEN_ADDRESS, 0, bob)
+        );
+
+        bytes32 expectedTxHash = DataEncoding.encodeTxDataHash({
+            _nativeTokenVault: address(nativeTokenVault),
+            _encodingVersion: LEGACY_ENCODING_VERSION,
+            _originalCaller: alice,
+            _assetId: nativeTokenVault.BASE_TOKEN_ASSET_ID(),
+            _transferData: abi.encode(amount, bob, ETH_TOKEN_ADDRESS)
+        });
+
+        assertEq(request.txDataHash, expectedTxHash);
     }
 }

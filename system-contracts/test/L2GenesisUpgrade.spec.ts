@@ -12,7 +12,7 @@ import {
   ADDRESS_ONE,
 } from "./shared/constants";
 import { deployContractOnAddress, loadArtifact } from "./shared/utils";
-import { setResult } from "./shared/mocks";
+import { prepareEnvironment, setResult } from "./shared/mocks";
 
 describe("L2GenesisUpgrade tests", function () {
   let l2GenesisUpgrade: L2GenesisUpgrade;
@@ -35,17 +35,24 @@ describe("L2GenesisUpgrade tests", function () {
   let fixedForceDeploymentsData: string;
 
   const additionalForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
-    ["tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address l2Weth)"],
+    [
+      "tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, string baseTokenName, string baseTokenSymbol)",
+    ],
     [
       {
         baseTokenAssetId: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
-        l2LegacySharedBridge: ADDRESS_ONE,
-        l2Weth: ADDRESS_ONE,
+        l2LegacySharedBridge: ethers.constants.AddressZero,
+        predeployedL2WethAddress: ADDRESS_ONE,
+        baseTokenL1Address: ADDRESS_ONE,
+        baseTokenName: "Ether",
+        baseTokenSymbol: "ETH",
       },
     ]
   );
 
   before(async () => {
+    await prepareEnvironment();
+
     const wallet = await ethers.getImpersonatedSigner(TEST_FORCE_DEPLOYER_ADDRESS);
     await deployContractOnAddress(TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS, "ComplexUpgrader");
     await deployContractOnAddress(TEST_L2_GENESIS_UPGRADE_CONTRACT_ADDRESS, "L2GenesisUpgrade");
@@ -90,7 +97,7 @@ describe("L2GenesisUpgrade tests", function () {
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address l2BridgeProxyOwnerAddress, address l2BridgedStandardERC20ProxyOwnerAddress)",
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address dangerousTestOnlyForcedBeacon)",
       ],
       [
         {
@@ -107,8 +114,7 @@ describe("L2GenesisUpgrade tests", function () {
           // For genesis upgrade these values will always be zero
           l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
           l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
-          l2BridgeProxyOwnerAddress: ethers.constants.AddressZero,
-          l2BridgedStandardERC20ProxyOwnerAddress: ethers.constants.AddressZero,
+          dangerousTestOnlyForcedBeacon: ethers.constants.AddressZero,
         },
       ]
     );
