@@ -14,7 +14,7 @@ import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Utils} from "./Utils.sol";
+import {Utils, ADDRESS_ONE} from "./Utils.sol";
 
 /**
  * @title Prepare ZKChain Registration Calldata
@@ -53,8 +53,6 @@ import {Utils} from "./Utils.sol";
  */
 contract PrepareZKChainRegistrationCalldataScript is Script {
     using stdToml for string;
-
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 
     struct Config {
         // Admin of the yet-to-be-registered chain (L1-based address)

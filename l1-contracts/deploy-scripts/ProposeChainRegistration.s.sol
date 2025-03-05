@@ -6,10 +6,10 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {ADDRESS_ONE} from "./Utils.sol";
 
 contract ProposeChainRegistration is Script {
     using stdToml for string;
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {

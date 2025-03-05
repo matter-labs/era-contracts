@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {DeployL1IntegrationScript} from "./deploy-scripts/DeployL1Integration.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -17,7 +17,7 @@ import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
 
-    DeployL1Script l1Script;
+    DeployL1IntegrationScript l1Script;
     struct AllAddresses {
         DeployedAddresses ecosystemAddresses;
         address bridgehubProxyAddress;
@@ -50,7 +50,7 @@ contract L1ContractDeployer is Test {
             "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
         );
 
-        l1Script = new DeployL1Script();
+        l1Script = new DeployL1IntegrationScript();
         l1Script.runForTest();
 
         addresses.ecosystemAddresses = l1Script.getAddresses();
@@ -64,7 +64,7 @@ contract L1ContractDeployer is Test {
             addresses.ecosystemAddresses.bridgehub.ctmDeploymentTrackerProxy
         );
 
-        addresses.sharedBridge = L1AssetRouter(addresses.ecosystemAddresses.bridges.sharedBridgeProxy);
+        addresses.sharedBridge = L1AssetRouter(addresses.ecosystemAddresses.bridges.l1AssetRouterProxy);
         addresses.l1Nullifier = L1Nullifier(addresses.ecosystemAddresses.bridges.l1NullifierProxy);
         addresses.l1NativeTokenVault = L1NativeTokenVault(
             payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)

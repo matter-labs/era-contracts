@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
+
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {IOwnable} from "./interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -22,7 +23,6 @@ import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
 import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -52,6 +52,9 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET +
 address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
 address constant L2_WETH_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
+/// @dev the address of the Gateway-specific upgrader contract
+address constant L2_GATEWAY_SPECIFIC_UPGRADER = address(USER_CONTRACTS_OFFSET + 0x08);
+
 address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
@@ -61,6 +64,8 @@ struct StateTransitionDeployedAddresses {
     address chainTypeManagerProxy;
     address chainTypeManagerImplementation;
     address verifier;
+    address verifierFflonk;
+    address verifierPlonk;
     address adminFacet;
     address mailboxFacet;
     address executorFacet;
@@ -71,6 +76,7 @@ struct StateTransitionDeployedAddresses {
     address validatorTimelock;
     address diamondProxy;
     address bytecodesSupplier;
+    bool isOnGateway;
 }
 
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error
@@ -86,6 +92,32 @@ struct PrepareL1L2TransactionParams {
     address l1SharedBridgeProxy;
 }
 
+struct SelectorToFacet {
+    address facetAddress;
+    uint16 selectorPosition;
+    bool isFreezable;
+}
+
+struct FacetToSelectors {
+    bytes4[] selectors;
+    uint16 facetPosition;
+}
+
+struct FacetCut {
+    address facet;
+    Action action;
+    bool isFreezable;
+    bytes4[] selectors;
+}
+
+enum Action {
+    Add,
+    Replace,
+    Remove
+}
+
+address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -95,7 +127,6 @@ library Utils {
     bytes internal constant CREATE2_FACTORY_BYTECODE =
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
 
     /**
@@ -395,7 +426,7 @@ library Utils {
     function prepareL1L2Transaction(
         PrepareL1L2TransactionParams memory params
     ) internal returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
-        Bridgehub bridgehub = Bridgehub(params.bridgehubAddress);
+        IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(
@@ -432,7 +463,7 @@ library Utils {
         internal
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
-        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
@@ -464,7 +495,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal {
-        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
@@ -524,7 +555,7 @@ library Utils {
             );
 
         requiredValueToDeploy = approveBaseTokenGovernance(
-            Bridgehub(bridgehubAddress),
+            IBridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             governor,
             salt,
@@ -533,7 +564,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            Bridgehub.requestL2TransactionDirect,
+            IBridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -543,7 +574,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -577,7 +608,7 @@ library Utils {
             );
 
         requiredValueToDeploy = approveBaseTokenGovernance(
-            Bridgehub(bridgehubAddress),
+            IBridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             governor,
             salt,
@@ -586,7 +617,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            Bridgehub.requestL2TransactionTwoBridges,
+            IBridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -596,7 +627,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -605,7 +636,7 @@ library Utils {
     }
 
     function approveBaseTokenGovernance(
-        Bridgehub bridgehub,
+        IBridgehub bridgehub,
         address l1SharedBridgeProxy,
         address governor,
         bytes32 salt,
@@ -658,7 +689,7 @@ library Utils {
             );
 
         requiredValueToDeploy = approveBaseTokenAdmin(
-            Bridgehub(bridgehubAddress),
+            IBridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             admin,
             accessControlRestriction,
@@ -667,7 +698,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            Bridgehub.requestL2TransactionDirect,
+            IBridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -683,7 +714,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -717,7 +748,7 @@ library Utils {
             );
 
         requiredValueToDeploy = approveBaseTokenAdmin(
-            Bridgehub(bridgehubAddress),
+            IBridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             admin,
             accessControlRestriction,
@@ -726,7 +757,7 @@ library Utils {
         );
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            Bridgehub.requestL2TransactionTwoBridges,
+            IBridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -742,7 +773,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = Bridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -751,7 +782,7 @@ library Utils {
     }
 
     function approveBaseTokenAdmin(
-        Bridgehub bridgehub,
+        IBridgehub bridgehub,
         address l1SharedBridgeProxy,
         address admin,
         address accessControlRestriction,
@@ -887,7 +918,7 @@ library Utils {
         uint256 _delay
     ) internal {
         IGovernance governance = IGovernance(_governor);
-        Ownable ownable = Ownable(_governor);
+        IOwnable ownable = IOwnable(_governor);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
@@ -1076,10 +1107,10 @@ library Utils {
         bytes memory _data,
         uint256 _value
     ) internal {
-        // If `_accessControlRestriction` is not provided, we expect that this ChainAdmin is Ownable
+        // If `_accessControlRestriction` is not provided, we expect that this ChainAdmin is IOwnable
         address adminOwner = _accessControlRestriction == address(0)
-            ? Ownable(_admin).owner()
-            : AccessControlRestriction(_accessControlRestriction).defaultAdmin();
+            ? IOwnable(_admin).owner()
+            : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
