@@ -92,6 +92,10 @@ struct StateTransitionContracts {
     address chainTypeManagerImplementation;
     /// @notice Address of the Verifier contract.
     address verifier;
+    /// @notice Address of the VerifierPlonk contract.
+    address verifierPlonk;
+    /// @notice Address of the VerifierFflonk contract.
+    address verifierFflonk;
     /// @notice Address of the Admin facet contract.
     address adminFacet;
     /// @notice Address of the Mailbox facet contract.
@@ -238,7 +242,9 @@ contract GatewayCTMDeployer {
         DeployedContracts memory _deployedContracts
     ) internal {
         L2VerifierFflonk fflonkVerifier = new L2VerifierFflonk{salt: _salt}();
+        _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
         L2VerifierPlonk verifierPlonk = new L2VerifierPlonk{salt: _salt}();
+        _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
                 new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
