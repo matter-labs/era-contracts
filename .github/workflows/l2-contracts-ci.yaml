@@ -46,7 +46,7 @@ jobs:
       - name: Create cache
         uses: actions/cache/save@v3
         with:
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l2-${{ github.sha }}
           path: |
             l1-contracts/cache-forge
             l1-contracts/out
