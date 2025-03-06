@@ -50,7 +50,7 @@ contract UpgradeLocalDevnet is Script, EcosystemUpgrade {
         console.log("Upgrading Era");
 
         // Now, the admin of the Era needs to call the upgrade function.
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData();
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
         chainUpgrade.upgradeChain(getOldProtocolVersion(), upgradeCutData);
 
         // Set timestamp of upgrade for server

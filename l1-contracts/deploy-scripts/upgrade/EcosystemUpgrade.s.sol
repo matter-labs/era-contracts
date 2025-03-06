@@ -1179,15 +1179,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Additional calls to newConfigure contracts
     function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](1);
-
-        // TODO not needed?
-        calls[0] = Call({
-            target: addresses.stateTransition.chainTypeManagerProxy,
-            // Making the old protocol version no longer invalid
-            data: abi.encodeCall(ChainTypeManager.setProtocolVersionDeadline, (getOldProtocolVersion(), 0)),
-            value: 0
-        });
+        calls = new Call[](0);
     }
 
     /// @notice Double checking that the deadline has passed.
