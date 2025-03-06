@@ -1,14 +1,21 @@
-era_chain_id = 13377331
+era_chain_id = 271
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 120
 
+# overwritten 
+owner_address = "0x0000000000000000000000000000000000000001" 
+
+support_l2_legacy_shared_bridge_test = false
+old_protocol_version = 0x1a00000000
+
 [contracts]
 max_number_of_chains = 100
-create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000001"
+create2_factory_salt = "0x75e884d927f2b750bb492e0b29b27f088a31198bf7b6b2ae2c37b60441599e9d"
+create2_factory_addr = "0xe441cf0795af14ddb9f7984da85cd36db1b8790d"
 validator_timelock_execution_delay = 0
-genesis_root = "0xf9030b78c5bf5ac997a76962aa32c90a6d8e8ebce9838c8eeb388d73e1f7659a"
-genesis_rollup_leaf_index = 64
-genesis_batch_commitment = "0x34c1b220363e0cde7eaf10fe95754d61de097e0f9d9a1dc56c8026562e395259"
+genesis_root = "0x351670c8039e0711f150ef7be78ddfd1274f9c6a015f52db2b9db4b70b5ae13e"
+genesis_rollup_leaf_index = 76
+genesis_batch_commitment = "0xf9a75ccb1d8c31ae644851b4cd1da1cc5fcdd91388c5cd9fe78a4d234e608fc3"
 recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -19,11 +26,32 @@ diamond_init_max_pubdata_per_batch = 120000
 diamond_init_max_l2_gas_per_batch = 80000000
 diamond_init_priority_tx_max_pubdata = 99000
 diamond_init_minimal_l2_gas_price = 250000000
-bootloader_hash = "0x010008e5b883de8897598e83d383e332b87d09164363816c15f22353c3cd910d"
-default_aa_hash = "0x0100052307b3b66ef67935255483d39b3c8dcdb47fdf94dddca11ebe8271afe6"
-evm_emulator_hash = "0x0100052307b3b66ef67935255483d39b3c8dcdb47fdf94dddca11ebe8271afe6"
-bridgehub_proxy_address = "0xbcb012c6a973f971c987a3be4ff3a75fe9510bcb"
-transparent_proxy_admin = "0x8b7e5ca7dd323657a1a276ef5aa3ab6454c90c53"
+bootloader_hash = "0x0100087fe7df1cf5616646f85bd5eebc8efe5d8deac4d85bea9b9aefd88803dd"
+default_aa_hash = "0x0100050bf9baf9d08e5d3c037f8d8b486076de7e6dceb3f3fc0989ea2c99cd67"
+evm_emulator_hash = "0x01000bbb8116fe7bdf690c19740ea350375426cec23f4f1f69a12fdc58adc9ba"
+bridgehub_proxy_address = "0x4c123b9f5af60cf9b757146fdac5f52cfd846937"
+transparent_proxy_admin = "0x5d89e25d17cf26baff7632f640d74eafde1c6e1c"
+l1_bytecodes_supplier_addr = "0xabdecacbb72251b06861a74b45ffebc9805dea53"
+
+governance_security_council_address = "0x0000000000000000000000000000000000000000" # unused kl todo
+governance_min_delay = 0 # unused
+latest_protocol_version = 0x1b00000000
 
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+
+[gateway]
+chain_id = 0
+
+[gateway.gateway_state_transition]
+chain_type_manager_proxy_addr = "0x0000000000000000000000000000000000000000"
+chain_type_manager_implementation_addr = "0x0000000000000000000000000000000000000000"
+verifier_addr = "0x0000000000000000000000000000000000000000"
+admin_facet_addr = "0x0000000000000000000000000000000000000000"
+mailbox_facet_addr = "0x0000000000000000000000000000000000000000"
+executor_facet_addr = "0x0000000000000000000000000000000000000000"
+getters_facet_addr = "0x0000000000000000000000000000000000000000"
+diamond_init_addr = "0x0000000000000000000000000000000000000000"
+genesis_upgrade_addr = "0x0000000000000000000000000000000000000000"
+default_upgrade_addr = "0x0000000000000000000000000000000000000000"
+validator_timelock_addr = "0x0000000000000000000000000000000000000000"
