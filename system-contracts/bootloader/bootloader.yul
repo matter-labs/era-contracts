@@ -3015,8 +3015,6 @@ object "Bootloader" {
                     }
                 }
 
-                // kl todo clear pendingMessageRootIds
-                mstore(0, {{RIGHT_PADDED_CLEAR_PENDING_MESSAGE_ROOT_IDS_SELECTOR}}) 
 
                 debugLog("Tried to clear pending messageRootIds: ", 0)
 

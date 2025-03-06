@@ -15,7 +15,7 @@ import {InteropAccount} from "./InteropAccount.sol";
 import {BASE_TOKEN_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
-import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, L2Log} from "../common/Messaging.sol";
+import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, L2Log, BUNDLE_IDENTIFIER} from "../common/Messaging.sol";
 // import {L2_MESSAGE_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {MessageHashing, ProofVerificationResult} from "../common/libraries/MessageHashing.sol";
 
@@ -61,7 +61,7 @@ contract InteropHandler is IInteropHandler {
     }
 
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) public {
-        _proof.message.data = _bundle;
+        _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
         bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
             _proof.chainId,
             _proof.l1BatchNumber,

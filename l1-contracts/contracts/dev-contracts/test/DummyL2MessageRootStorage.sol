@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.24;
 
-import {Unauthorized} from "./SystemContractErrors.sol";
-import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
+// import {Unauthorized} from "./SystemContractErrors.sol";
+// import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -11,7 +11,7 @@ import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
  * @notice MessageRootStorage contract for imported L2 message roots..
  * @dev
  */
-contract L2MessageRootStorage {
+contract DummyL2MessageRootStorage {
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 msgRoot)) public msgRoots;
     mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
     mapping(bytes32 msgRoot => uint256 chainId) public chainIdFromMsgRoot;
@@ -46,7 +46,6 @@ contract L2MessageRootStorage {
         }
     }
 
-    // kl todo figure out how the executor works with MsgRoot, this on GW.
     function addThisChainMessageRoot(uint256 batchNumber, bytes32[] memory sides) external {
         // kl todo add access control, onlyL1Messenger
         msgRoots[block.chainid][batchNumber] = sides[0];

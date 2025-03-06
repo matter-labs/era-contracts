@@ -302,7 +302,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bool _isNative
     ) internal override {
         // we update in the asset tracker itself, since we parse the messages there
-
     }
 
     /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.

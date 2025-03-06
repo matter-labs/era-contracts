@@ -6,11 +6,12 @@ import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 import {StdStorage, stdStorage, stdToml, Test} from "forge-std/Test.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR, L2_MESSAGE_VERIFICATION, L2_MESSAGE_ROOT_STORAGE} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
 
 import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
 import {InteropCenter, IInteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
+import {InteropHandler, IInteropHandler} from "../../../../../contracts/bridgehub/InteropHandler.sol";
 import {MessageRoot} from "../../../../../contracts/bridgehub/MessageRoot.sol";
 import {L2AssetRouter} from "../../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "../../../../../contracts/bridge/ntv/L2NativeTokenVault.sol";
@@ -19,6 +20,9 @@ import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/Du
 import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
 import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
+import {DummyL2MessageRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2MessageRootStorage.sol";
+import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 
 import {Utils} from "../../../../../deploy-scripts/Utils.sol";
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -68,6 +72,16 @@ library L2UtilsBase {
 
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
+        {
+            address interopHandler = address(new InteropHandler());
+            vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
+            address l2messageVerification = address(new L2MessageVerification());
+            vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
+            address l2MessageRootStorage = address(new DummyL2MessageRootStorage());
+            vm.etch(address(L2_MESSAGE_ROOT_STORAGE), l2MessageRootStorage.code);
+            address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
+            vm.etch(L2_STANDARD_TRIGGER_ACCOUNT_ADDR, l2StandardTriggerAccount.code);
+        }
         uint256 prevChainId = block.chainid;
         vm.chainId(_args.l1ChainId);
         Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);

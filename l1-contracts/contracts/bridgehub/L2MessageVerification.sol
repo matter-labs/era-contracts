@@ -16,7 +16,6 @@ contract L2MessageVerification is MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        return true;
         ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
             _chainId,
             _batchNumber,
