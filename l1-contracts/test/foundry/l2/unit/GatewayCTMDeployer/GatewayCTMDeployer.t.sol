@@ -3,10 +3,12 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {GatewayCTMDeployer, GatewayCTMDeployerConfig, DeployedContracts, StateTransitionContracts, DAContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -74,6 +76,8 @@ contract GatewayCTMDeployerTest is Test {
         new L2Verifier();
 
         new ValidatorTimelock(address(0), 0);
+
+        new ServerNotifier(false);
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
         try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}
@@ -186,6 +190,7 @@ library DeployedContractsComparator {
         require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
         require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
+        require(a.serverNotifier == b.serverNotifier, "serverNotifier proxy differs");
     }
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {
