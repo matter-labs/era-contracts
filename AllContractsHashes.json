@@ -217,7 +217,7 @@
   },
   {
     "contractName": "system-contracts/NonceHolder",
-    "zkBytecodeHash": "0x010000c3cd725cbc44e1b329432e26cf96af874f2d986fad534dff071a35ddea",
+    "zkBytecodeHash": "0x010000d54fb5bc7298d4b6142f666ca7326f75d4027b430e1fc2671f49673732",
     "zkBytecodePath": "/system-contracts/zkout/NonceHolder.sol/NonceHolder.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
