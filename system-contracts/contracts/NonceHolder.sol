@@ -55,6 +55,19 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         return minNonce;
     }
 
+    /// @notice Returns the current keyed nonce for account given its nonce key.
+    /// @param _address The account to return the nonce for.
+    /// @param _key The key of the nonce to return.
+    /// @return The current keyed nonce with the given key for this account.
+    /// Returns the full nonce (including the provided key), not just the nonce value.
+    function getKeyedNonce(address _address, uint192 _key) public view returns (uint256) {
+        if (_key == 0) {
+            return getMinNonce(_address);
+        }
+        uint256 addressAsKey = uint256(uint160(_address));
+        return _combineKeyedNonce(_key, keyedNonces[addressAsKey][_key]);
+    }
+
     /// @notice Returns the raw version of the current minimal nonce
     /// @dev It is equal to minNonce + 2^128 * deployment nonce.
     /// @param _address The account to return the raw nonce for
@@ -82,9 +95,23 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         (, oldMinNonce) = _splitRawNonce(oldRawNonce);
     }
 
+    /// @notice Splits a keyed nonce into its key and value components (192:64 bits).
+    /// `_combineKeyedNonce`'s counterpart.
+    /// @param _nonce The nonce to split.
+    /// @return nonceKey The upper 192 bits of the nonce -- the nonce key.
+    /// @return nonceValue The lower 64 bits of the nonce -- the nonce value.
     function _splitKeyedNonce(uint256 _nonce) private pure returns (uint192 nonceKey, uint64 nonceValue) {
         nonceKey = uint192(_nonce >> 64);
         nonceValue = uint64(_nonce);
+    }
+
+    /// @notice Combines a nonce key and a nonce value into a single 256-bit nonce.
+    /// `_splitKeyedNonce`'s counterpart.
+    /// @param _nonceKey The upper 192 bits of the nonce -- the nonce key.
+    /// @param _nonceValue The lower 64 bits of the nonce -- the nonce value.
+    /// @return The full 256-bit keyed nonce.
+    function _combineKeyedNonce(uint192 _nonceKey, uint64 _nonceValue) private pure returns (uint256) {
+        return (uint256(_nonceKey) << 64) + _nonceValue;
     }
 
     /// @notice A convenience method to increment the minimal nonce if it is equal
