@@ -291,7 +291,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
                     bytes32 historicalRoot = messageRootContract.historicalRoot(uint256(viaIR.logValue2));
                     if (viaIR.logValue4 != historicalRoot) {
-                        // kl todo. 
+                        // kl todo.
                         // revert InvalidLogValue(uint256(logValue), viaIR.logValue4, historicalRoot);
                     }
                 } else if (uint256(logValue) == L1_CHAIN_ID) {
