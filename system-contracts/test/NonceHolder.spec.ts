@@ -120,45 +120,42 @@ describe("NonceHolder tests", () => {
 
     it("should revert if trying to increment keyed nonce", async () => {
       const keyedNonce = 1n << 64n;
-      await expect(nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(keyedNonce)).to.be.revertedWithCustomError(
-        nonceHolder,
-        "InvalidNonceKey"
-      );
+      await expect(
+        nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(keyedNonce)
+      ).to.be.revertedWithCustomError(nonceHolder, "InvalidNonceKey");
     });
   });
 
   describe("incrementMinNonceIfEqualsKeyed", () => {
-      it("should revert This method require system call flag", async () => {
-          const keyedNonce = 1n << 64n;
-            await expect(nonceHolder.incrementMinNonceIfEquals(keyedNonce)).to.be.revertedWithCustomError(
-              nonceHolder,
-              "SystemCallFlagRequired"
-            );
-      });
-
-      it("should revert if trying to increment non-keyed nonce", async () => {
-      const expectedNonce = await nonceHolder.getMinNonce(systemAccount.address);
-      await expect(nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(expectedNonce)).to.be.revertedWithCustomError(
+    it("should revert This method require system call flag", async () => {
+      const keyedNonce = 1n << 64n;
+      await expect(nonceHolder.incrementMinNonceIfEquals(keyedNonce)).to.be.revertedWithCustomError(
         nonceHolder,
-        "InvalidNonceKey"
+        "SystemCallFlagRequired"
       );
-      });
+    });
 
-      it("should increment keyed nonce if equals to expected", async () => {
-          const nonceKey = 123;
-          const expectedNonce = await nonceHolder.getKeyedNonce(systemAccount.address, nonceKey);
-          await nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(expectedNonce);
-          const result = await nonceHolder.getKeyedNonce(systemAccount.address, nonceKey);
-          expect(result).to.equal(expectedNonce.add(1));
-      });
+    it("should revert if trying to increment non-keyed nonce", async () => {
+      const expectedNonce = await nonceHolder.getMinNonce(systemAccount.address);
+      await expect(
+        nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(expectedNonce)
+      ).to.be.revertedWithCustomError(nonceHolder, "InvalidNonceKey");
+    });
 
-      it("should revert if trying to increment keyed nonce with incorrect value", async () => {
-          const keyedNonce = (1n << 64n) + 2222222n;
-          await expect(nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(keyedNonce)).to.be.revertedWithCustomError(
-            nonceHolder,
-            "ValueMismatch"
-          );
-      });
+    it("should increment keyed nonce if equals to expected", async () => {
+      const nonceKey = 123;
+      const expectedNonce = await nonceHolder.getKeyedNonce(systemAccount.address, nonceKey);
+      await nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(expectedNonce);
+      const result = await nonceHolder.getKeyedNonce(systemAccount.address, nonceKey);
+      expect(result).to.equal(expectedNonce.add(1));
+    });
+
+    it("should revert if trying to increment keyed nonce with incorrect value", async () => {
+      const keyedNonce = (1n << 64n) + 2222222n;
+      await expect(
+        nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(keyedNonce)
+      ).to.be.revertedWithCustomError(nonceHolder, "ValueMismatch");
+    });
   });
 
   describe("incrementDeploymentNonce", () => {
