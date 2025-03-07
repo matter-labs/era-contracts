@@ -42,7 +42,6 @@ remappings = [
 ]
 optimizer = true
 optimizer_runs = 200
-allow_internal_expect_revert = true
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.7"
