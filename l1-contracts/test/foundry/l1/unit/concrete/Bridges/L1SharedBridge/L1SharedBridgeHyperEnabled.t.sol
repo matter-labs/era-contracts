@@ -100,7 +100,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        _setNativeTokenVaultChainBalance(chainId, address(token), amount);
+        _setAssetTrackerChainBalance(chainId, address(token), amount);
 
         vm.mockCall(
             interopCenterAddress,

@@ -11,4 +11,8 @@ interface IAssetTracker {
     function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
+
+    function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount);
+
+    function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 }

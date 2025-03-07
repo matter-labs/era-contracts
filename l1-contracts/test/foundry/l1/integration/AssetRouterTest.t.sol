@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
@@ -37,8 +37,11 @@ import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IBridgedStandardToken} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 
 contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+    using stdStorage for StdStorage;
+
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -79,6 +82,13 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function setUp() public {
         prepare();
+        bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
+        stdstore
+            .target(address(ecosystemAddresses.bridgehub.assetTrackerProxy))
+            .sig(IAssetTracker.chainBalance.selector)
+            .with_key(eraZKChainId)
+            .with_key(ETH_TOKEN_ASSET_ID)
+            .checked_write(100);
     }
 
     function depositToL1(address _tokenAddress) public {

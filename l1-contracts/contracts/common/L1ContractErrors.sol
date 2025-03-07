@@ -117,6 +117,8 @@ error ZKChainLimitReached();
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x826fb11e
 error InsufficientChainBalance();
+//
+error InsufficientChainBalanceAssetTracker(uint256 chainId, bytes32 assetId, uint256 amount);
 // 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x4fbe5dba

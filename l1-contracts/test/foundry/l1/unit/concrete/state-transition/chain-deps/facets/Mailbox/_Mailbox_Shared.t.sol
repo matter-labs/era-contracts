@@ -53,6 +53,7 @@ contract MailboxTest is Test {
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
+        utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     function setupDiamondProxy() public {

@@ -73,7 +73,7 @@ contract InteropHandler is IInteropHandler {
             revert MessageNotIncluded();
         }
         emit TxIsIncluded(isIncluded);
-        // kl todo check not executed. Rework hashing to contain all data.
+        // kl todo double execution not checked. Rework hashing to contain all data.
         bytes32 bundleHash = keccak256(_bundle);
         alreadyExecuted[bundleHash] = true;
 

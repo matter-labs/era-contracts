@@ -29,9 +29,7 @@ contract DummyL2MessageRootStorage {
 
     function addMessageRoot(uint256 chainId, uint256 batchNumber, bytes32[] memory sides) external {
         emit MessageRootAdded(chainId, batchNumber, sides);
-        // kl todo add access control, onlyBootloader
         if (sides.length == 1) {
-            // kl todo make sure we cannot have duplicates here.
             msgRoots[chainId][batchNumber] = sides[0];
             batchNumberFromMsgRoot[sides[0]] = batchNumber;
             chainIdFromMsgRoot[sides[0]] = chainId;
@@ -42,12 +40,10 @@ contract DummyL2MessageRootStorage {
             //     batchNumber: batchNumber
             // });
             // pendingMessageRootIdsLength++;
-            // kl todo add linking here
         }
     }
 
     function addThisChainMessageRoot(uint256 batchNumber, bytes32[] memory sides) external {
-        // kl todo add access control, onlyL1Messenger
         msgRoots[block.chainid][batchNumber] = sides[0];
         batchNumberFromMsgRoot[sides[0]] = batchNumber;
         chainIdFromMsgRoot[sides[0]] = block.chainid;

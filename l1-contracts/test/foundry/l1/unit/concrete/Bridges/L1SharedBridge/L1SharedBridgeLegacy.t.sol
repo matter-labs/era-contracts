@@ -54,7 +54,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -100,7 +100,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, address(token), amount);
+        _setAssetTrackerChainBalance(eraChainId, address(token), amount);
 
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(

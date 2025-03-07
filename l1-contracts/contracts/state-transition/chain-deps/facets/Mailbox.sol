@@ -34,6 +34,7 @@ import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBe
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {MessageVerification} from "./MessageVerification.sol";
+import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -225,10 +226,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     /// @inheritdoc IMailboxImpl
-    function requestL2TransactionToGatewayMailbox(
+    function requestL2TransactionToGatewayMailboxWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
@@ -240,7 +244,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
-            _expirationTimestamp: _expirationTimestamp
+            _expirationTimestamp: _expirationTimestamp,
+            _baseTokenAmount: _baseTokenAmount,
+            _assetId: _assetId,
+            _amount: _amount
         });
         canonicalTxHash = _requestL2TransactionToGatewayFree(wrappedRequest);
     }
@@ -257,12 +264,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _wrapRequest(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub.forwardTransactionOnGateway,
-            (_chainId, _canonicalTxHash, _expirationTimestamp)
+            IBridgehub.forwardTransactionOnGatewayWithBalanceChange,
+            (_chainId, _canonicalTxHash, _expirationTimestamp, _baseTokenAmount, _assetId, _amount)
         );
         return
             BridgehubL2TransactionRequest({
@@ -347,12 +357,29 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.settlementLayer != address(0)) {
-            // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
-                _chainId: s.chainId,
-                _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: _params.expirationTimestamp
-            });
+            address assetRouter = IBridgehub(s.bridgehub).assetRouter();
+            if (_params.request.sender != assetRouter) {
+                // slither-disable-next-line unused-return
+                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+                    _chainId: s.chainId,
+                    _canonicalTxHash: canonicalTxHash,
+                    _expirationTimestamp: _params.expirationTimestamp,
+                    _baseTokenAmount: _params.request.mintValue,
+                    _assetId: bytes32(0),
+                    _amount: 0
+                });
+            } else {
+                IAssetTracker assetTracker = IBridgehub(s.bridgehub).assetTracker();
+                (bytes32 assetId, uint256 amount) = (assetTracker.getBalanceChange(s.chainId));
+                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+                    _chainId: s.chainId,
+                    _canonicalTxHash: canonicalTxHash,
+                    _expirationTimestamp: _params.expirationTimestamp,
+                    _baseTokenAmount: _params.request.mintValue,
+                    _assetId: assetId,
+                    _amount: amount
+                });
+            }
         }
     }
 

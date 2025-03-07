@@ -32,8 +32,8 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyInteropCenter() {
+        // kl todo only IC
         if (msg.sender != address(INTEROP_CENTER) && msg.sender != address(BRIDGE_HUB)) {
-            // kl todo
             revert OnlyInteropCenter(msg.sender, address(INTEROP_CENTER));
         }
         _;

@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.24;
 
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+
 import {IAssetTracker} from "./IAssetTracker.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -9,15 +11,27 @@ import {InteropBundle, InteropCall} from "../../common/Messaging.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance, WithdrawFailed, ReconstructionMismatch, InvalidMessage, InvalidInteropCalldata} from "../../common/L1ContractErrors.sol";
+import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalanceAssetTracker, WithdrawFailed, ReconstructionMismatch, InvalidMessage, InvalidInteropCalldata} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES} from "../../common/Config.sol";
 import {BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../../common/Messaging.sol";
+import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
+import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {NotCurrentSL, SLNotWhitelisted} from "../../bridgehub/L1BridgehubErrors.sol";
 
-contract AssetTracker is IAssetTracker {
+import {TransientPrimitivesLib, tuint256, tbytes32, taddress} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
+
+error AlreadyMigrated();
+
+contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+
+    uint256 public immutable L1_CHAIN_ID;
+
+    IBridgehub public immutable BRIDGE_HUB;
 
     IAssetRouterBase public immutable ASSET_ROUTER;
 
@@ -28,40 +42,76 @@ contract AssetTracker is IAssetTracker {
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
+    /// @dev For minter chains, the balance is 0.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
     mapping(uint256 chainId => mapping(bytes32 assetId => bool isMinter)) public isMinterChain;
+    mapping(bytes32 assetId => uint256 numberOfSettlingMintingChains) public numberOfSettlingMintingChains;
 
     // for now
     mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
-    constructor(address _assetRouter, address _nativeTokenVault, address _messageRoot) {
+    constructor(
+        uint256 _l1ChainId,
+        address _bridgeHub,
+        address _assetRouter,
+        address _nativeTokenVault,
+        address _messageRoot
+    ) {
+        L1_CHAIN_ID = _l1ChainId;
+        BRIDGE_HUB = IBridgehub(_bridgeHub);
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
+    }
+
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyAssetRouter() {
+        if (msg.sender != address(ASSET_ROUTER)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
     }
 
     function initialize() external {
         // TODO: implement
     }
 
-    function migrateChainBalance(uint256 _chainId, bytes32 _assetId) external {
-        // TODO: implement
+    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external {
+        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
+        uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
+        if (settlementLayer != block.chainid) {
+            TransientPrimitivesLib.set(_chainId, uint256(_assetId));
+            TransientPrimitivesLib.set(_chainId + 1, _amount);
+        }
+        if (!isMinterChain[chainToUpdate][_assetId]) {
+            chainBalance[chainToUpdate][_assetId] += _amount;
+        }
     }
 
-    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external {
-        chainBalance[_chainId][_assetId] += _amount;
+    function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount) {
+        // kl todo add only chainId.
+        assetId = bytes32(TransientPrimitivesLib.getUint256(_chainId));
+        amount = TransientPrimitivesLib.getUint256(_chainId + 1);
+        TransientPrimitivesLib.set(_chainId, 0);
+        TransientPrimitivesLib.set(_chainId + 1, 0);
     }
 
     function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external {
-        // Check that the chain has sufficient balance
-        if (chainBalance[_chainId][_assetId] < _amount) {
-            revert InsufficientChainBalance();
+        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
+        uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
+        if (isMinterChain[chainToUpdate][_assetId]) {
+            return;
         }
-        chainBalance[_chainId][_assetId] -= _amount;
+        // Check that the chain has sufficient balance
+        if (chainBalance[chainToUpdate][_assetId] < _amount) {
+            revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
+        }
+        chainBalance[chainToUpdate][_assetId] -= _amount;
     }
 
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
+    // kl todo: estimate the txs size, and how much we can handle on GW.
     function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
         uint256 msgCount = 0;
         DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
@@ -81,6 +131,7 @@ contract AssetTracker is IAssetTracker {
             );
             reconstructedLogsTree.pushMemory(hashedLog);
             if (log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                // its just a log and not a message
                 continue;
             }
             if (log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
@@ -150,8 +201,89 @@ contract AssetTracker is IAssetTracker {
                             AssetHandler Functions
     //////////////////////////////////////////////////////////////*/
 
-    // kl todo add asset handler functions for migrating to GW
+    function bridgeMint(
+        uint256 _originSettlementChainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) external payable requireZeroValue(msg.value) onlyAssetRouter {
+        (
+            uint256 chainId,
+            bytes32 assetId,
+            uint256 amount,
+            bool migratingChainIsMinter,
+            bool isSLStillMinter,
+            uint256 newSLBalance
+        ) = abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
+        chainBalance[chainId][assetId] += amount;
+        isMinterChain[chainId][assetId] = migratingChainIsMinter;
+        numberOfSettlingMintingChains[assetId] += migratingChainIsMinter ? 1 : 0;
+        if (migratingChainIsMinter && block.chainid == L1_CHAIN_ID) {
+            if (!isSLStillMinter) {
+                isMinterChain[_originSettlementChainId][_assetId] = false;
+                chainBalance[_originSettlementChainId][_assetId] = newSLBalance;
+            }
+        }
+    }
 
+    function bridgeBurn(
+        uint256 _settlementChainId,
+        uint256,
+        bytes32 _assetId,
+        address _originalCaller,
+        bytes calldata _data
+    ) external payable requireZeroValue(msg.value) onlyAssetRouter returns (bytes memory _bridgeMintData) {
+        if (!BRIDGE_HUB.whitelistedSettlementLayers(_settlementChainId)) {
+            revert SLNotWhitelisted();
+        }
+        (uint256 chainId, bytes32 assetId) = abi.decode(_data, (uint256, bytes32));
+        // kl todo add assetId check.
+        // if (_assetId != ) {
+        //     revert IncorrectChainAssetId(_assetId, (chainId));
+        // }
+        if (BRIDGE_HUB.settlementLayer(chainId) != _settlementChainId) {
+            revert NotCurrentSL(BRIDGE_HUB.settlementLayer(chainId), _settlementChainId);
+        }
+        bool migratingChainIsMinter = isMinterChain[chainId][assetId];
+        uint256 amount = chainBalance[chainId][assetId];
+        if (amount == 0 && !migratingChainIsMinter) {
+            // we already migrated or there is nothing to migrate
+            revert AlreadyMigrated();
+        }
+        chainBalance[chainId][assetId] = 0;
+        isMinterChain[chainId][assetId] = false;
+        uint256 newSLBalance = 0;
+
+        if (migratingChainIsMinter) {
+            numberOfSettlingMintingChains[assetId] -= 1;
+            if (block.chainid == L1_CHAIN_ID) {
+                isMinterChain[_settlementChainId][assetId] = true;
+            } else {
+                if (numberOfSettlingMintingChains[assetId] == 0) {
+                    // we need to calculate the current balance of this chain, the sum of all the balances on it.
+                    uint256[] memory zkChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
+                    for (uint256 i = 0; i < zkChainIds.length; i++) {
+                        if (BRIDGE_HUB.settlementLayer(zkChainIds[i]) == block.chainid) {
+                            newSLBalance += chainBalance[zkChainIds[i]][assetId];
+                        }
+                    }
+                }
+            }
+        } else if (!isMinterChain[_settlementChainId][assetId] && block.chainid == L1_CHAIN_ID) {
+            // We only care about the chainBalance if the SL is not a minter.
+            // On GW we don't care about the L1 chainBalance.
+            chainBalance[_settlementChainId][assetId] += amount;
+        }
+
+        return
+            abi.encode(
+                chainId,
+                assetId,
+                amount,
+                migratingChainIsMinter,
+                numberOfSettlingMintingChains[assetId] > 0,
+                newSLBalance
+            );
+    }
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/

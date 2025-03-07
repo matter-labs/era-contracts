@@ -3,6 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {OnlyBridgehub, MessageRootNotRegistered} from "contracts/bridgehub/L1BridgehubErrors.sol";
@@ -20,12 +21,17 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 contract MessageRootTest is Test {
-    address bridgeHub;
+    address bridgehub;
     MessageRoot messageRoot;
+    address assetTracker;
 
     function setUp() public {
-        bridgeHub = makeAddr("bridgeHub");
-        messageRoot = new MessageRoot(IBridgehub(bridgeHub));
+        bridgehub = makeAddr("bridgehub");
+        assetTracker = makeAddr("assetTracker");
+        messageRoot = new MessageRoot(IBridgehub(bridgehub));
+        vm.mockCall(address(bridgehub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
+        vm.prank(assetTracker);
+        messageRoot.setAddresses(assetTracker);
     }
 
     function test_init() public {
@@ -38,7 +44,7 @@ contract MessageRootTest is Test {
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
-        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, address(this), bridgeHub));
+        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, address(this), bridgehub));
         messageRoot.addNewChain(alphaChainId);
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
@@ -51,7 +57,7 @@ contract MessageRootTest is Test {
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
         assertFalse(messageRoot.chainRegistered(betaChainId), "beta chain 1");
 
-        vm.prank(bridgeHub);
+        vm.prank(bridgehub);
         vm.expectEmit(true, false, false, false);
         emit MessageRoot.AddedChain(alphaChainId, 0);
         messageRoot.addNewChain(alphaChainId);
@@ -66,12 +72,12 @@ contract MessageRootTest is Test {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub,
+            bridgehub,
             abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
-        vm.prank(alphaChainSender);
+        vm.prank(assetTracker);
         vm.expectRevert(MessageRootNotRegistered.selector);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
@@ -80,15 +86,15 @@ contract MessageRootTest is Test {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub,
+            bridgehub,
             abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
-        vm.prank(bridgeHub);
+        vm.prank(bridgehub);
         messageRoot.addNewChain(alphaChainId);
 
-        vm.prank(alphaChainSender);
+        vm.prank(assetTracker);
         vm.expectEmit(true, false, false, false);
         emit MessageRoot.Preimage(bytes32(0), bytes32(0));
         vm.expectEmit(true, false, false, false);
@@ -100,15 +106,15 @@ contract MessageRootTest is Test {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub,
+            bridgehub,
             abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
-        vm.prank(bridgeHub);
+        vm.prank(bridgehub);
         messageRoot.addNewChain(alphaChainId);
 
-        vm.prank(alphaChainSender);
+        vm.prank(assetTracker);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
 
         messageRoot.updateFullTree();

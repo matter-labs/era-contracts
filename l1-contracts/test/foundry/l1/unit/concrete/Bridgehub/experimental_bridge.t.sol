@@ -44,7 +44,6 @@ contract ExperimentalBridgeTest is Test {
     address weth;
     Bridgehub bridgehub;
     IInteropCenter interopCenter;
-    IAssetTracker assetTracker;
     DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
@@ -61,6 +60,7 @@ contract ExperimentalBridgeTest is Test {
     L1NativeTokenVault ntv;
     IMessageRoot messageRoot;
     L1Nullifier l1Nullifier;
+    AssetTracker assetTracker;
 
     bytes32 tokenAssetId;
 
@@ -124,8 +124,16 @@ contract ExperimentalBridgeTest is Test {
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
 
+        // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTV(address(mockSharedBridge));
-        assetTracker = new AssetTracker(address(mockSharedBridge), address(ntv), address(0));
+        assetTracker = new AssetTracker(
+            block.chainid,
+            address(bridgehub),
+            address(mockSharedBridge),
+            address(ntv),
+            address(0)
+        );
+        ntv.setAssetTracker(address(assetTracker));
 
         mockSecondSharedBridge.setNativeTokenVault(ntv);
 

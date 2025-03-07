@@ -18,7 +18,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, INTEROP_OPERATION_TX_TYPE} from "../common/Config.sol";
-import {L2_MESSENGER} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSENGER, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
@@ -594,6 +594,32 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
+        address zkChain = zkChainMap.get(_chainId);
+        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
+    }
+
+    /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
+    /// @param _chainId the chainId of the chain
+    /// @param _canonicalTxHash the canonical transaction hash
+    /// @param _expirationTimestamp the expiration timestamp for the transaction
+    function forwardTransactionOnGatewayWithBalanceChange(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
+    ) external override onlySettlementLayerRelayedSender {
+        if (L1_CHAIN_ID == block.chainid) {
+            revert NotInGatewayMode();
+        }
+        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
+            _chainId,
+            baseTokenAssetId[_chainId],
+            _baseTokenAmount,
+            false
+        );
+        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
         address zkChain = zkChainMap.get(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }

@@ -52,6 +52,7 @@ contract ExecutorTest is Test {
     DummyEraBaseTokenBridge internal sharedBridge;
     address internal rollupL1DAValidator;
     MessageRoot internal messageRoot;
+    DummyBridgehub dummyBridgehub;
 
     uint256 eraChainId;
 
@@ -147,7 +148,7 @@ contract ExecutorTest is Test {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        dummyBridgehub = new DummyBridgehub();
         address interopCenter = makeAddr("interopCenter");
         messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
         dummyBridgehub.setMessageRoot(address(messageRoot));
@@ -264,6 +265,12 @@ contract ExecutorTest is Test {
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
         admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
+
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(DummyBridgehub.getZKChain.selector),
+            abi.encode(address(diamondProxy))
+        );
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1

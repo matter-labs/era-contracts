@@ -475,6 +475,8 @@ contract DeployL1Script is Script, DeployUtils {
         address contractAddress = deployViaCreate2(
             type(AssetTracker).creationCode,
             abi.encode(
+                config.l1ChainId,
+                addresses.bridgehub.bridgehubProxy,
                 addresses.bridges.sharedBridgeProxy,
                 addresses.vaults.l1NativeTokenVaultProxy,
                 addresses.bridgehub.messageRootProxy
