@@ -120,13 +120,10 @@ function TEST_getCurrentCompressedBytecodeHash() {
 }
 
 function TEST_checkOffset_success() {
-    //offset value := 8534624
-
     checkOffset(8534623)
 }
 
 function TEST_checkOffset_callDataEncodingTooBig() {
-    //offset value := 8534624
     testing_testWillFailWith("calldataEncoding too big")
 
     checkOffset(8534625)
