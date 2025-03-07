@@ -397,6 +397,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         setAddressesBasedOnBridgehub();
 
         addresses.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
+        addresses.protocolUpgradeHandlerImplementation = toml.readAddress(
+            "$.contracts.protocol_upgrade_handler_impl_address"
+        );
+        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
@@ -404,7 +408,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         // gatewayConfig.facetCutsData = abi.encode(new Diamond.DiamondCutData[](0)); // TODO
         // gatewayConfig.additionalForceDeployments = abi.encode(new IL2ContractDeployer.ForceDeployment[](0)); // TODO
 
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = toml.readAddress(
+        /*gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = toml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_implementation_addr"
         );
         gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
@@ -439,7 +443,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
 
-        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
+        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");*/
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
     }
@@ -557,6 +561,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "ctm_deployment_tracker_implementation_addr",
             addresses.bridgehub.ctmDeploymentTrackerImplementation
         );
+        vm.serializeAddress(
+            "bridgehub",
+            "ctm_deployment_tracker_proxy_addr",
+            addresses.bridgehub.ctmDeploymentTrackerProxy
+        );
+        vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
             "message_root_implementation_addr",
@@ -594,6 +604,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "l1_asset_router_implementation_addr",
             addresses.bridges.l1AssetRouterImplementation
         );
+        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", addresses.bridges.l1AssetRouterProxy);
         // TODO: legacy name
         vm.serializeAddress(
             "bridges",
@@ -703,6 +714,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_bytecodes_supplier_addr",
+            addresses.stateTransition.bytecodesSupplier
+        );
+        vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
 
         vm.serializeAddress(
             "deployed_addresses",
@@ -730,6 +747,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
+
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
@@ -738,6 +756,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("root", "contracts_newConfig", contractsConfig);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
+        vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
+        vm.serializeAddress(
+            "root",
+            "protocol_upgrade_handler_impl_address",
+            addresses.protocolUpgradeHandlerImplementation
+        );
 
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
