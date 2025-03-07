@@ -16,7 +16,7 @@
      safeDiv(4, 0, "divByZero")
  }
 
- function TEST_asserts() {
+ function TEST_safeSubAssert() {
      testing_testWillFailWith("willFail")
      safeSub(10, 12, "willFail")
  }
@@ -31,11 +31,8 @@
  function TEST_safeMulAssert() {
      testing_testWillFailWith("overflow")
      let left := shl(129, 1)
-     testing_log("left", left)
      safeMul(left, left, "overflow")
  }
-
- // function TEST_should ignore
 
  function TEST_strLen() {
      testing_assertEq(getStrLen("abcd"), 4, "short string")
@@ -80,16 +77,16 @@
      testing_assertEq(getGasPrice(6, 5), baseFee, "Invalid gas price")
  }
 
-//function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
-//    testing_testWillFailWith(13)
-//    getGasPrice(5, 6)
-//}
+function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
+    testing_testWillFailWith(13)
+    getGasPrice(5, 6)
+}
 
-//function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
-//    testing_testWillFailWith("Base fee greater than max fee")
-//    let baseFee := basefee()
-//    getGasPrice(baseFee, baseFee)
-//}
+function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
+    testing_testWillFailWith("Base fee greater than max fee")
+    let baseFee := basefee()
+    getGasPrice(baseFee, baseFee)
+}
 
 function TEST_getOperatorRefundForTx() {
     let transactionIndex := 10
