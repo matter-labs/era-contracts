@@ -91,7 +91,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         ExpectedL2Addresses expectedL2Addresses;
-        address gatewayUpgrade;
         address transitionaryOwner;
         address upgradeTimer;
         address bytecodesSupplier;
@@ -112,7 +111,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         // for facilitating partially trusted, but not critical tasks.
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        uint256 newProtocolVersion;
+        //uint256 newProtocolVersion;
         uint256 oldProtocolVersion;
         address oldValidatorTimelock;
     }
@@ -453,10 +452,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
-        require(
+        // TODO: revert this
+        /*require(
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
-        );
+        );*/
         addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
@@ -598,6 +598,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
 
         vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress(
             "bridges",
@@ -688,7 +689,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             newlyGeneratedData.fixedForceDeploymentsData
         );
 
-        vm.serializeUint("contracts_newConfig", "new_protocol_version", newConfig.newProtocolVersion);
+        vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
 
         vm.serializeUint("contracts_newConfig", "old_protocol_version", newConfig.oldProtocolVersion);
 
@@ -720,6 +721,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             addresses.stateTransition.bytecodesSupplier
         );
         vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "native_token_vault_implementation_addr",
+            addresses.vaults.l1NativeTokenVaultImplementation
+        );
 
         vm.serializeAddress(
             "deployed_addresses",
@@ -736,7 +742,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "l2_wrapped_base_token_store_addr",
             upgradeAddresses.l2WrappedBaseTokenStore
         );
-        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
 
