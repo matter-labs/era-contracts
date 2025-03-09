@@ -146,7 +146,7 @@ contract DeployL1Script is Script, DeployUtils {
             "L1AssetRouter"
         );
         (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20");
-        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner("BridgedTokenBeacon", config.ownerAddress);
+        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner("BridgedTokenBeacon", /*config.ownerAddress*/addresses.governance);
         (
             addresses.vaults.l1NativeTokenVaultImplementation,
             addresses.vaults.l1NativeTokenVaultProxy
@@ -244,8 +244,8 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
         vm.startBroadcast(msg.sender);
-        IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-        rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2ValidatorAddress(), true);
+        //IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
+        //rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2ValidatorAddress(), true);
         vm.stopBroadcast();
     }
 
@@ -780,7 +780,8 @@ contract DeployL1Script is Script, DeployUtils {
             return
                 abi.encodeCall(
                     L1NativeTokenVault.initialize,
-                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                    (addresses.governance, addresses.bridges.bridgedTokenBeacon)
+                    //(config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
                 );
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             return

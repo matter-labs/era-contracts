@@ -118,7 +118,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
+        // TODO: why this is here - and not using "regular" generateddata.
         bytes fixedForceDeploymentsData;
+        // And this seems to be empty ?? - we already have stuff in config.contracts.diamond_cut_data
         bytes diamondCutData;
         bytes upgradeCutData;
     }
@@ -225,6 +227,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
         getDiamondCutData(addresses.stateTransition); //{isOnGateway: false});
+        newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition); //{isOnGateway: false});
         console.log("UpgradeCutGenerated");
@@ -486,6 +489,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
+        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
@@ -591,6 +595,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
         vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
+        vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
+        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
