@@ -146,7 +146,10 @@ contract DeployL1Script is Script, DeployUtils {
             "L1AssetRouter"
         );
         (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20");
-        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner("BridgedTokenBeacon", /*config.ownerAddress*/addresses.governance);
+        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
+            "BridgedTokenBeacon",
+            /*config.ownerAddress*/ addresses.governance
+        );
         (
             addresses.vaults.l1NativeTokenVaultImplementation,
             addresses.vaults.l1NativeTokenVaultProxy
