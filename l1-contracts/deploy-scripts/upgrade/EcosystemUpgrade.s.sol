@@ -856,8 +856,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         calls = mergeCallsArray(allCalls);
     }
 
-    
-
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
         require(
             addresses.stateTransition.chainTypeManagerProxy != address(0),
@@ -894,8 +892,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         calls[1] = timerCall;
     }
 
-    
-
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
@@ -918,7 +914,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
-    
     function prepareAcceptOwnershipCalls(
         address[] memory addressesToAccept
     ) public virtual returns (Call[] memory calls) {
