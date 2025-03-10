@@ -24,6 +24,7 @@ import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "..
 import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L1TxInititaion} from "./L1TxInititaion.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 import {TransientInterop} from "./TransientInterop.sol";
@@ -32,7 +33,7 @@ import {TransientInterop} from "./TransientInterop.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The InteropCenter contract serves as the primary entry point for L1<->L2 communication,
 /// facilitating interactions between end user and bridges.
-contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, L1TxInititaion {
     /// @notice The bridgehub, responsible for registering chains.
     IBridgehub public immutable BRIDGE_HUB;
 
@@ -586,68 +587,19 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
-    ) external payable override returns (bytes32 canonicalTxHash) {
-        return _requestL2TransactionDirect(msg.sender, _request);
+    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
+        bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_request.chainId);
+        return _requestL2TransactionDirect(_request, tokenAssetId, ETH_TOKEN_ASSET_ID, address(assetRouter));
         // return _requestInteropSingleDirectCall(_request, msg.sender);
     }
 
-    function requestL2TransactionDirectSender(
-        address _sender,
-        L2TransactionRequestDirect calldata _request
-    ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
-        return _requestL2TransactionDirect(_sender, _request);
-        // return _requestInteropSingleDirectCall(_request, _sender);
-    }
-
-    /// @notice the mailbox is called directly after the assetRouter received the deposit
-    /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
-    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
-    function _requestL2TransactionDirect(
-        address _sender,
-        L2TransactionRequestDirect calldata _request
-    ) internal nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        // Note: If the ZK chain with corresponding `chainId` is not yet created,
-        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
-        {
-            bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_request.chainId);
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
-                if (msg.value != _request.mintValue) {
-                    revert MsgValueMismatch(_request.mintValue, msg.value);
-                }
-            } else {
-                if (msg.value != 0) {
-                    revert MsgValueMismatch(0, msg.value);
-                }
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterBase(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
-                _request.chainId,
-                tokenAssetId,
-                _sender,
-                _request.mintValue
-            );
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: _sender,
-                contractL2: _request.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: _request.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: _request.factoryDeps,
-                refundRecipient: address(0)
-            }),
-            _sender
-        );
-    }
+    // function requestL2TransactionDirectSender(
+    //     address _sender,
+    //     L2TransactionRequestDirect calldata _request
+    // ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
+    //     return _requestL2TransactionDirect(_sender, _request);
+    //     // return _requestInteropSingleDirectCall(_request, _sender);
+    // }
 
     /// @notice After depositing funds to the assetRouter, the secondBridge is called
     ///  to return the actual L2 message which is sent to the Mailbox.
@@ -662,109 +614,23 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _request the request for the L2 transaction
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
         // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
         // note claimFailedDeposit does not work with this hack!
-        return _requestL2TransactionTwoBridges(msg.sender, false, _request);
+        bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_request.chainId);
+        return _requestL2TransactionTwoBridges(_request, tokenAssetId, ETH_TOKEN_ASSET_ID, address(assetRouter));
         // return _requestInteropSingleCall(_request, msg.sender);
     }
 
-    function requestL2TransactionTwoBridgesSender(
-        address _sender,
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
-        // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
-        // note claimFailedDeposit does not work with this hack!
-        return _requestL2TransactionTwoBridges(_sender, true, _request);
-        // return _requestInteropSingleCall(_request, _sender);
-    }
-
-    function _requestL2TransactionTwoBridges(
-        address _sender,
-        bool _routeViaBridgehub,
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) internal nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
-            revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
-        }
-
-        {
-            bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_request.chainId);
-            uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
-                if (msg.value != _request.mintValue + _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = _request.mintValue;
-            } else {
-                if (msg.value != _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = 0;
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterBase(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _request.chainId,
-                tokenAssetId,
-                _sender,
-                _request.mintValue
-            );
-        }
-        L2TransactionRequestTwoBridgesInner memory outputRequest;
-        if (_request.secondBridgeAddress == address(assetRouter) || !_routeViaBridgehub) {
-            // slither-disable-next-line arbitrary-send-eth
-            outputRequest = IL1AssetRouter(_request.secondBridgeAddress).bridgehubDeposit{
-                value: _request.secondBridgeValue
-            }(_request.chainId, _sender, _request.l2Value, _request.secondBridgeCalldata);
-        } else {
-            outputRequest = BRIDGE_HUB.routeBridgehubDeposit{value: _request.secondBridgeValue}(
-                RouteBridgehubDepositStruct({
-                    secondBridgeAddress: _request.secondBridgeAddress,
-                    chainId: _request.chainId,
-                    sender: _sender,
-                    l2Value: _request.l2Value,
-                    secondBridgeCalldata: _request.secondBridgeCalldata
-                })
-            );
-        }
-
-        if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
-            revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: _request.secondBridgeAddress,
-                contractL2: outputRequest.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: outputRequest.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: address(0)
-            }),
-            _sender
-        );
-
-        if (_request.secondBridgeAddress == address(assetRouter)) {
-            IAssetRouterBase(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-                _request.chainId,
-                outputRequest.txDataHash,
-                canonicalTxHash
-            );
-        } else {
-            BRIDGE_HUB.routeBridgehubConfirmL2Transaction(
-                _request.secondBridgeAddress,
-                _request.chainId,
-                outputRequest.txDataHash,
-                canonicalTxHash
-            );
-        }
-    }
+    // function requestL2TransactionTwoBridgesSender(
+    //     address _sender,
+    //     L2TransactionRequestTwoBridgesOuter calldata _request
+    // ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
+    //     // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
+    //     // note claimFailedDeposit does not work with this hack!
+    //     return _requestL2TransactionTwoBridges(_sender, true, _request);
+    //     // return _requestInteropSingleCall(_request, _sender);
+    // }
 
     /// @notice This function is used to send a request to the ZK chain.
     /// @param _chainId the chainId of the chain
@@ -774,10 +640,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function _sendRequest(
         uint256 _chainId,
         address _refundRecipient,
-        BridgehubL2TransactionRequest memory _request,
-        address _sender
-    ) internal returns (bytes32 canonicalTxHash) {
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _sender);
+        BridgehubL2TransactionRequest memory _request
+    ) internal override returns (bytes32 canonicalTxHash) {
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         if (zkChain != address(0)) {

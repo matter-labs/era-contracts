@@ -29,6 +29,7 @@ import {NoCTMForAssetId, SettlementLayersMustSettleOnL1, MigrationPaused, AssetI
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
+import {L1TxInititaion} from "./L1TxInititaion.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -37,7 +38,7 @@ import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, AssetHandlerModifiers {
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, AssetHandlerModifiers, L1TxInititaion {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice the asset id of Eth. This is only used on L1.
@@ -140,12 +141,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlyInteropCenter() {
-        if (msg.sender != address(interopCenter)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
+    // modifier onlyInteropCenter() {
+    //     if (msg.sender != address(interopCenter)) {
+    //         revert Unauthorized(msg.sender);
+    //     }
+    //     _;
+    // }
 
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
@@ -289,17 +290,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Chain Type Manager can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the CTM, old chains are not affected
     /// @param _chainTypeManager the state transition manager address to be removed
-    function removeChainTypeManager(address _chainTypeManager) external onlyOwner {
-        if (_chainTypeManager == address(0)) {
-            revert ZeroAddress();
-        }
-        if (!chainTypeManagerIsRegistered[_chainTypeManager]) {
-            revert CTMNotRegistered();
-        }
-        chainTypeManagerIsRegistered[_chainTypeManager] = false;
+    /// kl todo removed this as the BH contract was too big. 
+    // function removeChainTypeManager(address _chainTypeManager) external onlyOwner {
+    //     if (_chainTypeManager == address(0)) {
+    //         revert ZeroAddress();
+    //     }
+    //     if (!chainTypeManagerIsRegistered[_chainTypeManager]) {
+    //         revert CTMNotRegistered();
+    //     }
+    //     chainTypeManagerIsRegistered[_chainTypeManager] = false;
 
-        emit ChainTypeManagerRemoved(_chainTypeManager);
-    }
+    //     emit ChainTypeManagerRemoved(_chainTypeManager);
+    // }
 
     /// @notice asset id can represent any token contract with the appropriate interface/functionality
     /// @param _baseTokenAssetId asset id of base token to be registered
@@ -478,8 +480,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request // todo onlyL1
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
-        return interopCenter.requestL2TransactionDirectSender{value: msg.value}(msg.sender, _request);
-    }
+        bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
+        return _requestL2TransactionDirect(_request, tokenAssetId, ETH_TOKEN_ASSET_ID, address(assetRouter));    }
 
     /// @notice This will be deprecated, use InteropCenter instead
     /// @notice After depositing funds to the assetRouter, the secondBridge is called
@@ -497,22 +499,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         // todo onlyL1
-        return interopCenter.requestL2TransactionTwoBridgesSender{value: msg.value}(msg.sender, _request);
+        bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
+        return _requestL2TransactionTwoBridges(_request, tokenAssetId, ETH_TOKEN_ASSET_ID, address(assetRouter));
     }
 
     /// @notice Used to route BridgehubDeposits to legacy bridges
     /// @param _request the forwarded bridgehubDepositRequest
-    function routeBridgehubDeposit(
-        RouteBridgehubDepositStruct calldata _request
-    ) external payable onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory outputRequest) {
-        // slither-disable-next-line arbitrary-send-eth
-        outputRequest = IAssetRouterBase(_request.secondBridgeAddress).bridgehubDeposit{value: msg.value}(
-            _request.chainId,
-            _request.sender,
-            _request.l2Value,
-            _request.secondBridgeCalldata
-        );
-    }
+    // function routeBridgehubDeposit(
+    //     RouteBridgehubDepositStruct calldata _request
+    // ) external payable onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory outputRequest) {
+    //     // slither-disable-next-line arbitrary-send-eth
+    //     outputRequest = IAssetRouterBase(_request.secondBridgeAddress).bridgehubDeposit{value: msg.value}(
+    //         _request.chainId,
+    //         _request.sender,
+    //         _request.l2Value,
+    //         _request.secondBridgeCalldata
+    //     );
+    // }
 
     /// @notice Used to route confirmL2Transaction to legacy bridges
     /// @notice Used by the InteropCenter to route the bridgehubConfirmL2Transaction.
@@ -520,14 +523,35 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @param _canonicalTxHash The hash of the L1->L2 transaction to confirm the deposit.
-    function routeBridgehubConfirmL2Transaction(
-        address _secondBridgeAddress,
+    // function routeBridgehubConfirmL2Transaction(
+    //     address _secondBridgeAddress,
+    //     uint256 _chainId,
+    //     bytes32 _txDataHash,
+    //     bytes32 _canonicalTxHash
+    // ) external override onlyInteropCenter {
+    //     IAssetRouterBase(_secondBridgeAddress).bridgehubConfirmL2Transaction(_chainId, _txDataHash, _canonicalTxHash);
+    // }
+
+    /// @notice This function is used to send a request to the ZK chain.
+    /// @param _chainId the chainId of the chain
+    /// @param _refundRecipient the refund recipient
+    /// @param _request the request
+    /// @return canonicalTxHash the canonical transaction hash
+    function _sendRequest(
         uint256 _chainId,
-        bytes32 _txDataHash,
-        bytes32 _canonicalTxHash
-    ) external override onlyInteropCenter {
-        IAssetRouterBase(_secondBridgeAddress).bridgehubConfirmL2Transaction(_chainId, _txDataHash, _canonicalTxHash);
+        address _refundRecipient,
+        BridgehubL2TransactionRequest memory _request
+    ) internal override returns (bytes32 canonicalTxHash) {
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
+        _request.refundRecipient = refundRecipient;
+        address zkChain = getZKChain(_chainId);
+        if (zkChain != address(0)) {
+            canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
+        } else {
+            // kl todo revert here
+        }
     }
+
 
     /// @notice This function is used to send a request to the ZK chain.
     /// @param _chainId the chainId of the chain

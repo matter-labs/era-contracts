@@ -47,15 +47,15 @@ interface IInteropCenter {
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
-    function requestL2TransactionDirectSender(
-        address _sender,
-        L2TransactionRequestDirect calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
+    // function requestL2TransactionDirectSender(
+    //     address _sender,
+    //     L2TransactionRequestDirect calldata _request
+    // ) external payable returns (bytes32 canonicalTxHash);
 
-    function requestL2TransactionTwoBridgesSender(
-        address _sender,
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
+    // function requestL2TransactionTwoBridgesSender(
+    //     address _sender,
+    //     L2TransactionRequestTwoBridgesOuter calldata _request
+    // ) external payable returns (bytes32 canonicalTxHash);
 
     function l2TransactionBaseCost(
         uint256 _chainId,

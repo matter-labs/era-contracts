@@ -8,7 +8,6 @@ import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
-import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -191,7 +190,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function addChainTypeManager(address _chainTypeManager) external;
 
-    function removeChainTypeManager(address _chainTypeManager) external;
+    // function removeChainTypeManager(address _chainTypeManager) external;
 
     function addTokenAssetId(bytes32 _baseTokenAssetId) external;
 
@@ -253,14 +252,14 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     // ) external;
 
     
-    function routeBridgehubConfirmL2Transaction(
-        address _secondBridgeAddress,
-        uint256 _chainId,
-        bytes32 _txDataHash,
-        bytes32 _canonicalTxHash
-    ) external;
+    // function routeBridgehubConfirmL2Transaction(
+    //     address _secondBridgeAddress,
+    //     uint256 _chainId,
+    //     bytes32 _txDataHash,
+    //     bytes32 _canonicalTxHash
+    // ) external;
 
-    function routeBridgehubDeposit(
-        RouteBridgehubDepositStruct calldata _request
-    ) external payable returns (L2TransactionRequestTwoBridgesInner memory outputRequest);
+    // function routeBridgehubDeposit(
+    //     RouteBridgehubDepositStruct calldata _request
+    // ) external payable returns (L2TransactionRequestTwoBridgesInner memory outputRequest);
 }
