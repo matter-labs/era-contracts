@@ -49,7 +49,6 @@ struct DeployedAddresses {
     address create2Factory;
     address chainRegistrar;
     address protocolUpgradeHandlerProxy;
-    address protocolUpgradeHandlerImplementation;
 }
 
 // solhint-disable-next-line gas-struct-packing

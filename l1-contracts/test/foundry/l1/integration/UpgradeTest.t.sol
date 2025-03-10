@@ -28,6 +28,7 @@ contract UpgradeIntegrationTest is Test {
         chainUpgrade = new ChainUpgrade();
     }
 
+    // NOTE: this test is currently testing "stage" - as mainnet is not upgraded yet.
     function test_MainnetFork() public {
         console.log("Preparing ecosystem upgrade");
         ecosystemUpgrade.prepareEcosystemUpgrade();

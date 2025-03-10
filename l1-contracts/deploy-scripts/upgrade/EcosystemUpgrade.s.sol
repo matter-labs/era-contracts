@@ -391,9 +391,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         setAddressesBasedOnBridgehub();
 
         addresses.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
-        addresses.protocolUpgradeHandlerImplementation = toml.readAddress(
-            "$.contracts.protocol_upgrade_handler_impl_address"
-        );
         addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
@@ -407,11 +404,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
-        // TODO: revert this
-        /*require(
+        require(
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
-        );*/
+        );
         addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
@@ -710,7 +706,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
-
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
@@ -720,11 +715,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
-        vm.serializeAddress(
-            "root",
-            "protocol_upgrade_handler_impl_address",
-            addresses.protocolUpgradeHandlerImplementation
-        );
 
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
@@ -836,8 +826,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     /// @notice The first step of upgrade. By default it just stops gateway migrations
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](0);
-        //allCalls[0] = preparePauseGatewayMigrationsCall();
-        //allCalls[1] = prepareGatewaySpecificStage1GovernanceCalls();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -851,8 +839,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         allCalls[3] = provideSetNewVersionUpgradeCall();
         allCalls[4] = prepareContractsConfigurationCalls();
         allCalls[5] = prepareUnpauseGatewayMigrationsCall();
-        //allCalls[6] = prepareGovernanceUpgradeTimerCheckCall(); // May be needed for 2-stage upgrades
-
         calls = mergeCallsArray(allCalls);
     }
 
