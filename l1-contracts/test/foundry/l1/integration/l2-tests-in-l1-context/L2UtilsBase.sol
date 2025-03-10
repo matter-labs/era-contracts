@@ -91,15 +91,14 @@ library L2UtilsBase {
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            L2_INTEROP_CENTER_ADDR,
-            L2_ASSET_TRACKER_ADDR
+            L2_INTEROP_CENTER_ADDR
         );
         vm.prank(_args.aliasedOwner);
         vm.chainId(_args.l1ChainId);
         Bridgehub(L2_INTEROP_CENTER_ADDR).initialize(_args.aliasedOwner);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
-        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(L2_ASSET_ROUTER_ADDR);
+        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);

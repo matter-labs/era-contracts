@@ -120,7 +120,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function interopCenter() external view returns (IInteropCenter);
 
-    function assetTracker() external view returns (IAssetTracker);
+    // function assetTracker() external view returns (IAssetTracker);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
@@ -199,8 +199,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _interopCenter,
-        address _assetTracker
+        address _interopCenter
     ) external;
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
@@ -253,15 +252,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     //     uint64 _expirationTimestamp
     // ) external;
 
-    function forwardTransactionOnGatewayWithBalanceChange(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
-    ) external;
-
+    
     function routeBridgehubConfirmL2Transaction(
         address _secondBridgeAddress,
         uint256 _chainId,

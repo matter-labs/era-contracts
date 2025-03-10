@@ -5,11 +5,12 @@ pragma solidity ^0.8.21;
 import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "../common/Messaging.sol";
+import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
-    function setAddresses(address assetRouter) external;
+    function setAddresses(address assetRouter, address assetTracker) external;
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
@@ -95,4 +96,15 @@ interface IInteropCenter {
 
     event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
     event InteropTriggerSent(InteropTrigger _interopTrigger);
+
+    function forwardTransactionOnGatewayWithBalanceChange(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
+    ) external;
+
+    function assetTracker() external view returns (IAssetTracker);
 }

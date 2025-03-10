@@ -24,6 +24,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {MessageRoot, L2Log} from "../../../common/Messaging.sol";
 import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
+import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -574,7 +575,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
                     messageRoot: messageRoots[i]
                 });
-                IAssetTracker assetTracker = IBridgehub(s.bridgehub).assetTracker();
+                IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
                 assetTracker.processLogsAndMessages(processLogsInput);
             }
         }

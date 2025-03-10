@@ -8,6 +8,7 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../../common/libraries/Merkle.sol";
@@ -22,7 +23,7 @@ import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol"
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
@@ -271,14 +272,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub.forwardTransactionOnGatewayWithBalanceChange,
+            IInteropCenter.forwardTransactionOnGatewayWithBalanceChange,
             (_chainId, _canonicalTxHash, _expirationTimestamp, _baseTokenAmount, _assetId, _amount)
         );
         return
             BridgehubL2TransactionRequest({
                 /// There is no sender for the wrapping, we use a virtual address.
                 sender: SETTLEMENT_LAYER_RELAY_SENDER,
-                contractL2: L2_BRIDGEHUB_ADDR,
+                contractL2: L2_INTEROP_CENTER_ADDR,
                 mintValue: 0,
                 l2Value: 0,
                 // Very large amount
@@ -369,7 +370,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                     _amount: 0
                 });
             } else {
-                IAssetTracker assetTracker = IBridgehub(s.bridgehub).assetTracker();
+                IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
                 (bytes32 assetId, uint256 amount) = (assetTracker.getBalanceChange(s.chainId));
                 IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                     _chainId: s.chainId,

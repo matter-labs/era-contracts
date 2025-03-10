@@ -15,7 +15,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {L2_MESSENGER} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSENGER, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, INTEROP_OPERATION_TX_TYPE, INSERT_MSG_ADDRESS_ON_DESTINATION} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest, BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../common/Messaging.sol";
@@ -24,6 +24,7 @@ import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "..
 import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 import {TransientInterop} from "./TransientInterop.sol";
 
@@ -44,6 +45,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
     address public assetRouter;
+
+    IAssetTracker public assetTracker;
 
     /// @notice The number of total sent bundles, used for bundle id generation and uniqueness.
     uint256 public bundleCount;
@@ -111,8 +114,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @notice To set the addresses of some of the ecosystem contracts, only Owner. Not done in initialize, as
     /// the order of deployment is InteropCenter, other contracts, and then we call this.
     /// @param _assetRouter the shared bridge address
-    function setAddresses(address _assetRouter) external onlyOwner {
+    function setAddresses(address _assetRouter, address _assetTracker) external onlyOwner {
         assetRouter = _assetRouter;
+        assetTracker = IAssetTracker(_assetTracker);
     }
     /*//////////////////////////////////////////////////////////////
                         Message interface
@@ -859,6 +863,36 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     ) external view returns (uint256) {
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         return IZKChain(zkChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            GW function
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
+    /// @param _chainId the chainId of the chain
+    /// @param _canonicalTxHash the canonical transaction hash
+    /// @param _expirationTimestamp the expiration timestamp for the transaction
+    function forwardTransactionOnGatewayWithBalanceChange(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
+    ) external override onlySettlementLayerRelayedSender {
+        if (L1_CHAIN_ID == block.chainid) {
+            revert NotInGatewayMode();
+        }
+        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
+            _chainId,
+            BRIDGE_HUB.baseTokenAssetId(_chainId),
+            _baseTokenAmount,
+            false
+        );
+        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
     /*//////////////////////////////////////////////////////////////

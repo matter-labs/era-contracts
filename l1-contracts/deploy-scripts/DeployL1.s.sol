@@ -438,10 +438,9 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridges.sharedBridgeProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
-            addresses.bridgehub.interopCenterProxy,
-            addresses.bridgehub.assetTrackerProxy
+            addresses.bridgehub.interopCenterProxy
         );
-        interopCenter.setAddresses(addresses.bridges.sharedBridgeProxy);
+        interopCenter.setAddresses(addresses.bridges.sharedBridgeProxy, addresses.bridgehub.assetTrackerProxy);
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
         vm.stopBroadcast();
         console.log("SharedBridge registered");

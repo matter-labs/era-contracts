@@ -62,7 +62,6 @@ contract ChainTypeManagerTest is Test {
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
             IMessageRoot(address(0)),
-            address(0),
             address(0)
         );
 

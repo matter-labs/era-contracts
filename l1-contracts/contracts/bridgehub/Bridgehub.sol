@@ -111,8 +111,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice interopCenter used for L1<>L2 communication
     IInteropCenter public override interopCenter;
 
-    IAssetTracker public assetTracker;
-
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
             revert Unauthorized(msg.sender);
@@ -127,13 +125,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlySettlementLayerRelayedSender() {
-        /// There is no sender for the wrapping, we use a virtual address.
-        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
-            revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
-        }
-        _;
-    }
+    // modifier onlySettlementLayerRelayedSender() {
+    //     /// There is no sender for the wrapping, we use a virtual address.
+    //     if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
+    //         revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
+    //     }
+    //     _;
+    // }
 
     modifier onlyAssetRouter() {
         if (msg.sender != assetRouter) {
@@ -230,14 +228,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _interopCenter,
-        address _assetTracker
+        address _interopCenter
     ) external onlyOwner {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         interopCenter = IInteropCenter(_interopCenter);
-        assetTracker = IAssetTracker(_assetTracker);
     }
 
     /// @notice Used to set the legacy chain data for the upgrade.
@@ -592,32 +588,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //     IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     // }
 
-    /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
-    /// @param _chainId the chainId of the chain
-    /// @param _canonicalTxHash the canonical transaction hash
-    /// @param _expirationTimestamp the expiration timestamp for the transaction
-    function forwardTransactionOnGatewayWithBalanceChange(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
-    ) external override onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID == block.chainid) {
-            revert NotInGatewayMode();
-        }
-        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
-            _chainId,
-            baseTokenAssetId[_chainId],
-            _baseTokenAmount,
-            false
-        );
-        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
-        address zkChain = zkChainMap.get(_chainId);
-        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
-    }
-
+    
     /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 message inclusion.

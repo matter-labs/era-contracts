@@ -120,8 +120,7 @@ library L2Utils {
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            L2_INTEROP_CENTER_ADDR,
-            L2_ASSET_TRACKER_ADDR
+            L2_INTEROP_CENTER_ADDR
         );
     }
 
@@ -136,7 +135,7 @@ library L2Utils {
         );
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
-        interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR);
+        interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
     }
 
     function forceDeployInteropAccount(SystemContractsArgs memory _args) internal {

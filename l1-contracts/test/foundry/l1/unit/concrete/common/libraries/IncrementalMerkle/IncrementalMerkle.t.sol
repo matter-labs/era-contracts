@@ -160,7 +160,6 @@ contract IncrementalMerkleTestTest is Test {
         merkleTestMemory.extendUntilEndMemory();
         // bytes32 aggregatedRootHash = hex"e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944";
 
-
         console.logBytes32(merkleTestMemory.rootMemory());
         // console.logBytes32(keccak256(bytes.concat(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, aggregatedRootHash)));
         // console.logBytes32(keccak256(bytes.concat(merkleTestMemory.rootMemory(), aggregatedRootHash)));

@@ -644,8 +644,7 @@ contract EcosystemUpgrade is Script {
                     addresses.bridges.sharedBridgeProxy,
                     CTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
                     MessageRoot(addresses.bridgehub.messageRootProxy),
-                    addresses.bridgehub.interopCenterProxy,
-                    addresses.bridgehub.assetTrackerProxy
+                    addresses.bridgehub.interopCenterProxy
                 )
             ),
             value: 0
