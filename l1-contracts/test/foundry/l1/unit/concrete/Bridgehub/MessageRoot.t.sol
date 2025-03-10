@@ -121,4 +121,37 @@ contract MessageRootTest is Test {
 
         assertEq(messageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
+
+    function test_addChainBatchRootWithRealData() public {
+        address alphaChainSender = makeAddr("alphaChainSender");
+        uint256 alphaChainId = 271; //uint256(uint160(makeAddr("alphaChainId")));
+        vm.mockCall(
+            bridgehub,
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encode(alphaChainSender)
+        );
+
+        vm.prank(bridgehub);
+        messageRoot.addNewChain(alphaChainId);
+
+        vm.prank(assetTracker);
+        // vm.expectEmit(true, false, false, false);
+        // emit MessageRoot.Preimage(bytes32(0), bytes32(0));
+        // vm.expectEmit(true, false, false, false);
+        // emit MessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        messageRoot.addChainBatchRoot(
+            alphaChainId,
+            1,
+            bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
+        );
+        // vm.prank(assetTracker);
+        // messageRoot.addChainBatchRoot(alphaChainId, 2, bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"));
+        vm.prank(assetTracker);
+        messageRoot.addChainBatchRoot(
+            alphaChainId,
+            3,
+            bytes32(hex"8d1ced168691d5e8a2dc778350a2c40a2714cc7d64bff5b8da40a96c47dc5f3e")
+        );
+        messageRoot.getChainRoot(alphaChainId);
+    }
 }

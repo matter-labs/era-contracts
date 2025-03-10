@@ -143,7 +143,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.erc20BridgeProxy = toml.readAddress("$.deployed_addresses.erc20_bridge_proxy_addr");
 
         ecosystem.bridgehub = IChainTypeManager(config.stateTransitionProxy).BRIDGE_HUB();
-        ecosystem.l1SharedBridgeProxy = address(Bridgehub(ecosystem.bridgehub).sharedBridge());
+        ecosystem.l1SharedBridgeProxy = address(Bridgehub(ecosystem.bridgehub).assetRouter());
         ecosystem.governance = Bridgehub(ecosystem.bridgehub).owner();
 
         config.chainId = toml.readUint("$.chain.chain_id");

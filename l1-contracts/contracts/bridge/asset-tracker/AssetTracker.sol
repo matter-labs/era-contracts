@@ -15,7 +15,7 @@ import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, In
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES} from "../../common/Config.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../../common/Messaging.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
@@ -117,8 +117,8 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
             .Bytes32PushTree(
                 0,
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
                 0,
                 0
             ); // todo 100 to const
@@ -181,16 +181,11 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
 
             // kl todo add change minter role here
         }
-        bytes32 localLogsRootHash;
-        if (_processLogsInputs.logs.length == 0) {
-            localLogsRootHash = L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH;
-        } else {
-            localLogsRootHash = reconstructedLogsTree.rootMemory();
-        }
+        reconstructedLogsTree.extendUntilEndMemory();
+        bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
-            // emit ReconstructionMismatch(localLogsRootHash, _processLogsInputs.messageRoot);
             revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
         }
 

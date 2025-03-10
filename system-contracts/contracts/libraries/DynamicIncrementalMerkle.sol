@@ -186,6 +186,7 @@ library DynamicIncrementalMerkle {
             // If so, next time we will come from the right, so we need to save it
             if (isLeft && !updatedSides) {
                 self._sides[i] = currentLevelHash;
+                // Note: in order to update the sides we should stop here. We continue in order to store the new root.
                 updatedSides = true;
             }
 
@@ -199,9 +200,45 @@ library DynamicIncrementalMerkle {
             // Update node index
             currentIndex >>= 1;
         }
-
+        // Note this is overloading the sides array with the root.
         self._sides[levels] = currentLevelHash;
         return (index, currentLevelHash);
+    }
+    /**
+     * @dev Extend until end.
+     */
+
+    /// @dev here we can extend the array, so the depth is not predetermined.
+    function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
+        bytes32 currentZero = self._zeros[self._zeros.length - 1];
+        if (self._nextLeafIndex == 0) {
+            self._sides[0] = currentZero;
+        }
+        bytes32 currentSide = self._sides[self._sides.length - 1];
+        for (uint256 i = self._sides.length; i < finalDepth; ++i) {
+            currentSide = Merkle.efficientHash(currentSide, currentZero);
+            currentZero = Merkle.efficientHash(currentZero, currentZero);
+            // at i
+            self._zeros.push(currentZero);
+            self._sides.push(currentSide);
+        }
+    }
+
+    /// @dev
+    function extendUntilEndMemory(Bytes32PushTree memory self) internal pure {
+        bytes32 currentZero = self._zeros[self._zerosLengthMemory - 1];
+        if (self._nextLeafIndex == 0) {
+            self._sides[0] = currentZero;
+        }
+        bytes32 currentSide = self._sides[self._sidesLengthMemory - 1];
+        for (uint256 i = self._sidesLengthMemory; i < self._sides.length; ++i) {
+            currentSide = Merkle.efficientHash(currentSide, currentZero);
+            currentZero = Merkle.efficientHash(currentZero, currentZero);
+            self._zeros[i] = currentZero;
+            self._sides[i] = currentSide;
+        }
+        self._sidesLengthMemory = self._sides.length;
+        self._zerosLengthMemory = self._zeros.length;
     }
 
     /**
@@ -212,6 +249,7 @@ library DynamicIncrementalMerkle {
     }
 
     function rootMemory(Bytes32PushTree memory self) internal view returns (bytes32) {
+        // note the last element of the sides array is the root, and is not really a side.
         return self._sides[self._sidesLengthMemory - 1];
     }
 

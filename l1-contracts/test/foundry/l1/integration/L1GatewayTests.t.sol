@@ -183,7 +183,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         }
 
         address chainAdmin = IZKChain(bridgehub.getZKChain(migratingChainId)).getAdmin();
-        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.sharedBridge()));
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
         bytes32 l2TxHash = keccak256("l2TxHash");
         uint256 l2BatchNumber = 5;
         uint256 l2MessageIndex = 0;
@@ -311,7 +311,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
+        bridgehub.forwardTransactionOnGatewayWithBalanceChange(migratingChainId, bytes32(0), 0, 0, 0, 0);
         vm.stopBroadcast();
     }
 

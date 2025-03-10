@@ -114,7 +114,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (address);
+    // function sharedBridge() external view returns (address);
 
     function messageRoot() external view returns (IMessageRoot);
 
@@ -243,15 +243,15 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     /// @notice return the ZK chain contract for a chainId
     /// @dev It is a legacy method. Do not use!
-    function getHyperchain(uint256 _chainId) external view returns (address);
+    // function getHyperchain(uint256 _chainId) external view returns (address);
 
     function registerLegacyChain(uint256 _chainId) external;
 
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
+    // function forwardTransactionOnGateway(
+    //     uint256 _chainId,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
 
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,

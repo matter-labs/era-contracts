@@ -599,7 +599,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -653,7 +653,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -740,7 +740,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -800,7 +800,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 

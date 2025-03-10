@@ -238,7 +238,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
         // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
         // is compatible with the legacy ones.
-        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
+        if (BRIDGE_HUB.getZKChain(chainId) != _chain) {
             // It is not a hyperchain, so we can return `false` here.
             return false;
         }
@@ -295,7 +295,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        address sharedBridge = BRIDGE_HUB.sharedBridge();
+        address sharedBridge = BRIDGE_HUB.assetRouter();
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.

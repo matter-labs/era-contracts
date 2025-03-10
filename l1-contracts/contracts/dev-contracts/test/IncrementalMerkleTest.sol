@@ -33,7 +33,19 @@ contract IncrementalMerkleTest {
         return tree._sides[_index];
     }
 
+    function sidesLength() external view returns (uint256) {
+        return tree._sides.length;
+    }
+
     function zeros(uint256 _index) external view returns (bytes32) {
         return tree._zeros[_index];
+    }
+
+    function zerosLength() external view returns (uint256) {
+        return tree._zeros.length;
+    }
+
+    function extendUntilEnd(uint256 _finalDepth) external {
+        tree.extendUntilEnd(_finalDepth);
     }
 }

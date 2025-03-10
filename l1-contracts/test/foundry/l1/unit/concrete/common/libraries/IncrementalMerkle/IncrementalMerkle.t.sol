@@ -21,7 +21,7 @@ contract IncrementalMerkleTestTest is Test {
 
     function setUpMemory() public returns (DynamicIncrementalMerkle.Bytes32PushTree memory merkleTestMemory) {
         // merkleTestMemory = DynamicIncrementalMerkle;
-        merkleTestMemory = DynamicIncrementalMerkle.Bytes32PushTree(0, new bytes32[](100), new bytes32[](100), 0, 0);
+        merkleTestMemory = DynamicIncrementalMerkle.Bytes32PushTree(0, new bytes32[](14), new bytes32[](14), 0, 0);
         merkleTestMemory.setupMemory(zero);
     }
 
@@ -33,6 +33,15 @@ contract IncrementalMerkleTestTest is Test {
 
         assertEq(merkleTestMemory.heightMemory(), 0);
         assertEq(merkleTestMemory._nextLeafIndex, 0);
+    }
+
+    function testExtend() public {
+        DynamicIncrementalMerkle.Bytes32PushTree memory merkleTestMemory = setUpMemory();
+
+        merkleTest.extendUntilEnd(14);
+        merkleTestMemory.extendUntilEndMemory();
+
+        assertEq(merkleTest.sidesLength(), 14);
     }
 
     function testSingleElement() public {
@@ -135,68 +144,26 @@ contract IncrementalMerkleTestTest is Test {
     }
 
     function testFromServer() public {
-        DynamicIncrementalMerkle.Bytes32PushTree memory merkleTestMemory = setUpMemory();
-        // [0x54455d451af06b0282cfdea6a5a2be64accc7f74b3cdeebc45e16dd5fe7f1228, 0x3410756c0edc53d1d17d87a13e5a99d51be37981ef9d081f8edbed39aa45897e, 0x5efbf9df485ac6b910823e713bc4094077a4c490dd1218b58e057eeffa498620, 0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21]        // merkleTestMemory.pushMemory(bytes32(uint256(2)));
-        merkleTestMemory.pushMemory(bytes32(hex"54455d451af06b0282cfdea6a5a2be64accc7f74b3cdeebc45e16dd5fe7f1228"));
-        console.logBytes32(merkleTestMemory._sides[0]);
-        console.logBytes32(merkleTestMemory._sides[1]);
-        console.logBytes32(merkleTestMemory._sides[2]);
-        console.logBytes32(merkleTestMemory._sides[3]);
+        uint256 length = 15;
+        DynamicIncrementalMerkle.Bytes32PushTree memory merkleTestMemory = DynamicIncrementalMerkle.Bytes32PushTree(
+            0,
+            new bytes32[](length),
+            new bytes32[](length),
+            0,
+            0
+        );
+        merkleTestMemory.setupMemory(zero);
+        merkleTestMemory.pushMemory(bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd"));
+        merkleTestMemory.pushMemory(bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"));
+        merkleTestMemory.pushMemory(bytes32(hex"8d1ced168691d5e8a2dc778350a2c40a2714cc7d64bff5b8da40a96c47dc5f3e"));
 
-        merkleTestMemory.pushMemory(bytes32(hex"3410756c0edc53d1d17d87a13e5a99d51be37981ef9d081f8edbed39aa45897e"));
-        console.log("sides");
-        console.logBytes32(merkleTestMemory._sides[0]);
-        console.logBytes32(merkleTestMemory._sides[1]);
-        console.logBytes32(merkleTestMemory._sides[2]);
-        console.logBytes32(merkleTestMemory._sides[3]);
-        merkleTestMemory.pushMemory(bytes32(hex"5efbf9df485ac6b910823e713bc4094077a4c490dd1218b58e057eeffa498620"));
-        console.log("sides");
-        console.logBytes32(merkleTestMemory._sides[0]);
-        console.logBytes32(merkleTestMemory._sides[1]);
-        console.logBytes32(merkleTestMemory._sides[2]);
-        console.logBytes32(merkleTestMemory._sides[3]);
-        merkleTestMemory.pushMemory(bytes32(hex"46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21"));
-        console.log("sides");
-        console.logBytes32(merkleTestMemory._sides[0]);
-        console.logBytes32(merkleTestMemory._sides[1]);
-        console.logBytes32(merkleTestMemory._sides[2]);
-        console.logBytes32(merkleTestMemory._sides[3]);
-        // merkleTestMemory.pushMemory(bytes32(hex"b1eb8605c1e1fb17809421a68d9ad15afed2207c7f12670a4dcfd6ee8260d2de"));
-        // console.log("sides");
-        // console.logBytes32(merkleTestMemory._sides[0]);
-        // console.logBytes32(merkleTestMemory._sides[1]);
-        // console.logBytes32(merkleTestMemory._sides[2]);
-        // console.logBytes32(merkleTestMemory._sides[3]);
-        // merkleTestMemory.pushMemory(bytes32(hex"72167a4002ac98b9768b5b127c3ef64ad44500e9a8b2fa6875a870c389461662"));
-        // console.log("sides");
-        // console.logBytes32(merkleTestMemory._sides[0]);
-        // console.logBytes32(merkleTestMemory._sides[1]);
-        // console.logBytes32(merkleTestMemory._sides[2]);
-        // console.logBytes32(merkleTestMemory._sides[3]);
-        // merkleTestMemory.pushMemory(bytes32(hex"5831859a651314f9898b77e8d336aeab3a6134c6138bb9227163594687ed7192"));
-        // console.log("sides");
-        // console.logBytes32(merkleTestMemory._sides[0]);
-        // console.logBytes32(merkleTestMemory._sides[1]);
-        // console.logBytes32(merkleTestMemory._sides[2]);
-        // console.logBytes32(merkleTestMemory._sides[3]);
-        // merkleTestMemory.pushMemory(bytes32(hex"7c5e3bcaaaa32ddc3954d3836cad66c26e674d59a5e8fa2b3a91421510ea2ecc"));
-        // console.log("sides");
-        // console.logBytes32(merkleTestMemory._sides[0]);
-        // console.logBytes32(merkleTestMemory._sides[1]);
-        // console.logBytes32(merkleTestMemory._sides[2]);
-        // console.logBytes32(merkleTestMemory._sides[3]);
-        console.log("zeros");
-        console.logBytes32(merkleTestMemory._zeros[0]);
-        console.logBytes32(merkleTestMemory._zeros[1]);
-        console.logBytes32(merkleTestMemory._zeros[2]);
-        console.logBytes32(merkleTestMemory._zeros[3]);
-        console.logBytes32(merkleTestMemory._zeros[4]);
+        merkleTestMemory.extendUntilEndMemory();
+        // bytes32 aggregatedRootHash = hex"e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944";
 
-        console.log("roots");
-        bytes32 aggregatedRootHash = hex"e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944";
+
         console.logBytes32(merkleTestMemory.rootMemory());
-        console.logBytes32(keccak256(bytes.concat(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, aggregatedRootHash)));
-        console.logBytes32(keccak256(bytes.concat(merkleTestMemory.rootMemory(), aggregatedRootHash)));
+        // console.logBytes32(keccak256(bytes.concat(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, aggregatedRootHash)));
+        // console.logBytes32(keccak256(bytes.concat(merkleTestMemory.rootMemory(), aggregatedRootHash)));
 
         merkleTestMemory.rootMemory();
     }

@@ -148,6 +148,8 @@ enum SystemLogKey {
 /// While formally a tree of any length is acceptable, the node supports only a constant length of 16384 leaves.
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
 
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;
+
 /// @dev The length of the derived key in bytes inside compressed state diffs.
 uint256 constant DERIVED_KEY_LENGTH = 32;
 /// @dev The length of the enum index in bytes inside compressed state diffs.

@@ -198,6 +198,7 @@ struct InteropTrigger {
     // kl todo add paymaster things here.
 }
 
+/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
 struct MessageInclusionProof {
     uint256 chainId;
     uint256 l1BatchNumber;

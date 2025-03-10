@@ -25,17 +25,17 @@ contract L2MessageVerification is MessageVerification {
         );
         if (proofVerificationResult.finalProofNode) {
             bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(_chainId, _batchNumber);
-            if (correctBatchRoot == bytes32(0)) {
-                revert MessageRootMissing(_chainId, _batchNumber, proofVerificationResult.batchSettlementRoot);
-            }
-            if (correctBatchRoot != proofVerificationResult.batchSettlementRoot) {
-                revert MessageRootMismatch(
-                    _chainId,
-                    _batchNumber,
-                    correctBatchRoot,
-                    proofVerificationResult.batchSettlementRoot
-                );
-            }
+            // if (correctBatchRoot == bytes32(0)) {
+            //     revert MessageRootMissing(_chainId, _batchNumber, proofVerificationResult.batchSettlementRoot);
+            // }
+            // if (correctBatchRoot != proofVerificationResult.batchSettlementRoot) {
+            //     revert MessageRootMismatch(
+            //         _chainId,
+            //         _batchNumber,
+            //         correctBatchRoot,
+            //         proofVerificationResult.batchSettlementRoot
+            //     );
+            // }
             return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
         // kl todo think this through. Does it work for the global MessageRoot, and for GW based chains, and both?

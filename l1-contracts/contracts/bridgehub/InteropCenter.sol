@@ -146,7 +146,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external override {
-        // console.log("addCallToBundle external", msg.sender);
         _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
     }
 

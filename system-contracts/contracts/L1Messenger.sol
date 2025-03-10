@@ -8,7 +8,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_STORAGE} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_STORAGE} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
@@ -246,10 +246,10 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         bytes32 inputLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         bytes32 storedLogsRootHash;
         if (numberOfLogsToProcess == 0) {
-            storedLogsRootHash = L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH;
-        } else {
-            storedLogsRootHash = logsTree.root();
+            logsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         }
+        logsTree.extendUntilEnd(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
+        storedLogsRootHash = logsTree.root();
         if (inputLogsRootHash != storedLogsRootHash) {
             // revert ReconstructionMismatch(PubdataField.InputLogsHash, storedLogsRootHash, inputLogsRootHash);
             // kl todo
@@ -307,8 +307,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
             .Bytes32PushTree(
                 0,
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
                 0,
                 0
             ); // todo 100 to const
@@ -321,12 +321,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             reconstructedLogsTree.pushMemory(hashedLog);
         }
         // bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
-        bytes32 localLogsRootHash;
-        if (numberOfLogsToProcess == 0) {
-            localLogsRootHash = L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH;
-        } else {
-            localLogsRootHash = reconstructedLogsTree.rootMemory();
-        }
+        reconstructedLogsTree.extendUntilEndMemory();
+        bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
         // if (localLogsRootHash != inputLogsRootHash) {
         //     revert ReconstructionMismatch(PubdataField.LogsHash, inputLogsRootHash, localLogsRootHash);
         // }

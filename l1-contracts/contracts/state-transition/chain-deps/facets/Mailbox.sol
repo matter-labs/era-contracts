@@ -358,7 +358,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.settlementLayer != address(0)) {
             address assetRouter = IBridgehub(s.bridgehub).assetRouter();
-            if (_params.request.sender != assetRouter) {
+            if (_params.request.sender != AddressAliasHelper.applyL1ToL2Alias(assetRouter)) {
                 // slither-disable-next-line unused-return
                 IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                     _chainId: s.chainId,
@@ -486,7 +486,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        address sharedBridge = IBridgehub(s.bridgehub).sharedBridge();
+        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
         IL1AssetRouter(sharedBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -523,7 +523,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 refundRecipient: _refundRecipient
             })
         );
-        address sharedBridge = IBridgehub(s.bridgehub).sharedBridge();
+        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
         IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,

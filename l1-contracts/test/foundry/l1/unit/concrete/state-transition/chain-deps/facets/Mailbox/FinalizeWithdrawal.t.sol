@@ -23,7 +23,7 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
         L1AssetRouter = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(L1AssetRouter);
 
-        vm.mockCall(bridgehub, abi.encodeCall(Bridgehub.sharedBridge, ()), abi.encode(baseTokenBridgeAddress));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehub.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
 
         proof = new bytes32[](0);
         message = "message";
