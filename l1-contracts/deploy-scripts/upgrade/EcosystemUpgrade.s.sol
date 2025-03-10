@@ -118,9 +118,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
-        // TODO: why this is here - and not using "regular" generateddata.
         bytes fixedForceDeploymentsData;
-        // And this seems to be empty ?? - we already have stuff in config.contracts.diamond_cut_data
         bytes diamondCutData;
         bytes upgradeCutData;
     }
