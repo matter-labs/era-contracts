@@ -148,13 +148,6 @@ contract DefaultAccount is IAccount {
             (, bytes memory executionBundle) = abi.decode(_transaction.data, (bytes, bytes));
             (, bytes memory executionProof) = abi.decode(_transaction.signature, (bytes, bytes));
             MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
-            // MessageInclusionProof memory executionInclusionProof = MessageInclusionProof(
-            //     0,
-            //     0,
-            //     0,
-            //     L2Message(0, address(0), new bytes(0)),
-            //     new bytes32[](0)
-            // );
             L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof, false);
             return;
         }
@@ -239,13 +232,6 @@ contract DefaultAccount is IAccount {
             (bytes memory paymasterBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
             (bytes memory paymasterProof, ) = abi.decode(_transaction.signature, (bytes, bytes));
             MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
-            // MessageInclusionProof memory paymasterInclusionProof = MessageInclusionProof(
-            //     0,
-            //     0,
-            //     0,
-            //     L2Message(0, address(0), new bytes(0)),
-            //     new bytes32[](0)
-            // );
             L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof, true);
         }
         bool success = _transaction.payToTheBootloader();
