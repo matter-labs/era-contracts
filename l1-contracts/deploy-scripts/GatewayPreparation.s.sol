@@ -159,7 +159,6 @@ contract GatewayPreparation is Script {
         saveOutput(output);
     }
 
-
     function notifyServerMigrationToGateway(
         address serverNotifier,
         address chainAdmin,

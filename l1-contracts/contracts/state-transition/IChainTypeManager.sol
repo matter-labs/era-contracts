@@ -16,13 +16,13 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @param protocolVersion The initial protocol version on the newly deployed chain
 /// @param serverNotifier The address that serves as server notifier
 // solhint-disable-next-line gas-struct-packing
-    struct ChainTypeManagerInitializeData {
-        address owner;
-        address validatorTimelock;
-        ChainCreationParams chainCreationParams;
-        uint256 protocolVersion;
-        address serverNotifier;
-    }
+struct ChainTypeManagerInitializeData {
+    address owner;
+    address validatorTimelock;
+    ChainCreationParams chainCreationParams;
+    uint256 protocolVersion;
+    address serverNotifier;
+}
 
 /// @notice The struct that contains the fields that define how a new chain should be created
 /// within this CTM.
@@ -32,14 +32,14 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
 // solhint-disable-next-line gas-struct-packing
-    struct ChainCreationParams {
-        address genesisUpgrade;
-        bytes32 genesisBatchHash;
-        uint64 genesisIndexRepeatedStorageChanges;
-        bytes32 genesisBatchCommitment;
-        Diamond.DiamondCutData diamondCut;
-        bytes forceDeploymentsData;
-    }
+struct ChainCreationParams {
+    address genesisUpgrade;
+    bytes32 genesisBatchHash;
+    uint64 genesisIndexRepeatedStorageChanges;
+    bytes32 genesisBatchCommitment;
+    Diamond.DiamondCutData diamondCut;
+    bytes forceDeploymentsData;
+}
 
 interface IChainTypeManager {
     /// @dev Emitted when a new ZKChain is added

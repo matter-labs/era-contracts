@@ -15,27 +15,26 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
-    struct FixedForceDeploymentsData {
-        uint256 l1ChainId;
-        uint256 eraChainId;
-        address l1AssetRouter;
-        bytes32 l2TokenProxyBytecodeHash;
-        address aliasedL1Governance;
-        uint256 maxNumberOfZKChains;
-        bytes32 bridgehubBytecodeHash;
-        bytes32 l2AssetRouterBytecodeHash;
-        bytes32 l2NtvBytecodeHash;
-        bytes32 messageRootBytecodeHash;
-        address l2SharedBridgeLegacyImpl;
-        address l2BridgedStandardERC20Impl;
-        // The forced beacon address. It is needed only for internal testing.
-        // MUST be equal to 0 in production.
-        // It will be the job of the governance to ensure that this value is set correctly.
-        address dangerousTestOnlyForcedBeacon;
-    }
+struct FixedForceDeploymentsData {
+    uint256 l1ChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedL1Governance;
+    uint256 maxNumberOfZKChains;
+    bytes32 bridgehubBytecodeHash;
+    bytes32 l2AssetRouterBytecodeHash;
+    bytes32 l2NtvBytecodeHash;
+    bytes32 messageRootBytecodeHash;
+    address l2SharedBridgeLegacyImpl;
+    address l2BridgedStandardERC20Impl;
+    // The forced beacon address. It is needed only for internal testing.
+    // MUST be equal to 0 in production.
+    // It will be the job of the governance to ensure that this value is set correctly.
+    address dangerousTestOnlyForcedBeacon;
+}
 
 // solhint-disable-next-line gas-struct-packing
-
 struct DeployedAddresses {
     BridgehubDeployedAddresses bridgehub;
     StateTransitionDeployedAddresses stateTransition;
@@ -50,95 +49,94 @@ struct DeployedAddresses {
     address create2Factory;
     address chainRegistrar;
     address protocolUpgradeHandlerProxy;
-    address serverNotifier;
 }
 
 // solhint-disable-next-line gas-struct-packing
-    struct L1NativeTokenVaultAddresses {
-        address l1NativeTokenVaultImplementation;
-        address l1NativeTokenVaultProxy;
-    }
+struct L1NativeTokenVaultAddresses {
+    address l1NativeTokenVaultImplementation;
+    address l1NativeTokenVaultProxy;
+}
 
-    struct DataAvailabilityDeployedAddresses {
-        address rollupDAManager;
-        address l1RollupDAValidator;
-        address noDAValidiumL1DAValidator;
-        address availBridge;
-        address availL1DAValidator;
-    }
-
-// solhint-disable-next-line gas-struct-packing
-    struct BridgehubDeployedAddresses {
-        address bridgehubImplementation;
-        address bridgehubProxy;
-        address ctmDeploymentTrackerImplementation;
-        address ctmDeploymentTrackerProxy;
-        address messageRootImplementation;
-        address messageRootProxy;
-    }
+struct DataAvailabilityDeployedAddresses {
+    address rollupDAManager;
+    address l1RollupDAValidator;
+    address noDAValidiumL1DAValidator;
+    address availBridge;
+    address availL1DAValidator;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct BridgesDeployedAddresses {
-        address erc20BridgeImplementation;
-        address erc20BridgeProxy;
-        address l1AssetRouterImplementation;
-        address l1AssetRouterProxy;
-        address l1NullifierImplementation;
-        address l1NullifierProxy;
-        address bridgedStandardERC20Implementation;
-        address bridgedTokenBeacon;
-    }
+struct BridgehubDeployedAddresses {
+    address bridgehubImplementation;
+    address bridgehubProxy;
+    address ctmDeploymentTrackerImplementation;
+    address ctmDeploymentTrackerProxy;
+    address messageRootImplementation;
+    address messageRootProxy;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct Config {
-        uint256 l1ChainId;
-        address deployerAddress;
-        uint256 eraChainId;
-        address ownerAddress;
-        bool testnetVerifier;
-        bool supportL2LegacySharedBridgeTest;
-        ContractsConfig contracts;
-        TokensConfig tokens;
-    }
+struct BridgesDeployedAddresses {
+    address erc20BridgeImplementation;
+    address erc20BridgeProxy;
+    address l1AssetRouterImplementation;
+    address l1AssetRouterProxy;
+    address l1NullifierImplementation;
+    address l1NullifierProxy;
+    address bridgedStandardERC20Implementation;
+    address bridgedTokenBeacon;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct ContractsConfig {
-        bytes32 create2FactorySalt;
-        address create2FactoryAddr;
-        address multicall3Addr;
-        uint256 validatorTimelockExecutionDelay;
-        bytes32 genesisRoot;
-        uint256 genesisRollupLeafIndex;
-        bytes32 genesisBatchCommitment;
-        uint256 latestProtocolVersion;
-        bytes32 recursionNodeLevelVkHash;
-        bytes32 recursionLeafLevelVkHash;
-        bytes32 recursionCircuitsSetVksHash;
-        uint256 priorityTxMaxGasLimit;
-        PubdataPricingMode diamondInitPubdataPricingMode;
-        uint256 diamondInitBatchOverheadL1Gas;
-        uint256 diamondInitMaxPubdataPerBatch;
-        uint256 diamondInitMaxL2GasPerBatch;
-        uint256 diamondInitPriorityTxMaxPubdata;
-        uint256 diamondInitMinimalL2GasPrice;
-        address governanceSecurityCouncilAddress;
-        uint256 governanceMinDelay;
-        uint256 maxNumberOfChains;
-        bytes diamondCutData;
-        bytes32 bootloaderHash;
-        bytes32 defaultAAHash;
-        bytes32 evmEmulatorHash;
-        address availL1DAValidator;
-    }
-
-    struct TokensConfig {
-        address tokenWethAddress;
-    }
+struct Config {
+    uint256 l1ChainId;
+    address deployerAddress;
+    uint256 eraChainId;
+    address ownerAddress;
+    bool testnetVerifier;
+    bool supportL2LegacySharedBridgeTest;
+    ContractsConfig contracts;
+    TokensConfig tokens;
+}
 
 // solhint-disable-next-line gas-struct-packing
-    struct GeneratedData {
-        bytes forceDeploymentsData;
-    }
+struct ContractsConfig {
+    bytes32 create2FactorySalt;
+    address create2FactoryAddr;
+    address multicall3Addr;
+    uint256 validatorTimelockExecutionDelay;
+    bytes32 genesisRoot;
+    uint256 genesisRollupLeafIndex;
+    bytes32 genesisBatchCommitment;
+    uint256 latestProtocolVersion;
+    bytes32 recursionNodeLevelVkHash;
+    bytes32 recursionLeafLevelVkHash;
+    bytes32 recursionCircuitsSetVksHash;
+    uint256 priorityTxMaxGasLimit;
+    PubdataPricingMode diamondInitPubdataPricingMode;
+    uint256 diamondInitBatchOverheadL1Gas;
+    uint256 diamondInitMaxPubdataPerBatch;
+    uint256 diamondInitMaxL2GasPerBatch;
+    uint256 diamondInitPriorityTxMaxPubdata;
+    uint256 diamondInitMinimalL2GasPrice;
+    address governanceSecurityCouncilAddress;
+    uint256 governanceMinDelay;
+    uint256 maxNumberOfChains;
+    bytes diamondCutData;
+    bytes32 bootloaderHash;
+    bytes32 defaultAAHash;
+    bytes32 evmEmulatorHash;
+    address availL1DAValidator;
+}
+
+struct TokensConfig {
+    address tokenWethAddress;
+}
+
+// solhint-disable-next-line gas-struct-packing
+struct GeneratedData {
+    bytes forceDeploymentsData;
+}
 
 abstract contract DeployUtils is Script {
     using stdToml for string;
@@ -281,13 +279,13 @@ abstract contract DeployUtils is Script {
         Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
         return
             ChainCreationParams({
-            genesisUpgrade: stateTransition.genesisUpgrade,
-            genesisBatchHash: config.contracts.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            forceDeploymentsData: generatedData.forceDeploymentsData
-        });
+                genesisUpgrade: stateTransition.genesisUpgrade,
+                genesisBatchHash: config.contracts.genesisRoot,
+                genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+                genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+                diamondCut: diamondCut,
+                forceDeploymentsData: generatedData.forceDeploymentsData
+            });
     }
 
     function getChainTypeManagerInitializeData(
@@ -296,33 +294,33 @@ abstract contract DeployUtils is Script {
         ChainCreationParams memory chainCreationParams = getChainCreationParams(stateTransition);
         return
             ChainTypeManagerInitializeData({
-            owner: msg.sender,
-            validatorTimelock: stateTransition.validatorTimelock,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: config.contracts.latestProtocolVersion,
-            serverNotifier: addresses.serverNotifier
-        });
+                owner: msg.sender,
+                validatorTimelock: stateTransition.validatorTimelock,
+                chainCreationParams: chainCreationParams,
+                protocolVersion: config.contracts.latestProtocolVersion,
+                serverNotifier: stateTransition.serverNotifier
+            });
     }
 
     function getVerifierParams() internal returns (VerifierParams memory) {
         return
             VerifierParams({
-            recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
-        });
+                recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
+                recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
+                recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
+            });
     }
 
     function getFeeParams() internal returns (FeeParams memory) {
         return
             FeeParams({
-            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
-            batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
-            maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
-            maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
-            priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
-            minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
-        });
+                pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
+                batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
+                maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
+                maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
+                priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
+                minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
+            });
     }
 
     function getInitializeData(
@@ -334,17 +332,17 @@ abstract contract DeployUtils is Script {
 
         return
             DiamondInitializeDataNewChain({
-            verifier: IVerifier(stateTransition.verifier),
-            verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
-            l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-            feeParams: feeParams,
-            blobVersionedHashRetriever: stateTransition.isOnGateway
-            ? ADDRESS_ONE
-            : addresses.blobVersionedHashRetriever
-        });
+                verifier: IVerifier(stateTransition.verifier),
+                verifierParams: verifierParams,
+                l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
+                l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
+                l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
+                priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
+                feeParams: feeParams,
+                blobVersionedHashRetriever: stateTransition.isOnGateway
+                    ? ADDRESS_ONE
+                    : addresses.blobVersionedHashRetriever
+            });
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
@@ -388,34 +386,34 @@ abstract contract DeployUtils is Script {
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return
                 abi.encode(
-                addresses.bridgehub.bridgehubProxy,
-                config.eraChainId,
-                addresses.stateTransition.diamondProxy
-            );
+                    addresses.bridgehub.bridgehubProxy,
+                    config.eraChainId,
+                    addresses.stateTransition.diamondProxy
+                );
         } else if (compareStrings(contractName, "L1AssetRouter")) {
             return
                 abi.encode(
-                config.tokens.tokenWethAddress,
-                addresses.bridgehub.bridgehubProxy,
-                addresses.bridges.l1NullifierProxy,
-                config.eraChainId,
-                addresses.stateTransition.diamondProxy
-            );
+                    config.tokens.tokenWethAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1NullifierProxy,
+                    config.eraChainId,
+                    addresses.stateTransition.diamondProxy
+                );
         } else if (compareStrings(contractName, "L1ERC20Bridge")) {
             return
                 abi.encode(
-                addresses.bridges.l1NullifierProxy,
-                addresses.bridges.l1AssetRouterProxy,
-                addresses.vaults.l1NativeTokenVaultProxy,
-                config.eraChainId
-            );
+                    addresses.bridges.l1NullifierProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.vaults.l1NativeTokenVaultProxy,
+                    config.eraChainId
+                );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return
                 abi.encode(
-                config.tokens.tokenWethAddress,
-                addresses.bridges.l1AssetRouterProxy,
-                addresses.bridges.l1NullifierProxy
-            );
+                    config.tokens.tokenWethAddress,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridges.l1NullifierProxy
+                );
         } else if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
@@ -448,10 +446,10 @@ abstract contract DeployUtils is Script {
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
-                config.ownerAddress,
-                config.contracts.governanceSecurityCouncilAddress,
-                config.contracts.governanceMinDelay
-            );
+                    config.ownerAddress,
+                    config.contracts.governanceSecurityCouncilAddress,
+                    config.contracts.governanceMinDelay
+                );
         } else if (compareStrings(contractName, "ChainAdminOwnable")) {
             return abi.encode(config.ownerAddress, address(0));
         } else if (compareStrings(contractName, "AccessControlRestriction")) {
@@ -550,10 +548,10 @@ abstract contract DeployUtils is Script {
     ) internal virtual returns (address) {
         return
             Utils.deployViaCreate2(
-            abi.encodePacked(creationCode, constructorArgs),
-            config.contracts.create2FactorySalt,
-            addresses.create2Factory
-        );
+                abi.encodePacked(creationCode, constructorArgs),
+                config.contracts.create2FactorySalt,
+                addresses.create2Factory
+            );
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

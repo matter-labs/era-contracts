@@ -7,7 +7,6 @@ import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/sta
 import {GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
@@ -27,7 +26,6 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             chainCreationParams: params,
             protocolVersion: 0,
             serverNotifier: serverNotifier
-
         });
 
         ChainTypeManager ctm = new ChainTypeManager(address(bridgehub));

@@ -233,7 +233,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function setChainTypeManagerInServerNotifier() internal {
-        ServerNotifier serverNotifier = ServerNotifier(addresses.serverNotifier);
+        ServerNotifier serverNotifier = ServerNotifier(addresses.stateTransition.serverNotifier);
         vm.broadcast(msg.sender);
         serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
         console.log("ChainTypeManager set in ServerNotifier");
@@ -251,7 +251,7 @@ contract DeployL1Script is Script, DeployUtils {
             abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
         );
         console.log("ServerNotifier deployed at:", contractAddress);
-        addresses.serverNotifier = contractAddress;
+        addresses.stateTransition.serverNotifier = contractAddress;
     }
 
     function deployDAValidators() internal {
@@ -525,7 +525,7 @@ contract DeployL1Script is Script, DeployUtils {
             "blob_versioned_hash_retriever_addr",
             addresses.blobVersionedHashRetriever
         );
-        vm.serializeAddress("deployed_addresses", "server_notifier", addresses.serverNotifier);
+        vm.serializeAddress("deployed_addresses", "server_notifier", addresses.stateTransition.serverNotifier);
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 

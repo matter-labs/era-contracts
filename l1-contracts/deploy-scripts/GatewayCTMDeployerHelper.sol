@@ -72,10 +72,10 @@ library GatewayCTMDeployerHelper {
         );
 
         contracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternal(
-        "ProxyAdmin",
-        "ProxyAdmin.sol",
-        hex"",
-        innerConfig
+            "ProxyAdmin",
+            "ProxyAdmin.sol",
+            hex"",
+            innerConfig
         );
 
         contracts.stateTransition.serverNotifier = _deployServerNotifier(
@@ -114,7 +114,6 @@ library GatewayCTMDeployerHelper {
 
         return serverNotifier;
     }
-
 
     function _deployFacetsAndUpgrades(
         bytes32 _salt,

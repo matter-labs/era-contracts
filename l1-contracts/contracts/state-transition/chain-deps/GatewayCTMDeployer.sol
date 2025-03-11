@@ -36,109 +36,109 @@ import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} 
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
-    struct GatewayCTMDeployerConfig {
-        /// @notice Address of the aliased governance contract.
-        address aliasedGovernanceAddress;
-        /// @notice Salt used for deterministic deployments via CREATE2.
-        bytes32 salt;
-        /// @notice Chain ID of the Era chain.
-        uint256 eraChainId;
-        /// @notice Chain ID of the L1 chain.
-        uint256 l1ChainId;
-        /// @notice Address of the Rollup L2 Data Availability Validator.
-        address rollupL2DAValidatorAddress;
-        /// @notice Flag indicating whether to use the testnet verifier.
-        bool testnetVerifier;
-        /// @notice Array of function selectors for the Admin facet.
-        bytes4[] adminSelectors;
-        /// @notice Array of function selectors for the Executor facet.
-        bytes4[] executorSelectors;
-        /// @notice Array of function selectors for the Mailbox facet.
-        bytes4[] mailboxSelectors;
-        /// @notice Array of function selectors for the Getters facet.
-        bytes4[] gettersSelectors;
-        /// @notice Parameters for the verifier contract.
-        VerifierParams verifierParams;
-        /// @notice Parameters related to fees.
-        /// @dev They are mainly related to the L1->L2 transactions, fees for
-        /// which are not processed on Gateway. However, we still need these
-        /// values to deploy new chain's instances on Gateway.
-        FeeParams feeParams;
-        /// @notice Hash of the bootloader bytecode.
-        bytes32 bootloaderHash;
-        /// @notice Hash of the default account bytecode.
-        bytes32 defaultAccountHash;
-        /// @notice Hash of the EVM emulator bytecode.
-        bytes32 evmEmulatorHash;
-        /// @notice Maximum gas limit for priority transactions.
-        uint256 priorityTxMaxGasLimit;
-        /// @notice Root hash of the genesis state.
-        bytes32 genesisRoot;
-        /// @notice Leaf index in the genesis rollup.
-        uint256 genesisRollupLeafIndex;
-        /// @notice Commitment of the genesis batch.
-        bytes32 genesisBatchCommitment;
-        /// @notice Data for force deployments.
-        bytes forceDeploymentsData;
-        /// @notice The latest protocol version.
-        uint256 protocolVersion;
-    }
+struct GatewayCTMDeployerConfig {
+    /// @notice Address of the aliased governance contract.
+    address aliasedGovernanceAddress;
+    /// @notice Salt used for deterministic deployments via CREATE2.
+    bytes32 salt;
+    /// @notice Chain ID of the Era chain.
+    uint256 eraChainId;
+    /// @notice Chain ID of the L1 chain.
+    uint256 l1ChainId;
+    /// @notice Address of the Rollup L2 Data Availability Validator.
+    address rollupL2DAValidatorAddress;
+    /// @notice Flag indicating whether to use the testnet verifier.
+    bool testnetVerifier;
+    /// @notice Array of function selectors for the Admin facet.
+    bytes4[] adminSelectors;
+    /// @notice Array of function selectors for the Executor facet.
+    bytes4[] executorSelectors;
+    /// @notice Array of function selectors for the Mailbox facet.
+    bytes4[] mailboxSelectors;
+    /// @notice Array of function selectors for the Getters facet.
+    bytes4[] gettersSelectors;
+    /// @notice Parameters for the verifier contract.
+    VerifierParams verifierParams;
+    /// @notice Parameters related to fees.
+    /// @dev They are mainly related to the L1->L2 transactions, fees for
+    /// which are not processed on Gateway. However, we still need these
+    /// values to deploy new chain's instances on Gateway.
+    FeeParams feeParams;
+    /// @notice Hash of the bootloader bytecode.
+    bytes32 bootloaderHash;
+    /// @notice Hash of the default account bytecode.
+    bytes32 defaultAccountHash;
+    /// @notice Hash of the EVM emulator bytecode.
+    bytes32 evmEmulatorHash;
+    /// @notice Maximum gas limit for priority transactions.
+    uint256 priorityTxMaxGasLimit;
+    /// @notice Root hash of the genesis state.
+    bytes32 genesisRoot;
+    /// @notice Leaf index in the genesis rollup.
+    uint256 genesisRollupLeafIndex;
+    /// @notice Commitment of the genesis batch.
+    bytes32 genesisBatchCommitment;
+    /// @notice Data for force deployments.
+    bytes forceDeploymentsData;
+    /// @notice The latest protocol version.
+    uint256 protocolVersion;
+}
 
 /// @notice Addresses of state transition related contracts.
 // solhint-disable-next-line gas-struct-packing
-    struct StateTransitionContracts {
-        /// @notice Address of the ChainTypeManager proxy contract.
-        address chainTypeManagerProxy;
-        /// @notice Address of the ChainTypeManager implementation contract.
-        address chainTypeManagerImplementation;
-        /// @notice Address of the Verifier contract.
-        address verifier;
-        /// @notice Address of the VerifierPlonk contract.
-        address verifierPlonk;
-        /// @notice Address of the VerifierFflonk contract.
-        address verifierFflonk;
-        /// @notice Address of the Admin facet contract.
-        address adminFacet;
-        /// @notice Address of the Mailbox facet contract.
-        address mailboxFacet;
-        /// @notice Address of the Executor facet contract.
-        address executorFacet;
-        /// @notice Address of the Getters facet contract.
-        address gettersFacet;
-        /// @notice Address of the DiamondInit contract.
-        address diamondInit;
-        /// @notice Address of the GenesisUpgrade contract.
-        address genesisUpgrade;
-        /// @notice Address of the ValidatorTimelock contract.
-        address validatorTimelock;
-        /// @notice Address of the ProxyAdmin for ChainTypeManager.
-        address chainTypeManagerProxyAdmin;
-        /// @notice Address of the ServerNotifier contract.
-        address serverNotifier;
-    }
+struct StateTransitionContracts {
+    /// @notice Address of the ChainTypeManager proxy contract.
+    address chainTypeManagerProxy;
+    /// @notice Address of the ChainTypeManager implementation contract.
+    address chainTypeManagerImplementation;
+    /// @notice Address of the Verifier contract.
+    address verifier;
+    /// @notice Address of the VerifierPlonk contract.
+    address verifierPlonk;
+    /// @notice Address of the VerifierFflonk contract.
+    address verifierFflonk;
+    /// @notice Address of the Admin facet contract.
+    address adminFacet;
+    /// @notice Address of the Mailbox facet contract.
+    address mailboxFacet;
+    /// @notice Address of the Executor facet contract.
+    address executorFacet;
+    /// @notice Address of the Getters facet contract.
+    address gettersFacet;
+    /// @notice Address of the DiamondInit contract.
+    address diamondInit;
+    /// @notice Address of the GenesisUpgrade contract.
+    address genesisUpgrade;
+    /// @notice Address of the ValidatorTimelock contract.
+    address validatorTimelock;
+    /// @notice Address of the ProxyAdmin for ChainTypeManager.
+    address chainTypeManagerProxyAdmin;
+    /// @notice Address of the ServerNotifier contract.
+    address serverNotifier;
+}
 
 /// @notice Addresses of Data Availability (DA) related contracts.
 // solhint-disable-next-line gas-struct-packing
-    struct DAContracts {
-        /// @notice Address of the RollupDAManager contract.
-        address rollupDAManager;
-        /// @notice Address of the RelayedSLDAValidator contract.
-        address relayedSLDAValidator;
-        /// @notice Address of the ValidiumL1DAValidator contract.
-        address validiumDAValidator;
-    }
+struct DAContracts {
+    /// @notice Address of the RollupDAManager contract.
+    address rollupDAManager;
+    /// @notice Address of the RelayedSLDAValidator contract.
+    address relayedSLDAValidator;
+    /// @notice Address of the ValidiumL1DAValidator contract.
+    address validiumDAValidator;
+}
 
 /// @notice Collection of all deployed contracts by the GatewayCTMDeployer.
-    struct DeployedContracts {
-        /// @notice Address of the Multicall3 contract.
-        address multicall3;
-        /// @notice Struct containing state transition related contracts.
-        StateTransitionContracts stateTransition;
-        /// @notice Struct containing Data Availability related contracts.
-        DAContracts daContracts;
-        /// @notice Encoded data for the diamond cut operation.
-        bytes diamondCutData;
-    }
+struct DeployedContracts {
+    /// @notice Address of the Multicall3 contract.
+    address multicall3;
+    /// @notice Struct containing state transition related contracts.
+    StateTransitionContracts stateTransition;
+    /// @notice Struct containing Data Availability related contracts.
+    DAContracts daContracts;
+    /// @notice Encoded data for the diamond cut operation.
+    bytes diamondCutData;
+}
 
 /// @dev The constant address to be used for the blobHashRetriever inside the contracts.
 /// At the time of this writing the blob hash retriever is not used at all, but the zero-address
@@ -392,7 +392,7 @@ contract GatewayCTMDeployer {
             genesisIndexRepeatedStorageChanges: uint64(_config.genesisRollupLeafIndex),
             genesisBatchCommitment: _config.genesisBatchCommitment,
             diamondCut: diamondCut,
-        // Note, it is the same as for contracts that are based on L2
+            // Note, it is the same as for contracts that are based on L2
             forceDeploymentsData: _config.forceDeploymentsData
         });
 
