@@ -2,16 +2,24 @@
 
 set -e -o pipefail
 
-readonly FILE_TO_PREPROCESS="contracts/bridge/asset-router/L2AssetRouter.sol"
+readonly -a FILES_TO_PREPROCESS=(
+  "contracts/bridge/asset-router/L2AssetRouter.sol"
+  "contracts/bridge/L2SharedBridgeLegacy.sol"
+)
 
-trap "git restore \"$FILE_TO_PREPROCESS\"" EXIT
+on_exit() {
+  git restore "${FILES_TO_PREPROCESS[@]}"
+}
+trap on_exit EXIT
 
 # two-step instead one-step because MacOS sed uses -I but GNU sed uses -i
-readonly TEMP="$(mktemp)"
-sed -e 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' \
-    -e 's/msg.sender != L2_LEGACY_SHARED_BRIDGE/false/' \
-    "$FILE_TO_PREPROCESS" > "$TEMP"
-mv "$TEMP" "$FILE_TO_PREPROCESS"
+readonly TEMP_FILE="$(mktemp)"
+for f in "${FILES_TO_PREPROCESS[@]}"; do
+  sed -e 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER/false/' \
+      -e 's/AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge/false/' \
+     "$f" > "$TEMP_FILE"
+  mv "$TEMP_FILE"   "$f"
+done
 
 case "$CONTEXT" in
   "L1")

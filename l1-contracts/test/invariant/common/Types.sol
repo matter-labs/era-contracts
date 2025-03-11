@@ -9,4 +9,5 @@ struct Token {
 struct ActorHandlerAddresses {
     address[] userActorHandlers;
     address l1AssetRouterActorHandler;
+    address l1SharedBridgeActorHandler;
 }

@@ -8,14 +8,14 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 
 import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
+import {Token} from "../common/Types.sol";
 import {UserActorHandler} from "./UserActorHandler.sol";
+import {ActorHandler} from "./ActorHandler.sol";
 
-contract LegacyBridgeActorHandler is Test {
-    UserActorHandler[] public users;
-    address[] public l1Tokens;
+contract L1SharedBridgeActorHandler is ActorHandler {
+    address[] public receivers;
 
     uint256 public ghost_totalDeposits;
     uint256 public ghost_totalWithdrawals;
@@ -23,24 +23,19 @@ contract LegacyBridgeActorHandler is Test {
     error UsersArrayIsEmpty();
     error L1TokensArrayIsEmpty();
 
-    constructor(UserActorHandler[] memory _users, address[] memory _l1Tokens) {
-        if (_users.length == 0) {
+    constructor(address[] memory _receivers, Token[] memory _tokens) ActorHandler(_tokens) {
+        if (_receivers.length == 0) {
             revert UsersArrayIsEmpty();
         }
-        users = _users;
-
-        if (_l1Tokens.length == 0) {
-            revert L1TokensArrayIsEmpty();
-        }
-        l1Tokens = _l1Tokens;
+        receivers = _receivers;
     }
 
-    function finalizeDeposit(uint256 _amount, address _sender, uint256 _userIndex, uint256 _l1TokenIndex) public {
+    function finalizeDeposit(uint256 _amount, address _sender, uint256 _userIndex, uint256 _tokenIndex) public {
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
-        uint256 userIndex = bound(_userIndex, 0, users.length - 1);
-        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
+        uint256 userIndex = bound(_userIndex, 0, receivers.length - 1);
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
-        address l1Token = l1Tokens[l1TokenIndex];
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
 
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
         uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
@@ -50,9 +45,9 @@ contract LegacyBridgeActorHandler is Test {
             return;
         }
 
-        l2AssetRouter.finalizeDepositLegacyBridge({
+        l2SharedBridge.finalizeDeposit({
             _l1Sender: _sender,
-            _l2Receiver: address(users[userIndex]),
+            _l2Receiver: receivers[userIndex],
             _l1Token: l1Token,
             _amount: amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
