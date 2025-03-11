@@ -188,7 +188,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
 
         upgradeAddresses.transitionaryOwner = deploySimpleContract("TransitionaryOwner");
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
+        // upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
         // Additional (optional) newConfiguration after deploy
 
         // allowDAPair(
@@ -863,15 +863,15 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         // The call that will start the timer till the end of the upgrade.
         // TODO
-        Call memory timerCall = Call({
-            target: upgradeAddresses.upgradeTimer,
-            data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
-            value: 0
-        });
+        // Call memory timerCall = Call({
+        //     target: upgradeAddresses.upgradeTimer,
+        //     data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
+        //     value: 0
+        // });
 
-        calls = new Call[](2);
+        calls = new Call[](1);
         calls[0] = ctmCall;
-        calls[1] = timerCall;
+        // calls[1] = timerCall;
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {

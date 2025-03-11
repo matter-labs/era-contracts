@@ -2,7 +2,7 @@
 
 ## Upgrade process
 
-V27 upgrade will happen after the gateway preperation upgrade, but before the gateway is deployed. As such the ugprade process does not involve the Gateway parts ( upgrading the CTM on GW, pausing migrations, etc), it is an L1-only upgrade. 
+V27 upgrade will happen after the gateway preparation upgrade, but before the gateway is deployed. As such the ugprade process does not involve the Gateway parts ( upgrading the CTM on GW, etc), it is an L1-only upgrade. 
 
 Additionally this is not a bridge upgrade, as the bridge and ecosystem contracts don't have new features, so L1<>L2 bridging is not affected. This means that only the system components, the Verifiers, Facets and L2 contracts need to be upgraded.
 
@@ -16,10 +16,11 @@ The upgrade process is as follows:
     - upgradeCut (which contains facetCuts, and upgrade forceDeployments, as well as upgrade data)
 - prepare ecosytem upgrade governance calls:
     - upgrade proxies for L1 contracts. 
+    - pause gateway migrations needed on CTM (but GW is not yet deployed)
     - CTM: 
         - set new ChainCreationParams (-> contains new genesis upgrade cut data)
         - set new version upgrade (-> contains new upgrade cut data)
-    - start upgrade timer
+    - unpause gateway migrations needed on CTM
 
 Read more here: [Upgrade process document](../../chain_management/upgrade_process.md)
 
@@ -27,8 +28,8 @@ Read more here: [Upgrade process document](../../chain_management/upgrade_proces
 
 ### New features: 
 
-- facets: EVM emulation, service transaction on Mailbox
-- System contract and bootloader: evm emulation.
+- EVM emulation, system contracts and bootloader
+- service transaction on Mailbox
 - verifiers: Fflonk and plonk Dual verifiers
 - identity precompile
 - ChainTypeManager: add setServerNotifier ( used for GW migration)
