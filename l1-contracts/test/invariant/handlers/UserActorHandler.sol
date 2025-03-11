@@ -26,7 +26,9 @@ contract UserActorHandler is ActorHandler {
             amount = _amount;
         } else {
             vm.assume(l2Token.code.length != 0);
-            amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
+            uint256 balance = BridgedStandardERC20(l2Token).balanceOf(address(this));
+            vm.assume(balance > 0);
+            amount = bound(_amount, 1, balance);
         }
 
         l2AssetRouter.withdraw(_receiver, l2Token, amount);
