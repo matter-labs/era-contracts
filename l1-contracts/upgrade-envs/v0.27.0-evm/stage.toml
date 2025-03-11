@@ -1,0 +1,49 @@
+era_chain_id = 270
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 86400
+
+# FIXME
+# original owner that was used to create bridgehub
+# 0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7 ?? 
+owner_address = "0x0000000000000000000000000000000000000001"
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+old_protocol_version = 0x1a00000000
+
+[contracts]
+# FIXME
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0x1000000000000000000000000000000000000000000000000000000000000001"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+genesis_root = "0x025f5dbd1ac1b87be9d80858b70c10146aca7cdd4a20371723d988b9ba7a1b74"
+genesis_rollup_leaf_index = 76
+genesis_batch_commitment = "0xa006e72373d26d07e6587cea4f5cbeb7b6b5eccf24fc9a75460d7b88fd75b616"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x0100087fe7df1cf5616646f85bd5eebc8efe5d8deac4d85bea9b9aefd88803dd"
+default_aa_hash = "0x0100050bf9baf9d08e5d3c037f8d8b486076de7e6dceb3f3fc0989ea2c99cd67"
+evm_emulator_hash = "0x01000bbb8116fe7bdf690c19740ea350375426cec23f4f1f69a12fdc58adc9ba"
+bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+transparent_proxy_admin = "0xcb7f8e556ef02771ea32f54e767d6f9742ed31c2"
+
+governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
+latest_protocol_version = 0x1b00000000
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+# on stage, this is not a proxy, but actual implementation.
+protocol_upgrade_handler_proxy_address = "0x699a1cd1fcd3213e20de15d2236a67d9084bf89e"
+protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000000"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
