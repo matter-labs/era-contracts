@@ -35,21 +35,23 @@ import {Create2AndTransfer} from "./Create2AndTransfer.sol";
     }
 
 // solhint-disable-next-line gas-struct-packing
-    struct DeployedAddresses {
-        BridgehubDeployedAddresses bridgehub;
-        StateTransitionDeployedAddresses stateTransition;
-        BridgesDeployedAddresses bridges;
-        L1NativeTokenVaultAddresses vaults;
-        DataAvailabilityDeployedAddresses daAddresses;
-        address transparentProxyAdmin;
-        address governance;
-        address chainAdmin;
-        address accessControlRestrictionAddress;
-        address blobVersionedHashRetriever;
-        address create2Factory;
-        address chainRegistrar;
-        address serverNotifier;
-    }
+
+struct DeployedAddresses {
+    BridgehubDeployedAddresses bridgehub;
+    StateTransitionDeployedAddresses stateTransition;
+    BridgesDeployedAddresses bridges;
+    L1NativeTokenVaultAddresses vaults;
+    DataAvailabilityDeployedAddresses daAddresses;
+    address transparentProxyAdmin;
+    address governance;
+    address chainAdmin;
+    address accessControlRestrictionAddress;
+    address blobVersionedHashRetriever;
+    address create2Factory;
+    address chainRegistrar;
+    address protocolUpgradeHandlerProxy;
+    address serverNotifier;
+}
 
 // solhint-disable-next-line gas-struct-packing
     struct L1NativeTokenVaultAddresses {

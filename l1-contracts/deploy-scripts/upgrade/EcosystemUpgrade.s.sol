@@ -91,7 +91,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         ExpectedL2Addresses expectedL2Addresses;
-        address gatewayUpgrade;
         address transitionaryOwner;
         address upgradeTimer;
         address bytecodesSupplier;
@@ -112,7 +111,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         // for facilitating partially trusted, but not critical tasks.
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        uint256 newProtocolVersion;
+        //uint256 newProtocolVersion;
         uint256 oldProtocolVersion;
         address oldValidatorTimelock;
     }
@@ -122,13 +121,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bytes fixedForceDeploymentsData;
         bytes diamondCutData;
         bytes upgradeCutData;
-    }
-
-    struct Gateway {
-        StateTransitionDeployedAddresses gatewayStateTransition;
-        bytes facetCutsData;
-        bytes additionalForceDeployments;
-        uint256 chainId;
     }
 
     /// @notice Internal state of the upgrade script
@@ -144,7 +136,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     AdditionalConfig internal newConfig;
-    Gateway internal gatewayConfig;
     NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
 
@@ -226,6 +217,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
         getDiamondCutData(addresses.stateTransition); //{isOnGateway: false});
+        newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition); //{isOnGateway: false});
         console.log("UpgradeCutGenerated");
@@ -397,49 +389,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         setAddressesBasedOnBridgehub();
 
         addresses.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
+        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
-
-        // gatewayConfig.facetCutsData = abi.encode(new Diamond.DiamondCutData[](0)); // TODO
-        // gatewayConfig.additionalForceDeployments = abi.encode(new IL2ContractDeployer.ForceDeployment[](0)); // TODO
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_implementation_addr"
-        );
-        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
-            "$.gateway.gateway_state_transition.verifier_addr"
-        );
-        gatewayConfig.gatewayStateTransition.adminFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.admin_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.mailboxFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.mailbox_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.executorFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.executor_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.gettersFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.getters_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.diamondInit = toml.readAddress(
-            "$.gateway.gateway_state_transition.diamond_init_addr"
-        );
-        gatewayConfig.gatewayStateTransition.genesisUpgrade = toml.readAddress(
-            "$.gateway.gateway_state_transition.genesis_upgrade_addr"
-        );
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = toml.readAddress(
-            "$.gateway.gateway_state_transition.default_upgrade_addr"
-        );
-        gatewayConfig.gatewayStateTransition.validatorTimelock = toml.readAddress(
-            "$.gateway.gateway_state_transition.validator_timelock_addr"
-        );
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        );
-
-        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
     }
@@ -482,6 +435,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
+        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
@@ -557,6 +511,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "ctm_deployment_tracker_implementation_addr",
             addresses.bridgehub.ctmDeploymentTrackerImplementation
         );
+        vm.serializeAddress(
+            "bridgehub",
+            "ctm_deployment_tracker_proxy_addr",
+            addresses.bridgehub.ctmDeploymentTrackerProxy
+        );
+        vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
             "message_root_implementation_addr",
@@ -581,6 +541,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
         vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
+        vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
+        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -588,12 +550,14 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
 
         vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress(
             "bridges",
             "l1_asset_router_implementation_addr",
             addresses.bridges.l1AssetRouterImplementation
         );
+        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", addresses.bridges.l1AssetRouterProxy);
         // TODO: legacy name
         vm.serializeAddress(
             "bridges",
@@ -677,7 +641,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             newlyGeneratedData.fixedForceDeploymentsData
         );
 
-        vm.serializeUint("contracts_newConfig", "new_protocol_version", newConfig.newProtocolVersion);
+        vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
 
         vm.serializeUint("contracts_newConfig", "old_protocol_version", newConfig.oldProtocolVersion);
 
@@ -703,6 +667,17 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_bytecodes_supplier_addr",
+            addresses.stateTransition.bytecodesSupplier
+        );
+        vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "native_token_vault_implementation_addr",
+            addresses.vaults.l1NativeTokenVaultImplementation
+        );
 
         vm.serializeAddress(
             "deployed_addresses",
@@ -719,7 +694,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "l2_wrapped_base_token_store_addr",
             upgradeAddresses.l2WrappedBaseTokenStore
         );
-        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
 
@@ -738,6 +712,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("root", "contracts_newConfig", contractsConfig);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
+        vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
 
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
@@ -848,27 +823,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The first step of upgrade. By default it just stops gateway migrations
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = prepareGatewaySpecificStage1GovernanceCalls();
-
-        calls = mergeCallsArray(allCalls);
-    }
-
-    function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
-
-        Call[][] memory allCalls = new Call[][](2);
-
-        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 l2GasLimit = 2000000; // TODO constant or newConfig
-        uint256 l1GasPrice = 100; // TODO constant or newConfig
-
-        uint256 tokensRequired;
-        (allCalls[1], tokensRequired) = preparePauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
-
-        // Approve required amount of base token
-        allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
+        Call[][] memory allCalls = new Call[][](0);
 
         calls = mergeCallsArray(allCalls);
     }
@@ -882,35 +837,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         allCalls[3] = provideSetNewVersionUpgradeCall();
         allCalls[4] = prepareContractsConfigurationCalls();
         allCalls[5] = prepareUnpauseGatewayMigrationsCall();
-        //allCalls[5] = prepareGatewaySpecificStage2GovernanceCalls();
-        //allCalls[6] = prepareGovernanceUpgradeTimerCheckCall(); // May be needed for 2-stage upgrades
-
-        calls = mergeCallsArray(allCalls);
-    }
-
-    function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
-
-        Call[][] memory allCalls = new Call[][](4);
-
-        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 l2GasLimit = 2000000; // TODO constant or newConfig
-        uint256 l1GasPrice = 100; // TODO constant or newConfig
-
-        uint256 tokensRequired;
-        uint256 tokensForCall;
-        (allCalls[1], tokensForCall) = provideSetNewVersionUpgradeCallForGateway(l2GasLimit, l1GasPrice);
-        tokensRequired += tokensForCall;
-
-        (allCalls[2], tokensForCall) = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
-        tokensRequired += tokensForCall;
-
-        (allCalls[3], tokensForCall) = prepareUnpauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
-        tokensRequired += tokensForCall;
-
-        // Approve required amount of base token
-        allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
-
         calls = mergeCallsArray(allCalls);
     }
 
@@ -950,35 +876,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         calls[1] = timerCall;
     }
 
-    function provideSetNewVersionUpgradeCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
-        require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
-            "chainTypeManager on gateway is zero in newConfig"
-        );
-
-        uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
-        uint256 newProtocolVersion = getNewProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCut = generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
-
-        bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setNewVersionUpgrade,
-            (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
-        );
-
-        // TODO: approve base token
-        calls = new Call[](1);
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-        );
-    }
-
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
@@ -990,22 +887,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
-    function preparePauseMigrationCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
-
-        // TODO: approve base token
-        calls = new Call[](1);
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            addresses.bridgehub.bridgehubProxy
-        );
-    }
-
     function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
@@ -1015,22 +896,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             value: 0,
             data: abi.encodeCall(IBridgehub.unpauseMigration, ())
         });
-    }
-
-    function prepareUnpauseMigrationCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
-
-        // TODO: approve base token
-        calls = new Call[](1);
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            addresses.bridgehub.bridgehubProxy
-        );
     }
 
     function prepareAcceptOwnershipCalls(
@@ -1063,71 +928,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             ),
             value: 0
         });
-    }
-
-    function prepareNewChainCreationParamsCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
-        require(
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy != address(0),
-            "chainTypeManager on gateway is zero in newConfig"
-        );
-
-        bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setChainCreationParams,
-            (getChainCreationParams(gatewayConfig.gatewayStateTransition))
-        );
-
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-        );
-    }
-
-    function _prepareL1ToGatewayCall(
-        bytes memory l2Calldata,
-        uint256 l2GasLimit,
-        uint256 l1GasPrice,
-        address dstAddress
-    ) internal returns (Call memory call, uint256 requiredTokens) {
-        require(gatewayConfig.chainId != 0, "Chain id of gateway is zero in newConfig");
-
-        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
-        require(addresses.bridges.l1AssetRouterProxy != address(0), "l1AssetRouterProxyAddress is zero in newConfig");
-
-        L2TransactionRequestDirect memory l2TransactionRequestDirect;
-        (l2TransactionRequestDirect, requiredTokens) = Utils.prepareL1L2Transaction(
-            PrepareL1L2TransactionParams({
-                l1GasPrice: l1GasPrice,
-                l2Calldata: l2Calldata,
-                l2GasLimit: l2GasLimit,
-                l2Value: 0,
-                factoryDeps: new bytes[](0),
-                dstAddress: dstAddress,
-                chainId: gatewayConfig.chainId,
-                bridgehubAddress: addresses.bridgehub.bridgehubProxy,
-                l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy
-            })
-        );
-
-        call = Call({
-            target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(IBridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect)),
-            value: 0
-        });
-    }
-
-    function prepareApproveGatewayBaseTokenCall(
-        address spender,
-        uint256 amount
-    ) public virtual returns (Call[] memory calls) {
-        address token = IBridgehub(addresses.bridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
-        require(token != address(0), "Base token for Gateway is zero");
-
-        calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});
     }
 
     /// @notice Update implementations in proxies
@@ -1180,19 +980,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     /// @notice Additional calls to newConfigure contracts
     function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](0);
-    }
-
-    /// @notice Double checking that the deadline has passed.
-    function prepareGovernanceUpgradeTimerCheckCall() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: upgradeAddresses.upgradeTimer,
-            // Double checking that the deadline has passed.
-            data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
-            value: 0
-        });
     }
 
     function _buildCallProxyUpgrade(

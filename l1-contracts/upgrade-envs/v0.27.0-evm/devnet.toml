@@ -1,0 +1,44 @@
+era_chain_id = 271
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 120
+
+# original owner that was used to create bridgehub
+owner_address = "0x0000000000000000000000000000000000000001"
+
+support_l2_legacy_shared_bridge_test = false
+old_protocol_version = 0x1a00000000
+
+[contracts]
+governance_min_delay = 0
+max_number_of_chains = 100
+create2_factory_salt = "0xcab00f1f3f7259c0e983a373236daddd1eb8c6c2b60222430c587dff2e5e4a12"
+create2_factory_addr = "0xe441cf0795af14ddb9f7984da85cd36db1b8790d"
+validator_timelock_execution_delay = 0
+genesis_root = "0x025f5dbd1ac1b87be9d80858b70c10146aca7cdd4a20371723d988b9ba7a1b74"
+genesis_rollup_leaf_index = 76
+genesis_batch_commitment = "0xa006e72373d26d07e6587cea4f5cbeb7b6b5eccf24fc9a75460d7b88fd75b616"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x0100087fe7df1cf5616646f85bd5eebc8efe5d8deac4d85bea9b9aefd88803dd"
+default_aa_hash = "0x0100050bf9baf9d08e5d3c037f8d8b486076de7e6dceb3f3fc0989ea2c99cd67"
+evm_emulator_hash = "0x01000bbb8116fe7bdf690c19740ea350375426cec23f4f1f69a12fdc58adc9ba"
+bridgehub_proxy_address = "0xeed894b00de0cc97b73d32b2a56539793bce4ae4"
+transparent_proxy_admin = "0xd9fe4695e981da1f3a24b988abebab97c1d5190f"
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+latest_protocol_version = 0x1b00000000
+l1_bytecodes_supplier_addr = "0x279fcb512521ff4aaba0650826c9a20658f8cbe1"
+protocol_upgrade_handler_proxy_address = "0xcfe831b8e15ef10794796b834716972a7b80082a"
+protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000000"
+
+
+[tokens]
+token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+

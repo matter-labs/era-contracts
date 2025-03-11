@@ -785,55 +785,6 @@ contract DeployL1Script is Script, DeployUtils {
             return type(GettersFacet).creationCode;
         } else if (compareStrings(contractName, "DiamondInit")) {
             return type(DiamondInit).creationCode;
-        } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return Utils.readRollupDAValidatorBytecode();
-        } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-            return type(ValidiumL1DAValidator).creationCode;
-        } else if (compareStrings(contractName, "AvailL1DAValidator")) {
-            return Utils.readAvailL1DAValidatorBytecode();
-        } else if (compareStrings(contractName, "DummyAvailBridge")) {
-            return Utils.readDummyAvailBridgeBytecode();
-        } else if (compareStrings(contractName, "Verifier")) {
-            if (config.testnetVerifier) {
-                return type(TestnetVerifier).creationCode;
-            } else {
-                return type(DualVerifier).creationCode;
-            }
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
-            return type(VerifierFflonk).creationCode;
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
-            return type(VerifierPlonk).creationCode;
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
-            return type(DefaultUpgrade).creationCode;
-        } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-            return type(L1GenesisUpgrade).creationCode;
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return type(ValidatorTimelock).creationCode;
-        } else if (compareStrings(contractName, "Governance")) {
-            return type(Governance).creationCode;
-        } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-            return type(ChainAdminOwnable).creationCode;
-        } else if (compareStrings(contractName, "AccessControlRestriction")) {
-            // TODO(EVM-924): this function is unused
-            return type(AccessControlRestriction).creationCode;
-        } else if (compareStrings(contractName, "ChainAdmin")) {
-            return type(ChainAdmin).creationCode;
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return type(ChainTypeManager).creationCode;
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return type(BytecodesSupplier).creationCode;
-        } else if (compareStrings(contractName, "ProxyAdmin")) {
-            return type(ProxyAdmin).creationCode;
-        } else if (compareStrings(contractName, "ExecutorFacet")) {
-            return type(ExecutorFacet).creationCode;
-        } else if (compareStrings(contractName, "AdminFacet")) {
-            return type(AdminFacet).creationCode;
-        } else if (compareStrings(contractName, "MailboxFacet")) {
-            return type(MailboxFacet).creationCode;
-        } else if (compareStrings(contractName, "GettersFacet")) {
-            return type(GettersFacet).creationCode;
-        } else if (compareStrings(contractName, "DiamondInit")) {
-            return type(DiamondInit).creationCode;
         } else {
             revert(string.concat("Contract ", contractName, " creation code not set"));
         }
