@@ -937,6 +937,90 @@ library Utils {
         vm.stopBroadcast();
     }
 
+    function getGuardiansEmergencySignatures(
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        bytes32 _emergencyUpgradeBoardDigest,
+        bytes32 _upgradeId
+    ) internal returns (bytes memory fullSignatures) {
+        address[] memory guardiansMembers = new address[](8);
+        {
+            IMultisig guardians = IMultisig(_protocolUpgradeHandler.guardians());
+            for (uint256 i = 0; i < 8; i++) {
+                guardiansMembers[i] = guardians.members(i);
+            }
+        }
+        bytes[] memory guardiansRawSignatures = new bytes[](8);
+        for (uint256 i = 0; i < 8; i++) {
+            bytes32 safeDigest;
+            {
+                bytes32 guardiansDigest = EIP712Utils.buildDigest(
+                    _emergencyUpgradeBoardDigest,
+                    keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH, _upgradeId))
+                );
+                safeDigest = ISafe(guardiansMembers[i]).getMessageHash(abi.encode(guardiansDigest));
+            }
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+            guardiansRawSignatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        fullSignatures = abi.encode(guardiansMembers, guardiansRawSignatures);
+    }
+
+    function getSecurityCouncilEmergencySignatures(
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        bytes32 _emergencyUpgradeBoardDigest,
+        bytes32 _upgradeId
+    ) internal returns (bytes memory fullSignatures) {
+        address[] memory securityCouncilMembers = new address[](SECURITY_COUNCIL_SIZE);
+        {
+            IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
+            for (uint256 i = 0; i < SECURITY_COUNCIL_SIZE; i++) {
+                securityCouncilMembers[i] = securityCouncil.members(i);
+            }
+        }
+        bytes[] memory securityCouncilRawSignatures = new bytes[](SECURITY_COUNCIL_SIZE);
+        for (uint256 i = 0; i < securityCouncilMembers.length; i++) {
+            bytes32 safeDigest;
+            {
+                bytes32 securityCouncilDigest = EIP712Utils.buildDigest(
+                    _emergencyUpgradeBoardDigest,
+                    keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH, _upgradeId))
+                );
+                safeDigest = ISafe(securityCouncilMembers[i]).getMessageHash(abi.encode(securityCouncilDigest));
+            }
+            {
+                (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+                securityCouncilRawSignatures[i] = abi.encodePacked(r, s, v);
+            }
+        }
+        fullSignatures = abi.encode(securityCouncilMembers, securityCouncilRawSignatures);
+    }
+
+    function getZKFoundationEmergencySignature(
+        Vm.Wallet memory _governorWallet,
+        IProtocolUpgradeHandler _protocolUpgradeHandler,
+        bytes32 _emergencyUpgradeBoardDigest,
+        bytes32 _upgradeId
+    ) internal returns (bytes memory fullSignatures) {
+        ISafe zkFoundation;
+        IEmergencyUpgrageBoard emergencyUpgradeBoard = IEmergencyUpgrageBoard(
+            _protocolUpgradeHandler.emergencyUpgradeBoard()
+        );
+        zkFoundation = ISafe(emergencyUpgradeBoard.ZK_FOUNDATION_SAFE());
+
+        bytes32 zkFoundationDigest = EIP712Utils.buildDigest(
+            _emergencyUpgradeBoardDigest,
+            keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, _upgradeId))
+        );
+        bytes32 safeDigest = ISafe(zkFoundation).getMessageHash(abi.encode(zkFoundationDigest));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
+        fullSignatures = abi.encodePacked(r, s, v);
+    }
+
     function executeEmergencyProtocolUpgrade(
         IProtocolUpgradeHandler _protocolUpgradeHandler,
         Vm.Wallet memory _governorWallet,
@@ -960,78 +1044,26 @@ library Utils {
             );
         }
 
-        bytes memory guardiansSignatures;
-        {
-            address[] memory guardiansMembers = new address[](8);
-            {
-                IMultisig guardians = IMultisig(_protocolUpgradeHandler.guardians());
-                for (uint256 i = 0; i < 8; i++) {
-                    guardiansMembers[i] = guardians.members(i);
-                }
-            }
-            bytes[] memory guardiansRawSignatures = new bytes[](8);
-            for (uint256 i = 0; i < 8; i++) {
-                bytes32 safeDigest;
-                {
-                    bytes32 guardiansDigest = EIP712Utils.buildDigest(
-                        emergencyUpgradeBoardDigest,
-                        keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH, upgradeId))
-                    );
-                    safeDigest = ISafe(guardiansMembers[i]).getMessageHash(abi.encode(guardiansDigest));
-                }
+        bytes memory guardiansSignatures = getGuardiansEmergencySignatures(
+            _governorWallet,
+            _protocolUpgradeHandler,
+            emergencyUpgradeBoardDigest,
+            upgradeId
+        );
 
-                (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
-                guardiansRawSignatures[i] = abi.encodePacked(r, s, v);
-            }
-            guardiansSignatures = abi.encode(guardiansMembers, guardiansRawSignatures);
-        }
+        bytes memory securityCouncilSignatures = getSecurityCouncilEmergencySignatures(
+            _governorWallet,
+            _protocolUpgradeHandler,
+            emergencyUpgradeBoardDigest,
+            upgradeId
+        );
 
-        bytes memory securityCouncilSignatures;
-        {
-            address[] memory securityCouncilMembers = new address[](SECURITY_COUNCIL_SIZE);
-            {
-                IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
-                for (uint256 i = 0; i < 12; i++) {
-                    securityCouncilMembers[i] = securityCouncil.members(i);
-                }
-            }
-            bytes[] memory securityCouncilRawSignatures = new bytes[](SECURITY_COUNCIL_SIZE);
-            for (uint256 i = 0; i < securityCouncilMembers.length; i++) {
-                bytes32 safeDigest;
-                {
-                    bytes32 securityCouncilDigest = EIP712Utils.buildDigest(
-                        emergencyUpgradeBoardDigest,
-                        keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH, upgradeId))
-                    );
-                    safeDigest = ISafe(securityCouncilMembers[i]).getMessageHash(abi.encode(securityCouncilDigest));
-                }
-                {
-                    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
-                    securityCouncilRawSignatures[i] = abi.encodePacked(r, s, v);
-                }
-            }
-            securityCouncilSignatures = abi.encode(securityCouncilMembers, securityCouncilRawSignatures);
-        }
-
-        bytes memory zkFoundationSignature;
-        {
-            ISafe zkFoundation;
-            {
-                IEmergencyUpgrageBoard emergencyUpgradeBoard = IEmergencyUpgrageBoard(
-                    _protocolUpgradeHandler.emergencyUpgradeBoard()
-                );
-                zkFoundation = ISafe(emergencyUpgradeBoard.ZK_FOUNDATION_SAFE());
-            }
-            bytes32 zkFoundationDigest = EIP712Utils.buildDigest(
-                emergencyUpgradeBoardDigest,
-                keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, upgradeId))
-            );
-            bytes32 safeDigest = ISafe(zkFoundation).getMessageHash(abi.encode(zkFoundationDigest));
-            {
-                (uint8 v, bytes32 r, bytes32 s) = vm.sign(_governorWallet, safeDigest);
-                zkFoundationSignature = abi.encodePacked(r, s, v);
-            }
-        }
+        bytes memory zkFoundationSignature = getZKFoundationEmergencySignature(
+            _governorWallet,
+            _protocolUpgradeHandler,
+            emergencyUpgradeBoardDigest,
+            upgradeId
+        );
 
         {
             vm.startBroadcast();

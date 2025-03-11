@@ -14,6 +14,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {Utils, ADDRESS_ONE} from "./Utils.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
@@ -32,7 +34,6 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -276,7 +277,7 @@ contract RegisterZKChainScript is Script {
 
     function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
         INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
@@ -288,15 +289,15 @@ contract RegisterZKChainScript is Script {
         if (bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
             console.log("Base token asset id already registered on Bridgehub");
         } else {
-            bytes memory data = abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId));
-            Utils.executeUpgrade({
-                _governor: ownable.owner(),
-                _salt: bytes32(config.bridgehubCreateNewChainSalt),
-                _target: config.bridgehub,
-                _data: data,
-                _value: 0,
-                _delay: 0
+            IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
+            calls[0] = IChainAdminOwnable.Call({
+                target: config.bridgehub,
+                value: 0,
+                data: abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId))
             });
+            vm.broadcast(admin.owner());
+            admin.multicall(calls, true);
+
             console.log("Base token asset id registered on Bridgehub");
         }
     }
@@ -381,41 +382,31 @@ contract RegisterZKChainScript is Script {
 
     function registerZKChain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
-        vm.recordLogs();
-        bytes memory data = abi.encodeCall(
-            bridgehub.createNewChain,
-            (
-                config.chainChainId,
-                config.chainTypeManagerProxy,
-                config.baseTokenAssetId,
-                config.bridgehubCreateNewChainSalt,
-                msg.sender,
-                abi.encode(config.diamondCutData, config.forceDeployments),
-                getFactoryDeps()
+        IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
+        calls[0] = IChainAdminOwnable.Call({
+            target: config.bridgehub,
+            value: 0,
+            data: abi.encodeCall(
+                bridgehub.createNewChain,
+                (
+                    config.chainChainId,
+                    config.chainTypeManagerProxy,
+                    config.baseTokenAssetId,
+                    config.bridgehubCreateNewChainSalt,
+                    msg.sender,
+                    abi.encode(config.diamondCutData, config.forceDeployments),
+                    getFactoryDeps()
+                )
             )
-        );
-        Utils.executeUpgrade({
-            _governor: ownable.owner(),
-            _salt: bytes32(config.bridgehubCreateNewChainSalt),
-            _target: config.bridgehub,
-            _data: data,
-            _value: 0,
-            _delay: 0
         });
+        vm.broadcast(admin.owner());
+        admin.multicall(calls, true);
         console.log("ZK chain registered");
 
         // Get new diamond proxy address from emitted events
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        address diamondProxyAddress;
-        uint256 logsLength = logs.length;
-        for (uint256 i = 0; i < logsLength; ++i) {
-            if (logs[i].topics[0] == STATE_TRANSITION_NEW_CHAIN_HASH) {
-                diamondProxyAddress = address(uint160(uint256(logs[i].topics[2])));
-                break;
-            }
-        }
+        address diamondProxyAddress = bridgehub.getZKChain(config.chainChainId);
         if (diamondProxyAddress == address(0)) {
             revert("Diamond proxy address not found");
         }
