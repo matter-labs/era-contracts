@@ -120,12 +120,38 @@ contract UserActorHandler is ActorHandler {
         ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
     }
 
-    // function registerTokenWithVaultV2(uint256 _tokenIndex) external {
-    //     uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+    function registerTokenWithVaultV3(uint256 _tokenIndex) external {
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
-    //     address l1Token = tokens[tokenIndex];
-    //     address l2Token = l2AssetRouter.l2TokenAddress(l1Token);
-    //     bytes memory d = DataEncoding.encodeBridgeBurnData(0, address(0), l2Token);
-    //     bytes32
-    // }
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
+
+        vm.assume(l2Token.code.length != 0);
+        vm.assume(l2SharedBridge.l1TokenAddress(l2Token) == address(0));
+        vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
+
+        l2NativeTokenVault.ensureTokenIsRegistered(l2Token);
+
+        ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
+    }
+
+    function registerTokenWithVaultV4(uint256 _tokenIndex) external {
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+
+        Token memory token = tokens[tokenIndex];
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(token);
+        bytes memory d = DataEncoding.encodeBridgeBurnData(0, address(0), l2Token);
+        uint256 chainid = token.bridged ? l2AssetRouter.L1_CHAIN_ID() : block.chainid;
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(chainid, l2Token);
+
+        if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] || l2NativeTokenVault.assetId(l2Token) != bytes32(0)) {
+            return;
+        }
+
+        l2NativeTokenVault.tryRegisterTokenFromBurnData({
+            _burnData: d,
+            _expectedAssetId: expectedAssetId
+        });
+
+        ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
+    }
 }
