@@ -53,8 +53,8 @@ optimizer = false
 [profile.invariant_tests_l1context.zksync]
 suppressed_warnings = ["txorigin"]
 [profile.invariant_tests_l1context.invariant]
-runs = 10
-depth = 1000
+runs = 100
+depth = 100
 
 [profile.invariant_tests_l2context]
 test = "test"
