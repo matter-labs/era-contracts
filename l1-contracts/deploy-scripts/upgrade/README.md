@@ -1,10 +1,28 @@
 # Gateway upgrade related scripts
 
+## Setup
+
+```sh
+yarn calculate-hashes:check
+```
+If this fails you have some issues with foundry or your setup. Try cleaning your contracts.
+
 ## Example of usage
 
 1. Create a file similar to one of those in the `/l1-contracts/upgrade-envs/` for our environment.
-2. Run the following to prepare the ecosystem:
 
+2. Simulate the deployment: 
 ```sh
-GATEWAY_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/<input-file> forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
+UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/stage.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000
+```
+
+3. Run the following to prepare the ecosystem:
+```sh
+UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/stage.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow
+```
+4. Verify contracts based on logs. 
+
+5. 
+```sh
+yarn upgrade-yaml-output-generator
 ```
