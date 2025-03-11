@@ -25,7 +25,10 @@ abstract contract AssetRouterProperties is Test {
 
     error AlreadyInitialized();
 
-    function initAssetRouterProperties(Token[] memory _tokens, ActorHandlerAddresses memory _actorHandlerAddresses) internal {
+    function initAssetRouterProperties(
+        Token[] memory _tokens,
+        ActorHandlerAddresses memory _actorHandlerAddresses
+    ) internal {
         if (initialized) {
             revert AlreadyInitialized();
         }
@@ -56,7 +59,8 @@ abstract contract AssetRouterProperties is Test {
             }
         }
 
-        uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits() + l1SharedBridgeActorHandler.ghost_totalDeposits();
+        uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits() +
+            l1SharedBridgeActorHandler.ghost_totalDeposits();
         for (uint256 i; i < userActorHandlers.length; i++) {
             totalDepositAmount -= userActorHandlers[i].ghost_totalWithdrawalAmount();
         }

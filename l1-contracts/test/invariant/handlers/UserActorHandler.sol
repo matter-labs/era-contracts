@@ -74,7 +74,6 @@ contract UserActorHandler is ActorHandler {
         // using `L2NativeTokenVault` instead of `IL2NativeTokenVault` because the latter doesn't have `L2_LEGACY_SHARED_BRIDGE`
         vm.assume(l2NativeTokenVault.L2_LEGACY_SHARED_BRIDGE().l1TokenAddress(l2Token) != address(0));
 
-
         uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes memory data = DataEncoding.encodeBridgeBurnData(amount, _receiver, l2Token);
@@ -114,7 +113,7 @@ contract UserActorHandler is ActorHandler {
         if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token]) {
             return;
         }
-        
+
         l2NativeTokenVault.registerToken(l2Token);
 
         ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
@@ -150,14 +149,15 @@ contract UserActorHandler is ActorHandler {
             expectedAssetId = DataEncoding.encodeNTVAssetId(chainid, l2Token);
         }
 
-        if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] || l2NativeTokenVault.assetId(l2Token) != bytes32(0) || l2Token.code.length == 0) {
+        if (
+            ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] ||
+            l2NativeTokenVault.assetId(l2Token) != bytes32(0) ||
+            l2Token.code.length == 0
+        ) {
             return;
         }
 
-        l2NativeTokenVault.tryRegisterTokenFromBurnData({
-            _burnData: d,
-            _expectedAssetId: expectedAssetId
-        });
+        l2NativeTokenVault.tryRegisterTokenFromBurnData({_burnData: d, _expectedAssetId: expectedAssetId});
 
         ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
     }

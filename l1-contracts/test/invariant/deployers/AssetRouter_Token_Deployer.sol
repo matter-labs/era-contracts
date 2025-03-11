@@ -37,9 +37,9 @@ contract AssetRouter_Token_Deployer is Test {
         // - deployed/undeployed
         // - bridged/non-bridged
         // - base/non-base
-        // 
+        //
         // A legacy token is a token that is registered with `L2SharedBridgeLegacy` but not registered with `L2NativeTokenVault`
-        // 
+        //
         // Impossible attribute combinations:
         // - registered with `L2SharedBridgeLegacy` and non-bridged
         tokens = new Token[](3);
