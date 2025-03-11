@@ -716,7 +716,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
 
-        string memory toml =  vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
+        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
     }
