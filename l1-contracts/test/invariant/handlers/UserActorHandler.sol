@@ -16,6 +16,21 @@ contract UserActorHandler is ActorHandler {
 
     constructor(Token[] memory _tokens) ActorHandler(_tokens) {}
 
+    function withdrawV1(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
+
+        vm.assume(l2Token.code.length != 0);
+        uint256 balance = BridgedStandardERC20(l2Token).balanceOf(address(this));
+        vm.assume(balance > 0);
+        uint256 amount = bound(_amount, 1, balance);
+
+        l2SharedBridge.withdraw(_receiver, l2Token, amount);
+
+        ghost_totalWithdrawalAmount += amount;
+    }
+
     function withdraw(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 

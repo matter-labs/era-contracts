@@ -61,38 +61,6 @@ contract LegacyBridgeActorHandler is Test {
         ghost_totalDeposits += amount;
     }
 
-    function withdraw(uint256 _amount, uint256 _userIndex, address _l1Receiver, uint256 _l1TokenIndex) public {
-        uint256 userIndex = bound(_userIndex, 0, users.length - 1);
-        uint256 l1TokenIndex = bound(_l1TokenIndex, 0, l1Tokens.length - 1);
-
-        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
-        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        IL2SharedBridgeLegacy sharedBridge = IL2SharedBridgeLegacy(l2AssetRouter.L2_LEGACY_SHARED_BRIDGE());
-        address sender = address(users[userIndex]);
-        address l1Token = l1Tokens[l1TokenIndex];
-        address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(l1Token);
-
-        vm.assume(l2Token.code.length != 0);
-
-        uint256 balance = BridgedStandardERC20(l2Token).balanceOf(sender);
-
-        vm.assume(balance != 0);
-
-        uint256 amount = bound(_amount, 1, balance);
-
-        vm.assume(sharedBridge.l1TokenAddress(l2Token) != address(0));
-        vm.assume(l2NativeTokenVault.assetId(l2Token) != bytes32(0));
-
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge({
-            _l1Receiver: _l1Receiver,
-            _l2Token: l2Token,
-            _amount: amount,
-            _sender: sender
-        });
-
-        ghost_totalWithdrawals += amount;
-    }
-
     // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
     /// @notice Encodes the token data.
     /// @param name The name of the token.
