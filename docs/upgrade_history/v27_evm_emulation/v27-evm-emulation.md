@@ -2,7 +2,7 @@
 
 ## Upgrade process
 
-V27 upgrade will happen after the gateway preparation upgrade, but before the gateway is deployed. As such the ugprade process does not involve the Gateway parts ( upgrading the CTM on GW, etc), it is an L1-only upgrade.
+V27 upgrade will happen after the gateway preparation upgrade, but before the gateway is deployed. As such the upgrade process does not involve the Gateway parts ( upgrading the CTM on GW, etc), it is an L1-only upgrade.
 
 Additionally this is not a bridge upgrade, as the bridge and ecosystem contracts don't have new features, so L1<>L2 bridging is not affected. This means that only the system components, the Verifiers, Facets and L2 contracts need to be upgraded.
 
@@ -24,9 +24,9 @@ The upgrade process is as follows:
 
 Read more here: [Upgrade process document](../../chain_management/upgrade_process.md)
 
-## Changes:
+## Changes
 
-### New features:
+### New features
 
 - EVM emulation, system contracts and bootloader
 - service transaction on Mailbox
@@ -34,14 +34,14 @@ Read more here: [Upgrade process document](../../chain_management/upgrade_proces
 - identity precompile
 - ChainTypeManager: add setServerNotifier ( used for GW migration)
 
-### Bug fixes:
+### Bug fixes
 
 - GW send data to L1 bug in Executor
 - safeCall tokenData on L2.
 - Token registration
 - Bridgehub: registerLegacy onlyL1 modifier
 
-### Token registration:
+### Token registration
 
 - L1Nullifier → small check added in token registration
 - L1AssetRouter: → small check in token registration
@@ -49,7 +49,7 @@ Read more here: [Upgrade process document](../../chain_management/upgrade_proces
 - L2AssetRouter: token registration check
 - L2NTV: token registration
 
-### Changed without need for upgrade:
+### Changed without need for upgrade
 
 - AssetRouterBase → casting, no need
 - L1ERC20Bridge → comment changes, don’t change
