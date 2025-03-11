@@ -35,15 +35,17 @@ contract L1SharedBridgeActorHandler is ActorHandler {
         uint256 userIndex = bound(_userIndex, 0, receivers.length - 1);
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
+        Token memory token = tokens[tokenIndex];
+
+        vm.assume(token.bridged);
+
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
 
         L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
         uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
 
-        if (DataEncoding.encodeNTVAssetId(l1ChainId, l1Token) == baseTokenAssetId) {
-            return;
-        }
+        vm.assume(DataEncoding.encodeNTVAssetId(l1ChainId, l1Token) == baseTokenAssetId);
 
         l2SharedBridge.finalizeDeposit({
             _l1Sender: _sender,
