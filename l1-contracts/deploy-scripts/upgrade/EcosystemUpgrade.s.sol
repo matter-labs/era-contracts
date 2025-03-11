@@ -187,7 +187,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         deployStateTransitionDiamondFacets();
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
 
-        upgradeAddresses.transitionaryOwner = deploySimpleContract("TransitionaryOwner");
+        // upgradeAddresses.transitionaryOwner = deploySimpleContract("TransitionaryOwner");
         // upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
         // Additional (optional) newConfiguration after deploy
 
