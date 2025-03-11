@@ -29,7 +29,7 @@ import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.s
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -64,6 +64,7 @@ struct Config {
     address create2FactoryAddress;
     bytes32 create2Salt;
     bool allowEvmEmulator;
+    address serverNotifier;
 }
 
 contract RegisterZKChainScript is Script {
@@ -157,6 +158,7 @@ contract RegisterZKChainScript is Script {
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
         config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr");
+        config.serverNotifier = toml.readAddress("$.deployed_addresses.server_notifier");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -211,6 +213,7 @@ contract RegisterZKChainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
+        config.serverNotifier = toml.readAddress("$.deployed_addresses.server_notifier");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");

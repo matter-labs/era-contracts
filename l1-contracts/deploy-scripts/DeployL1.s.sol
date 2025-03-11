@@ -82,6 +82,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -139,6 +140,8 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot"
         );
 
+        deployServerNotifier();
+
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
             "L1Nullifier"
         );
@@ -174,6 +177,7 @@ contract DeployL1Script is Script, DeployUtils {
         ) = deployTuppWithContract("ChainTypeManager");
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
+        setChainTypeManagerInServerNotifier();
 
         updateOwners();
 
@@ -226,6 +230,28 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier");
+    }
+
+    function setChainTypeManagerInServerNotifier() internal {
+        ServerNotifier serverNotifier = ServerNotifier(addresses.serverNotifier);
+        vm.broadcast(msg.sender);
+        serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
+        console.log("ChainTypeManager set in ServerNotifier");
+    }
+
+    function deployServerNotifier() public {
+        bytes memory bytecode = type(ServerNotifier).creationCode;
+        address contractAddressImpl = deployViaCreate2(bytecode, abi.encode(true));
+
+        console.log("ServerNotifier Impl deployed at:", contractAddressImpl);
+
+        bytes memory initCalldata = abi.encodeCall(ServerNotifier.initialize, (config.deployerAddress));
+        address contractAddress = deployViaCreate2(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
+        );
+        console.log("ServerNotifier deployed at:", contractAddress);
+        addresses.serverNotifier = contractAddress;
     }
 
     function deployDAValidators() internal {
@@ -499,6 +525,7 @@ contract DeployL1Script is Script, DeployUtils {
             "blob_versioned_hash_retriever_addr",
             addresses.blobVersionedHashRetriever
         );
+        vm.serializeAddress("deployed_addresses", "server_notifier", addresses.serverNotifier);
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 
