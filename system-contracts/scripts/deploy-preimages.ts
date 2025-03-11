@@ -3,9 +3,8 @@ import * as hre from "hardhat";
 
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { Command } from "commander";
-import type { BigNumber, BytesLike } from "ethers";
+import { BytesLike } from "ethers";
 import { ethers } from "ethers";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 import type { types } from "zksync-web3";
@@ -13,7 +12,7 @@ import { Provider, Wallet } from "zksync-web3";
 import { hashBytecode } from "zksync-web3/build/src/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import type { Dependency, DeployedDependency } from "./utils";
-import { checkMarkers, filterPublishedFactoryDeps, getBytecodes, publishFactoryDeps, readYulBytecode } from "./utils";
+import { checkMarkers, filterPublishedFactoryDeps, publishFactoryDeps, readYulBytecode } from "./utils";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -78,18 +77,12 @@ class PublishReporter {
 
 class ZkSyncDeployer {
   deployer: Deployer;
-  gasPrice: BigNumber;
-  nonce: number;
   dependenciesToUpgrade: DeployedDependency[];
   defaultAccountToUpgrade?: DeployedDependency;
   bootloaderToUpgrade?: DeployedDependency;
-  reporter: PublishReporter;
-  constructor(deployer: Deployer, gasPrice: BigNumber, nonce: number) {
+  constructor(deployer: Deployer) {
     this.deployer = deployer;
-    this.gasPrice = gasPrice;
-    this.nonce = nonce;
     this.dependenciesToUpgrade = [];
-    this.reporter = new PublishReporter();
   }
 
   async publishFactoryDeps(dependencies: Dependency[]) {
@@ -97,10 +90,7 @@ class ZkSyncDeployer {
       return;
     }
 
-    const priorityOpHandle = await publishFactoryDeps(dependencies, this.deployer, this.nonce, this.gasPrice);
-
-    await this.reporter.appendPublish(getBytecodes(dependencies), this.deployer, priorityOpHandle);
-    this.nonce += 1;
+    await publishFactoryDeps(dependencies, this.deployer);
   }
 
   // Returns the current default account bytecode on zkSync
@@ -112,7 +102,9 @@ class ZkSyncDeployer {
   // If needed, appends the default account bytecode to the upgrade
   async checkShouldUpgradeDefaultAA(defaultAccountBytecode: string) {
     const bytecodeHash = ethers.utils.hexlify(hashBytecode(defaultAccountBytecode));
-    const currentDefaultAccountBytecode = ethers.utils.hexlify(await this.currentDefaultAccountBytecode());
+
+    // Todo: fetch the default AA hash from L2
+    const currentDefaultAccountBytecode = "0x0";
 
     // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentDefaultAccountBytecode) {
@@ -159,7 +151,8 @@ class ZkSyncDeployer {
 
   async checkShouldUpgradeBootloader(bootloaderCode: string) {
     const bytecodeHash = ethers.utils.hexlify(hashBytecode(bootloaderCode));
-    const currentBootloaderBytecode = ethers.utils.hexlify(await this.currentBootloaderBytecode());
+    // Todo: fetch the bootloader hash from L2
+    const currentBootloaderBytecode = "0x0";
 
     // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentBootloaderBytecode) {
@@ -319,19 +312,9 @@ async function main() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const deployer = new Deployer(hre, wallet as any);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      deployer.zkWallet = deployer.zkWallet.connect(providerL2 as any).connectToL1(providerL1);
-      deployer.ethWallet = deployer.ethWallet.connect(providerL1);
-      const ethWallet = deployer.ethWallet;
+      deployer.zkWallet = deployer.zkWallet.connect(providerL2 as any);
 
-      console.log(`Using deployer wallet: ${ethWallet.address}`);
-
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await providerL1.getGasPrice();
-      console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
-
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await ethWallet.getTransactionCount();
-      console.log(`Using nonce: ${nonce}`);
-
-      const zkSyncDeployer = new ZkSyncDeployer(deployer, gasPrice, nonce);
+      const zkSyncDeployer = new ZkSyncDeployer(deployer);
       if (cmd.bootloader) {
         await zkSyncDeployer.processBootloader();
       }
@@ -344,9 +327,6 @@ async function main() {
         const dependenciesToPublish = await zkSyncDeployer.prepareContractsForPublishing();
         await zkSyncDeployer.publishDependencies(dependenciesToPublish);
       }
-
-      console.log("\nSending all L1->L2 transactions done. Now waiting for the reports on those...\n");
-      await zkSyncDeployer.reporter.report();
 
       const result = zkSyncDeployer.returnResult();
       console.log(JSON.stringify(result, null, 2));
