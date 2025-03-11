@@ -183,7 +183,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier");
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter");
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault");
-        
+
         deployStateTransitionDiamondFacets();
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
 
@@ -478,7 +478,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         require(config.ownerAddress != address(0), "owner not set");
 
         data = FixedForceDeploymentsData({
-            l1ChainId: config.l1ChainId, 
+            l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
@@ -494,7 +494,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
-            l2SharedBridgeLegacyImpl: address(0), 
+            l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
