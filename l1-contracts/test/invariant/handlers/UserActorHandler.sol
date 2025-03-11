@@ -140,10 +140,17 @@ contract UserActorHandler is ActorHandler {
         Token memory token = tokens[tokenIndex];
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(token);
         bytes memory d = DataEncoding.encodeBridgeBurnData(0, address(0), l2Token);
-        uint256 chainid = token.bridged ? l2AssetRouter.L1_CHAIN_ID() : block.chainid;
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(chainid, l2Token);
+        uint256 chainid;
+        bytes32 expectedAssetId;
+        if (token.bridged) {
+            chainid = l2AssetRouter.L1_CHAIN_ID();
+            expectedAssetId = DataEncoding.encodeNTVAssetId(chainid, l1Token);
+        } else {
+            chainid = block.chainid;
+            expectedAssetId = DataEncoding.encodeNTVAssetId(chainid, l2Token);
+        }
 
-        if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] || l2NativeTokenVault.assetId(l2Token) != bytes32(0)) {
+        if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] || l2NativeTokenVault.assetId(l2Token) != bytes32(0) || l2Token.code.length == 0) {
             return;
         }
 
