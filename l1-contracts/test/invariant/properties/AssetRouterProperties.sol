@@ -76,17 +76,19 @@ abstract contract AssetRouterProperties is Test {
     function invariant_L1AssetRouterActorHandlerHasZeroBalance() external {
         assertTrue(initialized);
 
-        address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+        for (uint256 i; i < tokens.length; i++) {
+            address l2Token = _getL2Token(tokens[i]);
 
-        if (l2TokenAddress.code.length == 0) {
-            return;
+            if (l2Token.code.length == 0) {
+                continue;
+            }
+
+            assertEq(
+                BridgedStandardERC20(l2Token).balanceOf(address(l1AssetRouterActorHandler)),
+                0,
+                "L1AssetRouter must own zero bridged tokens"
+            );
         }
-
-        assertEq(
-            BridgedStandardERC20(l2TokenAddress).balanceOf(address(l1AssetRouterActorHandler)),
-            0,
-            "L1AssetRouter must own zero bridged tokens"
-        );
     }
 
     function invariant_TokensRegisteredCorrectlyWithL2NativeTokenVault() external {
