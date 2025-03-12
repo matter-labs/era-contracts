@@ -195,7 +195,7 @@ library DeployedContractsComparator {
         require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
         require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
-        require(a.serverNotifier == b.serverNotifier, "serverNotifier proxy differs");
+        require(a.serverNotifierProxy == b.serverNotifierProxy, "serverNotifier proxy differs");
     }
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {
