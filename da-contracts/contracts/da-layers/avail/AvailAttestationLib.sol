@@ -6,11 +6,7 @@ import {IAvailBridge} from "./IAvailBridge.sol";
 
 abstract contract AvailAttestationLib {
     struct AttestationData {
-        /// @dev Address of the chain's diamond
-        address attester;
-        /// @dev Block number on Avail
         uint32 blockNumber;
-        /// @dev Index of the leaf in the data root
         uint128 leafIndex;
     }
 
@@ -31,7 +27,6 @@ abstract contract AvailAttestationLib {
     function _attest(IAvailBridge.MerkleProofInput memory input) internal virtual {
         if (!bridge.verifyBlobLeaf(input)) revert InvalidAttestationProof();
         attestations[input.leaf] = AttestationData(
-            msg.sender,
             vectorx.rangeStartBlocks(input.rangeHash) + uint32(input.dataRootIndex) + 1,
             uint128(input.leafIndex)
         );

@@ -39,7 +39,7 @@ The order of the files here only roughly represents the order of reading. A lot 
   - [DA handling on Gateway](./gateway/gateway_da.md)
 - Upgrade history
   - [Gateway upgrade diff](./upgrade_history/gateway_upgrade/gateway_diff_review.md)
-  - [Gateway upgrade process](<./upgrade_history/gateway_upgrade/upgrade_process%20(no%20gateway%20chain).md>)
+  - [Gateway upgrade process](./upgrade_history/gateway_upgrade/upgrade_process.md)
 
 ![Reading order](./img/reading_order.png)
 

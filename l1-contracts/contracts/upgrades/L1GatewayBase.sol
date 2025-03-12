@@ -12,14 +12,10 @@ import {ZKChainStorage} from "../state-transition/chain-deps/ZKChainStorage.sol"
 import {L2WrappedBaseTokenStore} from "../bridge/L2WrappedBaseTokenStore.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
-
 /// @title L1GatewayBase
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 abstract contract L1GatewayBase {
-    using UnsafeBytes for bytes;
-
     /// @notice The function to retrieve the chain-specific upgrade data.
     /// @param s The pointer to the storage of the chain.
     /// @param _wrappedBaseTokenStore The address of the `L2WrappedBaseTokenStore` contract.
@@ -47,23 +43,15 @@ abstract contract L1GatewayBase {
             baseTokenName = string("Ether");
             baseTokenSymbol = string("ETH");
         } else {
-            (string memory stringResult, bool success) = _safeCallTokenMetadata(
-                _baseTokenAddress,
-                abi.encodeCall(IERC20Metadata.name, ())
-            );
-            if (success) {
-                baseTokenName = stringResult;
-            } else {
+            try this.getTokenName(_baseTokenAddress) returns (string memory name) {
+                baseTokenName = name;
+            } catch {
                 baseTokenName = string("Base Token");
             }
 
-            (stringResult, success) = _safeCallTokenMetadata(
-                _baseTokenAddress,
-                abi.encodeCall(IERC20Metadata.symbol, ())
-            );
-            if (success) {
-                baseTokenSymbol = stringResult;
-            } else {
+            try this.getTokenSymbol(_baseTokenAddress) returns (string memory symbol) {
+                baseTokenSymbol = symbol;
+            } catch {
                 // "BT" is an acronym for "Base Token"
                 baseTokenSymbol = string("BT");
             }
@@ -81,31 +69,11 @@ abstract contract L1GatewayBase {
         return abi.encode(additionalForceDeploymentsData);
     }
 
-    /// @notice Calls a token's metadata method.
-    /// @dev For the sake of simplicity, we expect that either of the
-    /// following is true:
-    /// 1. The token does not support metadata methods
-    /// 2. The token supports it and returns a `bytes32` string there.
-    /// 3. The token supports it and returns a correct `string` as a returndata.
-    ///
-    /// For all other cases, this function will panic and so such chains would not be
-    /// deployable.
-    function _safeCallTokenMetadata(address _token, bytes memory data) internal view returns (string memory, bool) {
-        // We are not afraid if token returns large calldata, since it affects
-        // only the deployment of the chain that uses such a malicious token.
-        (bool callSuccess, bytes memory returnData) = _token.staticcall(data);
+    function getTokenName(address _token) external view returns (string memory) {
+        return IERC20Metadata(_token).name();
+    }
 
-        // The failed call most likely means that this method is not supported.
-        if (!callSuccess) {
-            return ("", false);
-        }
-
-        // This case covers non-standard tokens, such as Maker (MKR), that return `bytes32` instead of `string`
-        if (returnData.length == 32) {
-            return ("", false);
-        }
-
-        // Note, that the following line will panic in case the token has more non-standard behavior.
-        return (abi.decode(returnData, (string)), true);
+    function getTokenSymbol(address _token) external view returns (string memory) {
+        return IERC20Metadata(_token).symbol();
     }
 }
