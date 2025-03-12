@@ -256,16 +256,16 @@ contract AcceptAdmin is Script {
 
     /// @notice Change pubdata pricing mode. Need to be called by chain admin.
     /// @param chainAdmin The chain admin
-    /// @param target The diamond proxy of the chain.
+    /// @param target The zk chain contract.
     /// @param pricingMode The new pricing mode.
     function setPubdataPricingMode(ChainAdmin chainAdmin, address target, PubdataPricingMode pricingMode) public {
-        IZKChain adminContract = IZKChain(target);
+        IZKChain zkChainContract = IZKChain(target);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: target,
             value: 0,
-            data: abi.encodeCall(adminContract.setPubdataPricingMode, (pricingMode))
+            data: abi.encodeCall(zkChainContract.setPubdataPricingMode, (pricingMode))
         });
 
         vm.startBroadcast();
