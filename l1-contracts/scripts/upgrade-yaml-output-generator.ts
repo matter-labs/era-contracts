@@ -4,8 +4,10 @@ import * as fs from "fs/promises";
 import { parse } from "toml";
 import { stringify } from "yaml";
 
-const RUN_FILE_PATH = "broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json";
-const OUTPUT_FILE_PATH = "script-out/gateway-upgrade-ecosystem.toml";
+const RUN_FILE_PATH = process.env.UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS;
+// "broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json";
+const OUTPUT_FILE_PATH = process.env.UPGRADE_ECOSYSTEM_OUTPUT;
+// "script-out/v27-ecosystem.toml";
 
 // Utility function to safely parse JSON.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
