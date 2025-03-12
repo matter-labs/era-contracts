@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
-import {IL1Messenger} from "../../../common/interfaces/IL1Messenger.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
@@ -22,15 +21,9 @@ import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1T
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
-/// @dev The version that is used for the `Executor` calldata used for relaying the
-/// stored batch info.
-uint8 constant RELAYED_EXECUTOR_VERSION = 0;
-
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Note, that the exact code present below is only present on the L2 in production environment.
-/// For the code on L1 environment, you should look into the following commit: https://github.com/matter-labs/era-contracts/commit/e815d8d86841fa0d8dc6a544941222f48859eeda.
 contract ExecutorFacet is ZKChainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
@@ -54,7 +47,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal returns (StoredBatchInfo memory storedBatchInfo) {
+    ) internal returns (StoredBatchInfo memory) {
         // only commit next batch
         if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
@@ -88,43 +81,24 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) = _createBatchCommitment(
+        bytes32 commitment = _createBatchCommitment(
             _newBatch,
             daOutput.stateDiffHash,
             daOutput.blobsOpeningCommitments,
             daOutput.blobsLinearHashes
         );
 
-        storedBatchInfo = StoredBatchInfo({
-            batchNumber: _newBatch.batchNumber,
-            batchHash: _newBatch.newStateRoot,
-            indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
-            numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
-            priorityOperationsHash: _newBatch.priorityOperationsHash,
-            l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
-            timestamp: _newBatch.timestamp,
-            commitment: commitment
-        });
-
-        if (L1_CHAIN_ID != block.chainid) {
-            // If we are settling on top of Gateway, we always relay the data needed to construct
-            // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
-            // This data includes:
-            // - `StoredBatchInfo` that is needed to execute a block on top of the previous one.
-            // But also, we need to ensure that the components of the commitment of the batch are available:
-            // - passThroughDataHash (and its full preimage)
-            // - metadataHash (only the hash)
-            // - auxiliaryOutputHash (only the hash)
-            // The source of the truth for the data from above can be found here:
-            // https://github.com/matter-labs/zksync-protocol/blob/c80fa4ee94fd0f7f05f7aea364291abb8b4d7351/crates/zkevm_circuits/src/scheduler/mod.rs#L1356-L1369
-            //
-            // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
-            // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
-            // slither-disable-next-line unused-return
-            IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(
-                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
-            );
-        }
+        return
+            StoredBatchInfo({
+                batchNumber: _newBatch.batchNumber,
+                batchHash: _newBatch.newStateRoot,
+                indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
+                numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
+                priorityOperationsHash: _newBatch.priorityOperationsHash,
+                l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
+                timestamp: _newBatch.timestamp,
+                commitment: commitment
+            });
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
@@ -622,14 +596,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
-    ) internal view returns (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) {
+    ) internal view returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
-        metadataHash = keccak256(_batchMetaParameters());
-        auxiliaryOutputHash = keccak256(
+        bytes32 metadataHash = keccak256(_batchMetaParameters());
+        bytes32 auxiliaryOutputHash = keccak256(
             _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
         );
 
-        commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
     function _batchPassThroughData(CommitBatchInfo memory _batch) internal pure returns (bytes memory) {

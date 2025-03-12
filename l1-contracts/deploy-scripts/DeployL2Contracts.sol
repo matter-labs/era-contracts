@@ -128,14 +128,6 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-    function runDeployL2DAValidator() public {
-        initializeConfig();
-
-        deployL2DaValidator();
-
-        saveOutput();
-    }
-
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");

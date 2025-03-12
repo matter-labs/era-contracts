@@ -141,15 +141,15 @@ library GatewayCTMDeployerHelper {
     ) internal returns (DeployedContracts memory) {
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
-                "L2TestnetVerifier",
-                "L2TestnetVerifier.sol",
+                "TestnetVerifier",
+                "TestnetVerifier.sol",
                 hex"",
                 innerConfig
             );
         } else {
             _deployedContracts.stateTransition.verifier = _deployInternal(
-                "L2Verifier",
-                "L2Verifier.sol",
+                "Verifier",
+                "Verifier.sol",
                 hex"",
                 innerConfig
             );
@@ -313,8 +313,8 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
         // Include both verifiers since we cannot determine which one will be used
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L2TestnetVerifier.sol", "L2TestnetVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L2Verifier.sol", "L2Verifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Verifier.sol", "Verifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");

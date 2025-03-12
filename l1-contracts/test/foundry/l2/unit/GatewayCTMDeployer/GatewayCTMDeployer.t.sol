@@ -17,8 +17,8 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
-import {L2Verifier} from "contracts/state-transition/L2Verifier.sol";
-import {L2TestnetVerifier} from "contracts/state-transition/L2TestnetVerifier.sol";
+import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -70,8 +70,8 @@ contract GatewayCTMDeployerTest is Test {
         new ChainTypeManager(address(0));
         new ProxyAdmin();
 
-        new L2TestnetVerifier();
-        new L2Verifier();
+        new TestnetVerifier();
+        new Verifier();
 
         new ValidatorTimelock(address(0), 0);
 

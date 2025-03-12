@@ -20,7 +20,7 @@ import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
-uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
+uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
 
 /// @dev Unlike the value above, it is not overridden for the purpose of testing and
 /// is identical to the constant value actually used as the system contracts offset on

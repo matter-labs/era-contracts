@@ -12,9 +12,9 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-import {L2Verifier} from "../L2Verifier.sol";
+import {Verifier} from "../Verifier.sol";
 import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {L2TestnetVerifier} from "../L2TestnetVerifier.sol";
+import {TestnetVerifier} from "../TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
@@ -233,9 +233,9 @@ contract GatewayCTMDeployer {
         DeployedContracts memory _deployedContracts
     ) internal {
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(new L2TestnetVerifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(new TestnetVerifier{salt: _salt}());
         } else {
-            _deployedContracts.stateTransition.verifier = address(new L2Verifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(new Verifier{salt: _salt}());
         }
     }
 
