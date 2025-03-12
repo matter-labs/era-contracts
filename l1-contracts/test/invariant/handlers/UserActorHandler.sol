@@ -16,7 +16,7 @@ contract UserActorHandler is ActorHandler {
 
     constructor(Token[] memory _tokens) ActorHandler(_tokens) {}
 
-    function withdrawV1(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
+    function withdrawV0(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
@@ -31,7 +31,7 @@ contract UserActorHandler is ActorHandler {
         ghost_totalWithdrawalAmount += amount;
     }
 
-    function withdraw(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
+    function withdrawV1(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
@@ -84,7 +84,7 @@ contract UserActorHandler is ActorHandler {
         ghost_totalFunctionCalls++;
     }
 
-    function registerTokenWithVault(uint256 _tokenIndex) external {
+    function registerTokenWithVaultV0(uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
@@ -101,7 +101,7 @@ contract UserActorHandler is ActorHandler {
         ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
     }
 
-    function registerTokenWithVaultV2(uint256 _tokenIndex) external {
+    function registerTokenWithVaultV1(uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
@@ -119,7 +119,7 @@ contract UserActorHandler is ActorHandler {
         ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
     }
 
-    function registerTokenWithVaultV3(uint256 _tokenIndex) external {
+    function registerTokenWithVaultV2(uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
         (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
@@ -133,7 +133,7 @@ contract UserActorHandler is ActorHandler {
         ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
     }
 
-    function registerTokenWithVaultV4(uint256 _tokenIndex) external {
+    function registerTokenWithVaultV3(uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
         Token memory token = tokens[tokenIndex];
