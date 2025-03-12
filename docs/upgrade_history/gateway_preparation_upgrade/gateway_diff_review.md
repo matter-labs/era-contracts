@@ -97,4 +97,4 @@ In order to achieve CAB, we separated the liquidity managing logic from the Shar
 
 ## Upgrade process in detail
 
-You can read more about the upgrade process itself [here](<./upgrade_process%20(no%20gateway%20chain).md>).
+You can read more about the upgrade process itself [here](<./upgrade_process_(no_gateway_chain).md>).
