@@ -171,12 +171,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         instantiateCreate2Factory();
 
         deployVerifiers();
+        // add custom upgrade deployment here instead of DefaultUpgrade if needed.
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
-        // add custom upgrade deployment here
-
-        // initializeExpectedL2Addresses();
-        // deployDAValidators();
 
         addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub");
 
@@ -186,20 +183,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         deployStateTransitionDiamondFacets();
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
-
-        // upgradeAddresses.transitionaryOwner = deploySimpleContract("TransitionaryOwner");
-        // upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
-        // Additional (optional) newConfiguration after deploy
-
-        // allowDAPair(
-        //     addresses.daAddresses.rollupDAManager,
-        //     addresses.daAddresses.l1RollupDAValidator,
-        //     upgradeAddresses.expectedL2Addresses.expectedRollupL2DAValidator
-        // );
-
-        // address[] memory ownershipsToTransfer = new address[](1);
-        // ownershipsToTransfer[0] = addresses.daAddresses.rollupDAManager;
-        // transferOwnershipsToGovernance(ownershipsToTransfer);
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
@@ -427,26 +410,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
-        // require(upgradeConfig.expectedL2AddressesInitialized, "Expected L2 addresses not initialized");
         FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
         generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
-
-    // function initializeExpectedL2Addresses() internal virtual {
-    //     address aliasedGovernance = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
-
-    //     upgradeAddresses.expectedL2Addresses = ExpectedL2Addresses({
-    //         expectedRollupL2DAValidator: getExpectedL2Address("RollupL2DAValidator"),
-    //         expectedValidiumL2DAValidator: getExpectedL2Address("NoDAL2DAValidator"),
-    //         l2SharedBridgeLegacyImpl: getExpectedL2Address("L2LegacySharedBridge"),
-    //         l2BridgedStandardERC20Impl: getExpectedL2Address("L2StandardERC20")
-    //     });
-
-    //     upgradeConfig.expectedL2AddressesInitialized = true;
-    // }
 
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
         return
@@ -747,66 +716,22 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         upgradeConfig.factoryDepsPublished = true;
     }
 
-    // Permissioned actions
-
-    // function _transferOwnershipToGovernance(address target) internal virtual {
-    //     if (Ownable2StepUpgradeable(target).owner() != config.ownerAddress) {
-    //         Ownable2StepUpgradeable(target).transferOwnership(upgradeAddresses.transitionaryOwner);
-    //         TransitionaryOwner(upgradeAddresses.transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
-    //     }
-    // }
-
-    // function _transferOwnershipToEcosystemAdmin(address target) internal virtual {
-    //     if (Ownable2StepUpgradeable(target).owner() != newConfig.ecosystemAdminAddress) {
-    //         // Is agile enough to accept ownership quickly
-    //         Ownable2StepUpgradeable(target).transferOwnership(newConfig.ecosystemAdminAddress);
-    //     }
-    // }
-
-    // function transferOwnershipsToGovernance(address[] memory addressesToUpdate) public virtual {
-    //     vm.startBroadcast(msg.sender);
-
-    //     // Note, that it will take some time for the governance to sign the "acceptOwnership" transaction,
-    //     // in order to avoid any possibility of the front-run, we will temporarily give the ownership to the
-    //     // contract that can only transfer ownership to the governance.
-    //     for (uint256 i; i < addressesToUpdate.length; i++) {
-    //         _transferOwnershipToGovernance(addressesToUpdate[i]);
-    //     }
-
-    //     vm.stopBroadcast();
-    //     console.log("Owners updated");
-    // }
-
-    // function allowDAPair(
-    //     address rollupDAManager,
-    //     address l1RollupDAValidator,
-    //     address expectedRollupL2DAValidator
-    // ) public virtual {
-    //     if (
-    //         !RollupDAManager(rollupDAManager).isPairAllowed(address(l1RollupDAValidator), expectedRollupL2DAValidator)
-    //     ) {
-    //         vm.broadcast(msg.sender);
-    //         RollupDAManager(rollupDAManager).updateDAPair(
-    //             address(l1RollupDAValidator),
-    //             expectedRollupL2DAValidator,
-    //             true
-    //         );
-    //     }
-    //     console.log("DA pair set");
-    // }
-
     ////////////////////////////// Preparing calls /////////////////////////////////
 
     function prepareDefaultGovernanceCalls()
         public
         virtual
-        returns (Call[] memory stage1Calls, Call[] memory stage2Calls)
+        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
     {
-        // Default upgrade is done it 2 stages:
-        // 1. Pause migration to/from Gateway
-        // 2. Perform upgrade
-        // stage1Calls = prepareStage1GovernanceCalls();
-        // vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
+        // Default upgrade is done it 3 stages:
+        // 0. Pause migration to/from Gateway
+        // 1. Perform upgrade
+        // 2. Unpause migration to/from Gateway
+        stage0Calls = prepareStage0GovernanceCalls();
+        vm.serializeBytes("governance_calls", "governance_stage0_calls", abi.encode(stage0Calls));
+
+        stage1Calls = prepareStage1GovernanceCalls();
+        vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
 
         stage2Calls = prepareStage2GovernanceCalls();
 
@@ -819,22 +744,27 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
     }
 
-    /// @notice The first step of upgrade. By default it just stops gateway migrations
-    // function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-    //     Call[][] memory allCalls = new Call[][](0);
+    /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
+    function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
+        allCalls[0] = preparePauseGatewayMigrationsCall();
+        calls = mergeCallsArray(allCalls);
+    }
 
-    //     calls = mergeCallsArray(allCalls);
-    // }
-
-    /// @notice The second step of upgrade. By default it is actual upgrade
-    function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](6);
+    /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
+    function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](3);
         allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = preparePauseGatewayMigrationsCall(); // TODO: after Gateway launch should be done in stage 1 of upgrade
-        allCalls[2] = prepareNewChainCreationParamsCall();
-        allCalls[3] = provideSetNewVersionUpgradeCall();
-        // allCalls[4] = prepareContractsConfigurationCalls();
-        allCalls[5] = prepareUnpauseGatewayMigrationsCall();
+        allCalls[1] = prepareNewChainCreationParamsCall();
+        allCalls[2] = provideSetNewVersionUpgradeCall();
+        calls = mergeCallsArray(allCalls);
+    }
+
+    /// @notice The second step of upgrade. By default it unpauses migrations.
+    function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
+
+        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -861,17 +791,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             value: 0
         });
 
-        // The call that will start the timer till the end of the upgrade.
-        // TODO
-        // Call memory timerCall = Call({
-        //     target: upgradeAddresses.upgradeTimer,
-        //     data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
-        //     value: 0
-        // });
-
         calls = new Call[](1);
         calls[0] = ctmCall;
-        // calls[1] = timerCall;
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
@@ -896,21 +817,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
-    // function prepareAcceptOwnershipCalls(
-    //     address[] memory addressesToAccept
-    // ) public virtual returns (Call[] memory calls) {
-    //     console.log("Providing accept ownership calls");
-    //     calls = new Call[](addressesToAccept.length);
-
-    //     for (uint256 i; i < addressesToAccept.length; i++) {
-    //         calls[i] = Call({
-    //             target: addressesToAccept[i],
-    //             data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ()),
-    //             value: 0
-    //         });
-    //     }
-    // }
-
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
         require(
             addresses.stateTransition.chainTypeManagerProxy != address(0),
@@ -930,7 +836,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        // TODO
         calls = new Call[](5);
 
         calls[0] = _buildCallProxyUpgrade(
@@ -960,11 +865,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
     }
 
-    // /// @notice Additional calls to newConfigure contracts
-    // function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
-    //     calls = new Call[](0);
-    // }
-
     function _buildCallProxyUpgrade(
         address proxyAddress,
         address newImplementationAddress
@@ -980,23 +880,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             value: 0
         });
     }
-
-    // function _buildCallProxyUpgradeAndCall(
-    //     address proxyAddress,
-    //     address newImplementationAddress,
-    //     bytes memory data
-    // ) internal virtual returns (Call memory call) {
-    //     require(addresses.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
-
-    //     call = Call({
-    //         target: addresses.transparentProxyAdmin,
-    //         data: abi.encodeCall(
-    //             ProxyAdmin.upgradeAndCall,
-    //             (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress, data)
-    //         ),
-    //         value: 0
-    //     });
-    // }
 
     function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "GatewayUpgrade")) {
