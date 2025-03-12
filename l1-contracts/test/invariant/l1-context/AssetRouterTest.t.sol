@@ -49,7 +49,7 @@ contract AssetRouterTest is
         Token[] memory deployedTokens = _deployTokens();
         ActorHandlerAddresses memory actorHandlerAddresses = deployActorHandlers(deployedTokens);
 
-        assertEq(deployedTokens.length, 3);
+        assertEq(deployedTokens.length, 2);
 
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,

@@ -42,25 +42,17 @@ contract AssetRouter_Token_Deployer is Test {
         //
         // Impossible attribute combinations:
         // - registered with `L2SharedBridgeLegacy` and non-bridged
-        tokens = new Token[](3);
+        tokens = new Token[](2);
         // legacy, unregistered, deployed, bridged, non-base
-        address l1Token = makeAddr("legacyUnregisteredBridged L1 token");
-        tokens[0] = Token({addr: l1Token, bridged: true});
-        tokens[1] = Token({addr: L1_TOKEN_ADDRESS, bridged: true});
-        // l1Tokens[2] = ETH_TOKEN_ADDRESS;
-        address token2 = address(new ERC20("TOKEN2", "T2"));
-        tokens[2] = Token({addr: token2, bridged: false});
-
-        vm.label(L1_TOKEN_ADDRESS, "random L1 token");
-        vm.label(ETH_TOKEN_ADDRESS, "ETH L1 token");
-        vm.label(token2, "unregistered deployed non-base native L2 token");
+        address token0 = makeAddr("unregistered undeployed bridged non-base token");
+        tokens[0] = Token({addr: token0, bridged: true});
 
         UpgradeableBeacon beacon = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenBeacon();
-        bytes32 salt = bytes32(uint256(uint160(l1Token)));
+        bytes32 salt = bytes32(uint256(uint160(token0)));
         BeaconProxy proxy = new BeaconProxy{salt: salt}(address(beacon), "");
 
-        address l2Token = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenAddress(l1Token);
-        vm.label(l2Token, "legacyUnregisteredBridged L2 token");
+        address l2Token = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenAddress(token0);
+        vm.label(l2Token, "unregistered undeployed bridged non-base L2 token");
         vm.etch(l2Token, address(proxy).code);
         // slot - https://github.com/Openzeppelin/openzeppelin-contracts/blob/dc44c9f1a4c3b10af99492eed84f83ed244203f6/contracts/proxy/ERC1967/ERC1967Upgrade.sol#L123
         vm.store(
@@ -69,13 +61,13 @@ contract AssetRouter_Token_Deployer is Test {
             bytes32(uint256(uint160(address(beacon))))
         );
 
-        stdstore.target(l2SharedBridge).sig("l1TokenAddress(address)").with_key(l2Token).checked_write(l1Token);
+        stdstore.target(l2SharedBridge).sig("l1TokenAddress(address)").with_key(l2Token).checked_write(token0);
 
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, token0);
         vm.prank(address(l2NativeTokenVault));
         BridgedStandardERC20(l2Token).bridgeInitialize(
             assetId,
-            l1Token,
+            token0,
             abi.encode(abi.encode("Token"), abi.encode("T"), abi.encode(18))
         );
 
@@ -83,9 +75,13 @@ contract AssetRouter_Token_Deployer is Test {
         // of `calculateCreate2TokenAddress` returned different addresses
         assertEq(
             l2Token,
-            l2NativeTokenVault.calculateCreate2TokenAddress(l1ChainId, l1Token),
+            l2NativeTokenVault.calculateCreate2TokenAddress(l1ChainId, token0),
             "SharedBridge and L2NativeTokenVault address calculation differs"
         );
+
+        address token1 = address(new ERC20("TOKEN2", "T2"));
+        tokens[1] = Token({addr: token1, bridged: false});
+        vm.label(token1, "unregistered deployed non-bridged non-base token");
 
         assertEq(l2NativeTokenVault.originChainId(assetId), 0);
     }
