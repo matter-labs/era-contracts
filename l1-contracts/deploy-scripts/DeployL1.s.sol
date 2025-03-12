@@ -235,7 +235,7 @@ contract DeployL1Script is Script, DeployUtils {
             );
     }
 
-     function getEigenDAL2ValidatorAddress() internal returns (address) {
+    function getEigenDAL2ValidatorAddress() internal returns (address) {
         return
             Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
