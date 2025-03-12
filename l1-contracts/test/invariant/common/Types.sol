@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 struct Token {
     address addr;
+    uint256 chainid;
     bool bridged;
 }
 
