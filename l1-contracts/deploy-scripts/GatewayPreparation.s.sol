@@ -44,6 +44,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -156,6 +157,38 @@ contract GatewayPreparation is Script {
         });
 
         saveOutput(output);
+    }
+
+    function notifyServerMigrationToGateway(
+        address serverNotifier,
+        address chainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
+        ServerNotifier notifier = ServerNotifier(serverNotifier);
+        Utils.adminExecute(
+            chainAdmin,
+            accessControlRestriction,
+            serverNotifier,
+            abi.encodeCall(ServerNotifier.migrateToGateway, (chainId)),
+            0
+        );
+    }
+
+    function notifyServerMigrationFromGateway(
+        address serverNotifier,
+        address chainAdmin,
+        address accessControlRestriction,
+        uint256 chainId
+    ) public {
+        ServerNotifier notifier = ServerNotifier(serverNotifier);
+        Utils.adminExecute(
+            chainAdmin,
+            accessControlRestriction,
+            serverNotifier,
+            abi.encodeCall(ServerNotifier.migrateFromGateway, (chainId)),
+            0
+        );
     }
 
     function saveOutput() internal {
