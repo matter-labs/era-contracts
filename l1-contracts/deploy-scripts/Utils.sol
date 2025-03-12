@@ -76,6 +76,8 @@ struct StateTransitionDeployedAddresses {
     address validatorTimelock;
     address diamondProxy;
     address bytecodesSupplier;
+    address serverNotifierProxy;
+    address serverNotifierImplementation;
     bool isOnGateway;
 }
 

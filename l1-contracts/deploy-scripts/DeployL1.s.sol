@@ -82,6 +82,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -145,6 +146,11 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot"
         );
 
+        (
+            addresses.stateTransition.serverNotifierImplementation,
+            addresses.stateTransition.serverNotifierProxy
+        ) = deployTuppWithContract("ServerNotifier");
+
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
             "L1Nullifier"
         );
@@ -180,6 +186,7 @@ contract DeployL1Script is Script, DeployUtils {
         ) = deployTuppWithContract("ChainTypeManager");
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
+        setChainTypeManagerInServerNotifier();
 
         updateOwners();
 
@@ -232,6 +239,13 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier");
+    }
+
+    function setChainTypeManagerInServerNotifier() internal {
+        ServerNotifier serverNotifier = ServerNotifier(addresses.stateTransition.serverNotifierProxy);
+        vm.broadcast(msg.sender);
+        serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
+        console.log("ChainTypeManager set in ServerNotifier");
     }
 
     function deployDAValidators() internal {
@@ -505,6 +519,7 @@ contract DeployL1Script is Script, DeployUtils {
             "blob_versioned_hash_retriever_addr",
             addresses.blobVersionedHashRetriever
         );
+        vm.serializeAddress("deployed_addresses", "server_notifier", addresses.stateTransition.serverNotifierProxy);
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 
@@ -764,6 +779,8 @@ contract DeployL1Script is Script, DeployUtils {
             return type(GettersFacet).creationCode;
         } else if (compareStrings(contractName, "DiamondInit")) {
             return type(DiamondInit).creationCode;
+        } else if (compareStrings(contractName, "ServerNotifier")) {
+            return type(ServerNotifier).creationCode;
         } else {
             revert(string.concat("Contract ", contractName, " creation code not set"));
         }
@@ -800,6 +817,8 @@ contract DeployL1Script is Script, DeployUtils {
                     ChainRegistrar.initialize,
                     (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
                 );
+        } else if (compareStrings(contractName, "ServerNotifier")) {
+            return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

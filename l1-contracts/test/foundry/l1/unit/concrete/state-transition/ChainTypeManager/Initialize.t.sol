@@ -24,7 +24,8 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             owner: governor,
             validatorTimelock: validator,
             chainCreationParams: params,
-            protocolVersion: 0
+            protocolVersion: 0,
+            serverNotifier: serverNotifier
         });
 
         ChainTypeManager ctm = new ChainTypeManager(address(bridgehub));
