@@ -31,11 +31,11 @@ contract AssetRouter_Token_Deployer is Test {
         assertEq(l1ChainId, l2NativeTokenVault.L1_CHAIN_ID());
         assertNotEq(l2SharedBridge, address(0));
 
-        // Each token has one of each 5 attributes:
+        // Each token has 5 attributes:
         // - registered/unregistered with `L2SharedBridgeLegacy`
         // - registered/unregistered with `L2NativeTokenVault`
         // - deployed/undeployed
-        // - bridged/non-bridged
+        // - bridged/non-bridged (note that bridged can originate from L1 or another L2)
         // - base/non-base
         //
         // A legacy token is a token that is registered with `L2SharedBridgeLegacy` but not registered with `L2NativeTokenVault`
