@@ -89,7 +89,7 @@ abstract contract AssetRouterProperties is Test {
         );
     }
 
-    function invariant_BridgedTokensConfiguredCorrectly() external {
+    function invariant_TokensRegisteredCorrectlyWithL2NativeTokenVault() external {
         assertTrue(initialized);
 
         IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
@@ -115,7 +115,7 @@ abstract contract AssetRouterProperties is Test {
         }
     }
 
-    function invariant_WETHIsNotRegistered() external {
+    function invariant_WethNeverRegisteredWithL2NativeTokenVault() external {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         IL2SharedBridgeLegacy l2SharedBridge = l2NativeTokenVault.L2_LEGACY_SHARED_BRIDGE();
         address weth = l2NativeTokenVault.WETH_TOKEN();
