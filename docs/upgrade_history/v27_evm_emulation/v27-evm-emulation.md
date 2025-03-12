@@ -15,12 +15,15 @@ The upgrade process is as follows:
   - new genesis diamondCut (which contains facetCuts, and genesis forceDeployments, as well as init data)
   - upgradeCut (which contains facetCuts, and upgrade forceDeployments, as well as upgrade data)
 - prepare ecosytem upgrade governance calls:
-  - upgrade proxies for L1 contracts.
-  - pause gateway migrations needed on CTM (but GW is not yet deployed)
-  - CTM:
-    - set new ChainCreationParams (-> contains new genesis upgrade cut data)
-    - set new version upgrade (-> contains new upgrade cut data)
-  - unpause gateway migrations needed on CTM
+  - stage 0:
+    - pause gateway migrations (needed on CTM even though GW is not yet deployed)
+  - stage 1:
+    - upgrade proxies for L1 contracts.
+    - CTM:
+      - set new ChainCreationParams (-> contains new genesis upgrade cut data)
+      - set new version upgrade (-> contains new upgrade cut data)
+  - stage 2:
+    - unpause gateway migrations
 
 Read more here: [Upgrade process document](../../chain_management/upgrade_process.md)
 
@@ -32,6 +35,7 @@ Read more here: [Upgrade process document](../../chain_management/upgrade_proces
 - service transaction on Mailbox
 - verifiers: Fflonk and plonk Dual verifiers
 - identity precompile
+- new TUPP contract ServerNotifier
 - ChainTypeManager: add setServerNotifier ( used for GW migration)
 
 ### Bug fixes
