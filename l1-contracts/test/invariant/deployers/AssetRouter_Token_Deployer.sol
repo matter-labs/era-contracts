@@ -43,17 +43,31 @@ contract AssetRouter_Token_Deployer is Test {
 
         tokens = new Token[](6);
 
-        tokens[0] = Token({addr: makeAddr("unregistered undeployed-on-L2 non-bridged token"), chainid: block.chainid, bridged: false});
+        tokens[0] = Token({
+            addr: makeAddr("unregistered undeployed-on-L2 non-bridged token"),
+            chainid: block.chainid,
+            bridged: false
+        });
 
-        tokens[1] = Token({addr: makeAddr("unregistered undeployed-on-L2 bridged-from-another-L2 token"), chainid: anotherL2ChainId, bridged: true});
+        tokens[1] = Token({
+            addr: makeAddr("unregistered undeployed-on-L2 bridged-from-another-L2 token"),
+            chainid: anotherL2ChainId,
+            bridged: true
+        });
 
-        tokens[2] = Token({addr: makeAddr("unregistered undeployed-on-L2 bridged-from-L1 token (bridged token)"), chainid: l1ChainId, bridged: true});
+        tokens[2] = Token({
+            addr: makeAddr("unregistered undeployed-on-L2 bridged-from-L1 token (bridged token)"),
+            chainid: l1ChainId,
+            bridged: true
+        });
 
         address token3 = address(new ERC20("TOKEN3", "T3"));
         tokens[3] = Token({addr: token3, chainid: block.chainid, bridged: false});
         vm.label(token3, "unregistered deployed-on-L2 non-bridged token (native token)");
 
-        address token4 = makeAddr("registered-with-`L2SharedBridgeLegacy` deployed-on-L2 bridged-from-L1 token (legacy token)");
+        address token4 = makeAddr(
+            "registered-with-`L2SharedBridgeLegacy` deployed-on-L2 bridged-from-L1 token (legacy token)"
+        );
         tokens[4] = Token({addr: token4, chainid: l1ChainId, bridged: true});
 
         UpgradeableBeacon beacon = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenBeacon();
@@ -61,7 +75,10 @@ contract AssetRouter_Token_Deployer is Test {
         BeaconProxy proxy = new BeaconProxy{salt: salt}(address(beacon), "");
 
         address l2Token = IL2SharedBridgeLegacy(l2SharedBridge).l2TokenAddress(token4);
-        vm.label(l2Token, "registered-with-`L2SharedBridgeLegacy` deployed-on-L2 bridged-from-L1 token (legacy token) - L2 address");
+        vm.label(
+            l2Token,
+            "registered-with-`L2SharedBridgeLegacy` deployed-on-L2 bridged-from-L1 token (legacy token) - L2 address"
+        );
         vm.etch(l2Token, address(proxy).code);
         // slot - https://github.com/Openzeppelin/openzeppelin-contracts/blob/dc44c9f1a4c3b10af99492eed84f83ed244203f6/contracts/proxy/ERC1967/ERC1967Upgrade.sol#L123
         vm.store(
@@ -91,5 +108,6 @@ contract AssetRouter_Token_Deployer is Test {
 
         tokens[5] = Token({addr: l2NativeTokenVault.WETH_TOKEN(), chainid: l1ChainId, bridged: false});
         vm.label(tokens[5].addr, "WETH_TOKEN");
+        assertNotEq(tokens[5].addr.code.length, 0);
     }
 }
