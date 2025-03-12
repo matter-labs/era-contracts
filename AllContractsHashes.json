@@ -977,19 +977,19 @@
   },
   {
     "contractName": "l1-contracts/DummyChainTypeManagerWBH",
-    "zkBytecodeHash": "0x0100070fef95a75531bc85fceb23f308aa8528162c3908565a8131dbe8f7e319",
+    "zkBytecodeHash": "0x0100071111e40d5c9af13ba9b5feb4e0fde975ac09eda238f8b63e1598cd36dc",
     "zkBytecodePath": "/l1-contracts/zkout/DummyChainTypeManagerWithBridgeHubAddress.sol/DummyChainTypeManagerWBH.json",
-    "evmBytecodeHash": "0xad3c5b78477344050a8eb0ef64b2d9be4ef40e6d3424592f25777a3901e5b975",
+    "evmBytecodeHash": "0x91b9776abb4f374e820f0751198c20af710c952055799e10b01369d32ae43a26",
     "evmBytecodePath": "/l1-contracts/out/DummyChainTypeManagerWithBridgeHubAddress.sol/DummyChainTypeManagerWBH.json",
-    "evmDeployedBytecodeHash": "0x8a2e5e16c080dbba8ac58b47483b591329abda05e8de5a0545af77cd9645bd3f"
+    "evmDeployedBytecodeHash": "0xfc9ec0ed6c4bb34174efcc74b81f4807b09830ea98523444d242c97cecbc236e"
   },
   {
     "contractName": "l1-contracts/DummyERC20BytesTransferReturnValue",
-    "zkBytecodeHash": "0x0100071111e40d5c9af13ba9b5feb4e0fde975ac09eda238f8b63e1598cd36dc",
+    "zkBytecodeHash": "0x0100005f9a218914b96c2685777b2237510443ea9da62f8c32f97d9e73b34474",
     "zkBytecodePath": "/l1-contracts/zkout/DummyERC20BytesTransferReturnValue.sol/DummyERC20BytesTransferReturnValue.json",
-    "evmBytecodeHash": "0x91b9776abb4f374e820f0751198c20af710c952055799e10b01369d32ae43a26",
+    "evmBytecodeHash": "0x107e1e2dd453955e6bf4bab522d5ba75319c85cacf2fdcba0cd25d814b1e9228",
     "evmBytecodePath": "/l1-contracts/out/DummyERC20BytesTransferReturnValue.sol/DummyERC20BytesTransferReturnValue.json",
-    "evmDeployedBytecodeHash": "0xfc9ec0ed6c4bb34174efcc74b81f4807b09830ea98523444d242c97cecbc236e"
+    "evmDeployedBytecodeHash": "0xf5c342cfd74f40826a8ebf0de6d9bfe68516904d899a69acd4879f3daae3712e"
   },
   {
     "contractName": "l1-contracts/DummyERC20NoTransferReturnValue",
