@@ -114,7 +114,7 @@ struct StateTransitionContracts {
     /// @notice Address of the ProxyAdmin for ChainTypeManager.
     address chainTypeManagerProxyAdmin;
     /// @notice Address of the ServerNotifier contract.
-    address serverNotifier;
+    address serverNotifierProxy;
 }
 
 /// @notice Addresses of Data Availability (DA) related contracts.
@@ -199,7 +199,7 @@ contract GatewayCTMDeployer {
         _setChainTypeManagerInValidatorTimelock(_config.aliasedGovernanceAddress, timelock, contracts);
         _setChainTypeManagerInServerNotifier(
             _config.aliasedGovernanceAddress,
-            ServerNotifier(contracts.stateTransition.serverNotifier),
+            ServerNotifier(contracts.stateTransition.serverNotifierProxy),
             contracts
         );
 
@@ -264,7 +264,7 @@ contract GatewayCTMDeployer {
     /// in the process of the execution of this function.
     function _deployServerNotifier(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
         ServerNotifier serverNotifierImplementation = new ServerNotifier{salt: _salt}(true);
-        _deployedContracts.stateTransition.serverNotifier = address(
+        _deployedContracts.stateTransition.serverNotifierProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
                 address(serverNotifierImplementation),
                 address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
@@ -401,7 +401,7 @@ contract GatewayCTMDeployer {
             validatorTimelock: _deployedContracts.stateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: _config.protocolVersion,
-            serverNotifier: _deployedContracts.stateTransition.serverNotifier
+            serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
         _deployedContracts.stateTransition.chainTypeManagerProxy = address(

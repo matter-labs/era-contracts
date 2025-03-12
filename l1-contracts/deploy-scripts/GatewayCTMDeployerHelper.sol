@@ -78,7 +78,7 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
-        contracts.stateTransition.serverNotifier = _deployServerNotifier(
+        contracts.stateTransition.serverNotifierProxy = _deployServerNotifier(
             salt,
             contracts,
             innerConfig,
@@ -310,7 +310,7 @@ library GatewayCTMDeployerHelper {
             validatorTimelock: _deployedContracts.stateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: _config.protocolVersion,
-            serverNotifier: _deployedContracts.stateTransition.serverNotifier
+            serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
         _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternal(

@@ -167,7 +167,7 @@ contract GatewayCTMFromL1 is Script {
                 diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
-                serverNotifier: expectedGatewayContracts.stateTransition.serverNotifier,
+                serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                 // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
                 diamondProxy: address(0),
@@ -512,7 +512,7 @@ contract GatewayCTMFromL1 is Script {
             validatorTimelock: output.gatewayStateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: config.latestProtocolVersion,
-            serverNotifier: output.gatewayStateTransition.serverNotifier
+            serverNotifier: output.gatewayStateTransition.serverNotifierProxy
         });
 
         output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(

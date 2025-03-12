@@ -298,7 +298,7 @@ abstract contract DeployUtils is Script {
                 validatorTimelock: stateTransition.validatorTimelock,
                 chainCreationParams: chainCreationParams,
                 protocolVersion: config.contracts.latestProtocolVersion,
-                serverNotifier: stateTransition.serverNotifier
+                serverNotifier: stateTransition.serverNotifierProxy
             });
     }
 
