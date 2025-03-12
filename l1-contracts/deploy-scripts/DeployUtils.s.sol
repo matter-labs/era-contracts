@@ -472,6 +472,8 @@ abstract contract DeployUtils is Script {
             return abi.encode(config.eraChainId, config.l1ChainId);
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ServerNotifier")) {
+            return abi.encode(true);
         } else if (compareStrings(contractName, "DiamondInit")) {
             return abi.encode();
         } else {

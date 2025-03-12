@@ -140,7 +140,10 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot"
         );
 
-        deployServerNotifier();
+        (
+            addresses.stateTransition.serverNotifierImplementation,
+            addresses.stateTransition.serverNotifier
+        ) = deployTuppWithContract("ServerNotifier");
 
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
             "L1Nullifier"
@@ -237,21 +240,6 @@ contract DeployL1Script is Script, DeployUtils {
         vm.broadcast(msg.sender);
         serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
         console.log("ChainTypeManager set in ServerNotifier");
-    }
-
-    function deployServerNotifier() public {
-        bytes memory bytecode = type(ServerNotifier).creationCode;
-        address contractAddressImpl = deployViaCreate2(bytecode, abi.encode(true));
-
-        console.log("ServerNotifier Impl deployed at:", contractAddressImpl);
-
-        bytes memory initCalldata = abi.encodeCall(ServerNotifier.initialize, (config.deployerAddress));
-        address contractAddress = deployViaCreate2(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(contractAddressImpl, addresses.transparentProxyAdmin, initCalldata)
-        );
-        console.log("ServerNotifier deployed at:", contractAddress);
-        addresses.stateTransition.serverNotifier = contractAddress;
     }
 
     function deployDAValidators() internal {
@@ -785,6 +773,8 @@ contract DeployL1Script is Script, DeployUtils {
             return type(GettersFacet).creationCode;
         } else if (compareStrings(contractName, "DiamondInit")) {
             return type(DiamondInit).creationCode;
+        } else if (compareStrings(contractName, "ServerNotifier")) {
+            return type(ServerNotifier).creationCode;
         } else {
             revert(string.concat("Contract ", contractName, " creation code not set"));
         }
@@ -821,6 +811,8 @@ contract DeployL1Script is Script, DeployUtils {
                     ChainRegistrar.initialize,
                     (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
                 );
+        } else if (compareStrings(contractName, "ServerNotifier")) {
+            return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
