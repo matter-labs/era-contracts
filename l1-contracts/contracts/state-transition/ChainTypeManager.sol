@@ -235,7 +235,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev set ServerNotifier.
     /// @param _serverNotifier the new serverNotifier address
-    function setServerNotifier(address _serverNotifier) external onlyOwner {
+    function setServerNotifier(address _serverNotifier) external onlyOwnerOrAdmin {
         address oldServerNotifier = serverNotifierAddress;
         serverNotifierAddress = _serverNotifier;
         emit NewServerNotifier(oldServerNotifier, _serverNotifier);
