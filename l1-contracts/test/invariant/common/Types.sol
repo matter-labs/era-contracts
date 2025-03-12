@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 struct Token {
     address addr;
     uint256 chainid;
+    address assetDeploymentTrackerAddr;
     bool bridged;
 }
 
