@@ -37,3 +37,17 @@ e.g.:
 ```sh
 UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json yarn upgrade-yaml-output-generator
 ```
+
+## Finalization of the upgrade
+
+This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
+
+### Deploying the multicall with gas contract
+
+Firstly, you should deploy the `MulticallWithGas` contract.
+
+After that you should use the zkstack_cli tool to get the calldata for the `FinalizeUpgrade`'s `finalizeInit` function:
+
+```sh
+forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
+```

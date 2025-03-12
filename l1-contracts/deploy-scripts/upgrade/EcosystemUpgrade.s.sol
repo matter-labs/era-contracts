@@ -14,8 +14,8 @@ import {L2TransactionRequestDirect, IBridgehub} from "contracts/bridgehub/IBridg
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
+import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -278,6 +278,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function getOldProtocolDeadline() public virtual returns (uint256) {
+        // Note, that it is this way by design, on stage2 it
+        // will be set to 0
         return type(uint256).max;
     }
 
@@ -681,9 +683,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
 
-        vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
-
-        string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
+        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
     }

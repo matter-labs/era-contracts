@@ -45,8 +45,8 @@ import {StateTransitionDeployedAddresses, Utils, FacetCut, Action} from "./Utils
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
-import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
+import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
+import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -97,6 +97,12 @@ contract DeployL1Script is Script, DeployUtils {
 
     function runForTest() public {
         runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+
+        // In the production environment, there will be a separate script dedicated to accepting the adminship
+        // but for testing purposes we'll have to do it here.
+        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        vm.broadcast(addresses.chainAdmin);
+        bridgehub.acceptAdmin();
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -739,9 +745,9 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(DualVerifier).creationCode;
             }
         } else if (compareStrings(contractName, "VerifierFflonk")) {
-            return type(VerifierFflonk).creationCode;
+            return type(L1VerifierFflonk).creationCode;
         } else if (compareStrings(contractName, "VerifierPlonk")) {
-            return type(VerifierPlonk).creationCode;
+            return type(L1VerifierPlonk).creationCode;
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return type(DefaultUpgrade).creationCode;
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
