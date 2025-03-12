@@ -41,7 +41,7 @@ contract AssetRouter_Token_Deployer is Test {
         // - base token
         // - WETH
 
-        tokens = new Token[](5);
+        tokens = new Token[](6);
 
         tokens[0] = Token({addr: makeAddr("unregistered undeployed-on-L2 non-bridged token"), chainid: block.chainid, bridged: false});
 
@@ -88,5 +88,8 @@ contract AssetRouter_Token_Deployer is Test {
             "SharedBridge and L2NativeTokenVault address calculation differs"
         );
         assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+
+        tokens[5] = Token({addr: l2NativeTokenVault.WETH_TOKEN(), chainid: l1ChainId, bridged: false});
+        vm.label(tokens[5].addr, "WETH_TOKEN");
     }
 }

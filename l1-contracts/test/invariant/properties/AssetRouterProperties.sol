@@ -11,7 +11,8 @@ import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {L2NativeTokenVault, IL2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 import {Token, ActorHandlerAddresses} from "../common/Types.sol";
@@ -112,6 +113,16 @@ abstract contract AssetRouterProperties is Test {
                 assertNotEq(tokenAddress, address(0));
             }
         }
+    }
+
+    function invariant_WETHIsNotRegistered() external {
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        IL2SharedBridgeLegacy l2SharedBridge = l2NativeTokenVault.L2_LEGACY_SHARED_BRIDGE();
+        address weth = l2NativeTokenVault.WETH_TOKEN();
+
+        assertNotEq(address(l2SharedBridge), address(0));
+
+        assertEq(l2NativeTokenVault.assetId(weth), bytes32(0));
     }
 
     function _getL2Token(Token memory t) internal view returns (address l2Token) {
