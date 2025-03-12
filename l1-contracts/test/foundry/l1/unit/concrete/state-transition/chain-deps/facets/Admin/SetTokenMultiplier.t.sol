@@ -31,8 +31,8 @@ contract SetTokenMultiplierTest is AdminTest {
         uint128 denominator = 0;
 
         vm.startPrank(chainTypeManager);
-        vm.expectRevert(DenominatorIsZero.selector);
 
+        vm.expectRevert(DenominatorIsZero.selector);
         adminFacet.setTokenMultiplier(nominator, denominator);
     }
 

@@ -3,10 +3,29 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {PlonkVerifierTest} from "contracts/dev-contracts/test/PlonkVerifierTest.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 
-contract PlonkVerifierTestTest is Test {
+import {L2VerifierPlonk} from "contracts/state-transition/verifiers/L2VerifierPlonk.sol";
+import {L2PlonkVerifierTest} from "contracts/dev-contracts/test/L2PlonkVerifierTest.sol";
+
+contract L2VerifierPlonkCaller {
+    L2VerifierPlonk public verifier;
+
+    constructor(L2VerifierPlonk _verifier) {
+        verifier = _verifier;
+    }
+
+    function verify(
+        uint256[] memory publicInputs,
+        uint256[] memory serializedProof
+    ) public view returns (bool result, uint256 gasUsed) {
+        uint256 gasBefore = gasleft();
+        result = verifier.verify(publicInputs, serializedProof);
+        gasUsed = gasBefore - gasleft();
+    }
+}
+
+contract L2PlonkVerifierTestTest is Test {
     uint256 Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
@@ -14,7 +33,7 @@ contract PlonkVerifierTestTest is Test {
     uint256[] public serializedProof;
     uint256[] public recursiveAggregationInput;
 
-    L1VerifierPlonk public verifier;
+    L2VerifierPlonk public verifier;
 
     function setUp() public virtual {
         publicInputs.push(17257057577815541751225964212897374444694342989384539141520877492729);
@@ -64,12 +83,26 @@ contract PlonkVerifierTestTest is Test {
         serializedProof.push(7419167499813234488108910149511390953153207250610705609008080038658070088540);
         serializedProof.push(11628425014048216611195735618191126626331446742771562481735017471681943914146);
 
-        verifier = new PlonkVerifierTest();
+        verifier = new L2PlonkVerifierTest();
     }
 
     function testShouldVerify() public view {
         bool success = verifier.verify(publicInputs, serializedProof);
         assert(success);
+    }
+
+    function testShouldVerifyWithGas() public {
+        // `gas snapshot` does not work well with zksync setup, so in order to obtain the amount of
+        // zkevm gas consumed we do the following:
+        // - Deploy a L2VerifierPlonkCaller contract, which would execute in zkevm context
+        // - Call the verify function from the L2VerifierPlonkCaller contract and return the gas used
+
+        L2VerifierPlonkCaller caller = new L2VerifierPlonkCaller(verifier);
+
+        (bool success, uint256 gasUsed) = caller.verify(publicInputs, serializedProof);
+        assert(success);
+
+        console.log("Gas used: %d", gasUsed);
     }
 
     function testShouldVerifyWithDirtyBits() public view {

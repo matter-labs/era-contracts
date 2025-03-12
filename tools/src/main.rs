@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .replace("contract VerifierPlonk", "contract L2VerifierPlonk")
     } else {
         plonk_verifier_contract_template
+            .replace("contract VerifierPlonk", "contract L1VerifierPlonk")
     };
 
     let fflonk_verifier_contract_template = if opt.l2_mode {
@@ -77,6 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .replace("contract VerifierFflonk", "contract L2VerifierFflonk")
     } else {
         fflonk_verifier_contract_template
+            .replace("contract VerifierFflonk", "contract L1VerifierFflonk")
     };
 
     let plonk_verification_key = fs::read_to_string(&opt.plonk_input_path)

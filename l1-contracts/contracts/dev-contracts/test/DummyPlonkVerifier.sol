@@ -4,10 +4,24 @@ pragma solidity 0.8.24;
 
 import {L1VerifierPlonk} from "../../state-transition/verifiers/L1VerifierPlonk.sol";
 
-/// @author Matter Labs
-contract PlonkVerifierTest is L1VerifierPlonk {
+contract DummyPlonkVerifier is L1VerifierPlonk {
     // add this to be excluded from coverage report
     function test() internal virtual {}
+
+    constructor() L1VerifierPlonk() {
+        assert(block.chainid != 1);
+    }
+
+    /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
+    function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view override returns (bool) {
+        // We allow skipping the zkp verification for the test(net) environment
+        // If the proof is not empty, verify it, otherwise, skip the verification
+        if (_proof.length == 0) {
+            return true;
+        }
+
+        return super.verify(_publicInputs, _proof);
+    }
 
     function _loadVerificationKey() internal pure override {
         assembly {

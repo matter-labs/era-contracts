@@ -14,16 +14,19 @@ contract TestExecutor is ExecutorFacet {
         s.priorityTree.startIndex = _startIndex;
     }
 
-    function appendPriorityOp(bytes32 _hash) external {
-        s.priorityQueue.pushBack(
-            PriorityOperation({canonicalTxHash: _hash, expirationTimestamp: type(uint64).max, layer2Tip: 0})
-        );
-    }
-
     // /// @dev Since we want to test the blob functionality we want mock the calls to the blobhash opcode.
     // function _getBlobVersionedHash(uint256 _index) internal view virtual override returns (bytes32 versionedHash) {
     //     (bool success, bytes memory data) = s.blobVersionedHashRetriever.staticcall(abi.encode(_index));
     //     require(success, "vc");
     //     versionedHash = abi.decode(data, (bytes32));
     // }
+
+    function appendPriorityOp(bytes32 _hash) external {
+        s.priorityQueue.pushBack(
+            PriorityOperation({canonicalTxHash: _hash, expirationTimestamp: type(uint64).max, layer2Tip: 0})
+        );
+    }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

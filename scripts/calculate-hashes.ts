@@ -12,6 +12,7 @@ const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 const SKIPPED_FOLDERS = [
   "l1-contracts/deploy-scripts",
   "l1-contracts/test",
+  "l1-contracts/contracts/dev-contracts",
   "system-contracts/bootloader/tests/bootloader",
 ];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
