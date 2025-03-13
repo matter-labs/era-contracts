@@ -422,9 +422,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
         return
             Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), // todo add salt here?
+                bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
                 L2ContractHelper.hashL2Bytecode(getCreationCode(contractName)),
-                hex"" // todo add constructor args here?
+                hex"" // the same as it is currently in DeployL1.s.sol
             );
     }
 
@@ -753,10 +753,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
         allCalls[0] = prepareUpgradeProxiesCalls();
         allCalls[1] = prepareNewChainCreationParamsCall();
         allCalls[2] = provideSetNewVersionUpgradeCall();
+        allCalls[3] = prepareContractsConfigurationCalls();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -876,6 +877,20 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
+            ),
+            value: 0
+        });
+    }
+
+    /// @notice Additional calls to newConfigure contracts
+    function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: addresses.daAddresses.rollupDAManager,
+            data: abi.encodeCall(
+                RollupDAManager.updateDAPair,
+                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
             ),
             value: 0
         });
