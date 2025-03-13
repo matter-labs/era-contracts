@@ -413,9 +413,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
 
         address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
-        (addresses.daAddresses.l1RollupDAValidator,) = GettersFacet(
-            eraDiamondProxy
-        ).getDAValidatorPair();
+        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
