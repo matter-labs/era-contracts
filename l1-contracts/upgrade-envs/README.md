@@ -21,16 +21,17 @@ Outputs usually consist of 4 files:
 - run-latest.json
 - verification logs
 
-**Ecosystem.toml**
+### Ecosystem.toml
+
 This is the output coming from the running of EcosystemUpgrade.s.sol script with a given's ecosystem input file.
 
 The detailed instructions on how to do it can be found in README of deploy-scripts.
 
-**run-latest.json**
+### run-latest.json
 
-This is the file taken from the broadcast dir, after EcosystemUpgrade script is run. It would contain information about the transacions that were executed etc.
+This is the file taken from the broadcast dir, after EcosystemUpgrade script is run. It would contain information about the transactions that were executed etc.
 
-**verification-logs**
+### verification-logs
 
 This contains commands used to verify the bytecodes on etherscan. Currently has to be created manually by "grep" over the logs from EcosystemUpgrade script.
 
