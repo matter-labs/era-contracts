@@ -41,8 +41,7 @@ transparent_proxy_admin = "0xcb7f8e556ef02771ea32f54e767d6f9742ed31c2"
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
 latest_protocol_version = 0x1b00000000
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-# on stage, this is not a proxy, but actual implementation.
-protocol_upgrade_handler_proxy_address = "0x699a1cd1fcd3213e20de15d2236a67d9084bf89e"
+protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000000"
 
 [tokens]
