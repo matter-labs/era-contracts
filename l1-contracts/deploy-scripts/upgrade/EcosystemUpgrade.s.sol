@@ -666,6 +666,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
 
+        vm.serializeAddress("deployed_addresses", "l2_rollup_da_validator", getExpectedL2Address("RollupL2DAValidator"));
+
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "l1_governance_upgrade_timer",
