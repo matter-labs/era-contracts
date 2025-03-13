@@ -383,7 +383,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+            config.eraChainId
+        );
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
             ctmProtocolVersion != getNewProtocolVersion(),
