@@ -52,7 +52,7 @@ After that you should use the zkstack_cli tool to get the calldata for the `Fina
 forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
 ```
 
-# Local testing:
+## Local testing
 
 ```sh
  anvil --fork-url $SEPOLIA
