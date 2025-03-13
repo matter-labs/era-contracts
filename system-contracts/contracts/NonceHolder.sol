@@ -13,11 +13,10 @@ import {NonceIncreaseError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unaut
  * @notice A contract used for managing nonces for accounts. Together with bootloader,
  * this contract ensures that the pair (sender, nonce) is always unique, ensuring
  * unique transaction hashes.
- * @dev The account allows for both ascending growth in nonces and mapping nonces to specific
- * stored values in them.
- * The users can mark a range of nonces by increasing the `minNonce`. This way all the nonces
- * less than `minNonce` will become used. The other way to mark a certain 256-bit key as nonce is to set
- * some value under it in this contract.
+ * @dev The account allows for increasing their `minNonce` by 1 or any value up to 2^32.
+ * This way all the nonces less than `minNonce` will become used. The account can also
+ * manage keyed nonces, where the nonce is split into key:value parts, 192:64 bits.
+ * For each nonce key, the nonce value is tracked separately.
  * @dev Apart from transaction nonces, this contract also stores the deployment nonce for accounts, that
  * will be used for address derivation using CREATE. For the economy of space, this nonce is stored tightly
  * packed with the `minNonce`.
@@ -87,12 +86,18 @@ contract NonceHolder is INonceHolder, SystemContractBase {
 
         uint256 addressAsKey = uint256(uint160(msg.sender));
         uint256 oldRawNonce = rawNonces[addressAsKey];
+        (, oldMinNonce) = _splitRawNonce(oldRawNonce);
+
+        // Although unrealistic in practice, we still forbid `minNonce` overflow
+        // to prevent collisions with keyed nonces.
+        if (oldMinNonce + _value > type(uint64).max) {
+            uint256 maxAllowedIncrement = type(uint64).max - oldMinNonce;
+            revert NonceIncreaseError(maxAllowedIncrement, _value);
+        }
 
         unchecked {
             rawNonces[addressAsKey] = (oldRawNonce + _value);
         }
-
-        (, oldMinNonce) = _splitRawNonce(oldRawNonce);
     }
 
     /// @notice Splits a keyed nonce into its key and value components (192:64 bits).
@@ -116,7 +121,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
 
     /// @notice A convenience method to increment the minimal nonce if it is equal
     /// to the `_expectedNonce`.
-    /// @dev This function only increments minMince for nonces with nonceKey == 0.
+    /// @dev This function only increments `minNonce` for nonces with nonceKey == 0.
     /// AAs that try to use this method with a keyed nonce will revert.
     /// For keyed nonces, `incrementMinNonceIfEqualsKeyed` should be used.
     /// This is to prevent DefaultAccount and other deployed AAs from
@@ -134,6 +139,12 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         (, uint256 oldMinNonce) = _splitRawNonce(oldRawNonce);
         if (oldMinNonce != _expectedNonce) {
             revert ValueMismatch(_expectedNonce, oldMinNonce);
+        }
+
+        // Although unrealistic in practice, we still forbid `minNonce` overflow
+        // to prevent collisions with keyed nonces.
+        if (oldMinNonce + 1 > type(uint64).max) {
+            revert NonceIncreaseError(0, 1);
         }
 
         unchecked {
