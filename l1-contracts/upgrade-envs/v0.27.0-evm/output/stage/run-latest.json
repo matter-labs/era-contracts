@@ -6,11 +6,7 @@
       "contractName": "Bridgehub",
       "contractAddress": "0x1625148949e897cc11bc449ed5a54d5d167ad864",
       "function": null,
-      "arguments": [
-        "11155111",
-        "0x8f08627524aeD610192132A425D6b9C32a1727EF",
-        "100"
-      ],
+      "arguments": ["11155111", "0x8f08627524aeD610192132A425D6b9C32a1727EF", "100"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -31,9 +27,7 @@
       "logs": [
         {
           "address": "0x1625148949e897cc11bc449ed5a54d5d167ad864",
-          "topics": [
-            "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
-          ],
+          "topics": ["0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"],
           "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
           "blockHash": "0x86585c7a4686d6b85b4aaf53361d06da215c7ea26ef61fd8365814e4e072026c",
           "blockNumber": "0x787c48",
