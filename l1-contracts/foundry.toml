@@ -20,6 +20,7 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
+    { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },

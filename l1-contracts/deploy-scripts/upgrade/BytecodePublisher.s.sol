@@ -26,6 +26,9 @@ library BytecodePublisher {
         uint256 currentBatchSize = 0;
         uint256 batchStartIndex = 0;
 
+        bytes[] memory toPublish = new bytes[](bytecodes.length);
+        uint256 toPublishPtr = 0;
+
         for (uint256 i = 0; i < totalBytecodes; i++) {
             bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecodes[i]);
             if (bytecodesSupplier.publishingBlock(hash) != 0) {
@@ -49,20 +52,22 @@ library BytecodePublisher {
             // Check if adding this bytecode exceeds the MAX_BATCH_SIZE
             if (currentBatchSize + bytecodeSize > MAX_BATCH_SIZE) {
                 // Publish the current batch
-                bytes[] memory currentBatch = slice(bytecodes, batchStartIndex, i);
+                bytes[] memory currentBatch = slice(toPublish, 0, toPublishPtr);
                 _publishBatch(bytecodesSupplier, currentBatch);
 
                 // Reset for the next batch
                 batchStartIndex = i;
-                currentBatchSize = bytecodeSize;
-            } else {
-                currentBatchSize += bytecodeSize;
+                toPublishPtr = 0;
+                currentBatchSize = 0;
             }
+
+            currentBatchSize += bytecodeSize;
+            toPublish[toPublishPtr++] = bytecodes[i];
         }
 
         // Publish the last batch if any
-        if (batchStartIndex < totalBytecodes) {
-            bytes[] memory lastBatch = slice(bytecodes, batchStartIndex, totalBytecodes);
+        if (toPublishPtr != 0) {
+            bytes[] memory lastBatch = slice(toPublish, 0, toPublishPtr);
             _publishBatch(bytecodesSupplier, lastBatch);
         }
     }
