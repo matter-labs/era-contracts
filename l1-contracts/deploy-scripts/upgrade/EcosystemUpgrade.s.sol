@@ -376,6 +376,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
+
+        addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
@@ -409,6 +411,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             .validatorTimelock();
 
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+
+        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+        (addresses.daAddresses.l1RollupDAValidator,) = GettersFacet(
+            eraDiamondProxy
+        ).getDAValidatorPair();
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
