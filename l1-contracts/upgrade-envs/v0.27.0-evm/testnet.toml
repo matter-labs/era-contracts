@@ -37,6 +37,7 @@ default_aa_hash = "0x0100050bf9baf9d08e5d3c037f8d8b486076de7e6dceb3f3fc0989ea2c9
 evm_emulator_hash = "0x01000bbb8116fe7bdf690c19740ea350375426cec23f4f1f69a12fdc58adc9ba"
 bridgehub_proxy_address = "0x35A54c8C757806eB6820629bc82d90E056394C92"
 transparent_proxy_admin = "0x0358BACa94dcD7931B7BA7aAf8a5Ac6090E143a5"
+rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
 
 governance_security_council_address = "0x25Ab0397DA109A50C8921A1d4a034e0973602469"
 latest_protocol_version = 0x1b00000000
