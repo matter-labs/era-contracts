@@ -357,11 +357,11 @@ const readSystemContractsHashesFile = (path: string): ContractsInfo[] => {
     const file = fs.readFileSync(absolutePath, "utf8");
     const parsedFile = JSON.parse(file);
     return parsedFile;
-  } catch (err: any) {
-    if (err.code === "ENOENT") {
-        console.warn(`File ${absolutePath} not found. Creating a new one.`);
-        fs.writeFileSync(absolutePath, "[]");
-        return [];
+  } catch (err) {
+    if ((err as { code?: string })?.code === "ENOENT") {
+      console.warn(`File ${absolutePath} not found. Creating a new one.`);
+      fs.writeFileSync(absolutePath, "[]");
+      return [];
     }
     const msg = err instanceof Error ? err.message : "Unknown error";
     throw new Error(`Failed to read file: ${absolutePath} Error: ${msg}`);
