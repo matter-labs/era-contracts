@@ -44,10 +44,7 @@
       "contractName": "TestnetVerifier",
       "contractAddress": "0x9be9945fce34d0871f10452172dba1b6b68d968c",
       "function": null,
-      "arguments": [
-        "0xF39f64816819C0c2DBDAD130b3CC3299643c7F80",
-        "0x24bE99617c8d85C881fE9275678Ac53369E58Db1"
-      ],
+      "arguments": ["0xF39f64816819C0c2DBDAD130b3CC3299643c7F80", "0x24bE99617c8d85C881fE9275678Ac53369E58Db1"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -104,11 +101,7 @@
       "contractName": "Bridgehub",
       "contractAddress": "0x8a822fdb62cdca0743cffb43fa73c113de1f97df",
       "function": null,
-      "arguments": [
-        "11155111",
-        "0x699a1cd1FcD3213E20dE15D2236A67D9084Bf89e",
-        "100"
-      ],
+      "arguments": ["11155111", "0x699a1cd1FcD3213E20dE15D2236A67D9084Bf89e", "100"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -127,11 +120,7 @@
       "contractName": "L1Nullifier",
       "contractAddress": "0x80be20231ecf67ea0d7fd82c4068b75bdb9313bc",
       "function": null,
-      "arguments": [
-        "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE",
-        "270",
-        "0x0000000000000000000000000000000000000000"
-      ],
+      "arguments": ["0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE", "270", "0x0000000000000000000000000000000000000000"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -198,9 +187,7 @@
       "contractName": "ExecutorFacet",
       "contractAddress": "0x23ba48a44217cee8b3e88c90bec2363ddbab33e3",
       "function": null,
-      "arguments": [
-        "11155111"
-      ],
+      "arguments": ["11155111"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -219,10 +206,7 @@
       "contractName": "AdminFacet",
       "contractAddress": "0xeb26443c746964577591cab9664a31e66d5bc8d4",
       "function": null,
-      "arguments": [
-        "11155111",
-        "0x0000000000000000000000000000000000000000"
-      ],
+      "arguments": ["11155111", "0x0000000000000000000000000000000000000000"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -241,10 +225,7 @@
       "contractName": "MailboxFacet",
       "contractAddress": "0x1231ed0017c667957e9a22463f6b0c060c3fb55e",
       "function": null,
-      "arguments": [
-        "270",
-        "11155111"
-      ],
+      "arguments": ["270", "11155111"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -301,9 +282,7 @@
       "contractName": "ChainTypeManager",
       "contractAddress": "0xfba2cb78201df9762a4adbef0d6cf1370b69a32a",
       "function": null,
-      "arguments": [
-        "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-      ],
+      "arguments": ["0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"],
       "transaction": {
         "from": "0x2820e578dba82e8db297afe7e283ce09bb661a37",
         "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
@@ -467,9 +446,7 @@
       "logs": [
         {
           "address": "0x8a822fdb62cdca0743cffb43fa73c113de1f97df",
-          "topics": [
-            "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
-          ],
+          "topics": ["0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"],
           "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
           "blockHash": "0x2f5ee68b7636e470ebd63e5ee6cb3d63e25ddaf2523ab39240b06c3c11f67e67",
           "blockNumber": "0x786327",
@@ -514,9 +491,7 @@
       "logs": [
         {
           "address": "0x80be20231ecf67ea0d7fd82c4068b75bdb9313bc",
-          "topics": [
-            "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
-          ],
+          "topics": ["0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"],
           "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
           "blockHash": "0x6d7056366abdc55e010355a25ad42659a95d1563aea4370269dddeeb456c5859",
           "blockNumber": "0x786328",
@@ -545,9 +520,7 @@
       "logs": [
         {
           "address": "0xe40037f42ec6c5fc45ba8e9d60f08b6eb180121d",
-          "topics": [
-            "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
-          ],
+          "topics": ["0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"],
           "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
           "blockHash": "0xbcc316d4a15471cbf700b63620a003cf4f7914775d27708170d61261743c6ec0",
           "blockNumber": "0x786329",
@@ -576,9 +549,7 @@
       "logs": [
         {
           "address": "0x7d1b81af3a221068c4a413a831a70fc30215a9d8",
-          "topics": [
-            "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
-          ],
+          "topics": ["0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"],
           "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
           "blockHash": "0x40ad04c4d1401d088f72e022c10768abca1524e5e6749261629085ede6e96f8b",
           "blockNumber": "0x78632a",
@@ -687,9 +658,7 @@
       "logs": [
         {
           "address": "0xfba2cb78201df9762a4adbef0d6cf1370b69a32a",
-          "topics": [
-            "0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"
-          ],
+          "topics": ["0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498"],
           "data": "0x00000000000000000000000000000000000000000000000000000000000000ff",
           "blockHash": "0x421e76117dc76c84d654dbbbc4e73dd272071346e723c9a022a8d6c004cf3385",
           "blockNumber": "0x786332",
