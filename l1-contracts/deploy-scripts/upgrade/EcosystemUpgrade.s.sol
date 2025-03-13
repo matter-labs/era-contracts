@@ -595,12 +595,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress(
             "contracts_newConfig",
             "expected_rollup_l2_da_validator",
-            upgradeAddresses.expectedL2Addresses.expectedRollupL2DAValidator
+            getExpectedL2Address("RollupL2DAValidator")
         );
         vm.serializeAddress(
             "contracts_newConfig",
             "expected_validium_l2_da_validator",
-            upgradeAddresses.expectedL2Addresses.expectedValidiumL2DAValidator
+            getExpectedL2Address("NoDAL2DAValidator")
         );
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
 
@@ -665,8 +665,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
-
-        vm.serializeAddress("deployed_addresses", "l2_rollup_da_validator", getExpectedL2Address("RollupL2DAValidator"));
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
