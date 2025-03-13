@@ -19,9 +19,9 @@ max_number_of_chains = 100
 create2_factory_salt = "0x1000000000000000000000000000000000000000000000000000000000000001"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0
-genesis_root = "0x025f5dbd1ac1b87be9d80858b70c10146aca7cdd4a20371723d988b9ba7a1b74"
+genesis_root = "0xb192c5937e91363c0b880faf0568b0621a3b16010cb2df42b588972516c1d4fe"
 genesis_rollup_leaf_index = 76
-genesis_batch_commitment = "0xa006e72373d26d07e6587cea4f5cbeb7b6b5eccf24fc9a75460d7b88fd75b616"
+genesis_batch_commitment = "0xe23f2436b09ef15ba64ec3f30dc26833dda86d6dd6bef7ba6f8274e434801d05"
 recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -42,8 +42,7 @@ rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
 latest_protocol_version = 0x1b00000000
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-# on stage, this is not a proxy, but actual implementation.
-protocol_upgrade_handler_proxy_address = "0x699a1cd1fcd3213e20de15d2236a67d9084bf89e"
+protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000000"
 
 [tokens]
