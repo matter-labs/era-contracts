@@ -764,7 +764,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         allCalls[0] = prepareUpgradeProxiesCalls();
         allCalls[1] = prepareNewChainCreationParamsCall();
         allCalls[2] = provideSetNewVersionUpgradeCall();
-        allCalls[3] = prepareContractsConfigurationCalls();
+        allCalls[3] = prepareDAValidatorCall();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -890,7 +890,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     /// @notice Additional calls to newConfigure contracts
-    function prepareContractsConfigurationCalls() public virtual returns (Call[] memory calls) {
+    function prepareDAValidatorCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
         calls[0] = Call({
