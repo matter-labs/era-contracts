@@ -4,9 +4,9 @@ import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
 import {ISP1Verifier} from "../../../../lib/sp1-contracts/contracts/src/ISP1Verifier.sol";
 import {ISP1Blobstream} from "../../../../lib/sp1-blobstream/contracts/src/interfaces/ISP1Blobstream.sol";
 
-struct KeccakInclusionToDataRootOutput {
-    bytes32 keccakHash;
-    bytes32 dataRoot;
+struct CelestiaZKStackInput {
+    AttestationProof attestationProof;
+    bytes equivalenceProof;
 }
 
 contract CelestiaL1DAValidator is IL1DAValidator {
