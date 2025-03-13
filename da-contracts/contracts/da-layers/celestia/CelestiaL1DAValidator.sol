@@ -5,6 +5,7 @@ import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
 struct CelestiaZKStackInput {
     AttestationProof attestationProof;
     bytes equivalenceProof;
+    bytes publicValues;
 }
 
 struct DataRootTuple {
@@ -66,6 +67,8 @@ contract CelestiaL1DAValidator is IL1DAValidator {
     // THIS is the SEPOLIA address, make sure each deployment has the right address!
     address public constant BLOBSTREAM = 0xF0c6429ebAB2e7DC6e05DaFB61128bE21f13cb1e;
 
+    bytes32 eqsVkey = 0x005a902e725cde951470b808cc74ba08d2470219e281b82aec0a1c239da7db7e;
+
     function checkDA(
         uint256,
         uint256,
@@ -75,13 +78,10 @@ contract CelestiaL1DAValidator is IL1DAValidator {
     ) external returns (L1DAValidatorOutput memory output) {
         CelestiaZKStackInput memory input = abi.decode(_operatorDAInput, (CelestiaZKStackInput));
 
-        (bytes32 programVKey, bytes memory publicValues, bytes memory proofBytes) = abi.decode(
-            input.equivalenceProof,
-            (bytes32, bytes, bytes)
-        );
+        (bytes32 eqKeccakHash, bytes32 eqDataRoot) = abi.decode(input.publicValues, (bytes32, bytes32));
 
         // First verify the equivalency proof (im assuming this call reverts if the proof ins invalid, so we move onward from here)
-        ISP1Verifier(SP1_GROTH_16_VERIFIER).verifyProof(programVKey, publicValues, proofBytes);
+        ISP1Verifier(SP1_GROTH_16_VERIFIER).verifyProof(eqsVkey, input.publicValues, input.equivalenceProof);
 
         // lastly we verify the data root is inside of blobstream
         bool valid = IDAOracle(BLOBSTREAM).verifyAttestation(
@@ -93,10 +93,11 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         // can use custom error or whatever matter labs likes the most
         if (!valid) revert("INVALID_PROOF");
 
-        // does our input include the DA hash or do we get it from somewhere else and how do we properly fill these out
         output.stateDiffHash = bytes32(_operatorDAInput[:32]);
 
-        // Do we need this?
+        if (output.stateDiffHash != eqKeccakHash) revert("operator DA hash does not match value from equivalence proof");
+        if (input.attestationProof.tuple.dataRoot != eqDataRoot) revert("data root does not match value from equivalence proof");
+
         output.blobsLinearHashes = new bytes32[](_maxBlobsSupported);
         output.blobsOpeningCommitments = new bytes32[](_maxBlobsSupported);
     }
