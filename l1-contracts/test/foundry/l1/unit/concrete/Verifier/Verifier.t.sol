@@ -12,6 +12,7 @@ contract VerifierTestTest is Test {
 
     uint256[] public publicInputs;
     uint256[] public serializedProof;
+    uint256[] public recursiveAggregationInput;
 
     Verifier public verifier;
 

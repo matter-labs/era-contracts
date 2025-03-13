@@ -4,7 +4,7 @@ import * as fs from "fs/promises";
 import { parse } from "toml";
 import { stringify } from "yaml";
 
-const RUN_FILE_PATH = "broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json";
+const RUN_FILE_PATH = "broadcast/EcosystemUpgrade.s.sol/1/run-latest.json";
 const OUTPUT_FILE_PATH = "script-out/gateway-upgrade-ecosystem.toml";
 
 // Utility function to safely parse JSON.

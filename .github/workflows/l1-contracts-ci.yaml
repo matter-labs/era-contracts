@@ -232,17 +232,29 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.72.0
-
       - name: Generate Verifier.sol
         working-directory: tools
         run: cargo run
 
       - name: Compare
         run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/Verifier.sol
+
+  check-verifier-generator-l2:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Generate Verifier.sol
+        working-directory: tools
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --input_path data/scheduler_key.json --l2_mode
+
+      - name: Compare
+        run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/L2Verifier.sol
 
   coverage:
     defaults:

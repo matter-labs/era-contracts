@@ -31,7 +31,6 @@ contract AdminManagement is ChainTypeManagerTest {
         chainContractAddress.setPendingAdmin(newAdmin);
 
         vm.stopPrank();
-
         vm.prank(random);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, random));

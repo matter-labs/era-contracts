@@ -12,6 +12,7 @@ const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 const SKIPPED_FOLDERS = [
   "l1-contracts/deploy-scripts",
   "l1-contracts/test",
+  "l1-contracts/contracts/dev-contracts",
   "system-contracts/bootloader/tests/bootloader",
 ];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
@@ -356,7 +357,12 @@ const readSystemContractsHashesFile = (path: string): ContractsInfo[] => {
     const file = fs.readFileSync(absolutePath, "utf8");
     const parsedFile = JSON.parse(file);
     return parsedFile;
-  } catch (err) {
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
+        console.warn(`File ${absolutePath} not found. Creating a new one.`);
+        fs.writeFileSync(absolutePath, "[]");
+        return [];
+    }
     const msg = err instanceof Error ? err.message : "Unknown error";
     throw new Error(`Failed to read file: ${absolutePath} Error: ${msg}`);
   }
