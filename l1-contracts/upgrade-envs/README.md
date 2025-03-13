@@ -37,7 +37,7 @@ This contains commands used to verify the bytecodes on etherscan. Currently has 
 
 Note: make sure to add the --chain sepolia when running stage or testnet.
 
-**Ecosystem.yaml**
+### Ecosystem.yaml
 
 This is the final file that can be sent for verification. It contains the same fields as Ecosystem.toml, but with addition of list of transaction hashes (as verifier tool needs them to check the correctness of addresses, bytecodes and constructor parameters).
 
