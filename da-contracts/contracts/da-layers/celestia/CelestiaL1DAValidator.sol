@@ -70,9 +70,9 @@ contract CelestiaL1DAValidator is IL1DAValidator {
     bytes32 eqsVkey = 0x005a902e725cde951470b808cc74ba08d2470219e281b82aec0a1c239da7db7e;
 
     function checkDA(
-        uint256,
-        uint256,
-        bytes32,
+        uint256 chainId,
+        uint256 batchNumber,
+        bytes32 l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
     ) external returns (L1DAValidatorOutput memory output) {
@@ -93,7 +93,7 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         // can use custom error or whatever matter labs likes the most
         if (!valid) revert("INVALID_PROOF");
 
-        output.stateDiffHash = bytes32(_operatorDAInput[:32]);
+        output.stateDiffHash = l2DAValidatorOutputHash;
 
         if (output.stateDiffHash != eqKeccakHash) revert("operator DA hash does not match value from equivalence proof");
         if (input.attestationProof.tuple.dataRoot != eqDataRoot) revert("data root does not match value from equivalence proof");
