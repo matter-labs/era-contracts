@@ -10,7 +10,7 @@ remappings = [
 ]
 
 [profile.default.zksync]
-enable_eravm_extensions = true
 zksolc = "1.5.11"
+enable_eravm_extensions = true
 optimization = "0"
 suppressed_errors = ["sendtransfer"]
