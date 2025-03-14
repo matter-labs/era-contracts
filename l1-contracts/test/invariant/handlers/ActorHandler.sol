@@ -43,6 +43,9 @@ abstract contract ActorHandler is Test {
     }
 
     function _assumeNonZero(address _token) internal {
-        if (_token == address(0)) assembly { return (0, 0) }
+        if (_token == address(0))
+            assembly {
+                return(0, 0)
+            }
     }
 }

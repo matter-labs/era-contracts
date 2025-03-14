@@ -17,7 +17,7 @@ contract UserActorHandler is ActorHandler {
     constructor(Token[] memory _tokens) ActorHandler(_tokens) {}
 
     function withdrawV0(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
-        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        (, address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
         uint256 amount = _boundAmountAndAssumeBalance(_amount, l2Token);
 
         l2SharedBridge.withdraw(_receiver, l2Token, amount);
@@ -27,7 +27,7 @@ contract UserActorHandler is ActorHandler {
     }
 
     function withdrawV1(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
-        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        (, address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
         uint256 amount = _boundAmountAndAssumeBalance(_amount, l2Token);
 
         l2AssetRouter.withdraw(_receiver, l2Token, amount);
@@ -53,7 +53,7 @@ contract UserActorHandler is ActorHandler {
     }
 
     function registerTokenWithVaultV0(uint256 _tokenIndex) external {
-        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        (, address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
 
         _assumeRegisteredWithL2SharedBridge(l2Token);
         _assumeNotRegisteredWithNativeTokenVault(l2Token);
@@ -68,7 +68,7 @@ contract UserActorHandler is ActorHandler {
     }
 
     function registerTokenWithVaultV1(uint256 _tokenIndex) external {
-        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        (, address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
 
         _assumeNotRegistered(l2Token);
         _assumeHasCodeAndNotWeth(l2Token);
@@ -83,7 +83,7 @@ contract UserActorHandler is ActorHandler {
     }
 
     function registerTokenWithVaultV2(uint256 _tokenIndex) external {
-        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        (, address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
 
         _assumeNotRegistered(l2Token);
         _assumeHasCodeAndNotWeth(l2Token);
@@ -134,11 +134,17 @@ contract UserActorHandler is ActorHandler {
     }
 
     function _boundAmountAndAssumeBalance(uint256 _amount, address _token) internal returns (uint256) {
-        if (_token.code.length == 0) assembly { return(0, 0) }
+        if (_token.code.length == 0)
+            assembly {
+                return(0, 0)
+            }
 
         uint256 balance = BridgedStandardERC20(_token).balanceOf(address(this));
 
-        if (balance == 0) assembly { return(0, 0) }
+        if (balance == 0)
+            assembly {
+                return(0, 0)
+            }
         // without bounding the amount the handler usually tries to withdraw more than it has causing reverts
         // on the other hand we do want to test for "withdraw more than one has" cases
         // by bounding the amount for _some_ withdrawals we balance between having too many useless reverts
@@ -147,24 +153,39 @@ contract UserActorHandler is ActorHandler {
     }
 
     function _assumeRegisteredWithL2SharedBridge(address _token) internal {
-        if (l2SharedBridge.l1TokenAddress(_token) == address(0)) assembly { return(0, 0) }
+        if (l2SharedBridge.l1TokenAddress(_token) == address(0))
+            assembly {
+                return(0, 0)
+            }
     }
 
     function _assumeNotRegisteredWithNativeTokenVault(address _token) internal {
-        if (l2AssetRouter.l1TokenAddress(_token) != address(0)) assembly { return(0, 0) }
+        if (l2AssetRouter.l1TokenAddress(_token) != address(0))
+            assembly {
+                return(0, 0)
+            }
     }
 
     function _assumeNotRegistered(address _token) internal {
-        if (l2SharedBridge.l1TokenAddress(_token) != address(0)) assembly { return(0, 0) }
+        if (l2SharedBridge.l1TokenAddress(_token) != address(0))
+            assembly {
+                return(0, 0)
+            }
         _assumeNotRegisteredWithNativeTokenVault(_token);
     }
 
     function _assumeHasCodeAndNotWeth(address _token) internal {
-        if (_token.code.length == 0) assembly { return(0, 0) }
+        if (_token.code.length == 0)
+            assembly {
+                return(0, 0)
+            }
         _assumeNotWeth(_token);
     }
 
     function _assumeNotWeth(address _token) internal {
-        if (_token == l2NativeTokenVault.WETH_TOKEN()) assembly { return(0, 0) }
+        if (_token == l2NativeTokenVault.WETH_TOKEN())
+            assembly {
+                return(0, 0)
+            }
     }
 }
