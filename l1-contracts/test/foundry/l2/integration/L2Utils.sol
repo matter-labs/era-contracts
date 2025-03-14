@@ -100,6 +100,7 @@ library L2Utils {
             _args.l2TokenProxyBytecodeHash,
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
+            _args.weth,
             _args.contractsDeployedAlready
         );
     }
@@ -165,6 +166,7 @@ library L2Utils {
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _l2TokenBeacon,
+        address _weth,
         bool _contractsDeployedAlready
     ) internal {
         // to ensure that the bytecode is known
@@ -177,7 +179,7 @@ library L2Utils {
                 _legacySharedBridge: _legacySharedBridge,
                 _bridgedTokenBeacon: _l2TokenBeacon,
                 _contractsDeployedAlready: _contractsDeployedAlready,
-                _wethToken: address(0),
+                _wethToken: _weth,
                 _baseTokenAssetId: ethAssetId
             });
         }
@@ -191,7 +193,7 @@ library L2Utils {
                 _legacySharedBridge,
                 _l2TokenBeacon,
                 _contractsDeployedAlready,
-                address(0),
+                _weth,
                 ethAssetId
             )
         );
