@@ -3,5 +3,5 @@
 pragma solidity ^0.8.20;
 
 interface IInteropCenter {
-    function setAddresses(address _assetRouter) external;
+    function setAddresses(address _assetRouter, address _assetTracker) external;
 }

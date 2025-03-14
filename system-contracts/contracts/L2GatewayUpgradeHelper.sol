@@ -52,8 +52,7 @@ library L2GenesisUpgradeHelper {
                 L2_ASSET_ROUTER,
                 _ctmDeployer,
                 address(L2_MESSAGE_ROOT),
-                address(L2_INTEROP_CENTER),
-                L2_ASSET_TRACKER_ADDRESS
+                address(L2_INTEROP_CENTER)
             )
         );
 
@@ -72,7 +71,7 @@ library L2GenesisUpgradeHelper {
             }
         }
 
-        bytes memory interopCenterConstructorData = abi.encodeCall(L2_INTEROP_CENTER.setAddresses, (L2_ASSET_ROUTER));
+        bytes memory interopCenterConstructorData = abi.encodeCall(L2_INTEROP_CENTER.setAddresses, (L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS));
 
         (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
             address(L2_INTEROP_CENTER),

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {console} from "forge-std/console.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -55,11 +56,16 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function _deployZKChain(address _baseToken) internal {
+        _deployZKChain(_baseToken, 0);
+    }
+
+    function _deployZKChain(address _baseToken, uint256 _chainId) internal {
+        uint256 chainId = _chainId == 0 ? currentZKChainId : _chainId;
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             string.concat(
                 "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-",
-                Strings.toString(currentZKChainId),
+                Strings.toString(chainId),
                 ".toml"
             )
         );
@@ -67,13 +73,15 @@ contract ZKChainDeployer is L1ContractDeployer {
             "ZK_CHAIN_OUT",
             string.concat(
                 "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
-                Strings.toString(currentZKChainId),
+                Strings.toString(chainId),
                 ".toml"
             )
         );
-        zkChainIds.push(currentZKChainId);
-        saveZKChainConfig(_getDefaultDescription(currentZKChainId, _baseToken, currentZKChainId));
-        currentZKChainId++;
+        zkChainIds.push(chainId);
+        saveZKChainConfig(_getDefaultDescription(chainId, _baseToken, chainId));
+        if (chainId == currentZKChainId) {
+            currentZKChainId++;
+        }
         deployScript.runForTest();
     }
 
@@ -147,7 +155,12 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function acceptPendingAdmin() public {
-        IZKChain chain = IZKChain(bridgehub.getZKChain(currentZKChainId - 1));
+        acceptPendingAdmin(0);
+    }
+
+    function acceptPendingAdmin(uint256 _chainId) public {
+        uint256 chainId = _chainId == 0 ? currentZKChainId - 1 : _chainId;
+        IZKChain chain = IZKChain(bridgehub.getZKChain(chainId));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();

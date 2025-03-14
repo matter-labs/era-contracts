@@ -9,8 +9,7 @@ interface IBridgehub {
         address _assetRouter,
         address _ctmDeployer,
         address _messageRoot,
-        address _interopCenter,
-        address _assetTracker
+        address _interopCenter
     ) external;
 
     function owner() external view returns (address);

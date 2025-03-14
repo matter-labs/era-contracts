@@ -25,7 +25,9 @@ contract GatewayPreparationForTests is GatewayPreparation {
         path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_CONFIG"));
         toml = vm.readFile(path);
 
-        config.gatewayChainId = toml.readUint("$.chain.chain_chain_id");
+        config.gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
+        // currently there is a single gateway test file.
+        console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
 
         path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));
         toml = vm.readFile(path);
