@@ -95,8 +95,10 @@ contract CelestiaL1DAValidator is IL1DAValidator {
 
         output.stateDiffHash = l2DAValidatorOutputHash;
 
-        if (output.stateDiffHash != eqKeccakHash) revert("operator DA hash does not match value from equivalence proof");
-        if (input.attestationProof.tuple.dataRoot != eqDataRoot) revert("data root does not match value from equivalence proof");
+        if (output.stateDiffHash != eqKeccakHash)
+            revert("operator DA hash does not match value from equivalence proof");
+        if (input.attestationProof.tuple.dataRoot != eqDataRoot)
+            revert("data root does not match value from equivalence proof");
 
         output.blobsLinearHashes = new bytes32[](_maxBlobsSupported);
         output.blobsOpeningCommitments = new bytes32[](_maxBlobsSupported);
