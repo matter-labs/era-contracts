@@ -79,7 +79,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         _;
     }
 
-    modifier notToL1(uint256 _destinationChainId) {
+    modifier onlyL2NotToL1(uint256 _destinationChainId) {
         if (_destinationChainId == L1_CHAIN_ID) {
             revert Unauthorized(msg.sender);
         }
@@ -133,7 +133,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     function startBundle(
         uint256 _destinationChainId
-    ) external override notToL1(_destinationChainId) returns (bytes32 bundleId) {
+    ) external override onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleId) {
         bundleId = _startBundle(_destinationChainId, msg.sender);
     }
 
@@ -149,7 +149,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
     }
 
-    function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external override {
+    function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external onlyL2 override {
         _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
     }
 
@@ -265,7 +265,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     function sendInteropTrigger(
         InteropTrigger memory _interopTrigger
-    ) public override notToL1(_interopTrigger.destinationChainId) returns (bytes32 canonicalTxHash) {
+    ) public override onlyL2NotToL1(_interopTrigger.destinationChainId) returns (bytes32 canonicalTxHash) {
         _sendInteropTrigger(_interopTrigger, bytes32(0), bytes32(0), new bytes[](0), address(0), address(0));
     }
 
@@ -318,7 +318,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _destinationAddress,
         bytes calldata _data,
         uint256 _value
-    ) public payable returns (bytes32) {
+    ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) {
         bytes32 bundleId = _startBundle(_destinationChainId, msg.sender);
         _addCallToBundle(
             bundleId,
@@ -340,7 +340,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropCallStarter[] memory _feePaymentCallStarters,
         InteropCallStarter[] memory _executionCallStarters,
         GasFields memory _gasFields
-    ) public payable override notToL1(_destinationChainId) returns (bytes32 canonicalTxHash) {
+    ) public payable override onlyL2NotToL1(_destinationChainId) returns (bytes32 canonicalTxHash) {
         return
             _requestInterop(
                 _destinationChainId,
@@ -469,7 +469,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
     function requestInteropSingleCall(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) public payable returns (bytes32 canonicalTxHash) {
+    ) public payable onlyL2 returns (bytes32 canonicalTxHash) {
         // kl todo if to L1, empty message value. To withdraw value use singleDirectCall.
         return _requestInteropSingleCall(_request, msg.sender);
     }
@@ -514,7 +514,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
     function requestInteropSingleDirectCall(
         L2TransactionRequestDirect calldata _request
-    ) public payable override returns (bytes32 canonicalTxHash) {
+    ) public payable onlyL2 override returns (bytes32 canonicalTxHash) {
         // kl todo if to L1, empty message value or empty calldata, as we don't have calls on L1, only messages.
         return _requestInteropSingleDirectCall(_request, msg.sender);
     }
@@ -566,7 +566,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 _bundleId,
         uint256 _value,
         L2TransactionRequestTwoBridgesInner memory _request
-    ) public {
+    ) public onlyL2 {
         // console.log("addCallToBundleFromRequest", msg.sender);
         _addCallToBundle(
             _bundleId,

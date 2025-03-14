@@ -33,7 +33,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     uint256 internal immutable L1_CHAIN_ID;
 
     /// @notice The address that is responsible for determining whether a certain DA pair is allowed for rollups.
-    RollupDAManager internal immutable ROLLUP_DA_MANAGER;
+    RollupDAManager public immutable ROLLUP_DA_MANAGER;
 
     constructor(uint256 _l1ChainId, RollupDAManager _rollupDAManager) {
         L1_CHAIN_ID = _l1ChainId;

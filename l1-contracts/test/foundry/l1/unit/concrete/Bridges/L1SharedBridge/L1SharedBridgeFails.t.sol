@@ -116,10 +116,11 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_transferFundsToSharedBridge_Eth_CallFailed() public {
-        // vm.mockCallRevert(address(nativeTokenVault), "", "eth transfer failed");
-        // vm.prank(address(nativeTokenVault));
-        // vm.expectRevert(abi.encodeWithSelector(EthTransferFailed.selector));
-        // l1Nullifier.transferTokenToNTV(ETH_TOKEN_ADDRESS);
+        bytes memory emptyData = "";
+        vm.mockCallRevert(address(nativeTokenVault), emptyData, "eth transfer failed");
+        vm.prank(address(nativeTokenVault));
+        vm.expectRevert(abi.encodeWithSelector(EthTransferFailed.selector));
+        l1Nullifier.transferTokenToNTV(ETH_TOKEN_ADDRESS);
     }
 
     // function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
