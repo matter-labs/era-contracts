@@ -2,7 +2,7 @@
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 /// @title Create2AndTransfer
 /// @author Matter Labs
