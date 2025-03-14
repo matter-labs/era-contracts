@@ -100,7 +100,7 @@ jobs:
   #         cargo run
 
   test-contracts:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
