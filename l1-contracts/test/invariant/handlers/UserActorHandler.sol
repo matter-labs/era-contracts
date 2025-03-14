@@ -109,6 +109,7 @@ contract UserActorHandler is ActorHandler {
         vm.assume(l2Token.code.length != 0);
         vm.assume(l2SharedBridge.l1TokenAddress(l2Token) == address(0));
         vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
+        vm.assume(l2Token != l2NativeTokenVault.WETH_TOKEN());
 
         if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token]) {
             return;
@@ -127,6 +128,7 @@ contract UserActorHandler is ActorHandler {
         vm.assume(l2Token.code.length != 0);
         vm.assume(l2SharedBridge.l1TokenAddress(l2Token) == address(0));
         vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
+        vm.assume(l2Token != l2NativeTokenVault.WETH_TOKEN());
 
         l2NativeTokenVault.ensureTokenIsRegistered(l2Token);
 
@@ -148,6 +150,8 @@ contract UserActorHandler is ActorHandler {
             chainid = block.chainid;
             expectedAssetId = DataEncoding.encodeNTVAssetId(chainid, l2Token);
         }
+
+        vm.assume(l2Token != l2NativeTokenVault.WETH_TOKEN());
 
         if (
             ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] ||
