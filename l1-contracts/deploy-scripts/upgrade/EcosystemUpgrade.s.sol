@@ -765,12 +765,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         //stage 0
         allCalls[0] = preparePauseGatewayMigrationsCall();
         //stage 1
-        allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
-        allCalls[3] = prepareDAValidatorCall();
+        allCalls[1] = prepareUpgradeProxiesCalls();
+        allCalls[2] = prepareNewChainCreationParamsCall();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = prepareDAValidatorCall();
         //stage 2
-        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
+        allCalls[5] = prepareUnpauseGatewayMigrationsCall();
         calls = mergeCallsArray(allCalls);
     }
 
