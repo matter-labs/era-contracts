@@ -41,4 +41,8 @@ abstract contract ActorHandler is Test {
             _l1Token = l2AssetRouter.l1TokenAddress(_l2Token);
         }
     }
+
+    function _assumeNonZero(address _token) internal {
+        if (_token == address(0)) assembly { return (0, 0) }
+    }
 }

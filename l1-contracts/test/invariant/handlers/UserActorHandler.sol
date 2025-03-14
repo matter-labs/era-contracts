@@ -17,34 +17,18 @@ contract UserActorHandler is ActorHandler {
     constructor(Token[] memory _tokens) ActorHandler(_tokens) {}
 
     function withdrawV0(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
-        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
-
-        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
-
-        vm.assume(l2Token.code.length != 0);
-        uint256 balance = BridgedStandardERC20(l2Token).balanceOf(address(this));
-        vm.assume(balance > 0);
-        uint256 amount = bound(_amount, 1, balance);
+        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        uint256 amount = _boundAmountAndAssumeBalance(_amount, l2Token);
 
         l2SharedBridge.withdraw(_receiver, l2Token, amount);
 
         ghost_totalWithdrawalAmount += amount;
+        ghost_totalFunctionCalls++;
     }
 
     function withdrawV1(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
-        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
-
-        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
-
-        uint256 amount;
-        if (ghost_totalFunctionCalls % 10 == 0 && false) {
-            amount = _amount;
-        } else {
-            vm.assume(l2Token.code.length != 0);
-            uint256 balance = BridgedStandardERC20(l2Token).balanceOf(address(this));
-            vm.assume(balance > 0);
-            amount = bound(_amount, 1, balance);
-        }
+        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        uint256 amount = _boundAmountAndAssumeBalance(_amount, l2Token);
 
         l2AssetRouter.withdraw(_receiver, l2Token, amount);
 
@@ -53,26 +37,10 @@ contract UserActorHandler is ActorHandler {
     }
 
     function withdrawV2(uint256 _amount, address _receiver, uint256 _tokenIndex) external {
-        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+        (address l1Token, address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
+        uint256 amount = _boundAmountAndAssumeBalance(_amount, l2Token);
 
-        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
-
-        // without bounding the amount the handler usually tries to withdraw more than it has causing reverts
-        // on the other hand we do want to test for "withdraw more than one has" cases
-        // by bounding the amount for _some_ withdrawals we balance between having too many useless reverts
-        // and testing too few cases
-        uint256 amount;
-        if (ghost_totalFunctionCalls % 10 == 0 && false) {
-            amount = _amount;
-        } else {
-            vm.assume(l2Token.code.length != 0);
-            amount = bound(_amount, 0, BridgedStandardERC20(l2Token).balanceOf(address(this)));
-        }
-
-        // too many reverts (around 50%) without this condition
-        vm.assume(amount != 0);
-        // using `L2NativeTokenVault` instead of `IL2NativeTokenVault` because the latter doesn't have `L2_LEGACY_SHARED_BRIDGE`
-        vm.assume(l2NativeTokenVault.L2_LEGACY_SHARED_BRIDGE().l1TokenAddress(l2Token) != address(0));
+        _assumeRegisteredWithL2SharedBridge(l2Token);
 
         uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
@@ -85,12 +53,10 @@ contract UserActorHandler is ActorHandler {
     }
 
     function registerTokenWithVaultV0(uint256 _tokenIndex) external {
-        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
 
-        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
-
-        vm.assume(l2SharedBridge.l1TokenAddress(l2Token) != address(0));
-        vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
+        _assumeRegisteredWithL2SharedBridge(l2Token);
+        _assumeNotRegisteredWithNativeTokenVault(l2Token);
 
         if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token]) {
             return;
@@ -102,14 +68,10 @@ contract UserActorHandler is ActorHandler {
     }
 
     function registerTokenWithVaultV1(uint256 _tokenIndex) external {
-        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
 
-        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
-
-        vm.assume(l2Token.code.length != 0);
-        vm.assume(l2SharedBridge.l1TokenAddress(l2Token) == address(0));
-        vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
-        vm.assume(l2Token != l2NativeTokenVault.WETH_TOKEN());
+        _assumeNotRegistered(l2Token);
+        _assumeHasCodeAndNotWeth(l2Token);
 
         if (ghost_tokenRegisteredWithL2NativeTokenVault[l2Token]) {
             return;
@@ -121,14 +83,10 @@ contract UserActorHandler is ActorHandler {
     }
 
     function registerTokenWithVaultV2(uint256 _tokenIndex) external {
-        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+        (,address l2Token) = _boundTokenIndexAndGetTokenAddresses(_tokenIndex);
 
-        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
-
-        vm.assume(l2Token.code.length != 0);
-        vm.assume(l2SharedBridge.l1TokenAddress(l2Token) == address(0));
-        vm.assume(l2AssetRouter.l1TokenAddress(l2Token) == address(0));
-        vm.assume(l2Token != l2NativeTokenVault.WETH_TOKEN());
+        _assumeNotRegistered(l2Token);
+        _assumeHasCodeAndNotWeth(l2Token);
 
         l2NativeTokenVault.ensureTokenIsRegistered(l2Token);
 
@@ -138,8 +96,9 @@ contract UserActorHandler is ActorHandler {
     function registerTokenWithVaultV3(uint256 _tokenIndex) external {
         uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
 
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
+
         Token memory token = tokens[tokenIndex];
-        (address l1Token, address l2Token) = _getL1TokenAndL2Token(token);
         bytes memory d = DataEncoding.encodeBridgeBurnData(0, address(0), l2Token);
         uint256 chainid;
         bytes32 expectedAssetId;
@@ -151,7 +110,7 @@ contract UserActorHandler is ActorHandler {
             expectedAssetId = DataEncoding.encodeNTVAssetId(chainid, l2Token);
         }
 
-        vm.assume(l2Token != l2NativeTokenVault.WETH_TOKEN());
+        _assumeNotWeth(l2Token);
 
         if (
             ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] ||
@@ -164,5 +123,48 @@ contract UserActorHandler is ActorHandler {
         l2NativeTokenVault.tryRegisterTokenFromBurnData({_burnData: d, _expectedAssetId: expectedAssetId});
 
         ghost_tokenRegisteredWithL2NativeTokenVault[l2Token] = true;
+    }
+
+    function _boundTokenIndexAndGetTokenAddresses(uint256 _tokenIndex) internal returns (address, address) {
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
+
+        return (l1Token, l2Token);
+    }
+
+    function _boundAmountAndAssumeBalance(uint256 _amount, address _token) internal returns (uint256) {
+        if (_token.code.length == 0) assembly { return(0, 0) }
+
+        uint256 balance = BridgedStandardERC20(_token).balanceOf(address(this));
+
+        if (balance == 0) assembly { return(0, 0) }
+        // without bounding the amount the handler usually tries to withdraw more than it has causing reverts
+        // on the other hand we do want to test for "withdraw more than one has" cases
+        // by bounding the amount for _some_ withdrawals we balance between having too many useless reverts
+        // and testing too few cases
+        return bound(_amount, 1, balance);
+    }
+
+    function _assumeRegisteredWithL2SharedBridge(address _token) internal {
+        if (l2SharedBridge.l1TokenAddress(_token) == address(0)) assembly { return(0, 0) }
+    }
+
+    function _assumeNotRegisteredWithNativeTokenVault(address _token) internal {
+        if (l2AssetRouter.l1TokenAddress(_token) != address(0)) assembly { return(0, 0) }
+    }
+
+    function _assumeNotRegistered(address _token) internal {
+        if (l2SharedBridge.l1TokenAddress(_token) != address(0)) assembly { return(0, 0) }
+        _assumeNotRegisteredWithNativeTokenVault(_token);
+    }
+
+    function _assumeHasCodeAndNotWeth(address _token) internal {
+        if (_token.code.length == 0) assembly { return(0, 0) }
+        _assumeNotWeth(_token);
+    }
+
+    function _assumeNotWeth(address _token) internal {
+        if (_token == l2NativeTokenVault.WETH_TOKEN()) assembly { return(0, 0) }
     }
 }

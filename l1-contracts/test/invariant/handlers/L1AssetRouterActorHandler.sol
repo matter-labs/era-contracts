@@ -37,8 +37,7 @@ contract L1AssetRouterActorHandler is ActorHandler {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
         bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
 
-        vm.assume(assetId != baseTokenAssetId);
-        vm.assume(l1Token != address(0));
+        _assumeNonZero(l1Token);
 
         console.log("l1Token", l1Token);
 
@@ -71,8 +70,7 @@ contract L1AssetRouterActorHandler is ActorHandler {
             _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
-        vm.assume(assetId != baseTokenAssetId);
-        vm.assume(l1Token != address(0));
+        _assumeNonZero(l1Token);
 
         console.log("l1Token", l1Token);
 
