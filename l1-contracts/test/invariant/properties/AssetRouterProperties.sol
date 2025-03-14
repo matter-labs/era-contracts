@@ -49,8 +49,6 @@ abstract contract AssetRouterProperties is Test {
     }
 
     function invariant_TotalDepositsEqualTotalSupply() external {
-        assertTrue(initialized);
-
         uint256 totalSupply;
         for (uint i; i < tokens.length; i++) {
             address l2Token = _getL2Token(tokens[i]);
@@ -74,8 +72,6 @@ abstract contract AssetRouterProperties is Test {
     }
 
     function invariant_L1AssetRouterActorHandlerHasZeroBalance() external {
-        assertTrue(initialized);
-
         for (uint256 i; i < tokens.length; i++) {
             address l2Token = _getL2Token(tokens[i]);
 
@@ -92,8 +88,6 @@ abstract contract AssetRouterProperties is Test {
     }
 
     function invariant_TokensRegisteredCorrectlyWithL2NativeTokenVault() external {
-        assertTrue(initialized);
-
         IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         for (uint256 i; i < tokens.length; i++) {
@@ -125,6 +119,10 @@ abstract contract AssetRouterProperties is Test {
         assertNotEq(address(l2SharedBridge), address(0));
 
         assertEq(l2NativeTokenVault.assetId(weth), bytes32(0));
+    }
+
+    function test_CheckInitialized() external {
+        assertTrue(initialized, "`AssetRouterProperties::initAssetRouterProperties` must be called during `setUp`");
     }
 
     function _getL2Token(Token memory t) internal view returns (address l2Token) {
