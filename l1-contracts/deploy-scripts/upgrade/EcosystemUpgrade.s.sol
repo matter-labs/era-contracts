@@ -354,7 +354,7 @@ contract EcosystemUpgrade is Script {
             .validatorTimelock();
 
         // In the future this value will be populated with the new shared bridge, but since the version on the CTM is the old one, the old bridge is stored here as well.
-        config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
+        config.contracts.l1LegacySharedBridge = Bridgehub(config.contracts.bridgehubProxyAddress).assetRouter();
     }
 
     function provideAcceptOwnershipCalls() public view returns (Call[] memory calls) {
@@ -827,7 +827,7 @@ contract EcosystemUpgrade is Script {
         );
         config.contracts.stateTransitionManagerAddress = IBridgehubLegacy(config.contracts.bridgehubProxyAddress)
             .stateTransitionManager(config.eraChainId);
-        config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).sharedBridge();
+        config.contracts.oldSharedBridgeProxyAddress = Bridgehub(config.contracts.bridgehubProxyAddress).assetRouter();
         config.contracts.eraDiamondProxy = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
             .getHyperchain(config.eraChainId);
         config.contracts.legacyErc20BridgeAddress = address(

@@ -89,6 +89,6 @@ contract ChainUpgrade is Script {
         toml = vm.readFile(ecosystemInputPath);
         config.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        config.chainDiamondProxyAddress = Bridgehub(config.bridgehubProxyAddress).getHyperchain(config.chainChainId);
+        config.chainDiamondProxyAddress = Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
     }
 }
