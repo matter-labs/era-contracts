@@ -13,6 +13,9 @@ on:
         required: false
         default: manual
 
+permissions:
+  contents: write
+
 jobs:
   build-contracts:
     runs-on: ubuntu-latest

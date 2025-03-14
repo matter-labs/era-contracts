@@ -3,10 +3,8 @@ name: L1 contracts CI
 on:
   pull_request:
 
-# We need this permissions for this CI to work with external contributions
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   build:
@@ -170,6 +168,9 @@ jobs:
         working-directory: l1-contracts
     needs: [build, lint]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout the repository
