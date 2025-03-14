@@ -252,7 +252,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     //     uint64 _expirationTimestamp
     // ) external;
 
-    
     function routeBridgehubConfirmL2Transaction(
         address _secondBridgeAddress,
         uint256 _chainId,

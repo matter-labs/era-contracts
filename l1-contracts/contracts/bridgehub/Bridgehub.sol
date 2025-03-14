@@ -588,7 +588,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //     IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     // }
 
-    
     /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 message inclusion.

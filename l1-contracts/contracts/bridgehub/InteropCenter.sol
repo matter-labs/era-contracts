@@ -149,7 +149,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
     }
 
-    function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external onlyL2 override {
+    function addCallToBundle(
+        bytes32 _bundleId,
+        InteropCallRequest memory _interopCallRequest
+    ) external override onlyL2 {
         _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
     }
 
@@ -514,7 +517,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
     function requestInteropSingleDirectCall(
         L2TransactionRequestDirect calldata _request
-    ) public payable onlyL2 override returns (bytes32 canonicalTxHash) {
+    ) public payable override onlyL2 returns (bytes32 canonicalTxHash) {
         // kl todo if to L1, empty message value or empty calldata, as we don't have calls on L1, only messages.
         return _requestInteropSingleDirectCall(_request, msg.sender);
     }
