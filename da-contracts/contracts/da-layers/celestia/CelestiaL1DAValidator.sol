@@ -65,7 +65,7 @@ contract CelestiaL1DAValidator is IL1DAValidator {
     address public constant SP1_GROTH_16_VERIFIER = 0x397A5f7f3dBd538f23DE225B51f532c34448dA9B;
 
     // THIS is the SEPOLIA address, make sure each deployment has the right address!
-    address public constant BLOBSTREAM = 0x7Cf3876F681Dbb6EdA8f6FfC45D66B996Df08fAe;
+    address public constant BLOBSTREAM = 0xF0c6429ebAB2e7DC6e05DaFB61128bE21f13cb1e;
 
     bytes32 eqsVkey = 0x005a902e725cde951470b808cc74ba08d2470219e281b82aec0a1c239da7db7e;
 
