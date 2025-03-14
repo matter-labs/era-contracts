@@ -43,20 +43,20 @@ contract UpgradeIntegrationTest is Test {
             Call[] memory upgradeGovernanceStage2Calls
         ) = ecosystemUpgrade.prepareDefaultGovernanceCalls();
 
-        console.log("Starting ecosystem upgrade stage 0!");
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
+        // console.log("Starting ecosystem upgrade stage 0!");
+        // governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
 
         console.log("Starting ecosystem upgrade stage 1!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
 
-        console.log("Starting ecosystem upgrade stage 2!");
+        // console.log("Starting ecosystem upgrade stage 2!");
 
         // Not needed without stage 1
         // if (ecosystemUpgrade.getGovernanceUpgradeInitialDelay() != 0) {
         //     vm.warp(block.timestamp + ecosystemUpgrade.getGovernanceUpgradeInitialDelay());
         // }
 
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
+        // governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 
