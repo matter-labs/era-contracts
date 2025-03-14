@@ -13,6 +13,7 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "./script-config" },
+    { access = "read", path = "./" },
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "./out" }
 ]
