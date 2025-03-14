@@ -755,26 +755,29 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](1);
-        allCalls[0] = preparePauseGatewayMigrationsCall();
+        Call[][] memory allCalls = new Call[][](0);
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](6);
+        //stage 0
+        allCalls[0] = preparePauseGatewayMigrationsCall();
+        //stage 1
         allCalls[0] = prepareUpgradeProxiesCalls();
         allCalls[1] = prepareNewChainCreationParamsCall();
         allCalls[2] = provideSetNewVersionUpgradeCall();
         allCalls[3] = prepareDAValidatorCall();
+        //stage 2
+        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](1);
+        Call[][] memory allCalls = new Call[][](0);
 
-        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
         calls = mergeCallsArray(allCalls);
     }
 
