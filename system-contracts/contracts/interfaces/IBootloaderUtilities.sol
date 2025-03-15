@@ -8,15 +8,4 @@ interface IBootloaderUtilities {
     function getTransactionHashes(
         Transaction calldata _transaction
     ) external view returns (bytes32 txHash, bytes32 signedTxHash);
-
-    function calculateXL2MerkleProof(
-        bytes calldata _proofData
-    )
-        external
-        view
-        returns (
-            // uin256, uin256
-            bytes32 txHash,
-            bytes32 messageRoot
-        );
 }

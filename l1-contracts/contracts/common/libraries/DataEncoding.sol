@@ -193,4 +193,52 @@ library DataEncoding {
     ) internal pure returns (bytes memory) {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
     }
+
+    
+    /// @notice Encodes the asset tracker data by combining chain id, asset id, amount, minting chain status and settlement layer balance.
+    /// @param _chainId The id of the chain being migrated.
+    /// @param _assetId The id of the asset being migrated.
+    /// @param _amount The amount being migrated.
+    /// @param _migratingChainIsMinter Whether the migrating chain is a minter.
+    /// @param _hasSettlingMintingChains Whether there are still settling minting chains.
+    /// @param _newSLBalance The new settlement layer balance.
+    /// @return The encoded asset tracker data.
+    function encodeAssetTrackerData(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _migratingChainIsMinter,
+        bool _hasSettlingMintingChains,
+        uint256 _newSLBalance
+    ) internal pure returns (bytes memory) {
+        return abi.encode(
+            _chainId,
+            _assetId,
+            _amount,
+            _migratingChainIsMinter,
+            _hasSettlingMintingChains,
+            _newSLBalance
+        );
+    }
+
+    /// @notice Decodes the asset tracker data into its component parts.
+    /// @param _data The encoded asset tracker data.
+    /// @return chainId The id of the chain being migrated.
+    /// @return assetId The id of the asset being migrated.
+    /// @return amount The amount being migrated.
+    /// @return migratingChainIsMinter Whether the migrating chain is a minter.
+    /// @return hasSettlingMintingChains Whether there are still settling minting chains.
+    /// @return newSLBalance The new settlement layer balance.
+    function decodeAssetTrackerData(
+        bytes calldata _data
+    ) internal pure returns (
+        uint256 chainId,
+        bytes32 assetId,
+        uint256 amount,
+        bool migratingChainIsMinter,
+        bool hasSettlingMintingChains,
+        uint256 newSLBalance
+    ) {
+        return abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
+    }
 }

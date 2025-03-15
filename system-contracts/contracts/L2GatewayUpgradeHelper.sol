@@ -241,13 +241,14 @@ library L2GenesisUpgradeHelper {
             newAddress: L2_ASSET_TRACKER_ADDRESS,
             callConstructor: true,
             value: 0,
-            input: abi.encode({
-                l1ChainId: fixedForceDeploymentsData.l1ChainId,
-                bridgeHub: L2_BRIDGE_HUB,
-                assetRouter: L2_ASSET_ROUTER,
-                nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR,
-                messageRoot: L2_MESSAGE_ROOT
-            })
+            // solhint-disable-next-line func-named-parameters
+            input: abi.encode(
+                fixedForceDeploymentsData.l1ChainId,
+                L2_BRIDGE_HUB,
+                L2_ASSET_ROUTER,
+                L2_NATIVE_TOKEN_VAULT_ADDR,
+                L2_MESSAGE_ROOT
+            )
         });
     }
 
