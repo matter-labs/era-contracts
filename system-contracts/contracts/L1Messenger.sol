@@ -305,13 +305,13 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         }
 
         DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
-            .Bytes32PushTree(
-                0,
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                0,
-                0
-            ); // todo 100 to const
+            .Bytes32PushTree({
+                _nextLeafIndex: 0,
+                _sides: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+                _zeros: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+                _sidesLengthMemory: 0,
+                _zerosLengthMemory: 0
+            });
         reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(

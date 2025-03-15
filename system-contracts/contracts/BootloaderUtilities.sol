@@ -7,7 +7,6 @@ import {Transaction, TransactionHelper, EIP_712_TX_TYPE, LEGACY_TX_TYPE, EIP_293
 import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {UnsupportedTxType, InvalidSig, SigField} from "./SystemContractErrors.sol";
-// import {MessageHashing, ProofVerificationResult} from "./libraries/MessageHashing.sol";
 
 /**
  * @author Matter Labs
@@ -329,44 +328,5 @@ contract BootloaderUtilities is IBootloaderUtilities {
                     sEncoded
                 )
             );
-    }
-
-    struct ProofData {
-        bytes32 canonicalTxHash;
-        bytes32 messageRoot;
-    }
-    // event TestEvent(bytes indexed data);
-    function calculateXL2MerkleProof(
-        bytes calldata _proofData
-    )
-        external
-        view
-        returns (
-            // uin256, uin256
-            bytes32 txHash,
-            bytes32 messageRoot
-        )
-    {
-        // (ProofData memory proofData ) = abi.decode(_proofData, (ProofData));
-        // kl todo verify the proof here, get return values
-        // emit TestEvent(_proofData);
-        uint256 chainId = abi.decode(_proofData, (uint256));
-        // (uint256 chainId, uint256 batchNumber, uint256 leafProofMask) = abi.decode(_proofData, (uint256, uint256, uint256));
-        // (uint256 chainId, uint256 batchNumber, uint256 leafProofMask, bytes32 leaf) = abi.decode(
-        //     _proofData,
-        //     (uint256, uint256, uint256, bytes32)
-        // );
-        // (uint256 chainId, uint256 batchNumber, uint256 leafProofMask, bytes32 leaf, bytes32[] memory proof  ) = abi.decode(_proofData, (uint256, uint256, uint256, bytes32, bytes32[]));
-        // ProofVerificationResult memory result = MessageHashing.hashProof(
-        //     chainId,
-        //     batchNumber,
-        //     leafProofMask,
-        //     leaf,
-        //     proof
-        // );
-        // txHash = result.batchSettlementRoot;
-        // messageRoot = result.batchSettlementRoot;
-        txHash = bytes32(uint256(0x01));
-        messageRoot = bytes32(uint256(0x02));
     }
 }

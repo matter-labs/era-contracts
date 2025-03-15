@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.24;
 
-import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
+import { L2Message, L2Log} from "../../../common/Messaging.sol";
 import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow, InvalidProofLengthForFinalNode} from "../../../common/L1ContractErrors.sol";
+import { L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../../../common/Config.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
 
 abstract contract MessageVerification is IMessageVerification {
     /// @inheritdoc IMessageVerification

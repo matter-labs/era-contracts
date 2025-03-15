@@ -169,9 +169,9 @@ library DynamicIncrementalMerkle {
             bytes32 zero = self._zeros[levels];
             bytes32 newZero = Merkle.efficientHash(zero, zero);
             self._zeros[self._zerosLengthMemory] = newZero;
-            self._zerosLengthMemory++;
+            ++self._zerosLengthMemory;
             self._sides[self._sidesLengthMemory] = bytes32(0);
-            self._sidesLengthMemory++;
+            ++self._sidesLengthMemory;
             ++levels;
         }
 
@@ -231,7 +231,8 @@ library DynamicIncrementalMerkle {
             self._sides[0] = currentZero;
         }
         bytes32 currentSide = self._sides[self._sidesLengthMemory - 1];
-        for (uint256 i = self._sidesLengthMemory; i < self._sides.length; ++i) {
+        uint256 finalDepth = self._sides.length;
+        for (uint256 i = self._sidesLengthMemory; i < finalDepth; ++i) {
             currentSide = Merkle.efficientHash(currentSide, currentZero);
             currentZero = Merkle.efficientHash(currentZero, currentZero);
             self._zeros[i] = currentZero;

@@ -48,12 +48,7 @@ library L2GenesisUpgradeHelper {
         // Prepare calldata to set addresses in BridgeHub.
         bytes memory bridgehubConstructorData = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (
-                L2_ASSET_ROUTER,
-                _ctmDeployer,
-                address(L2_MESSAGE_ROOT),
-                address(L2_INTEROP_CENTER)
-            )
+            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_INTEROP_CENTER))
         );
 
         // Execute the call to set addresses in BridgeHub.
@@ -71,7 +66,10 @@ library L2GenesisUpgradeHelper {
             }
         }
 
-        bytes memory interopCenterConstructorData = abi.encodeCall(L2_INTEROP_CENTER.setAddresses, (L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS));
+        bytes memory interopCenterConstructorData = abi.encodeCall(
+            L2_INTEROP_CENTER.setAddresses,
+            (L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS)
+        );
 
         (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
             address(L2_INTEROP_CENTER),
@@ -243,13 +241,13 @@ library L2GenesisUpgradeHelper {
             newAddress: L2_ASSET_TRACKER_ADDRESS,
             callConstructor: true,
             value: 0,
-            input: abi.encode(
-                fixedForceDeploymentsData.l1ChainId,
-                L2_BRIDGE_HUB,
-                L2_ASSET_ROUTER,
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                L2_MESSAGE_ROOT
-            )
+            input: abi.encode({
+                l1ChainId: fixedForceDeploymentsData.l1ChainId,
+                bridgeHub: L2_BRIDGE_HUB,
+                assetRouter: L2_ASSET_ROUTER,
+                nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR,
+                messageRoot: L2_MESSAGE_ROOT
+            })
         });
     }
 

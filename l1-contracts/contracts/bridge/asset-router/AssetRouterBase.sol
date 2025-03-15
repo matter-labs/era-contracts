@@ -9,18 +9,18 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
-import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+// import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
-import {UnsupportedEncodingVersion, AssetIdNotSupported, NonEmptyMsgValue, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
+import {UnsupportedEncodingVersion, AssetIdNotSupported, NonEmptyMsgValue, AssetHandlerDoesNotExist, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
@@ -160,13 +160,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data,
         address _nativeTokenVault
     ) internal virtual {
-        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit(
-            _chainId,
-            _originalCaller,
-            _value,
-            _data,
-            _nativeTokenVault
-        );
+        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
+            _chainId: _chainId,
+            _originalCaller: _originalCaller,
+            _value: _value,
+            _data: _data,
+            _nativeTokenVault: _nativeTokenVault
+        });
         INTEROP_CENTER.addCallToBundleFromRequest(_bundleId, _value, request);
     }
 
@@ -177,13 +177,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data,
         address _nativeTokenVault
     ) internal virtual {
-        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit(
-            _chainId,
-            msg.sender,
-            _value,
-            _data,
-            _nativeTokenVault
-        );
+        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
+            _chainId: _chainId,
+            _originalCaller: msg.sender,
+            _value: _value,
+            _data: _data,
+            _nativeTokenVault: _nativeTokenVault
+        });
         INTEROP_CENTER.addCallToBundleFromRequest(_bundleId, _value, request);
     }
 

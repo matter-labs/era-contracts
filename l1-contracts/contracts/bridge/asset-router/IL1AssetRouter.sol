@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+// import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 
 /// @title L1 Bridge contract interface

@@ -5,24 +5,24 @@ pragma solidity ^0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IAssetTracker} from "./IAssetTracker.sol";
-import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
+import {L2Log} from "../../common/Messaging.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {InteropBundle, InteropCall} from "../../common/Messaging.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {OriginChainIdNotFound, Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalanceAssetTracker, WithdrawFailed, ReconstructionMismatch, InvalidMessage, InvalidInteropCalldata} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, InsufficientChainBalanceAssetTracker, ReconstructionMismatch, InvalidMessage, InvalidInteropCalldata} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
-import {BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER} from "../../common/Messaging.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {NotCurrentSL, SLNotWhitelisted} from "../../bridgehub/L1BridgehubErrors.sol";
 
-import {TransientPrimitivesLib, tuint256, tbytes32, taddress} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
+import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 
 error AlreadyMigrated();
 
@@ -77,7 +77,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         // TODO: implement
     }
 
-    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external {
+    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
         if (settlementLayer != block.chainid) {
@@ -97,7 +97,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         TransientPrimitivesLib.set(_chainId + 1, 0);
     }
 
-    function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external {
+    function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
         if (isMinterChain[chainToUpdate][_assetId]) {
@@ -123,7 +123,8 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                 0
             ); // todo 100 to const
         reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-        for (uint256 logCount = 0; logCount < _processLogsInputs.logs.length; logCount++) {
+        uint256 logsLength = _processLogsInputs.logs.length;
+        for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
             bytes32 hashedLog = keccak256(
                 // solhint-disable-next-line func-named-parameters
@@ -135,11 +136,11 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                 continue;
             }
             if (log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                msgCount++;
+                ++msgCount;
                 continue;
             }
             bytes memory message = _processLogsInputs.messages[msgCount];
-            msgCount++;
+            ++msgCount;
 
             if (log.value != keccak256(message)) {
                 revert InvalidMessage();
@@ -152,7 +153,8 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
 
             // handle msg.value call separately
             InteropCall memory interopCall = interopBundle.calls[0];
-            for (uint256 callCount = 1; callCount < interopBundle.calls.length; callCount++) {
+            uint256 callsLength = interopBundle.calls.length;
+            for (uint256 callCount = 1; callCount < callsLength; ++callCount) {
                 interopCall = interopBundle.calls[callCount];
 
                 // e.g. for direct calls we just skip
@@ -208,7 +210,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
             bool migratingChainIsMinter,
             bool isSLStillMinter,
             uint256 newSLBalance
-        ) = abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
+        ) = DataEncoding.decodeAssetTrackerData(_data);
         chainBalance[chainId][assetId] += amount;
         isMinterChain[chainId][assetId] = migratingChainIsMinter;
         numberOfSettlingMintingChains[assetId] += migratingChainIsMinter ? 1 : 0;
@@ -224,7 +226,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         uint256 _settlementChainId,
         uint256,
         bytes32 _assetId,
-        address _originalCaller,
+        address,
         bytes calldata _data
     ) external payable requireZeroValue(msg.value) onlyAssetRouter returns (bytes memory _bridgeMintData) {
         if (!BRIDGE_HUB.whitelistedSettlementLayers(_settlementChainId)) {
@@ -249,14 +251,15 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         uint256 newSLBalance = 0;
 
         if (migratingChainIsMinter) {
-            numberOfSettlingMintingChains[assetId] -= 1;
+            --numberOfSettlingMintingChains[assetId];
             if (block.chainid == L1_CHAIN_ID) {
                 isMinterChain[_settlementChainId][assetId] = true;
             } else {
                 if (numberOfSettlingMintingChains[assetId] == 0) {
                     // we need to calculate the current balance of this chain, the sum of all the balances on it.
                     uint256[] memory zkChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
-                    for (uint256 i = 0; i < zkChainIds.length; i++) {
+                    uint256 zkChainIdsLength = zkChainIds.length;
+                    for (uint256 i = 0; i < zkChainIdsLength; ++i) {
                         if (BRIDGE_HUB.settlementLayer(zkChainIds[i]) == block.chainid) {
                             newSLBalance += chainBalance[zkChainIds[i]][assetId];
                         }
@@ -270,7 +273,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         }
 
         return
-            abi.encode(
+            DataEncoding.encodeAssetTrackerData(
                 chainId,
                 assetId,
                 amount,

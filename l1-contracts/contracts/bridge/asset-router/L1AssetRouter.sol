@@ -7,12 +7,12 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+// import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
@@ -22,7 +22,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
+import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -242,7 +242,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
-        return _bridgehubDeposit(_chainId, _originalCaller, _value, _data, address(nativeTokenVault));
+        return _bridgehubDeposit({
+            _chainId: _chainId,
+            _originalCaller: _originalCaller,
+            _value: _value,
+            _data: _data,
+            _nativeTokenVault: address(nativeTokenVault)
+        });
     }
 
     /// @inheritdoc IAssetRouterBase
@@ -261,7 +267,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _value,
         bytes calldata _data
     ) external payable {
-        _bridgehubAddCallToBundle(_chainId, _bundleId, _originalCaller, _value, _data, address(nativeTokenVault));
+        _bridgehubAddCallToBundle({
+            _chainId: _chainId,
+            _bundleId: _bundleId,
+            _originalCaller: _originalCaller,
+            _value: _value,
+            _data: _data,
+            _nativeTokenVault: address(nativeTokenVault)
+        });
     }
 
     /*//////////////////////////////////////////////////////////////
