@@ -5,7 +5,7 @@ deployment and interaction with Turing-complete smart contracts.
 
 - L2 smart contracts are executed on a zkEVM.
 - zkEVM bytecode is different from the L1 EVM.
-- There is a Solidity and Vyper compilers for L2 smart contracts.
+- There are Solidity and Vyper compilers for L2 smart contracts.
 - There is a standard way to pass messages between L1 and L2. That is a part of the protocol.
 - There is no escape hatch mechanism yet, but there will be one.
 
@@ -20,7 +20,7 @@ See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html
   addresses.
 - **Security council** - an address of the Gnosis multisig with the trusted owners that can decrease upgrade timelock.
 - **Validator/Operator** - a privileged address that can commit/verify/execute L2 batches.
-- **L2 batch (or just batch)** - An aggregation of multiple L2 blocks. Note, that while the API operates on L2 blocks,
+- **L2 batch (or just batch)** - An aggregation of multiple L2 blocks. Note that, while the API operates on L2 blocks,
   the prove system operates on batches, which represent a single proved VM execution, which typically contains multiple
   L2 blocks.
 - **Facet** - implementation contract. The word comes from the EIP-2535.
@@ -124,7 +124,7 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
 we simply reused the same L1 addresses as the L2 sender. In ZKsync Era address derivation rule is different from the
 Ethereum, so cross-chain exploits are already impossible. However, ZKsync Era may add full EVM support in the future, so
-applying address aliasing leave room for future EVM compatibility.
+applying address aliasing leaves room for future EVM compatibility.
 
 The L1 -> L2 communication is also used for bridging ether. The user should include a `msg.value` when initiating a
 transaction request on the L1 contract. Before executing a transaction on L2, the specified address will be credited
@@ -203,7 +203,7 @@ When a batch is committed, we process L2 -> L1 system logs. Here are the invaria
   - `CHAINED_PRIORITY_TXN_HASH_KEY`
   - `NUMBER_OF_LAYER_1_TXS_KEY`
   - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY`
-- None logs from other addresses (may be changed in the future).
+- No logs from other addresses (may be changed in the future).
 
 #### Bridges
 
