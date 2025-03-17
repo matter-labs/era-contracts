@@ -5,9 +5,8 @@ import { parse } from "toml";
 import { stringify } from "yaml";
 
 const RUN_FILE_PATH = process.env.UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS;
-// "broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json";
 const OUTPUT_FILE_PATH = process.env.UPGRADE_ECOSYSTEM_OUTPUT;
-// "script-out/v27-ecosystem.toml";
+const YAML_OUTPUT_FILE = process.env.YAML_OUTPUT_FILE;
 
 // Utility function to safely parse JSON.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +51,7 @@ async function main() {
 
   // Convert the final object into YAML and output it.
   const yamlOutput = stringify(outputToml, { lineWidth: -1 });
+  await fs.writeFile(YAML_OUTPUT_FILE, yamlOutput);
   console.log(yamlOutput);
 }
 

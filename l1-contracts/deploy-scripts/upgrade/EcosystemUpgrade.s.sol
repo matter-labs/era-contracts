@@ -376,12 +376,18 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
+
+        addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
         config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
+        // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
+        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+            config.eraChainId
+        );
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
             ctmProtocolVersion != getNewProtocolVersion(),
@@ -409,6 +415,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             .validatorTimelock();
 
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+
+        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -422,9 +431,9 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
         return
             Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), // todo add salt here?
+                bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
                 L2ContractHelper.hashL2Bytecode(getCreationCode(contractName)),
-                hex"" // todo add constructor args here?
+                hex"" // the same as it is currently in DeployL1.s.sol
             );
     }
 
@@ -595,12 +604,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress(
             "contracts_newConfig",
             "expected_rollup_l2_da_validator",
-            upgradeAddresses.expectedL2Addresses.expectedRollupL2DAValidator
+            getExpectedL2Address("RollupL2DAValidator")
         );
         vm.serializeAddress(
             "contracts_newConfig",
             "expected_validium_l2_da_validator",
-            upgradeAddresses.expectedL2Addresses.expectedValidiumL2DAValidator
+            getExpectedL2Address("NoDAL2DAValidator")
         );
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
 
@@ -746,25 +755,29 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](1);
-        allCalls[0] = preparePauseGatewayMigrationsCall();
+        Call[][] memory allCalls = new Call[][](0);
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-        allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
+        Call[][] memory allCalls = new Call[][](6);
+        //stage 0
+        allCalls[0] = preparePauseGatewayMigrationsCall();
+        //stage 1
+        allCalls[1] = prepareUpgradeProxiesCalls();
+        allCalls[2] = prepareNewChainCreationParamsCall();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = prepareDAValidatorCall();
+        //stage 2
+        allCalls[5] = prepareUnpauseGatewayMigrationsCall();
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](1);
+        Call[][] memory allCalls = new Call[][](0);
 
-        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -876,6 +889,20 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
+            ),
+            value: 0
+        });
+    }
+
+    /// @notice Additional calls to newConfigure contracts
+    function prepareDAValidatorCall() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: addresses.daAddresses.rollupDAManager,
+            data: abi.encodeCall(
+                RollupDAManager.updateDAPair,
+                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
             ),
             value: 0
         });
