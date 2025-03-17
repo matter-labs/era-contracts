@@ -113,8 +113,10 @@ struct StateTransitionContracts {
     address validatorTimelock;
     /// @notice Address of the ProxyAdmin for ChainTypeManager.
     address chainTypeManagerProxyAdmin;
-    /// @notice Address of the ServerNotifier contract.
+    /// @notice Address of the ServerNotifier proxy contract.
     address serverNotifierProxy;
+    /// @notice Address of the ServerNotifier implementation contract.
+    address serverNotifierImplementation;
 }
 
 /// @notice Addresses of Data Availability (DA) related contracts.
@@ -263,10 +265,11 @@ contract GatewayCTMDeployer {
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployServerNotifier(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
-        ServerNotifier serverNotifierImplementation = new ServerNotifier{salt: _salt}(true);
+        address serverNotifierImplementation = address(new ServerNotifier{salt: _salt}(true));
+        _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
         _deployedContracts.stateTransition.serverNotifierProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
-                address(serverNotifierImplementation),
+                serverNotifierImplementation,
                 address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
                 abi.encodeCall(ServerNotifier.initialize, (address(this)))
             )
