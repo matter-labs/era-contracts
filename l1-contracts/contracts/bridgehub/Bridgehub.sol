@@ -15,12 +15,9 @@ import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, INTEROP_OPERATION_TX_TYPE} from "../common/Config.sol";
-import {L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
@@ -28,7 +25,6 @@ import {NotL1, NotRelayedSender, NotAssetRouter, ChainIdAlreadyPresent, ChainNot
 import {NoCTMForAssetId, SettlementLayersMustSettleOnL1, MigrationPaused, AssetIdAlreadyRegistered, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
-import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -125,13 +121,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    // modifier onlySettlementLayerRelayedSender() {
-    //     /// There is no sender for the wrapping, we use a virtual address.
-    //     if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
-    //         revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
-    //     }
-    //     _;
-    // }
+    modifier onlySettlementLayerRelayedSender() {
+        /// There is no sender for the wrapping, we use a virtual address.
+        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
+            revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
+        }
+        _;
+    }
 
     modifier onlyAssetRouter() {
         if (msg.sender != assetRouter) {
@@ -529,64 +525,21 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IAssetRouterBase(_secondBridgeAddress).bridgehubConfirmL2Transaction(_chainId, _txDataHash, _canonicalTxHash);
     }
 
-    /// @notice This function is used to send a request to the ZK chain.
-    /// @param _chainId the chainId of the chain
-    /// @param _refundRecipient the refund recipient
-    /// @param _request the request
-    /// @return canonicalTxHash the canonical transaction hash
-    // function _sendRequest(
-    //     uint256 _chainId,
-    //     address _refundRecipient,
-    //     BridgehubL2TransactionRequest memory _request
-    // ) internal returns (bytes32 canonicalTxHash) {
-    //     address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
-    //     _request.refundRecipient = refundRecipient;
-    //     (bool registered, address zkChain) = zkChainMap.tryGet(_chainId);
-    //     if (registered) {
-    //         canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
-    //     } else {
-    //         L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
-    //             txType: INTEROP_OPERATION_TX_TYPE,
-    //             from: uint256(uint160(_request.sender)),
-    //             to: uint256(uint160(_request.contractL2)),
-    //             gasLimit: _request.l2GasLimit,
-    //             gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-    //             maxFeePerGas: uint256(276250000), // todo change in the bootloader
-    //             maxPriorityFeePerGas: uint256(140000000),
-    //             paymaster: uint256(0),
-    //             nonce: uint256(0), //todo
-    //             value: _request.l2Value,
-    //             reserved: [81667768061025231231209905783624370749440, uint256(uint160(refundRecipient)), 0, 0], //[_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
-    //             data: _request.l2Calldata,
-    //             signature: new bytes(0),
-    //             factoryDeps: L2ContractHelper.hashFactoryDeps(_request.factoryDeps),
-    //             paymasterInput: new bytes(0),
-    //             reservedDynamic: new bytes(0)
-    //         });
-    //         /// Fixme this does not have a unique hash atm.
-    //         // canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(_request));
-    //         canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
-
-    //         // solhint-disable-next-line func-named-parameters
-    //         emit IMailboxImpl.NewPriorityRequest(0, canonicalTxHash, 0, transaction, _request.factoryDeps);
-    //     }
-    // }
-
     /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
     /// @param _chainId the chainId of the chain
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp the expiration timestamp for the transaction
-    // function forwardTransactionOnGateway(
-    //     uint256 _chainId,
-    //     bytes32 _canonicalTxHash,
-    //     uint64 _expirationTimestamp
-    // ) external override onlySettlementLayerRelayedSender {
-    //     if (L1_CHAIN_ID == block.chainid) {
-    //         revert NotInGatewayMode();
-    //     }
-    //     address zkChain = zkChainMap.get(_chainId);
-    //     IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
-    // }
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override onlySettlementLayerRelayedSender {
+        if (L1_CHAIN_ID == block.chainid) {
+            revert NotInGatewayMode();
+        }
+        address zkChain = zkChainMap.get(_chainId);
+        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
+    }
 
     /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
@@ -816,7 +769,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /*//////////////////////////////////////////////////////////////
-                        Chain migration
+                        Chain registration
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Registers an already deployed chain with the bridgehub

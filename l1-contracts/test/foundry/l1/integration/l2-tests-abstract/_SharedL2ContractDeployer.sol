@@ -24,7 +24,8 @@ import {IAdmin} from "../../../../../contracts/state-transition/chain-interfaces
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {Bridgehub, IBridgehub, BridgehubL2TransactionRequest} from "../../../../../contracts/bridgehub/Bridgehub.sol";
+import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
+import {BridgehubL2TransactionRequest} from "../../../../../contracts/common/Messaging.sol";
 import {InteropCenter, IInteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";

@@ -49,7 +49,6 @@ contract InteropHandler is IInteropHandler {
         if (!isIncluded) {
             revert MessageNotIncluded();
         }
-        // kl todo double execution not checked. Rework hashing to contain all data.
         bytes32 bundleHash = keccak256(
             abi.encode(_proof.chainId, _proof.l1BatchNumber, _proof.l2MessageIndex, _bundle)
         );

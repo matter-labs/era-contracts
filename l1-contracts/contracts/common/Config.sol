@@ -20,9 +20,6 @@ bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e5202
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
-/// @dev Denotest the type of transaction that is used for L2->L2 interop
-uint256 constant INTEROP_OPERATION_TX_TYPE = 253;
-
 /// @dev Denotes the type of the ZKsync transaction that came from L1.
 uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 

@@ -194,7 +194,6 @@ library DataEncoding {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
     }
 
-    
     /// @notice Encodes the asset tracker data by combining chain id, asset id, amount, minting chain status and settlement layer balance.
     /// @param _chainId The id of the chain being migrated.
     /// @param _assetId The id of the asset being migrated.
@@ -211,14 +210,8 @@ library DataEncoding {
         bool _hasSettlingMintingChains,
         uint256 _newSLBalance
     ) internal pure returns (bytes memory) {
-        return abi.encode(
-            _chainId,
-            _assetId,
-            _amount,
-            _migratingChainIsMinter,
-            _hasSettlingMintingChains,
-            _newSLBalance
-        );
+        return
+            abi.encode(_chainId, _assetId, _amount, _migratingChainIsMinter, _hasSettlingMintingChains, _newSLBalance);
     }
 
     /// @notice Decodes the asset tracker data into its component parts.
@@ -231,14 +224,18 @@ library DataEncoding {
     /// @return newSLBalance The new settlement layer balance.
     function decodeAssetTrackerData(
         bytes calldata _data
-    ) internal pure returns (
-        uint256 chainId,
-        bytes32 assetId,
-        uint256 amount,
-        bool migratingChainIsMinter,
-        bool hasSettlingMintingChains,
-        uint256 newSLBalance
-    ) {
+    )
+        internal
+        pure
+        returns (
+            uint256 chainId,
+            bytes32 assetId,
+            uint256 amount,
+            bool migratingChainIsMinter,
+            bool hasSettlingMintingChains,
+            uint256 newSLBalance
+        )
+    {
         return abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
     }
 }

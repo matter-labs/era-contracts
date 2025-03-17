@@ -91,18 +91,6 @@ library DynamicIncrementalMerkle {
         }
     }
 
-    function clearMemory(Bytes32PushTree memory self) internal {
-        self._nextLeafIndex = 0;
-        uint256 length = self._zerosLengthMemory;
-        for (uint256 i = length; 0 < i; --i) {
-            self._zeros[i] = bytes32(0);
-        }
-        length = self._sidesLengthMemory;
-        for (uint256 i = length; 0 < i; --i) {
-            self._sides[i] = bytes32(0);
-        }
-    }
-
     /**
      * @dev Insert a new leaf in the tree, and compute the new root. Returns the position of the inserted leaf in the
      * tree, and the resulting root.

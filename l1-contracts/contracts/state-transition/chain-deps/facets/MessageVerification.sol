@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-import { L2Message, L2Log} from "../../../common/Messaging.sol";
+import {L2Message, L2Log} from "../../../common/Messaging.sol";
 import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
-import { L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../../../common/Config.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../../../common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
 

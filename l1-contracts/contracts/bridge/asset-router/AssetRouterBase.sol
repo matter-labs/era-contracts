@@ -112,38 +112,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
-    function bridgehubDepositBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _originalCaller,
-        uint256 _amount
-    ) public payable virtual;
-
-    function _bridgehubDepositBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _originalCaller,
-        uint256 _amount
-    ) internal virtual whenNotPaused {
-        address assetHandler = assetHandlerAddress[_assetId];
-        if (assetHandler == address(0)) {
-            revert AssetHandlerDoesNotExist(_assetId);
-        }
-
-        // slither-disable-next-line unused-return
-        IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
-            _chainId: _chainId,
-            _msgValue: 0,
-            _assetId: _assetId,
-            _originalCaller: _originalCaller,
-            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
-        });
-
-        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
-        emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
-    }
-
-    /// @inheritdoc IAssetRouterBase
     function bridgehubDeposit(
         uint256 _chainId,
         address _originalCaller,
@@ -163,23 +131,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
-            _value: _value,
-            _data: _data,
-            _nativeTokenVault: _nativeTokenVault
-        });
-        INTEROP_CENTER.addCallToBundleFromRequest(_bundleId, _value, request);
-    }
-
-    function _addCallToBundle(
-        uint256 _chainId,
-        bytes32 _bundleId,
-        uint256 _value,
-        bytes calldata _data,
-        address _nativeTokenVault
-    ) internal virtual {
-        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
-            _chainId: _chainId,
-            _originalCaller: msg.sender,
             _value: _value,
             _data: _data,
             _nativeTokenVault: _nativeTokenVault

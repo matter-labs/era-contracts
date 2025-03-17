@@ -176,15 +176,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         });
     }
 
-    function bridgehubDepositBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _originalCaller,
-        uint256 _amount
-    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyInteropCenter {
-        // _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
-    }
-
     function bridgehubDeposit(
         uint256 _chainId,
         address _originalCaller,
@@ -207,7 +198,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     }
 
     function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyInteropCenter {
-        // revert L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented(); // kl todo. figure out failed txs. Maybe the current L2->L1 i.e. reexecution model is enough.
+        // On the L2, tx confirmation is not stored, as txs can always be retried.
     }
 
     function _setAssetHandlerAddressOnCounterpart(

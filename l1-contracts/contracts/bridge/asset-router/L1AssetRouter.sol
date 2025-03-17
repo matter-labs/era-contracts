@@ -12,7 +12,7 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-// import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
@@ -22,7 +22,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
+import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, Unauthorized, AssetHandlerDoesNotExist, ZeroAddress, TokenNotSupported, AddressAlreadyUsed, TokensWithFeesNotSupported} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -70,14 +70,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
         _;
     }
-
-    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-    // modifier onlyBridgehubOrEra(uint256 _chainId) {
-    //     if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
-    //         revert Unauthorized(msg.sender);
-    //     }
-    //     _;
-    // }
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
@@ -210,21 +202,29 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc IL1AssetRouter
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    )
-        public
-        payable
-        virtual
-        override(AssetRouterBase, IAssetRouterBase)
-        onlyInteropCenterOrEra(_chainId)
-        whenNotPaused
-    {
-        _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
+    ) public payable virtual override onlyInteropCenterOrEra(_chainId) whenNotPaused {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler == address(0)) {
+            revert AssetHandlerDoesNotExist(_assetId);
+        }
+
+        // slither-disable-next-line unused-return
+        IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
+            _chainId: _chainId,
+            _msgValue: 0,
+            _assetId: _assetId,
+            _originalCaller: _originalCaller,
+            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
+        });
+
+        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
+        emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
     }
 
     /// @inheritdoc IAssetRouterBase
@@ -242,13 +242,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
-        return _bridgehubDeposit({
-            _chainId: _chainId,
-            _originalCaller: _originalCaller,
-            _value: _value,
-            _data: _data,
-            _nativeTokenVault: address(nativeTokenVault)
-        });
+        return
+            _bridgehubDeposit({
+                _chainId: _chainId,
+                _originalCaller: _originalCaller,
+                _value: _value,
+                _data: _data,
+                _nativeTokenVault: address(nativeTokenVault)
+            });
     }
 
     /// @inheritdoc IAssetRouterBase

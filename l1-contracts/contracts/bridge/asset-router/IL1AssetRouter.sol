@@ -140,6 +140,19 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         bytes32[] calldata _merkleProof
     ) external;
 
+    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
+    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _assetId The deposited asset ID.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
+    /// @param _amount The total amount of tokens to be bridged.
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) external payable;
+
     function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,
