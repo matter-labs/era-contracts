@@ -39,7 +39,7 @@ contract EigenDAL1Validator is IL1DAValidator {
             revert("EigenDAL1Validator: blob proof is not verified");
         }
 
-         if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(stateDiffHash, eigenDAHash)))
+        if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(stateDiffHash, eigenDAHash)))
             revert InvalidValidatorOutputHash();
 
         output.stateDiffHash = stateDiffHash;

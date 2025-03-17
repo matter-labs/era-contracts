@@ -13,7 +13,7 @@ contract EigenDAL2Validator is IL2DAValidator, StateDiffL2DAValidator {
         bytes32,
         // The root hash of the user L2->L1 logs.
         bytes32,
-         // The chained hash of the L2->L1 messages
+        // The chained hash of the L2->L1 messages
         bytes32 _chainedMessagesHash,
         // The chained hash of uncompressed bytecodes sent to L1
         bytes32 _chainedBytecodesHash,
