@@ -36,7 +36,8 @@ fn execute_internal_bootloader_test() {
     let artifacts_location = artifacts_location_path
         .to_str()
         .expect("Invalid path: {artifacts_location_path:?}");
-    
+    println!("Current dir is {:?}", artifacts_location);
+
     let bytecode = read_yul_bytecode(artifacts_location, "bootloader_test");
     let hash = hash_bytecode(&bytecode);
     let bootloader = SystemContractCode {
@@ -114,10 +115,14 @@ fn execute_internal_bootloader_test() {
         test_count.get().unwrap().clone()
     };
     
+    println!(" ==== Running {} tests ====", test_count);
+
     let mut tests_failed: u32 = 0;
 
     // Now we iterate over the tests.
     for test_id in 1..=test_count {
+        println!("\n === Running test {}", test_id);
+
         let storage: StoragePtr<StorageView<InMemoryStorage>> =
             StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
                 L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
@@ -203,15 +208,19 @@ fn execute_internal_bootloader_test() {
         }
 
         match &test_result.unwrap() {
-            Ok(_) => {},
+            Ok(_) => println!("{} {}", "[PASS]".green(), test_name),
             Err(error_info) => {
                 tests_failed += 1;
+                println!("{} {} {}", "[FAIL]".red(), test_name, error_info)
             }
         }
     }
     if tests_failed > 0 {
+        println!("{}", format!("{} tests failed.", tests_failed).red());
         process::exit(1);
-    } 
+    } else {
+        println!("{}", "ALL tests passed.".green())
+    }
 }
 
 fn main() {
