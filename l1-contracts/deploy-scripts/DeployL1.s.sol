@@ -146,10 +146,9 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot"
         );
 
-        (
-            addresses.stateTransition.serverNotifierImplementation,
-            addresses.stateTransition.serverNotifierProxy
-        ) = deployTuppWithContract("ServerNotifier");
+        (, /** Implementation */ addresses.stateTransition.serverNotifierProxy) = deployTuppWithContract(
+            "ServerNotifier"
+        );
 
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
             "L1Nullifier"
