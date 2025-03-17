@@ -114,7 +114,6 @@ fn execute_internal_bootloader_test() {
 
         test_count.get().unwrap().clone()
     };
-    
     println!(" ==== Running {} tests ====", test_count);
 
     let mut tests_failed: u32 = 0;
@@ -173,12 +172,11 @@ fn execute_internal_bootloader_test() {
                         "Should have failed with {}, but run successfully.",
                         requested_assert
                     )),
-                    ExecutionResult::Revert { output } => {
-                        Err(format!(
+                    ExecutionResult::Revert { output } => Err(format!(
                         "Should have failed with {}, but run reverted with {}.",
                         requested_assert,
                         output.to_user_friendly_string()
-                    ))},
+                    )),
                     ExecutionResult::Halt { reason } => {
                         if let Halt::UnexpectedVMBehavior(reason) = reason {
                             let reason = reason.strip_prefix("Assertion error: ").unwrap();

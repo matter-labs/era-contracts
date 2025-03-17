@@ -49,11 +49,10 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         _storage: StoragePtr<S>,
     ) {
         let hook = TestVmHook::from_opcode_memory(&state, &data, memory);
-        
+
         if let TestVmHook::TestLog(msg, data_str) = &hook {
             println!("{} {} {}", "Test log".bold(), msg, data_str);
         }
-        
         if let TestVmHook::AssertEqFailed(a, b, msg) = &hook {
             let result = format!("Assert failed: {} is not equal to {}: {}", a, b, msg);
 
