@@ -156,7 +156,9 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         GasFields memory options = GasFields({
             gasLimit: 30000000,
             gasPerPubdataByteLimit: 1000,
-            refundRecipient: address(this)
+            refundRecipient: address(this),
+            paymaster: address(0),
+            paymasterInput: ""
         });
         uint256 destinationChainId = 270;
         vm.mockCall(
@@ -164,6 +166,6 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_MESSENGER.sendToL1.selector),
             abi.encode(bytes(""))
         );
-        l2InteropCenter.requestInterop{value: 3 ether}(destinationChainId, feePaymentCalls, executionCalls, options);
+        l2InteropCenter.requestInterop{value: 3 ether}(destinationChainId, address(0), feePaymentCalls, executionCalls, options);
     }
 }

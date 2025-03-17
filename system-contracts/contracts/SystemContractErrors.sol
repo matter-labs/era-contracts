@@ -8,6 +8,8 @@ error AddressHasNoCode(address);
 error BatchNotExecuted(uint256 batchNumber);
 // 0xefce78c7
 error CallerMustBeBootloader();
+/// 
+error CallerMustBeInteropCenter();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0x4f951510

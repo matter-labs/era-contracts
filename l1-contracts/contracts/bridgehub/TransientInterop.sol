@@ -25,7 +25,7 @@ library TransientInterop {
     function setBundleMetadata(bytes32 _bundleId, BundleMetadata memory _bundleMetadata) internal {
         uint256 bundleSlot = uint256(keccak256(abi.encodePacked(BUNDLE_METADATA_SLOT_MODIFIER, _bundleId)));
         TransientPrimitivesLib.set(bundleSlot, _bundleMetadata.destinationChainId);
-        TransientPrimitivesLib.set(bundleSlot + 1, uint256(uint160(_bundleMetadata.initiator)));
+        TransientPrimitivesLib.set(bundleSlot + 1, uint256(uint160(_bundleMetadata.sender)));
         TransientPrimitivesLib.set(bundleSlot + 2, _bundleMetadata.callCount);
         TransientPrimitivesLib.set(bundleSlot + 3, _bundleMetadata.totalValue);
     }
@@ -41,7 +41,7 @@ library TransientInterop {
 
     function addBaseTokenCallToBundle(bytes32 _bundleId) internal {
         BundleMetadata memory bundleMetadata = getBundleMetadata(_bundleId);
-        // console.log("addBTcallToBundle 1", bundleMetadata.initiator);
+        // console.log("addBTcallToBundle 1", bundleMetadata.sender);
         // console.logBytes32(_bundleId);
 
         uint256 callCount = bundleMetadata.callCount;
@@ -62,7 +62,7 @@ library TransientInterop {
 
     function addCallToBundle(bytes32 _bundleId, InteropCall memory _interopCall) internal {
         BundleMetadata memory bundleMetadata = getBundleMetadata(_bundleId);
-        // console.log("addCallToBundle 2", bundleMetadata.initiator);
+        // console.log("addCallToBundle 2", bundleMetadata.sender);
         // console.logBytes32(_bundleId);
 
         uint256 callCount = bundleMetadata.callCount;

@@ -24,11 +24,11 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev Interop Center contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IInteropCenter public immutable override INTEROP_CENTER;
-
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
+    
+    /// @dev Interop Center contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    IInteropCenter public immutable override INTEROP_CENTER;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyInteropCenter() {

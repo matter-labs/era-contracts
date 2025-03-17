@@ -19,19 +19,19 @@ contract TransientInteropTest is Test {
 
     function test_getBundleMetadata() public {
         BundleMetadata memory bundleMetadataBefore = TransientInterop.getBundleMetadata(bundleId);
-        assertEq(bundleMetadataBefore.initiator, address(0));
+        assertEq(bundleMetadataBefore.sender, address(0));
         assertEq(bundleMetadataBefore.callCount, 0);
         assertEq(bundleMetadataBefore.totalValue, 0);
 
         uint256 checkpointGasLeftBefore = gasleft();
         TransientInterop.setBundleMetadata(
             bundleId,
-            BundleMetadata({destinationChainId: 1, initiator: address(1), callCount: 1, totalValue: 1})
+            BundleMetadata({destinationChainId: 1, sender: address(1), callCount: 1, totalValue: 1})
         );
         uint256 checkpointGasLeftAfter = gasleft();
 
         BundleMetadata memory bundleMetadataAfter = TransientInterop.getBundleMetadata(bundleId);
-        assertEq(bundleMetadataAfter.initiator, address(1));
+        assertEq(bundleMetadataAfter.sender, address(1));
         assertEq(bundleMetadataAfter.callCount, 1);
         assertEq(bundleMetadataAfter.totalValue, 1);
         assert(checkpointGasLeftBefore - checkpointGasLeftAfter < 3000); // we are using tstore

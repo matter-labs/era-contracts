@@ -112,6 +112,10 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         }
     }
 
+    function burnMsgValue() external payable override onlyCallFromInteropCenter {
+        _burnMsgValue();
+    }
+
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
     function _getL1WithdrawMessage(address _to, uint256 _amount) internal pure returns (bytes memory) {
         return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount);

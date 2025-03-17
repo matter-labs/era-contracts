@@ -165,7 +165,7 @@ struct InteropCall {
 
 struct BundleMetadata {
     uint256 destinationChainId;
-    address initiator;
+    address sender;
     uint256 callCount;
     // Note the total value is provided by the user.
     // This is because we cannot guarantee atomicity of xL2 txs (just the atomicity of calls on the destination chain)
@@ -177,15 +177,15 @@ struct InteropBundle {
     uint256 destinationChainId;
     InteropCall[] calls;
     // If not set - anyone can execute it.
-    address[] executionAddresses;
-    // Who can 'cancel' this bundle.
-    address cancellationAddress;
+    address executionAddress;
 }
 
 struct GasFields {
     uint256 gasLimit;
     uint256 gasPerPubdataByteLimit;
     address refundRecipient;
+    address paymaster;
+    bytes paymasterInput;
 }
 
 struct InteropTrigger {
@@ -195,7 +195,6 @@ struct InteropTrigger {
     bytes32 feeBundleHash;
     bytes32 executionBundleHash;
     GasFields gasFields;
-    // kl todo add paymaster things here.
 }
 
 /// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message

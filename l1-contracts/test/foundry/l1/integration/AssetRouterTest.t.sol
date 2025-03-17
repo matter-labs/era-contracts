@@ -250,12 +250,15 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
         interopCenter.requestInterop{value: 250000000000100}(
             eraZKChainId,
+            address(0),
             feePaymentCallStarters,
             executionCallStarters,
             GasFields({
                 gasLimit: uint256(1000000),
                 gasPerPubdataByteLimit: uint256(REQUIRED_L2_GAS_PRICE_PER_PUBDATA),
-                refundRecipient: address(0)
+                refundRecipient: address(0),
+                paymaster: address(0),
+                paymasterInput: ""
             })
         );
     }

@@ -83,7 +83,7 @@ IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCode
     address(SYSTEM_CONTRACTS_OFFSET + 0x02)
 );
 
-IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+IBaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(0x1000b));
 

@@ -21,9 +21,9 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest, BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "../common/L1ContractErrors.sol";
-import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
+import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy, ChainIdNotRegistered} from "./L1BridgehubErrors.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 import {TransientInterop} from "./TransientInterop.sol";
@@ -142,10 +142,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bundleCount++;
         TransientInterop.setBundleMetadata(
             bundleId,
-            BundleMetadata({destinationChainId: _destinationChainId, initiator: _sender, callCount: 0, totalValue: 0})
+            BundleMetadata({destinationChainId: _destinationChainId, sender: _sender, callCount: 0, totalValue: 0})
         );
         TransientInterop.addBaseTokenCallToBundle(
-            bundleId // minting here to interopCaller
+            bundleId
         );
     }
 
@@ -191,7 +191,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender
     ) internal returns (bytes32 interopBundleHash) {
         BundleMetadata memory bundleMetadata = TransientInterop.getBundleMetadata(_bundleId);
-        if (bundleMetadata.initiator != _sender) {
+        if (bundleMetadata.sender != _sender) {
             revert Unauthorized(_sender);
         }
 
@@ -203,18 +203,16 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
         _ensureCorrectTotalValue(
             bundleMetadata.destinationChainId,
-            bundleMetadata.initiator,
+            bundleMetadata.sender,
             bundleMetadata.totalValue,
             _receivedMsgValue
         );
 
         address[] memory executionAddresses = new address[](1);
-        executionAddresses[0] = _executionAddress;
         InteropBundle memory interopBundle = InteropBundle({
             destinationChainId: bundleMetadata.destinationChainId,
             calls: interopCalls,
-            executionAddresses: executionAddresses,
-            cancellationAddress: address(0)
+            executionAddress: _executionAddress
         });
         bytes memory interopBundleBytes = abi.encode(interopBundle);
         interopBundleHash = keccak256(interopBundleBytes);
@@ -254,18 +252,25 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        IAssetRouterBase(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-            _destinationChainId,
-            tokenAssetId,
-            _initiator,
-            _totalValue
-        );
+        if (block.chainid == L1_CHAIN_ID) {
+            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+                _destinationChainId,
+                tokenAssetId,
+                _initiator,
+                _totalValue
+            );
+        } else {
+            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
                         Interop tx interface
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice sends the interopTrigger
+    /// @dev Dangerous to use by itself, the feeBundleId and executionBundleId are not checked for correctness.
+    /// @dev e.g. the bundles might not exist, point to wrong chains, etc. 
     function sendInteropTrigger(
         InteropTrigger memory _interopTrigger
     ) public override onlyL2NotToL1(_interopTrigger.destinationChainId) returns (bytes32 canonicalTxHash) {
@@ -280,38 +285,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender,
         address _refundRecipient
     ) internal returns (bytes32 canonicalTxHash) {
-        if (block.chainid == L1_CHAIN_ID) {
-            // kl todo add to MessageRoot here.
-        } else {
-            emit InteropTriggerSent(_interopTrigger);
-            return L2_MESSENGER.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
-        }
+        emit InteropTriggerSent(_interopTrigger);
+        return L2_MESSENGER.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
     }
 
-    // function _constructRequestFromTrigger(
-    //     InteropTrigger memory _interopTrigger,
-    //     bytes32 _feeBundleId,
-    //     bytes32 _executionBundleId,
-    //     bytes[] memory _factoryDeps,
-    //     address _refundRecipient
-    // ) internal returns (BridgehubL2TransactionRequest memory request) {
-    //     // InteropCall memory feeCall_0 = TransientInterop.getBundleCall(_interopTrigger.feeBundleHash, 0);
-    //     InteropCall memory feeCall_1 = TransientInterop.getBundleCall(_feeBundleId, 1);
-    //     // InteropCall memory executionCall_0 = TransientInterop.getBundleCall(_interopTrigger.executionBundleHash, 0);
-    //     InteropCall memory executionCall_1 = TransientInterop.getBundleCall(_executionBundleId, 1);
-    //     return
-    //         BridgehubL2TransactionRequest({
-    //             sender: executionCall_1.from,
-    //             contractL2: executionCall_1.to,
-    //             mintValue: feeCall_1.value + executionCall_1.value,
-    //             l2Value: executionCall_1.value,
-    //             l2Calldata: executionCall_1.data,
-    //             l2GasLimit: _interopTrigger.gasFields.gasLimit,
-    //             l2GasPerPubdataByteLimit: _interopTrigger.gasFields.gasPerPubdataByteLimit,
-    //             factoryDeps: _factoryDeps,
-    //             refundRecipient: AddressAliasHelper.actualRefundRecipient(_refundRecipient, _interopTrigger.sender)
-    //         });
-    // }
     /*//////////////////////////////////////////////////////////////
                         EOA helpers
     //////////////////////////////////////////////////////////////*/
@@ -328,18 +305,20 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             InteropCallRequest({to: _destinationAddress, value: _value, data: _data}),
             msg.sender
         );
-        bytes32 bundleHash = _finishAndSendBundleLong(bundleId, msg.sender, msg.value, msg.sender);
+        bytes32 bundleHash = _finishAndSendBundleLong(bundleId, address(0), msg.value, msg.sender);
         return bundleHash;
     }
 
     struct ExtraInputs {
         address sender;
+        address executionAddress;
         address refundRecipient;
         bytes[] factoryDeps;
     }
 
     function requestInterop(
         uint256 _destinationChainId,
+        address _executionAddress,
         InteropCallStarter[] memory _feePaymentCallStarters,
         InteropCallStarter[] memory _executionCallStarters,
         GasFields memory _gasFields
@@ -350,7 +329,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 _feePaymentCallStarters,
                 _executionCallStarters,
                 _gasFields,
-                ExtraInputs({sender: msg.sender, factoryDeps: new bytes[](0), refundRecipient: address(0)})
+                ExtraInputs({sender: msg.sender, executionAddress: _executionAddress, factoryDeps: new bytes[](0), refundRecipient: address(0)})
             );
     }
 
@@ -407,7 +386,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
         viaIR.feeBundleHash = _finishAndSendBundleLong(
             viaIR.feeBundleId,
-            _extraInputs.sender,
+            _extraInputs.executionAddress,
             feeValue,
             _extraInputs.sender
         );
@@ -433,13 +412,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
         bytes32 executionBundleHash = _finishAndSendBundleLong(
             viaIR.executionBundleId,
-            address(0),
+            _extraInputs.executionAddress,
             msg.value - feeValue,
             _extraInputs.sender
         );
         InteropTrigger memory interopTrigger = InteropTrigger({
             sender: _extraInputs.sender,
-            recipient: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
+            recipient: _extraInputs.executionAddress,
             destinationChainId: _destinationChainId,
             feeBundleHash: viaIR.feeBundleHash,
             executionBundleHash: executionBundleHash,
@@ -508,9 +487,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 GasFields({
                     gasLimit: _request.l2GasLimit,
                     gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                    refundRecipient: _request.refundRecipient
+                    refundRecipient: _request.refundRecipient,
+                    paymaster: address(0),
+                    paymasterInput: ""
                 }),
-                ExtraInputs({sender: _sender, factoryDeps: new bytes[](0), refundRecipient: _request.refundRecipient})
+                ExtraInputs({sender: _sender, executionAddress: L2_STANDARD_TRIGGER_ACCOUNT_ADDR, factoryDeps: new bytes[](0), refundRecipient: _request.refundRecipient})
             );
     }
 
@@ -555,10 +536,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 GasFields({
                     gasLimit: _request.l2GasLimit,
                     gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                    refundRecipient: _request.refundRecipient
+                    refundRecipient: _request.refundRecipient,
+                    paymaster: address(0),
+                    paymasterInput: ""
                 }),
                 ExtraInputs({
                     sender: _sender,
+                    executionAddress: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
                     factoryDeps: _request.factoryDeps,
                     refundRecipient: _request.refundRecipient
                 })
@@ -786,7 +770,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         if (zkChain != address(0)) {
             canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
         } else {
-            // kl todo revert here
+            revert ChainIdNotRegistered();
         }
     }
 
