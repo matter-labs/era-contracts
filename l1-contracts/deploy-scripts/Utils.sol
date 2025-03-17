@@ -1170,6 +1170,10 @@ library Utils {
         bytecode = readFoundryBytecode("/../da-contracts/out/EigenDAL1Validator.sol/EigenDAL1Validator.json");
     }
 
+    function readEigenDADummyRegistryBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/DummyEigenDARegistry.sol/DummyEigenDARegistry.json");
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }

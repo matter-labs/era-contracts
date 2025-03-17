@@ -273,8 +273,15 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
 
+        // TODO: Use deploySimpleContract
         if (config.contracts.eigenDAL1Validator == address(0)) {
-            addresses.daAddresses.eigenDAL1Validator = deployViaCreate2(Utils.readEigenDAL1ValidatorBytecode(), "");
+            if (config.contracts.eigenDARegistry == address(0)) {
+                addresses.daAddresses.eigenDARegistry = deployViaCreate2(Utils.readEigenDADummyRegistryBytecode(), "");
+                console.log("DummyEigenDARegistry deployed at:", addresses.daAddresses.eigenDARegistry);
+            } else {
+                addresses.daAddresses.eigenDARegistry = config.contracts.eigenDARegistry;
+            }
+            addresses.daAddresses.eigenDAL1Validator = deployViaCreate2(Utils.readEigenDAL1ValidatorBytecode(), abi.encode(addresses.daAddresses.eigenDARegistry));
             console.log("EigenDAL1Validator deployed at:", addresses.daAddresses.eigenDAL1Validator);
         } else {
             addresses.daAddresses.eigenDAL1Validator = config.contracts.eigenDAL1Validator;
@@ -585,6 +592,12 @@ contract DeployL1Script is Script, DeployUtils {
             "deployed_addresses",
             "eigenda_l1_validator_addr",
             addresses.daAddresses.eigenDAL1Validator
+        );
+
+        vm.serializeAddress(
+            "deployed_addresses",
+            "eigenda_registry_addr",
+            addresses.daAddresses.eigenDARegistry
         );
 
         string memory deployedAddresses = vm.serializeAddress(
