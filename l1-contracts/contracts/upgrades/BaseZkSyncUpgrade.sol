@@ -4,21 +4,22 @@ pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, L2BytecodeHashMismatch, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "./ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionMinorDeltaTooBig, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetEvmEmulator} from "./ZkSyncUpgradeErrors.sol";
+import {TooManyFactoryDeps, TimeNotReached} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
-/// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
 /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
 /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
+/// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
 /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
 /// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
 /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
@@ -30,9 +31,9 @@ import {SemVer} from "../common/libraries/SemVer.sol";
 /// the previous protocol version.
 struct ProposedUpgrade {
     L2CanonicalTransaction l2ProtocolUpgradeTx;
-    bytes[] factoryDeps;
     bytes32 bootloaderHash;
     bytes32 defaultAccountHash;
+    bytes32 evmEmulatorHash;
     address verifier;
     VerifierParams verifierParams;
     bytes l1ContractsUpgradeCalldata;
@@ -44,7 +45,7 @@ struct ProposedUpgrade {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
+abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -53,6 +54,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Сhanges to the bytecode that is used in L2 as a default account
     event NewL2DefaultAccountBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
+
+    /// @notice Сhanges to the bytecode that is used in L2 as an EVM emulator
+    event NewL2EvmEmulatorBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
 
     /// @notice Verifier address changed
     event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
@@ -63,7 +67,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @notice Notifies about complete upgrade
     event UpgradeComplete(uint256 indexed newProtocolVersion, bytes32 indexed l2UpgradeTxHash, ProposedUpgrade upgrade);
 
-    /// @notice The main function that will be provided by the upgrade proxy
+    /// @notice The main function that will be delegate-called by the chain.
     /// @dev This is a virtual function and should be overridden by custom upgrade implementations.
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @return txHash The hash of the L2 system contract upgrade transaction.
@@ -79,14 +83,14 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
-        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
-
-        txHash = _setL2SystemContractUpgrade(
-            _proposedUpgrade.l2ProtocolUpgradeTx,
-            _proposedUpgrade.factoryDeps,
-            newMinorVersion,
+        _setBaseSystemContracts(
+            _proposedUpgrade.bootloaderHash,
+            _proposedUpgrade.defaultAccountHash,
+            _proposedUpgrade.evmEmulatorHash,
             isPatchOnly
         );
+
+        txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
 
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
@@ -113,6 +117,28 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // Change the default account bytecode hash
         s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
         emit NewL2DefaultAccountBytecodeHash(previousDefaultAccountBytecodeHash, _l2DefaultAccountBytecodeHash);
+    }
+
+    /// @notice Change EVM emulator bytecode hash, that is used on L2
+    /// @param _l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
+    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed
+    function _setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash, bool _patchOnly) private {
+        if (_l2EvmEmulatorBytecodeHash == bytes32(0)) {
+            return;
+        }
+
+        if (_patchOnly) {
+            revert PatchUpgradeCantSetEvmEmulator();
+        }
+
+        L2ContractHelper.validateBytecodeHash(_l2EvmEmulatorBytecodeHash);
+
+        // Save previous value into the stack to put it into the event later
+        bytes32 previousL2EvmEmulatorBytecodeHash = s.l2EvmEmulatorBytecodeHash;
+
+        // Change the EVM emulator bytecode hash
+        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
+        emit NewL2EvmEmulatorBytecodeHash(previousL2EvmEmulatorBytecodeHash, _l2EvmEmulatorBytecodeHash);
     }
 
     /// @notice Change bootloader bytecode hash, that is used on L2
@@ -184,23 +210,28 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @notice Updates the bootloader hash and the hash of the default account
     /// @param _bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
     /// @param _defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
+    /// @param _evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
     /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
-    function _setBaseSystemContracts(bytes32 _bootloaderHash, bytes32 _defaultAccountHash, bool _patchOnly) internal {
+    function _setBaseSystemContracts(
+        bytes32 _bootloaderHash,
+        bytes32 _defaultAccountHash,
+        bytes32 _evmEmulatorHash,
+        bool _patchOnly
+    ) internal {
         _setL2BootloaderBytecodeHash(_bootloaderHash, _patchOnly);
         _setL2DefaultAccountBytecodeHash(_defaultAccountHash, _patchOnly);
+        _setL2EvmEmulatorBytecodeHash(_evmEmulatorHash, _patchOnly);
     }
 
     /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed
     /// @dev If the transaction is noop (i.e. its type is 0) it does nothing and returns 0.
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
-    /// @param _factoryDeps The factory dependencies that are used by the transaction.
     /// @param _newMinorProtocolVersion The new minor protocol version. It must be used as the `nonce` field
     /// of the `_l2ProtocolUpgradeTx`.
     /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
         L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
-        bytes[] calldata _factoryDeps,
         uint32 _newMinorProtocolVersion,
         bool _patchOnly
     ) internal returns (bytes32) {
@@ -233,7 +264,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             revert L2UpgradeNonceNotEqualToNewProtocolVersion(_l2ProtocolUpgradeTx.nonce, _newMinorProtocolVersion);
         }
 
-        _verifyFactoryDeps(_factoryDeps, _l2ProtocolUpgradeTx.factoryDeps);
+        _verifyFactoryDeps(_l2ProtocolUpgradeTx.factoryDeps);
 
         bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);
 
@@ -242,23 +273,14 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         return l2ProtocolUpgradeTxHash;
     }
 
-    /// @notice Verifies that the factory deps correspond to the proper hashes
-    /// @param _factoryDeps The list of factory deps
-    /// @param _expectedHashes The list of expected bytecode hashes
-    function _verifyFactoryDeps(bytes[] calldata _factoryDeps, uint256[] calldata _expectedHashes) private pure {
-        if (_factoryDeps.length != _expectedHashes.length) {
-            revert UnexpectedNumberOfFactoryDeps();
-        }
-        if (_factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
+    /// @notice Verifies that the factory deps provided are in the correct format
+    /// @param _hashes The list of hashes of factory deps
+    /// @dev Note, that unlike normal L1->L2 transactions, factory dependencies for
+    /// an upgrade transaction should be made available prior to the upgrade via publishing those
+    /// to the `BytecodesSupplier` contract.
+    function _verifyFactoryDeps(uint256[] calldata _hashes) private pure {
+        if (_hashes.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
-        }
-        uint256 length = _factoryDeps.length;
-
-        for (uint256 i = 0; i < length; ++i) {
-            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[i]);
-            if (bytecodeHash != bytes32(_expectedHashes[i])) {
-                revert L2BytecodeHashMismatch(bytecodeHash, bytes32(_expectedHashes[i]));
-            }
         }
     }
 
@@ -304,7 +326,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-            // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
+            // Note it is important to keep this check, as otherwise ZK chains might skip upgrades by overwriting
             if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
                 revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
             }

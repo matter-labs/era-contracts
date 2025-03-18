@@ -150,12 +150,6 @@ Since scripts, READMEs, etc., are code that is not subject to audits, these are 
 branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these
 changes.
 
-## License
-
-The ZKsync Era system-contracts are distributed under the terms of the MIT license.
-
-See [LICENSE-MIT](LICENSE-MIT) for details.
-
 ## Official Links
 
 - [Website](https://zksync.io/)
