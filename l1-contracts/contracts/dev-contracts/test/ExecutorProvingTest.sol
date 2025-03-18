@@ -23,7 +23,8 @@ contract ExecutorProvingTest is ExecutorFacet {
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
     ) external view returns (bytes32) {
-        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
+        (, , bytes32 commitment) = _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
+        return commitment;
     }
 
     function processL2Logs(
@@ -34,10 +35,15 @@ contract ExecutorProvingTest is ExecutorFacet {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
-    /// Sets the DefaultAccount Hash and Bootloader Hash.
-    function setHashes(bytes32 l2DefaultAccountBytecodeHash, bytes32 l2BootloaderBytecodeHash) external {
+    /// Sets the DefaultAccount Hash, Bootloader Hash and EVM emulator Hash.
+    function setHashes(
+        bytes32 l2DefaultAccountBytecodeHash,
+        bytes32 l2BootloaderBytecodeHash,
+        bytes32 l2EvmEmulatorBytecode
+    ) external {
         s.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
         s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
+        s.l2EvmEmulatorBytecodeHash = l2EvmEmulatorBytecode;
         s.zkPorterIsAvailable = false;
     }
 

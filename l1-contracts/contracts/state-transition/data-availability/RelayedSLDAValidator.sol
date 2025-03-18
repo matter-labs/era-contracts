@@ -3,13 +3,15 @@
 pragma solidity ^0.8.24;
 
 import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
-import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
-
 import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {BlobHashBlobCommitmentMismatchValue, L1DAValidatorInvalidSender, InvalidPubdataSource} from "../L1StateTransitionErrors.sol";
+
+/// @dev The version that is used for the `RelayedSLDAValidator` calldata.
+/// This is needed to ensure easier future-compatible encoding.
+uint8 constant RELAYED_SL_DA_VALIDATOR_VERSION = 0;
 
 /// @notice The DA validator intended to be used in Era-environment.
 /// @dev For compatibility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
@@ -33,7 +35,9 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
     function _relayCalldata(uint256 _chainId, uint256 _batchNumber, bytes calldata _pubdata) internal {
         // Re-sending all the pubdata in pure form to L1.
         // slither-disable-next-line unused-return
-        IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(_chainId, _batchNumber, _pubdata));
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
+            abi.encode(RELAYED_SL_DA_VALIDATOR_VERSION, _chainId, _batchNumber, _pubdata)
+        );
     }
 
     /// @inheritdoc IL1DAValidator

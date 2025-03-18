@@ -76,6 +76,14 @@ contract UtilsFacet is ZKChainBase {
         return s.l2DefaultAccountBytecodeHash;
     }
 
+    function util_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
+        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
+    }
+
+    function util_getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
+        return s.l2EvmEmulatorBytecodeHash;
+    }
+
     function util_setPendingAdmin(address _pendingAdmin) external {
         s.pendingAdmin = _pendingAdmin;
     }
@@ -168,6 +176,18 @@ contract UtilsFacet is ZKChainBase {
 
     function util_setBaseTokenGasPriceMultiplierNominator(uint128 _nominator) external {
         s.baseTokenGasPriceMultiplierNominator = _nominator;
+    }
+
+    function util_setTotalBatchesCommitted(uint256 _totalBatchesCommitted) external {
+        s.totalBatchesCommitted = _totalBatchesCommitted;
+    }
+
+    function util_getBaseTokenGasPriceMultiplierDenominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierDenominator;
+    }
+
+    function util_getBaseTokenGasPriceMultiplierNominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierNominator;
     }
 
     // add this to be excluded from coverage report

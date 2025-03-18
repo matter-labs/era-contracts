@@ -30,6 +30,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address validatorSenderOperatorBlobsEth;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
+        bool allowEvmEmulator;
     }
 
     ChainConfig internal eraConfig;
@@ -98,7 +99,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             validatorSenderOperatorCommitEth: address(0),
             validatorSenderOperatorBlobsEth: address(1),
             baseTokenGasPriceMultiplierNominator: uint128(1),
-            baseTokenGasPriceMultiplierDenominator: uint128(1)
+            baseTokenGasPriceMultiplierDenominator: uint128(1),
+            allowEvmEmulator: false
         });
     }
 
@@ -135,6 +137,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         vm.serializeUint("chain", "governance_min_delay", 0);
         vm.serializeAddress("chain", "governance_security_council_address", address(0));
 
+        vm.serializeBool("chain", "allow_evm_emulator", description.allowEvmEmulator);
+
         string memory single_serialized = vm.serializeUint(
             "chain",
             "base_token_gas_price_multiplier_denominator",
@@ -147,11 +151,11 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function getZKChainAddress(uint256 _chainId) public view returns (address) {
-        return bridgehub.getZKChain(_chainId);
+        return addresses.bridgehub.getZKChain(_chainId);
     }
 
     function getZKChainBaseToken(uint256 _chainId) public view returns (address) {
-        return bridgehub.baseToken(_chainId);
+        return addresses.bridgehub.baseToken(_chainId);
     }
 
     function acceptPendingAdmin() public {
@@ -160,7 +164,7 @@ contract ZKChainDeployer is L1ContractDeployer {
 
     function acceptPendingAdmin(uint256 _chainId) public {
         uint256 chainId = _chainId == 0 ? currentZKChainId - 1 : _chainId;
-        IZKChain chain = IZKChain(bridgehub.getZKChain(chainId));
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(chainId));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();

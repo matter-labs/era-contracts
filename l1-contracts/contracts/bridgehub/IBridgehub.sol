@@ -246,6 +246,10 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function registerLegacyChain(uint256 _chainId) external;
 
+    function pauseMigration() external;
+
+    function unpauseMigration() external;
+
     function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,

@@ -80,7 +80,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_setL1Erc20Bridge_alreadySet() public {
         address currentBridge = address(sharedBridge.legacyBridge());
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(AddressAlreadyUsed.selector, currentBridge));
+        vm.expectRevert(abi.encodeWithSelector(AddressAlreadySet.selector, currentBridge));
         sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
     }
 

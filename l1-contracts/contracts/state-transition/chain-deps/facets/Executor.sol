@@ -26,6 +26,10 @@ import {MessageRoot, L2Log} from "../../../common/Messaging.sol";
 import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
 import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
+/// @dev The version that is used for the `Executor` calldata used for relaying the
+/// stored batch info.
+uint8 constant RELAYED_EXECUTOR_VERSION = 0;
+
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -52,7 +56,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal returns (StoredBatchInfo memory) {
+    ) internal returns (StoredBatchInfo memory storedBatchInfo) {
         // only commit next batch
         if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
@@ -86,24 +90,43 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(
+        (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) = _createBatchCommitment(
             _newBatch,
             daOutput.stateDiffHash,
             daOutput.blobsOpeningCommitments,
             daOutput.blobsLinearHashes
         );
         _emitMessageRoot(_newBatch.batchNumber, logOutput.l2LogsTreeRoot);
-        return
-            StoredBatchInfo({
-                batchNumber: _newBatch.batchNumber,
-                batchHash: _newBatch.newStateRoot,
-                indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
-                numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
-                priorityOperationsHash: _newBatch.priorityOperationsHash,
-                l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
-                timestamp: _newBatch.timestamp,
-                commitment: commitment
-            });
+        storedBatchInfo = StoredBatchInfo({
+            batchNumber: _newBatch.batchNumber,
+            batchHash: _newBatch.newStateRoot,
+            indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
+            priorityOperationsHash: _newBatch.priorityOperationsHash,
+            l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
+            timestamp: _newBatch.timestamp,
+            commitment: commitment
+        });
+
+        if (L1_CHAIN_ID != block.chainid) {
+            // If we are settling on top of Gateway, we always relay the data needed to construct
+            // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
+            // This data includes:
+            // - `StoredBatchInfo` that is needed to execute a block on top of the previous one.
+            // But also, we need to ensure that the components of the commitment of the batch are available:
+            // - passThroughDataHash (and its full preimage)
+            // - metadataHash (only the hash)
+            // - auxiliaryOutputHash (only the hash)
+            // The source of the truth for the data from above can be found here:
+            // https://github.com/matter-labs/zksync-protocol/blob/c80fa4ee94fd0f7f05f7aea364291abb8b4d7351/crates/zkevm_circuits/src/scheduler/mod.rs#L1356-L1369
+            //
+            // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
+            // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
+            // slither-disable-next-line unused-return
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
+                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
+            );
+        }
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
@@ -196,7 +219,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2LogsTreeRoot = logValue;
@@ -221,14 +244,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 }
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
                     revert MismatchL2DAValidator();
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2DAValidatorOutputHash = logValue;
@@ -719,14 +742,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
-    ) internal view returns (bytes32) {
+    ) internal view returns (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
-        bytes32 metadataHash = keccak256(_batchMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(
+        metadataHash = keccak256(_batchMetaParameters());
+        auxiliaryOutputHash = keccak256(
             _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
         );
 
-        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+        commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
     function _batchPassThroughData(CommitBatchInfo memory _batch) internal pure returns (bytes memory) {
@@ -741,14 +764,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
-        bytes32 l2DefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
         return
             abi.encodePacked(
                 s.zkPorterIsAvailable,
                 s.l2BootloaderBytecodeHash,
-                l2DefaultAccountBytecodeHash,
-                // VM 1.5.0 requires us to pass the EVM simulator code hash. For now it is the same as the default account.
-                l2DefaultAccountBytecodeHash
+                s.l2DefaultAccountBytecodeHash,
+                s.l2EvmEmulatorBytecodeHash
             );
     }
 

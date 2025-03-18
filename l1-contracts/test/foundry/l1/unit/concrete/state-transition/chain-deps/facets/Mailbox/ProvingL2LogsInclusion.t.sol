@@ -73,7 +73,7 @@ contract MailboxL2LogsProve is MailboxTest {
             _shardId: 0,
             _isService: true,
             _txNumberInBatch: 0,
-            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             _key: bytes32(uint256(uint160(sender))),
             _value: keccak256(data)
         });
@@ -82,7 +82,7 @@ contract MailboxL2LogsProve is MailboxTest {
             _shardId: 0,
             _isService: true,
             _txNumberInBatch: 1,
-            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             _key: bytes32(uint256(uint160(sender))),
             _value: keccak256(data)
         });
@@ -124,7 +124,7 @@ contract MailboxL2LogsProve is MailboxTest {
             _shardId: shardId,
             _isService: isService,
             _txNumberInBatch: 0,
-            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             _key: bytes32(uint256(uint160(sender))),
             _value: keccak256(data)
         });
@@ -133,7 +133,7 @@ contract MailboxL2LogsProve is MailboxTest {
             _shardId: shardId,
             _isService: isService,
             _txNumberInBatch: 1,
-            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             _key: bytes32(uint256(uint160(sender))),
             _value: keccak256(data)
         });
@@ -142,7 +142,7 @@ contract MailboxL2LogsProve is MailboxTest {
             l2ShardId: shardId,
             isService: isService,
             txNumberInBatch: 1,
-            sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             key: bytes32(uint256(uint160(sender))),
             value: keccak256(data)
         });
@@ -205,7 +205,7 @@ contract MailboxL2LogsProve is MailboxTest {
             _shardId: 0,
             _isService: true,
             _txNumberInBatch: 1,
-            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _sender: address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             _key: bytes32(uint256(uint160(sender))),
             _value: keccak256(data)
         });

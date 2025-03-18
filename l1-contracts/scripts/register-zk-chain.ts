@@ -67,6 +67,7 @@ async function main() {
     .option("--base-token-address <base-token-address>")
     .option("--use-governance")
     .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
+    .option("--allow-evm-emulation")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -118,10 +119,17 @@ async function main() {
       );
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
+
       if (tokenMultiplierSetterAddress != "") {
         console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
         await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
       }
+
+      if (cmd.allowEvmEmulation) {
+        console.log("Allowing EVM emulation");
+        await deployer.enableEvmEmulation();
+      }
+
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 

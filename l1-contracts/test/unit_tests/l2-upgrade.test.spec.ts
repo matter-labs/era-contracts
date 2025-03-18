@@ -387,6 +387,7 @@ describe("L2 upgrade test", function () {
   it("Should successfully perform an upgrade", async () => {
     const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
+    const evmEmulatorHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
     const newVerifier = testnetVerifierContract.address;
@@ -406,6 +407,7 @@ describe("L2 upgrade test", function () {
     const upgrade = {
       bootloaderHash,
       defaultAccountHash,
+      evmEmulatorHash,
       verifier: newVerifier,
       verifierParams: newerVerifierParams,
       executeUpgradeTx: true,
@@ -436,6 +438,7 @@ describe("L2 upgrade test", function () {
     // Now, we check that all the data was set as expected
     expect(await proxyGetters.getL2BootloaderBytecodeHash()).to.equal(bootloaderHash);
     expect(await proxyGetters.getL2DefaultAccountBytecodeHash()).to.equal(defaultAccountHash);
+    expect(await proxyGetters.getL2EvmEmulatorBytecodeHash()).to.equal(evmEmulatorHash);
     expect((await proxyGetters.getVerifier()).toLowerCase()).to.equal(newVerifier.toLowerCase());
     expect(await proxyGetters.getProtocolVersion()).to.equal(addToProtocolVersion(initialProtocolVersion, 5, 0));
 
@@ -469,6 +472,7 @@ describe("L2 upgrade test", function () {
     expect(upgradeEvents[3].args.newBytecodeHash).to.eq(bootloaderHash);
 
     expect(upgradeEvents[4].name).to.eq("NewL2DefaultAccountBytecodeHash");
+
     expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(L2_DEFAULT_ACCOUNT_BYTECODE_HASH);
     expect(upgradeEvents[4].args.newBytecodeHash).to.eq(defaultAccountHash);
   });
@@ -478,6 +482,7 @@ describe("L2 upgrade test", function () {
     const currentVerifierParams = await proxyGetters.getVerifierParams();
     const currentBootloaderHash = await proxyGetters.getL2BootloaderBytecodeHash();
     const currentL2DefaultAccountBytecodeHash = await proxyGetters.getL2DefaultAccountBytecodeHash();
+    const currentL2EvmEmulatorBytecodeHash = await proxyGetters.getL2EvmEmulatorBytecodeHash();
 
     const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
@@ -522,6 +527,7 @@ describe("L2 upgrade test", function () {
     // Now, we check that all the data was set as expected
     expect(await proxyGetters.getL2BootloaderBytecodeHash()).to.equal(currentBootloaderHash);
     expect(await proxyGetters.getL2DefaultAccountBytecodeHash()).to.equal(currentL2DefaultAccountBytecodeHash);
+    expect(await proxyGetters.getL2EvmEmulatorBytecodeHash()).to.equal(currentL2EvmEmulatorBytecodeHash);
     expect((await proxyGetters.getVerifier()).toLowerCase()).to.equal(newVerifier.toLowerCase());
     expect(await proxyGetters.getProtocolVersion()).to.equal(addToProtocolVersion(initialProtocolVersion, 5, 1));
 
@@ -952,6 +958,7 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     l2ProtocolUpgradeTx: buildL2CanonicalTransaction({ nonce: newProtocolVersion }),
     bootloaderHash: ethers.constants.HashZero,
     defaultAccountHash: ethers.constants.HashZero,
+    evmEmulatorHash: ethers.constants.HashZero,
     verifier: ethers.constants.AddressZero,
     verifierParams: buildVerifierParams({}),
     l1ContractsUpgradeCalldata: "0x",

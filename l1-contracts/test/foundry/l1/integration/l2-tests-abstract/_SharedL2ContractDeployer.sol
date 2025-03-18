@@ -8,10 +8,12 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {BridgedStandardERC20} from "../../../../../contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "../../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
@@ -33,26 +35,15 @@ import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps
 import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
 
-import {IChainTypeManager} from "../../../../../contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "../../../../../contracts/state-transition/chain-interfaces/IZKChain.sol";
-// import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
-
-import {DeployUtils} from "../../../../../deploy-scripts/DeployUtils.s.sol";
-
-struct SystemContractsArgs {
-    bool broadcast;
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    address legacySharedBridge;
-    address l2TokenBeacon;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedOwner;
-    bool contractsDeployedAlready;
-    address l1CtmDeployer;
-}
-
 abstract contract SharedL2ContractDeployer is DeployUtils {
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {SystemContractsArgs} from "./Utils.sol";
+
+import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+
+abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -269,4 +260,6 @@ abstract contract SharedL2ContractDeployer is DeployUtils {
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;
     function deployL2Contracts(uint256 _l1ChainId) public virtual;
+
+    function test() internal virtual override {}
 }

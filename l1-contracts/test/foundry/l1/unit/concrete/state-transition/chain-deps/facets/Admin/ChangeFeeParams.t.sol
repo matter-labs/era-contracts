@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {Unauthorized, PriorityTxPubdataExceedsMaxPubDataPerBatch} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode} from "contracts/common/L1ContractErrors.sol";
 import {FeeParamsWereNotChangedCorrectly} from "../../../../../../../L1TestsErrors.sol";
 
 contract ChangeFeeParamsTest is AdminTest {
@@ -47,6 +47,45 @@ contract ChangeFeeParamsTest is AdminTest {
         address chainTypeManager = utilsFacet.util_getChainTypeManager();
         uint32 priorityTxMaxPubdata = 88_000;
         uint32 maxPubdataPerBatch = priorityTxMaxPubdata - 1;
+        FeeParams memory newFeeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: maxPubdataPerBatch,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: priorityTxMaxPubdata,
+            minimalL2GasPrice: 250_000_000
+        });
+
+        vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
+
+        vm.startPrank(chainTypeManager);
+        adminFacet.changeFeeParams(newFeeParams);
+    }
+
+    function test_revertWhen_changePubdataPricingMode() public {
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
+        FeeParams memory newFeeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Validium,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+
+        vm.expectRevert(InvalidPubdataPricingMode.selector);
+
+        vm.startPrank(chainTypeManager);
+        adminFacet.changeFeeParams(newFeeParams);
+    }
+
+    function test_revertWhen_PriorityTxPubdataExceedsMaxPubDataPerBatch(
+        uint32 maxPubdataPerBatch,
+        uint32 priorityTxMaxPubdata
+    ) public {
+        vm.assume(maxPubdataPerBatch < priorityTxMaxPubdata);
+
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
             batchOverheadL1Gas: 1_000_000,

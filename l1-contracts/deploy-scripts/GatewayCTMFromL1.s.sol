@@ -17,7 +17,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_CREATE2_FACTORY_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_CREATE2_FACTORY_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -30,8 +30,6 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
-import {Verifier} from "../contracts/state-transition/Verifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -53,7 +51,6 @@ import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 contract GatewayCTMFromL1 is Script {
     using stdToml for string;
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
     address deployerAddress;
@@ -82,6 +79,7 @@ contract GatewayCTMFromL1 is Script {
         uint256 diamondInitMinimalL2GasPrice;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
+        bytes32 evmEmulatorHash;
         uint256 priorityTxMaxGasLimit;
         bytes32 genesisRoot;
         uint256 genesisRollupLeafIndex;
@@ -160,17 +158,22 @@ contract GatewayCTMFromL1 is Script {
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
                 chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                 verifier: expectedGatewayContracts.stateTransition.verifier,
+                verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
+                verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk,
                 adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
                 mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
                 executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
                 gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
                 diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
+                validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
+                serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
+                serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
                 // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
-                validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 diamondProxy: address(0),
-                bytecodesSupplier: address(0)
+                bytecodesSupplier: address(0),
+                isOnGateway: true
             }),
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
@@ -189,7 +192,7 @@ contract GatewayCTMFromL1 is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
 
-        // Initializing all values at once is preferableo ensure type safety of
+        // Initializing all values at once is preferable to ensure type safety of
         // the fact that all values are initialized
         config = Config({
             bridgehub: toml.readAddress("$.bridgehub_proxy_addr"),
@@ -214,6 +217,7 @@ contract GatewayCTMFromL1 is Script {
             diamondInitMinimalL2GasPrice: toml.readUint("$.diamond_init_minimal_l2_gas_price"),
             bootloaderHash: toml.readBytes32("$.bootloader_hash"),
             defaultAAHash: toml.readBytes32("$.default_aa_hash"),
+            evmEmulatorHash: toml.readBytes32("$.evm_emulator_hash"),
             priorityTxMaxGasLimit: toml.readUint("$.priority_tx_max_gas_limit"),
             genesisRoot: toml.readBytes32("$.genesis_root"),
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
@@ -250,6 +254,7 @@ contract GatewayCTMFromL1 is Script {
             }),
             bootloaderHash: config.bootloaderHash,
             defaultAccountHash: config.defaultAAHash,
+            evmEmulatorHash: config.evmEmulatorHash,
             priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
             genesisRoot: config.genesisRoot,
             genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
@@ -379,12 +384,24 @@ contract GatewayCTMFromL1 is Script {
     }
 
     function deployGatewayVerifier() internal returns (address verifier) {
+        address verifierFflonk = address(
+            _deployInternal(L2ContractsBytecodesLib.readL2VerifierFflonkBytecode(), hex"")
+        );
+        console.log("VerifierFflonk deployed at", verifierFflonk);
+        address verifierPlonk = address(_deployInternal(L2ContractsBytecodesLib.readL2VerifierPlonkBytecode(), hex""));
+        console.log("VerifierPlonk deployed at", verifierPlonk);
+
         if (config.testnetVerifier) {
             verifier = address(
                 _deployInternal(L2ContractsBytecodesLib.readL2TestnetVerifierBytecode(), abi.encode(config.l1ChainId))
             );
         } else {
-            verifier = address(_deployInternal(L2ContractsBytecodesLib.readL2VerifierBytecode(), hex""));
+            verifier = address(
+                _deployInternal(
+                    L2ContractsBytecodesLib.readL2VerifierBytecode(),
+                    abi.encode(verifierFflonk, verifierPlonk)
+                )
+            );
         }
 
         console.log("Verifier deployed at", verifier);
@@ -466,6 +483,7 @@ contract GatewayCTMFromL1 is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: config.bootloaderHash,
             l2DefaultAccountBytecodeHash: config.defaultAAHash,
+            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash,
             priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
             feeParams: feeParams,
             // We can not provide zero value there. At the same time, there is no such contract on gateway
@@ -494,7 +512,8 @@ contract GatewayCTMFromL1 is Script {
             owner: msg.sender,
             validatorTimelock: output.gatewayStateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: config.latestProtocolVersion
+            protocolVersion: config.latestProtocolVersion,
+            serverNotifier: output.gatewayStateTransition.serverNotifierProxy
         });
 
         output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(

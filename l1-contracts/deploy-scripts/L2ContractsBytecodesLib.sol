@@ -130,16 +130,28 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
     }
 
-    /// @notice Reads the bytecode of the Verifier contract.
-    /// @return The bytecode of the Verifier contract.
+    /// @notice Reads the bytecode of the DualVerifier contract.
+    /// @return The bytecode of the DualVerifier contract.
     function readVerifierBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL1("Verifier.sol", "Verifier");
+        return Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
     }
 
     /// @notice Reads the bytecode of the L2 Verifier contract.
     /// @return The bytecode of the Verifier contract.
     function readL2VerifierBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2("Verifier.sol", "Verifier");
+        return Utils.readZKFoundryBytecodeL2("DualVerifier.sol", "DualVerifier");
+    }
+
+    /// @notice Reads the bytecode of the L2 VerifierFflonk contract.
+    /// @return The bytecode of the VerifierFflonk contract.
+    function readL2VerifierFflonkBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL2("VerifierFflonk.sol", "VerifierFflonk");
+    }
+
+    /// @notice Reads the bytecode of the L2 VerifierPlonk contract.
+    /// @return The bytecode of the VerifierPlonk contract.
+    function readL2VerifierPlonkBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL2("VerifierPlonk.sol", "VerifierPlonk");
     }
 
     /// @notice Reads the bytecode of the ConsensusRegistry contract.
@@ -151,7 +163,7 @@ library L2ContractsBytecodesLib {
     /// @notice Reads the bytecode of the TestnetVerifier contract.
     /// @return The bytecode of the TestnetVerifier contract.
     function readL2TestnetVerifierBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2("TestnetVerifier.sol", "TestnetVerifier");
+        return Utils.readZKFoundryBytecodeL1("L2TestnetVerifier.sol", "L2TestnetVerifier");
     }
 
     /// @notice Reads the bytecode of the ValidatorTimelock contract.

@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {AddressAliasHelperSharedTest} from "./_AddressAliasHelper_Shared.t.sol";
 
-contract undoL1ToL2AliasTest is AddressAliasHelperSharedTest {
+contract UndoL1ToL2AliasTest is AddressAliasHelperSharedTest {
     function testL2toL1AddressConversion() public {
         address[2] memory l2Addresses = [
             0x1111000000000000000000000000000000001110,

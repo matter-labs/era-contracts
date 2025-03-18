@@ -1,5 +1,5 @@
 use zksync_multivm::vm_latest::{
-    constants::{BOOTLOADER_HEAP_PAGE, get_vm_hook_start_position_latest},
+    constants::{get_vm_hook_start_position_latest, BOOTLOADER_HEAP_PAGE},
     HistoryMode, SimpleMemory,
 };
 

@@ -89,7 +89,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
     ) internal {
-        bool senderIsNTV = msg.sender == address(_nativeTokenVault);
+        bool senderIsNTV = msg.sender == _nativeTokenVault;
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
         if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {

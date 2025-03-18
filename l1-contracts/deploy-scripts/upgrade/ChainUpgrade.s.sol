@@ -10,12 +10,14 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 contract ChainUpgrade is Script {
     using stdToml for string;
@@ -68,6 +70,14 @@ contract ChainUpgrade is Script {
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             0
         );
+    }
+
+    function setUpgradeTimestamp(uint256 newProtocolVersion, uint256 timestamp) public {
+        address admin = IZKChain(config.chainDiamondProxyAddress).getAdmin();
+        address adminOwner = Ownable(admin).owner();
+
+        vm.startBroadcast(adminOwner);
+        IChainAdminOwnable(admin).setUpgradeTimestamp(newProtocolVersion, timestamp);
     }
 
     function initializeConfig(

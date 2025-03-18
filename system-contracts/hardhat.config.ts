@@ -7,10 +7,12 @@ import "hardhat-typechain";
 
 export default {
   zksolc: {
+    version: "1.5.7",
     compilerSource: "binary",
     version: "1.5.11",
     settings: {
-      isSystem: true,
+      enableEraVMExtensions: true,
+      suppressedErrors: ["sendtransfer"],
     },
   },
   zkSyncDeploy: {
@@ -22,7 +24,7 @@ export default {
     settings: {
       evmVersion: "cancun",
       optimizer: {
-        enabled: true,
+      enabled: true,
         runs: 9999999,
       },
       outputSelection: {

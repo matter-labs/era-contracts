@@ -14,6 +14,7 @@ import { Deployer } from "./deploy";
 import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+  L2_EVM_EMULATOR_BYTECODE_HASH,
   initialBridgehubDeployment,
   registerZKChain,
 } from "./deploy-process";
@@ -62,6 +63,7 @@ export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
     l1ChainId: process.env.CONTRACTS_L1_CHAIN_ID,
+    evmEmulatorBytecodeHash: L2_EVM_EMULATOR_BYTECODE_HASH,
   });
 }
 
@@ -74,6 +76,7 @@ export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddr
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
     l1ChainId: process.env.CONTRACTS_L1_CHAIN_ID,
+    evmEmulatorBytecodeHash: L2_EVM_EMULATOR_BYTECODE_HASH,
   });
   const l2_rpc_addr = "http://localhost:3050";
   const web3Provider = new zkethers.Provider(l2_rpc_addr);
@@ -338,6 +341,7 @@ export class EraDeployer extends Deployer {
         verifierParams,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+        l2EvmEmulatorBytecodeHash: L2_EVM_EMULATOR_BYTECODE_HASH,
         priorityTxMaxGasLimit,
         feeParams,
         blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,

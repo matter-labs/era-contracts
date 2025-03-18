@@ -13,7 +13,7 @@ import {GatewayUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {L1GatewayBase} from "./L1GatewayBase.sol";
+import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct GatewayUpgradeEncodedInput {
@@ -30,7 +30,7 @@ struct GatewayUpgradeEncodedInput {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade, L1GatewayBase, IGatewayUpgrade {
+contract GatewayUpgrade is BaseZkSyncUpgrade, L1FixedForceDeploymentsHelper, IGatewayUpgrade {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 

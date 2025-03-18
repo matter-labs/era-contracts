@@ -131,7 +131,7 @@ library DataEncoding {
     /// @param _originalCaller The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _nativeTokenVault The address of the token, only used if the encoding version is legacy.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @param _transferData The encoded transfer data, which includes the deposit amount, the address of the L2 receiver, and potentially the token address.
     /// @return txDataHash The resulting encoded transaction data hash.
     function encodeTxDataHash(
         bytes1 _encodingVersion,

@@ -151,6 +151,7 @@ export interface ProposedUpgrade {
   l2ProtocolUpgradeTx: L2CanonicalTransaction;
   bootloaderHash: BytesLike;
   defaultAccountHash: BytesLike;
+  evmEmulatorHash: BytesLike;
   verifier: string;
   verifierParams: VerifierParams;
   l1ContractsUpgradeCalldata: BytesLike;
@@ -216,6 +217,7 @@ function checkValidInitialCutHashParams(
   verifierParams: VerifierParams,
   l2BootloaderBytecodeHash: string,
   l2DefaultAccountBytecodeHash: string,
+  l2EvmEmulatorBytecodeHash: string,
   verifier: string,
   blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number
@@ -244,6 +246,9 @@ function checkValidInitialCutHashParams(
   if (l2DefaultAccountBytecodeHash === ethers.constants.HashZero) {
     throw new Error("L2 default account bytecode hash is zero");
   }
+  if (l2EvmEmulatorBytecodeHash === ethers.constants.HashZero) {
+    throw new Error("L2 evm emulator bytecode hash is zero");
+  }
   if (verifier === ethers.constants.AddressZero) {
     throw new Error("Verifier address is zero");
   }
@@ -263,6 +268,7 @@ export function compileInitialCutHash(
   verifierParams: VerifierParams,
   l2BootloaderBytecodeHash: string,
   l2DefaultAccountBytecodeHash: string,
+  l2EvmEmulatorBytecodeHash: string,
   verifier: string,
   blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number,
@@ -275,6 +281,7 @@ export function compileInitialCutHash(
       verifierParams,
       l2BootloaderBytecodeHash,
       l2DefaultAccountBytecodeHash,
+      l2EvmEmulatorBytecodeHash,
       verifier,
       blobVersionedHashRetriever,
       priorityTxMaxGasLimit
@@ -308,6 +315,7 @@ export function compileInitialCutHash(
       verifierParams,
       l2BootloaderBytecodeHash,
       l2DefaultAccountBytecodeHash,
+      l2EvmEmulatorBytecodeHash,
       priorityTxMaxGasLimit,
       feeParams,
       blobVersionedHashRetriever,

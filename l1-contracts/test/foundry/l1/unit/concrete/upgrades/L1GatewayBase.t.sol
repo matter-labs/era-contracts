@@ -2,15 +2,15 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import {L1GatewayBase} from "contracts/upgrades/L1GatewayBase.sol"; // Adjust the import path accordingly
+import {L1FixedForceDeploymentsHelper} from "contracts/upgrades/L1FixedForceDeploymentsHelper.sol"; // Adjust the import path accordingly
 import {ZKChainStorage} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-// Concrete implementation of L1GatewayBase for testing
-contract TestL1GatewayBase is L1GatewayBase {
+// Concrete implementation of L1FixedForceDeploymentsHelper for testing
+contract TestL1FixedForceDeploymentsHelper is L1FixedForceDeploymentsHelper {
     ZKChainStorage s;
 
     // For testing, we need to be able to call the internal function from outside
@@ -54,8 +54,8 @@ contract MockERC20TokenWithMetadata {
 
 contract MockERC20TokenWithoutMetadata {}
 
-contract L1GatewayBaseTest is Test {
-    TestL1GatewayBase testGateway;
+contract L1FixedForceDeploymentsHelperTest is Test {
+    TestL1FixedForceDeploymentsHelper testGateway;
     // Mocks for dependencies
     address bridgehubMock;
     address sharedBridgeMock;
@@ -75,7 +75,7 @@ contract L1GatewayBaseTest is Test {
         sharedBridgeMock = makeAddr("sharedBridgeMock");
         legacySharedBridgeAddress = makeAddr("legacySharedBridgeAddress");
 
-        testGateway = new TestL1GatewayBase();
+        testGateway = new TestL1FixedForceDeploymentsHelper();
 
         // Initialize ZKChainStorage
         testGateway.setChainId(chainId);

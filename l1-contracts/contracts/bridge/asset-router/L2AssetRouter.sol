@@ -236,9 +236,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     /// @inheritdoc AssetRouterBase
     function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
-        IL2NativeTokenVault nativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        nativeTokenVault.ensureTokenIsRegistered(_token);
-        assetId = nativeTokenVault.assetId(_token);
+        assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).ensureTokenIsRegistered(_token);
     }
 
     /// @param _assetId The asset id of the withdrawn asset

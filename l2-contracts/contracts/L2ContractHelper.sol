@@ -18,7 +18,7 @@ import {MalformedBytecode, BytecodeError} from "./errors/L2ContractErrors.sol";
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-interface IL2Messenger {
+interface IL1Messenger {
     /// @notice Sends an arbitrary length message to L1.
     /// @param _message The variable length message to be sent to L1.
     /// @return Returns the keccak256 hashed value of the message.
@@ -124,7 +124,7 @@ address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x
 
 address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 
-IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
+IL1Messenger constant L2_MESSENGER = IL1Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
 IBaseToken constant L2_BASE_TOKEN_ADDRESS = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 

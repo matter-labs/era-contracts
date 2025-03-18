@@ -128,11 +128,12 @@ async function deployBytecode(bytecode: string): Promise<Contract> {
 export async function deployContractOnAddress(
   address: string,
   name: string,
-  constructorData?: string,
+  callConstructor: boolean = true,
+  input = "0x",
   artifact?: ZkSyncArtifact
 ) {
-  artifact = artifact || (await loadArtifact(name));
-  await setCode(address, artifact.bytecode, true, constructorData);
+  const artifact =  artifact || (await loadArtifact(name));
+  await setCode(address, artifact.bytecode, callConstructor, input);
 }
 
 export async function publishBytecode(bytecode: BytesLike) {
@@ -152,12 +153,7 @@ export async function getCode(address: string): Promise<string> {
 }
 
 // Force deploy bytecode on the address
-export async function setCode(
-  address: string,
-  bytecode: BytesLike,
-  callConstructor: boolean = false,
-  constructorData?: string
-) {
+export async function setCode(address: string, bytecode: BytesLike, callConstructor: boolean = false, input = "0x") {
   // TODO: think about factoryDeps with eth_sendTransaction
   try {
     // publish bytecode in a separate tx
@@ -174,8 +170,9 @@ export async function setCode(
     newAddress: address,
     callConstructor,
     value: 0,
-    input: constructorData || "0x",
+    input,
   };
+
   await deployerContract.forceDeployOnAddress(deployment, ethers.constants.AddressZero);
 }
 

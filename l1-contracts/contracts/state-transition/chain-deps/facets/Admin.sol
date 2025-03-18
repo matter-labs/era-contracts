@@ -3,6 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -14,6 +15,8 @@ import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, InvalidDAForPermanentRollup, AlreadyPermanentRollup} from "../../../common/L1ContractErrors.sol";
 import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {IL2ContractDeployer, AllowedBytecodeTypes} from "../../../common/interfaces/IL2ContractDeployer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -182,6 +185,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         s.isPermanentRollup = true;
+    }
+
+    /// @inheritdoc IAdmin
+    function allowEvmEmulation() external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
+            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
+        );
+        emit EnableEvmEmulator();
     }
 
     /*//////////////////////////////////////////////////////////////

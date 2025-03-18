@@ -22,7 +22,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION, SERVICE_TRANSACTION_SENDER} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
@@ -250,7 +250,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             _assetId: _assetId,
             _amount: _amount
         });
-        canonicalTxHash = _requestL2TransactionToGatewayFree(wrappedRequest);
+        canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
 
     /// @inheritdoc IMailboxImpl
@@ -290,6 +290,37 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 // Tx is free, no so refund recipient needed
                 refundRecipient: address(0)
             });
+    }
+
+    ///  @inheritdoc IMailbox
+    function requestL2ServiceTransaction(
+        address _contractL2,
+        bytes calldata _l2Calldata
+    ) external onlySelf returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = _requestL2TransactionFree(
+            BridgehubL2TransactionRequest({
+                sender: SERVICE_TRANSACTION_SENDER,
+                contractL2: _contractL2,
+                mintValue: 0,
+                l2Value: 0,
+                // Very large amount
+                l2GasLimit: 72_000_000,
+                l2Calldata: _l2Calldata,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                // Tx is free, so no refund recipient needed
+                refundRecipient: address(0)
+            })
+        );
+
+        if (s.settlementLayer != address(0)) {
+            // slither-disable-next-line unused-return
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+                _chainId: s.chainId,
+                _canonicalTxHash: canonicalTxHash,
+                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+            });
+        }
     }
 
     function _requestL2TransactionSender(
@@ -392,7 +423,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
     }
 
-    function _requestL2TransactionToGatewayFree(
+    function _requestL2TransactionFree(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({
