@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
-import {IL1Messenger} from "../../../common/interfaces/IL1Messenger.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
@@ -29,8 +28,6 @@ uint8 constant RELAYED_EXECUTOR_VERSION = 0;
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Note, that the exact code present below is only present on the L2 in production environment.
-/// For the code on L1 environment, you should look into the following commit: https://github.com/matter-labs/era-contracts/commit/e815d8d86841fa0d8dc6a544941222f48859eeda.
 contract ExecutorFacet is ZKChainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
