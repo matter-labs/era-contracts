@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE} from "./Constants.sol";
 import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
 
 /**
@@ -115,6 +115,8 @@ contract AccountCodeStorage is IAccountCodeStorage {
         // so set `keccak256("")` as a code hash. The EVM has the same behavior.
         else if (Utils.isContractConstructing(codeHash)) {
             codeHash = EMPTY_STRING_KECCAK;
+        } else if (Utils.isCodeHashEVM(codeHash)) {
+            codeHash = EVM_HASHES_STORAGE.getEvmCodeHash(codeHash);
         }
 
         return codeHash;
@@ -144,5 +146,11 @@ contract AccountCodeStorage is IAccountCodeStorage {
         ) {
             codeSize = Utils.bytecodeLenInBytes(codeHash);
         }
+    }
+
+    /// @notice Method for detecting whether an address is an EVM contract
+    function isAccountEVM(address _addr) external view override returns (bool) {
+        bytes32 bytecodeHash = getRawCodeHash(_addr);
+        return Utils.isCodeHashEVM(bytecodeHash);
     }
 }
