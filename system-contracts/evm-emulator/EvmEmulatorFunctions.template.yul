@@ -449,42 +449,6 @@ function rawStaticcall(gas, to, dataStart, dataLength, outputOffset, outputLen) 
     success := verbatim_4i_1o("raw_static_call", to, farCallAbi, outputOffset, outputLen)
 }
 
-// Most significant bit
-// credit to https://github.com/PaulRBerg/prb-math/blob/280fc5f77e1b21b9c54013aac51966be33f4a410/src/Common.sol#L323
-function msb(x) -> result {
-    let factor := shl(7, gt(x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)) // 2^128
-    x := shr(factor, x)
-    result := or(result, factor)
-    factor := shl(6, gt(x, 0xFFFFFFFFFFFFFFFF)) // 2^64
-    x := shr(factor, x)
-    result := or(result, factor)
-    factor := shl(5, gt(x, 0xFFFFFFFF)) // 2^32
-    x := shr(factor, x)
-    result := or(result, factor)
-    factor := shl(4, gt(x, 0xFFFF))  // 2^16
-    x := shr(factor, x)
-    result := or(result, factor)
-    factor := shl(3, gt(x, 0xFF)) // 2^8
-    x := shr(factor, x)
-    result := or(result, factor)
-    factor := shl(2, gt(x, 0xF)) // 2^4
-    x := shr(factor, x)
-    result := or(result, factor)
-    factor := shl(1, gt(x, 0x3)) // 2^2
-    x := shr(factor, x)
-    result := or(result, factor)
-    factor := gt(x, 0x1) // 2^1
-    // No need to shift x any more.
-    result := or(result, factor)
-}
-
-function getMax(a, b) -> result {
-    result := a
-    if gt(b, a) {
-        result := b
-    }
-}
-
 ////////////////////////////////////////////////////////////////
 //                     STACK OPERATIONS
 ////////////////////////////////////////////////////////////////
@@ -1000,7 +964,70 @@ function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
         }
 }
 
-// TODO description
+//////////// Modexp gas cost calculation ////////////
+
+function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
+    // This precompile is a bit tricky since the gas depends on the input data
+    let inputBoundary := add(inputOffset, inputSize)
+
+    // modexp gas cost implements EIP-2565
+    // https://eips.ethereum.org/EIPS/eip-2565
+
+    // Expected input layout
+    // [0; 31] (32 bytes)	Bsize	Byte size of B
+    // [32; 63] (32 bytes)	Esize	Byte size of E
+    // [64; 95] (32 bytes)	Msize	Byte size of M
+    // [96; ..] input values
+
+    let Bsize := mloadPotentiallyPaddedValue(inputOffset, inputBoundary)
+    let Esize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
+    let Msize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
+
+    // If any of input sizes exceeds uint32, we can skip calculations - it is too big
+    let inputIsTooBig := or(gt(Bsize, MAX_UINT32()), or(gt(Esize, MAX_UINT32()), gt(Msize, MAX_UINT32())))
+
+    switch inputIsTooBig
+    case 1 {
+        gasToCharge := MAX_UINT64() // User can't pay anyway, skip calculation
+    }
+    default {
+        // 96 + Bsize, offset of the exponent value
+        let expOffset := add(add(inputOffset, 0x60), Bsize)
+
+        // Calculate iteration count
+        let iterationCount
+        switch gt(Esize, 32)
+        case 0 { // if exponent_length <= 32
+            let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
+            exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
+
+            // if exponent == 0: iteration_count = 0
+            // else: iteration_count = exponent.bit_length() - 1
+            if exponent {
+                iterationCount := msb(exponent)
+            }
+        }
+        default { // elif exponent_length > 32
+            // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+
+            // load last 32 bytes of exponent
+            let exponentLast32Bytes := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), inputBoundary)
+            iterationCount := add(shl(3, sub(Esize, 32)), msb(exponentLast32Bytes))
+        }
+        if iszero(iterationCount) {
+            iterationCount := 1
+        }
+
+        // mult_complexity(Bsize, Msize), EIP-2565
+        let words := shr(3, add(getMax(Bsize, Msize), 7))
+        let multiplicationComplexity := mul(words, words)
+
+        // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
+        gasToCharge := getMax(200, div(mul(multiplicationComplexity, iterationCount), 3))
+    }
+}
+
+// Read value from bounded memory region. Any out-of-bounds bytes are zeroed out.
 function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
     value := mload(index)
 
@@ -1011,54 +1038,43 @@ function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
     }
 }
 
-function modexpGasCost(argsOffset, argsSize) -> gasToCharge {
-    let argsBoundary := add(argsOffset, argsSize)
-
-    // modexp gas cost EIP below
-    // https://eips.ethereum.org/EIPS/eip-2565
-    // [0; 31] (32 bytes)	Bsize	Byte size of B
-    // [32; 63] (32 bytes)	Esize	Byte size of E
-    // [64; 95] (32 bytes)	Msize	Byte size of M
-    let Bsize := mloadPotentiallyPaddedValue(argsOffset, argsBoundary)
-    let Esize := mloadPotentiallyPaddedValue(add(argsOffset, 0x20), argsBoundary)
-    let Msize := mloadPotentiallyPaddedValue(add(argsOffset, 0x40), argsBoundary)
-
-    let mulComplex
-    {
-        // mult_complexity(Bsize, Msize), EIP-2565
-        let words := getMax(Bsize, Msize)
-        words := div(add(words, 7), 8) // TODO OVERFLOW CHECKS
-        mulComplex := mul(words, words)
-    }
-
-    let iterationCount := 0
-    // [96 + Bsize; 96 + Bsize + Esize]	E
-    let expOffset := add(add(argsOffset, 0x60), Bsize)
-    switch gt(Esize, 32)
-    case 0 { // if exponent_length <= 32
-        let exponent := mloadPotentiallyPaddedValue(expOffset, argsBoundary) // load 32 bytes
-        exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
-
-        // if exponent_length <= 32 and exponent == 0: iteration_count = 0
-        // elif exponent_length <= 32: iteration_count = exponent.bit_length() - 1
-        if exponent {
-            iterationCount := msb(exponent)
-        }
-    }
-    default { // elif exponent_length > 32
-        // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
-
-        // load last 32 bytes of exponent
-        let exponentLast256 := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), argsBoundary)
-        iterationCount := add(mul(8, sub(Esize, 32)), msb(exponentLast256)) // TODO OVERFLOW CHECKS
-    }
-    if iszero(iterationCount) {
-        iterationCount := 1
-    }
-
-    // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
-    gasToCharge := getMax(200, div(mul(mulComplex, iterationCount), 3))
+// Most significant bit
+// credit to https://github.com/PaulRBerg/prb-math/blob/280fc5f77e1b21b9c54013aac51966be33f4a410/src/Common.sol#L323
+function msb(x) -> result {
+    let factor := shl(7, gt(x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)) // 2^128
+    x := shr(factor, x)
+    result := or(result, factor)
+    factor := shl(6, gt(x, 0xFFFFFFFFFFFFFFFF)) // 2^64
+    x := shr(factor, x)
+    result := or(result, factor)
+    factor := shl(5, gt(x, 0xFFFFFFFF)) // 2^32
+    x := shr(factor, x)
+    result := or(result, factor)
+    factor := shl(4, gt(x, 0xFFFF))  // 2^16
+    x := shr(factor, x)
+    result := or(result, factor)
+    factor := shl(3, gt(x, 0xFF)) // 2^8
+    x := shr(factor, x)
+    result := or(result, factor)
+    factor := shl(2, gt(x, 0xF)) // 2^4
+    x := shr(factor, x)
+    result := or(result, factor)
+    factor := shl(1, gt(x, 0x3)) // 2^2
+    x := shr(factor, x)
+    result := or(result, factor)
+    factor := gt(x, 0x1) // 2^1
+    // No need to shift x any more.
+    result := or(result, factor)
 }
+
+function getMax(a, b) -> result {
+    result := a
+    if gt(b, a) {
+        result := b
+    }
+}
+
+//////////// Returndata pointers operation ////////////
 
 function _saveReturndataAfterZkEVMCall() {
     loadReturndataIntoActivePtr()
