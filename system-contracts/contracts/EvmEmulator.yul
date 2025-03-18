@@ -1060,19 +1060,28 @@ object "EvmEmulator" {
                 }
         }
         
+        // TODO description
+        function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
+            value := mload(index)
+        
+            if lt(memoryBound, add(index, 32)) {
+                memoryBound := getMax(index, memoryBound)
+                let shift := sub(add(index, 32), memoryBound)
+                let value := shl(shift, shr(shift, value))
+            }
+        }
+        
         function modexpGasCost(argsOffset, argsSize) -> gasToCharge {
-            /// TODO: This is draft, it is necessary to take into account the case when argsSize is less than expected (data is truncated and padded with zeroes)
-            /// Also we need to check sanity of Bsize, Esize, Msize
-            /// And we need to check for overflows
+            let argsBoundary := add(argsOffset, argsSize)
         
             // modexp gas cost EIP below
             // https://eips.ethereum.org/EIPS/eip-2565
             // [0; 31] (32 bytes)	Bsize	Byte size of B
             // [32; 63] (32 bytes)	Esize	Byte size of E
             // [64; 95] (32 bytes)	Msize	Byte size of M
-            let Bsize := mload(argsOffset)
-            let Esize := mload(add(argsOffset, 0x20))
-            let Msize := mload(add(argsOffset, 0x40))
+            let Bsize := mloadPotentiallyPaddedValue(argsOffset, argsBoundary)
+            let Esize := mloadPotentiallyPaddedValue(add(argsOffset, 0x20), argsBoundary)
+            let Msize := mloadPotentiallyPaddedValue(add(argsOffset, 0x40), argsBoundary)
         
             let mulComplex
             {
@@ -1082,20 +1091,12 @@ object "EvmEmulator" {
                 mulComplex := mul(words, words)
             }
         
-            /*       
-            def calculate_iteration_count(exponent_length, exponent):
-                iteration_count = 0
-                if exponent_length <= 32 and exponent == 0: iteration_count = 0
-                elif exponent_length <= 32: iteration_count = exponent.bit_length() - 1
-                elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
-                return max(iteration_count, 1)
-            */
-            // [96 + Bsize; 96 + Bsize + Esize]	E
             let iterationCount := 0
+            // [96 + Bsize; 96 + Bsize + Esize]	E
             let expOffset := add(add(argsOffset, 0x60), Bsize)
             switch gt(Esize, 32)
             case 0 { // if exponent_length <= 32
-                let exponent := mload(expOffset) // load 32 bytes
+                let exponent := mloadPotentiallyPaddedValue(expOffset, argsBoundary) // load 32 bytes
                 exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
         
                 // if exponent_length <= 32 and exponent == 0: iteration_count = 0
@@ -1105,19 +1106,17 @@ object "EvmEmulator" {
                 }
             }
             default { // elif exponent_length > 32
-                // elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+                // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
         
                 // load last 32 bytes of exponent
-                let exponentLast256 := mload(add(expOffset, sub(Esize, 32)))
-                iterationCount := add(mul(8, sub(Esize, 32)), msb(exponentLast256))
+                let exponentLast256 := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), argsBoundary)
+                iterationCount := add(mul(8, sub(Esize, 32)), msb(exponentLast256)) // TODO OVERFLOW CHECKS
             }
             if iszero(iterationCount) {
                 iterationCount := 1
             }
         
-            /* 
-                return max(200, math.floor(multiplication_complexity * iteration_count / 3))
-            */
+            // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
             gasToCharge := getMax(200, div(mul(mulComplex, iterationCount), 3))
         }
         
@@ -4086,19 +4085,28 @@ object "EvmEmulator" {
                     }
             }
             
+            // TODO description
+            function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
+                value := mload(index)
+            
+                if lt(memoryBound, add(index, 32)) {
+                    memoryBound := getMax(index, memoryBound)
+                    let shift := sub(add(index, 32), memoryBound)
+                    let value := shl(shift, shr(shift, value))
+                }
+            }
+            
             function modexpGasCost(argsOffset, argsSize) -> gasToCharge {
-                /// TODO: This is draft, it is necessary to take into account the case when argsSize is less than expected (data is truncated and padded with zeroes)
-                /// Also we need to check sanity of Bsize, Esize, Msize
-                /// And we need to check for overflows
+                let argsBoundary := add(argsOffset, argsSize)
             
                 // modexp gas cost EIP below
                 // https://eips.ethereum.org/EIPS/eip-2565
                 // [0; 31] (32 bytes)	Bsize	Byte size of B
                 // [32; 63] (32 bytes)	Esize	Byte size of E
                 // [64; 95] (32 bytes)	Msize	Byte size of M
-                let Bsize := mload(argsOffset)
-                let Esize := mload(add(argsOffset, 0x20))
-                let Msize := mload(add(argsOffset, 0x40))
+                let Bsize := mloadPotentiallyPaddedValue(argsOffset, argsBoundary)
+                let Esize := mloadPotentiallyPaddedValue(add(argsOffset, 0x20), argsBoundary)
+                let Msize := mloadPotentiallyPaddedValue(add(argsOffset, 0x40), argsBoundary)
             
                 let mulComplex
                 {
@@ -4108,20 +4116,12 @@ object "EvmEmulator" {
                     mulComplex := mul(words, words)
                 }
             
-                /*       
-                def calculate_iteration_count(exponent_length, exponent):
-                    iteration_count = 0
-                    if exponent_length <= 32 and exponent == 0: iteration_count = 0
-                    elif exponent_length <= 32: iteration_count = exponent.bit_length() - 1
-                    elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
-                    return max(iteration_count, 1)
-                */
-                // [96 + Bsize; 96 + Bsize + Esize]	E
                 let iterationCount := 0
+                // [96 + Bsize; 96 + Bsize + Esize]	E
                 let expOffset := add(add(argsOffset, 0x60), Bsize)
                 switch gt(Esize, 32)
                 case 0 { // if exponent_length <= 32
-                    let exponent := mload(expOffset) // load 32 bytes
+                    let exponent := mloadPotentiallyPaddedValue(expOffset, argsBoundary) // load 32 bytes
                     exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
             
                     // if exponent_length <= 32 and exponent == 0: iteration_count = 0
@@ -4131,19 +4131,17 @@ object "EvmEmulator" {
                     }
                 }
                 default { // elif exponent_length > 32
-                    // elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+                    // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
             
                     // load last 32 bytes of exponent
-                    let exponentLast256 := mload(add(expOffset, sub(Esize, 32)))
-                    iterationCount := add(mul(8, sub(Esize, 32)), msb(exponentLast256))
+                    let exponentLast256 := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), argsBoundary)
+                    iterationCount := add(mul(8, sub(Esize, 32)), msb(exponentLast256)) // TODO OVERFLOW CHECKS
                 }
                 if iszero(iterationCount) {
                     iterationCount := 1
                 }
             
-                /* 
-                    return max(200, math.floor(multiplication_complexity * iteration_count / 3))
-                */
+                // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
                 gasToCharge := getMax(200, div(mul(mulComplex, iterationCount), 3))
             }
             
