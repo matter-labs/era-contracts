@@ -204,6 +204,12 @@ object "EvmEmulator" {
             value := 2500000000000000 // This value is fixed in EraVM
         }
         
+        /// @dev This restriction comes from circuit precompile call limitations
+        /// In future we should use MAX_UINT32 to prevent overflows during gas costs calculation
+        function MAX_MODEXP_INPUT_FIELD_SIZE() -> ret {
+            ret := 32 // 256 bits
+        }
+        
         ////////////////////////////////////////////////////////////////
         //                  GENERAL FUNCTIONS
         ////////////////////////////////////////////////////////////////
@@ -1043,12 +1049,14 @@ object "EvmEmulator" {
             let Esize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
             let Msize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
         
-            // If any of input sizes exceeds uint32, we can skip calculations - it is too big
-            let inputIsTooBig := or(gt(Bsize, MAX_UINT32()), or(gt(Esize, MAX_UINT32()), gt(Msize, MAX_UINT32())))
+            let inputIsTooBig := or(
+                gt(Bsize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
+                or(gt(Esize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(Msize, MAX_MODEXP_INPUT_FIELD_SIZE()))
+            )
         
             switch inputIsTooBig
             case 1 {
-                gasToCharge := MAX_UINT64() // User can't pay anyway, skip calculation
+                gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
             }
             default {
                 // 96 + Bsize, offset of the exponent value
@@ -3245,6 +3253,12 @@ object "EvmEmulator" {
                 value := 2500000000000000 // This value is fixed in EraVM
             }
             
+            /// @dev This restriction comes from circuit precompile call limitations
+            /// In future we should use MAX_UINT32 to prevent overflows during gas costs calculation
+            function MAX_MODEXP_INPUT_FIELD_SIZE() -> ret {
+                ret := 32 // 256 bits
+            }
+            
             ////////////////////////////////////////////////////////////////
             //                  GENERAL FUNCTIONS
             ////////////////////////////////////////////////////////////////
@@ -4084,12 +4098,14 @@ object "EvmEmulator" {
                 let Esize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
                 let Msize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
             
-                // If any of input sizes exceeds uint32, we can skip calculations - it is too big
-                let inputIsTooBig := or(gt(Bsize, MAX_UINT32()), or(gt(Esize, MAX_UINT32()), gt(Msize, MAX_UINT32())))
+                let inputIsTooBig := or(
+                    gt(Bsize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
+                    or(gt(Esize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(Msize, MAX_MODEXP_INPUT_FIELD_SIZE()))
+                )
             
                 switch inputIsTooBig
                 case 1 {
-                    gasToCharge := MAX_UINT64() // User can't pay anyway, skip calculation
+                    gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
                 }
                 default {
                     // 96 + Bsize, offset of the exponent value
