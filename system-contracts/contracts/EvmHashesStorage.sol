@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.25;
 
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";

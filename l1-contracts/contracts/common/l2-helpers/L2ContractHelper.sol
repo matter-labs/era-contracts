@@ -57,7 +57,7 @@ library L2ContractHelper {
     /// @param _message Data to be sent to L1.
     /// @return keccak256 hash of the sent message.
     function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
-        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(_message);
+        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(_message);
     }
 
     /// @notice Validate the bytecode format and calculate its hash.

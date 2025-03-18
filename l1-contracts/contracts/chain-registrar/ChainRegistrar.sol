@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.25;
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
@@ -196,7 +196,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
         address diamondProxy = IChainTypeManager(ctm).getZKChain(_chainId);
         address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
         address chainAdmin = IGetters(diamondProxy).getAdmin();
-        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.sharedBridge()).l2BridgeAddress(_chainId);
+        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.assetRouter()).l2BridgeAddress(_chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }

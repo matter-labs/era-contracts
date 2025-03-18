@@ -5,7 +5,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {SYSTEM_CONTRACTS_OFFSET} from "contracts/common/L2ContractAddresses.sol";
+import {SYSTEM_CONTRACTS_OFFSET} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14);
 

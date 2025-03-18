@@ -75,7 +75,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function test_assetTracker() public {
-        IAssetTracker assetTracker = interopCenter.assetTracker();
+        IAssetTracker assetTracker = addresses.interopCenter.assetTracker();
         // Note: get this from real local txs
         address(assetTracker).call(
             bytes.concat(

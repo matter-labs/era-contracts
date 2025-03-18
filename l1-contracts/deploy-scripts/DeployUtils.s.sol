@@ -474,7 +474,7 @@ abstract contract DeployUtils is Script {
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy);
+            return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
@@ -495,7 +495,7 @@ abstract contract DeployUtils is Script {
             return abi.encode(
                 config.l1ChainId,
                 addresses.bridgehub.bridgehubProxy,
-                addresses.bridges.sharedBridgeProxy,
+                addresses.bridges.l1AssetRouterProxy,
                 addresses.vaults.l1NativeTokenVaultProxy,
                 addresses.bridgehub.messageRootProxy
             );

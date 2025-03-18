@@ -42,7 +42,7 @@ import {
   makeExecutedEqualCommitted,
   getBatchStoredInfo,
   buildL2DARollupPubdataCommitment,
-  L2_TO_L1_MESSENGER,
+  L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
 } from "./utils";
 import { packSemver, unpackStringSemVer, addToProtocolVersion } from "../../scripts/utils";
 
@@ -922,7 +922,7 @@ async function buildCommitBatchInfoWithCustomLogs(
   );
   systemLogs[SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY] = constructL2Log(
     true,
-    L2_TO_L1_MESSENGER,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     l1DAOutputHash
   );

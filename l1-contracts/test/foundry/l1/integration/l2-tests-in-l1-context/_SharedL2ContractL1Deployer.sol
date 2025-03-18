@@ -28,7 +28,7 @@ import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
 import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
 
-import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {SystemContractsArgs, SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
@@ -36,9 +36,8 @@ import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.s
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 import {StateTransitionDeployedAddresses, FacetCut, Action} from "deploy-scripts/Utils.sol";
 
-import {SystemContractsArgs} from "./Utils.sol";
+import {SystemContractsArgs} from "../l2-tests-abstract/Utils.sol";
 
-import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
@@ -48,11 +47,11 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
     using stdStorage for StdStorage;
 
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
-    function initSystemContracts(SystemContractsArgs memory _args) internal virtual {
+    function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
         L2UtilsBase.initSystemContracts(_args);
     }
 
-    function deployL2Contracts(uint256 _l1ChainId) public virtual {
+    function deployL2Contracts(uint256 _l1ChainId) public virtual override {
         deployL2ContractsInner(_l1ChainId, false);
     }
 

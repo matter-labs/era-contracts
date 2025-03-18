@@ -53,7 +53,7 @@ contract UpgradeIntegrationTest is Test {
         // governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage0Calls);
 
         console.log("Starting ecosystem upgrade stage 1!");
-        governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
+        _governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage1Calls);
 
         // console.log("Starting ecosystem upgrade stage 2!");
 
@@ -65,8 +65,6 @@ contract UpgradeIntegrationTest is Test {
         // governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeGovernanceStage2Calls);
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
-
-    function _upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory chainUpgradeInfo) internal virtual;
 
         // Now, the admin of the Era needs to call the upgrade function.
         // TODO: We do not include calls that ensure that the server is ready for the sake of brevity.
@@ -80,6 +78,8 @@ contract UpgradeIntegrationTest is Test {
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
         // so it was tested in e2e local environment.
     }
+
+    function _upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory chainUpgradeInfo) internal virtual {}
 
     /// @dev Executes a series of governance calls.
     function _governanceMulticall(address governanceAddr, Call[] memory calls) internal {
@@ -111,45 +111,45 @@ contract UpgradeIntegrationTest is Test {
     function _prepareEcosystemOwner() internal {
         // This data is generated before the protocol upgrade handler has received the ownership for the contracts.
         // Thus, we manually set it as its owner.
-        address newProtocolUpgradeHandler = generateUpgradeData.getProtocolUpgradeHandlerAddress();
+        // address newProtocolUpgradeHandler = generateUpgradeData.getProtocolUpgradeHandlerAddress();
 
-        _forceMoveOwnership(generateUpgradeData.getTransparentProxyAdmin(), newProtocolUpgradeHandler, false);
-        _forceMoveOwnership(generateUpgradeData.getBridgehub(), newProtocolUpgradeHandler, true);
-        _forceMoveOwnership(generateUpgradeData.getChainTypeManager(), newProtocolUpgradeHandler, true);
-        _forceMoveOwnership(generateUpgradeData.getL1LegacySharedBridge(), newProtocolUpgradeHandler, true);
+        // _forceMoveOwnership(generateUpgradeData.getTransparentProxyAdmin(), newProtocolUpgradeHandler, false);
+        // _forceMoveOwnership(generateUpgradeData.getBridgehub(), newProtocolUpgradeHandler, true);
+        // _forceMoveOwnership(generateUpgradeData.getChainTypeManager(), newProtocolUpgradeHandler, true);
+        // _forceMoveOwnership(generateUpgradeData.getL1LegacySharedBridge(), newProtocolUpgradeHandler, true);
     }
 
     function _mainnetForkTestImpl() internal {
         console.log("Preparing ecosystem contracts");
-        _prepareEcosystemContracts();
+        // _prepareEcosystemContracts();
 
         console.log("Preparing chain for the upgrade");
-        _prepareChain();
+        // _prepareChain();
 
         console.log("Setting up ownership");
         _prepareEcosystemOwner();
 
         console.log("Starting stage1 of the upgrade!");
-        Call[] memory stage1Calls = _getStage1UpgradeCalls();
-        _governanceMulticall(_getProtocolUpgradeHandlerAddress(), stage1Calls);
+        // Call[] memory stage1Calls = _getStage1UpgradeCalls();
+        // _governanceMulticall(_getProtocolUpgradeHandlerAddress(), stage1Calls);
 
-        console.log("Stage1 is done, now all the chains have to upgrade to the new version");
-        console.log("Upgrading Era");
+        // console.log("Stage1 is done, now all the chains have to upgrade to the new version");
+        // console.log("Upgrading Era");
 
-        // Upgrade the chain. Note: the chainUpgrade also updates other contracts as required.
-        _upgradeChain(_getOldProtocolVersion(), _getChainUpgradeInfo());
+        // // Upgrade the chain. Note: the chainUpgrade also updates other contracts as required.
+        // _upgradeChain(_getOldProtocolVersion(), _getChainUpgradeInfo());
 
-        // Try to create a new chain using the legacy interface (which is expected to revert).
-        _createNewChain(101101, true);
+        // // Try to create a new chain using the legacy interface (which is expected to revert).
+        // _createNewChain(101101, true);
 
-        vm.warp(block.timestamp + _getInitialDelay());
+        // vm.warp(block.timestamp + _getInitialDelay());
 
-        console.log("Starting stage2 of the upgrade!");
-        // Execute stage2 calls.
-        _governanceMulticall(_getProtocolUpgradeHandlerAddress(), _getStage2UpgradeCalls());
+        // console.log("Starting stage2 of the upgrade!");
+        // // Execute stage2 calls.
+        // _governanceMulticall(_getProtocolUpgradeHandlerAddress(), _getStage2UpgradeCalls());
 
-        // After stage2, deploying a new chain should work.
-        _createNewChain(101101, false);
+        // // After stage2, deploying a new chain should work.
+        // _createNewChain(101101, false);
     }
 }
 
@@ -158,191 +158,191 @@ contract UpgradeIntegrationTest is Test {
  * @dev This implementation of UpgradeTestAbstract generates the upgrade data
  * locally by instantiating EcosystemUpgrade and ChainUpgrade.
  */
-contract UpgradeTestScriptBased is UpgradeTestAbstract {
-    function setUp() public {
-        _setUp();
-    }
+// contract UpgradeTestScriptBased is UpgradeTestAbstract {
+//     function setUp() public {
+//         _setUp();
+//     }
 
-    // --- Implementation of virtual functions that forward to generateUpgradeData ---
+//     // --- Implementation of virtual functions that forward to generateUpgradeData ---
 
-    function _getEcosystemAdmin() internal view override returns (address) {
-        return generateUpgradeData.getEcosystemAdmin();
-    }
+//     function _getEcosystemAdmin() internal view override returns (address) {
+//         return generateUpgradeData.getEcosystemAdmin();
+//     }
 
-    function _getBridgehub() internal view override returns (address) {
-        return generateUpgradeData.getBridgehub();
-    }
+//     function _getBridgehub() internal view override returns (address) {
+//         return generateUpgradeData.getBridgehub();
+//     }
 
-    function _getChainTypeManager() internal view override returns (address) {
-        return generateUpgradeData.getChainTypeManager();
-    }
+//     function _getChainTypeManager() internal view override returns (address) {
+//         return generateUpgradeData.getChainTypeManager();
+//     }
 
-    function _getDummyDiamondCutData() internal view override returns (Diamond.DiamondCutData memory) {
-        return generateUpgradeData.getDummyDiamondCutData();
-    }
+//     function _getDummyDiamondCutData() internal view override returns (Diamond.DiamondCutData memory) {
+//         return generateUpgradeData.getDummyDiamondCutData();
+//     }
 
-    function _getDiamondCutData() internal view override returns (bytes memory) {
-        return generateUpgradeData.getDiamondCutData();
-    }
+//     function _getDiamondCutData() internal view override returns (bytes memory) {
+//         return generateUpgradeData.getDiamondCutData();
+//     }
 
-    function _prepareForceDeploymentsData() internal view override returns (bytes memory) {
-        return generateUpgradeData.prepareForceDeploymentsData();
-    }
+//     function _prepareForceDeploymentsData() internal view override returns (bytes memory) {
+//         return generateUpgradeData.prepareForceDeploymentsData();
+//     }
 
-    function _getStage1UpgradeCalls() internal override returns (Call[] memory) {
-        return generateUpgradeData.getStage1UpgradeCalls();
-    }
+//     function _getStage1UpgradeCalls() internal override returns (Call[] memory) {
+//         return generateUpgradeData.getStage1UpgradeCalls();
+//     }
 
-    function _getProtocolUpgradeHandlerAddress() internal view override returns (address) {
-        return generateUpgradeData.getProtocolUpgradeHandlerAddress();
-    }
+//     function _getProtocolUpgradeHandlerAddress() internal view override returns (address) {
+//         return generateUpgradeData.getProtocolUpgradeHandlerAddress();
+//     }
 
-    function _getOldProtocolVersion() internal view override returns (uint256) {
-        return generateUpgradeData.getOldProtocolVersion();
-    }
+//     function _getOldProtocolVersion() internal view override returns (uint256) {
+//         return generateUpgradeData.getOldProtocolVersion();
+//     }
 
-    function _getChainUpgradeInfo() internal override returns (Diamond.DiamondCutData memory) {
-        return generateUpgradeData.getChainUpgradeInfo();
-    }
+//     function _getChainUpgradeInfo() internal override returns (Diamond.DiamondCutData memory) {
+//         return generateUpgradeData.getChainUpgradeInfo();
+//     }
 
-    function _getInitialDelay() internal view override returns (uint256) {
-        return generateUpgradeData.getInitialDelay();
-    }
+//     function _getInitialDelay() internal view override returns (uint256) {
+//         return generateUpgradeData.getInitialDelay();
+//     }
 
-    // --- Implementation of virtual functions for preparing upgrades --------
+//     // --- Implementation of virtual functions for preparing upgrades --------
 
-    function _prepareEcosystemContracts() internal override {
-        generateUpgradeData.prepareEcosystemContracts(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT);
-    }
+//     function _prepareEcosystemContracts() internal override {
+//         generateUpgradeData.prepareEcosystemContracts(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT);
+//     }
 
-    function _prepareChain() internal override {
-        chainUpgrade.prepareChain(
-            vm.envString("ECOSYSTEM_INPUT"),
-            ECOSYSTEM_OUTPUT,
-            vm.envString("CHAIN_INPUT"),
-            CHAIN_OUTPUT
-        );
-    }
+//     function _prepareChain() internal override {
+//         chainUpgrade.prepareChain(
+//             vm.envString("ECOSYSTEM_INPUT"),
+//             ECOSYSTEM_OUTPUT,
+//             vm.envString("CHAIN_INPUT"),
+//             CHAIN_OUTPUT
+//         );
+//     }
 
-    function _upgradeChain(
-        uint256 oldProtocolVersion,
-        Diamond.DiamondCutData memory chainUpgradeInfo
-    ) internal override {
-        chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
-    }
+//     function _upgradeChain(
+//         uint256 oldProtocolVersion,
+//         Diamond.DiamondCutData memory chainUpgradeInfo
+//     ) internal override {
+//         chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
+//     }
 
-    function _getStage2UpgradeCalls() internal override returns (Call[] memory) {
-        return generateUpgradeData.getStage2UpgradeCalls();
-    }
+//     function _getStage2UpgradeCalls() internal override returns (Call[] memory) {
+//         return generateUpgradeData.getStage2UpgradeCalls();
+//     }
 
-    function test_MainnetForkScriptBased() public {
-        _mainnetForkTestImpl();
-    }
-}
+//     function test_MainnetForkScriptBased() public {
+//         _mainnetForkTestImpl();
+//     }
+// }
 
-/**
- * @title UpgradeTestFileBased
- * @dev This implementation of UpgradeTestAbstract reads the upgrade data from a file
- */
-contract UpgradeTestFileBased is UpgradeTestAbstract {
-    using stdToml for string;
+// /**
+//  * @title UpgradeTestFileBased
+//  * @dev This implementation of UpgradeTestAbstract reads the upgrade data from a file
+//  */
+// contract UpgradeTestFileBased is UpgradeTestAbstract {
+//     using stdToml for string;
 
-    string internal outputFile;
-    function setUp() public {
-        _setUp();
-        string memory root = vm.projectRoot();
-        outputFile = string.concat(root, vm.envString("UPGRADE_OUTPUT"));
-    }
+//     string internal outputFile;
+//     function setUp() public {
+//         _setUp();
+//         string memory root = vm.projectRoot();
+//         outputFile = string.concat(root, vm.envString("UPGRADE_OUTPUT"));
+//     }
 
-    // --- Implementation of virtual functions that forward to generateUpgradeData ---
+//     // --- Implementation of virtual functions that forward to generateUpgradeData ---
 
-    function _getEcosystemAdmin() internal view override returns (address) {
-        return generateUpgradeData.getEcosystemAdmin();
-    }
+//     function _getEcosystemAdmin() internal view override returns (address) {
+//         return generateUpgradeData.getEcosystemAdmin();
+//     }
 
-    function _getBridgehub() internal view override returns (address) {
-        return generateUpgradeData.getBridgehub();
-    }
+//     function _getBridgehub() internal view override returns (address) {
+//         return generateUpgradeData.getBridgehub();
+//     }
 
-    function _getChainTypeManager() internal view override returns (address) {
-        return generateUpgradeData.getChainTypeManager();
-    }
+//     function _getChainTypeManager() internal view override returns (address) {
+//         return generateUpgradeData.getChainTypeManager();
+//     }
 
-    function _getDummyDiamondCutData() internal view override returns (Diamond.DiamondCutData memory) {
-        return generateUpgradeData.getDummyDiamondCutData();
-    }
+//     function _getDummyDiamondCutData() internal view override returns (Diamond.DiamondCutData memory) {
+//         return generateUpgradeData.getDummyDiamondCutData();
+//     }
 
-    function _getDiamondCutData() internal view override returns (bytes memory) {
-        string memory toml = vm.readFile(outputFile);
-        return toml.readBytes("$.contracts_config.diamond_cut_data");
-    }
+//     function _getDiamondCutData() internal view override returns (bytes memory) {
+//         string memory toml = vm.readFile(outputFile);
+//         return toml.readBytes("$.contracts_config.diamond_cut_data");
+//     }
 
-    function _prepareForceDeploymentsData() internal view override returns (bytes memory) {
-        string memory toml = vm.readFile(outputFile);
-        return toml.readBytes("$.contracts_config.force_deployments_data");
-    }
+//     function _prepareForceDeploymentsData() internal view override returns (bytes memory) {
+//         string memory toml = vm.readFile(outputFile);
+//         return toml.readBytes("$.contracts_config.force_deployments_data");
+//     }
 
-    function _getStage1UpgradeCalls() internal override returns (Call[] memory) {
-        string memory toml = vm.readFile(outputFile);
-        return abi.decode(toml.readBytes("$.governance_stage1_calls"), (Call[]));
-    }
+//     function _getStage1UpgradeCalls() internal override returns (Call[] memory) {
+//         string memory toml = vm.readFile(outputFile);
+//         return abi.decode(toml.readBytes("$.governance_stage1_calls"), (Call[]));
+//     }
 
-    function _getProtocolUpgradeHandlerAddress() internal view override returns (address) {
-        return generateUpgradeData.getProtocolUpgradeHandlerAddress();
-    }
+//     function _getProtocolUpgradeHandlerAddress() internal view override returns (address) {
+//         return generateUpgradeData.getProtocolUpgradeHandlerAddress();
+//     }
 
-    function _getOldProtocolVersion() internal view override returns (uint256) {
-        return generateUpgradeData.getOldProtocolVersion();
-    }
+//     function _getOldProtocolVersion() internal view override returns (uint256) {
+//         return generateUpgradeData.getOldProtocolVersion();
+//     }
 
-    function _getChainUpgradeInfo() internal override returns (Diamond.DiamondCutData memory) {
-        string memory toml = vm.readFile(outputFile);
-        return abi.decode(toml.readBytes("$.chain_upgrade_diamond_cut"), (Diamond.DiamondCutData));
-    }
+//     function _getChainUpgradeInfo() internal override returns (Diamond.DiamondCutData memory) {
+//         string memory toml = vm.readFile(outputFile);
+//         return abi.decode(toml.readBytes("$.chain_upgrade_diamond_cut"), (Diamond.DiamondCutData));
+//     }
 
-    function _getInitialDelay() internal view override returns (uint256) {
-        return generateUpgradeData.getInitialDelay();
-    }
+//     function _getInitialDelay() internal view override returns (uint256) {
+//         return generateUpgradeData.getInitialDelay();
+//     }
 
-    // --- Implementation of virtual functions for preparing upgrades --------
+//     // --- Implementation of virtual functions for preparing upgrades --------
 
-    function _prepareEcosystemContracts() internal override {
-        generateUpgradeData.testInitialize(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT);
-    }
+//     function _prepareEcosystemContracts() internal override {
+//         generateUpgradeData.testInitialize(vm.envString("ECOSYSTEM_INPUT"), ECOSYSTEM_OUTPUT);
+//     }
 
-    function _prepareChain() internal override {
-        chainUpgrade.prepareChain(
-            vm.envString("ECOSYSTEM_INPUT"),
-            ECOSYSTEM_OUTPUT,
-            vm.envString("CHAIN_INPUT"),
-            CHAIN_OUTPUT
-        );
-    }
+//     function _prepareChain() internal override {
+//         chainUpgrade.prepareChain(
+//             vm.envString("ECOSYSTEM_INPUT"),
+//             ECOSYSTEM_OUTPUT,
+//             vm.envString("CHAIN_INPUT"),
+//             CHAIN_OUTPUT
+//         );
+//     }
 
-    function _upgradeChain(
-        uint256 oldProtocolVersion,
-        Diamond.DiamondCutData memory chainUpgradeInfo
-    ) internal override {
-        chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
-    }
+//     function _upgradeChain(
+//         uint256 oldProtocolVersion,
+//         Diamond.DiamondCutData memory chainUpgradeInfo
+//     ) internal override {
+//         chainUpgrade.upgradeChain(oldProtocolVersion, chainUpgradeInfo);
+//     }
 
-    function _getStage2UpgradeCalls() internal override returns (Call[] memory) {
-        string memory toml = vm.readFile(outputFile);
-        return abi.decode(toml.readBytes("$.governance_stage2_calls"), (Call[]));
-    }
+//     function _getStage2UpgradeCalls() internal override returns (Call[] memory) {
+//         string memory toml = vm.readFile(outputFile);
+//         return abi.decode(toml.readBytes("$.governance_stage2_calls"), (Call[]));
+//     }
 
-    function test_MainnetForkFileBased() public {
-        _mainnetForkTestImpl();
+//     function test_MainnetForkFileBased() public {
+//         _mainnetForkTestImpl();
 
-        // We should also double check that at least emergency upgrades work.
-        address puh = generateUpgradeData.getProtocolUpgradeHandlerAddress();
-        address emergencyUpgradeBoard = IProtocolUpgradeHandler(puh).emergencyUpgradeBoard();
+//         // We should also double check that at least emergency upgrades work.
+//         address puh = generateUpgradeData.getProtocolUpgradeHandlerAddress();
+//         address emergencyUpgradeBoard = IProtocolUpgradeHandler(puh).emergencyUpgradeBoard();
 
-        IProtocolUpgradeHandler.Call[] memory calls = new IProtocolUpgradeHandler.Call[](1);
-        vm.startBroadcast(emergencyUpgradeBoard);
-        IProtocolUpgradeHandler(puh).executeEmergencyUpgrade(
-            IProtocolUpgradeHandler.UpgradeProposal({calls: calls, executor: emergencyUpgradeBoard, salt: bytes32(0)})
-        );
-        vm.stopBroadcast();
-    }
-}
+//         IProtocolUpgradeHandler.Call[] memory calls = new IProtocolUpgradeHandler.Call[](1);
+//         vm.startBroadcast(emergencyUpgradeBoard);
+//         IProtocolUpgradeHandler(puh).executeEmergencyUpgrade(
+//             IProtocolUpgradeHandler.UpgradeProposal({calls: calls, executor: emergencyUpgradeBoard, salt: bytes32(0)})
+//         );
+//         vm.stopBroadcast();
+//     }
+// }

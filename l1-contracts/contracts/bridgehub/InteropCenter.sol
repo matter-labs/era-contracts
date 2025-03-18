@@ -15,13 +15,13 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {L2_MESSENGER, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest, BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "../common/L1ContractErrors.sol";
-import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy, ChainIdNotRegistered} from "./L1BridgehubErrors.sol";
+import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1, ChainIdNotRegistered} from "../common/L1ContractErrors.sol";
+import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
@@ -124,7 +124,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     function sendMessage(bytes calldata _msg) external onlyL2 returns (bytes32 canonicalTxHash) {
         // kl todo modify messenger to specify original msg.sender
-        return L2_MESSENGER.sendToL1(_msg);
+        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(_msg);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -220,7 +220,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             return interopBundleHash;
         } else {
             emit InteropBundleSent(interopBundleHash, interopBundle);
-            L2_MESSENGER.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
         }
     }
 
@@ -284,7 +284,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _refundRecipient
     ) internal returns (bytes32 canonicalTxHash) {
         emit InteropTriggerSent(_interopTrigger);
-        return L2_MESSENGER.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
+        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -778,7 +778,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         if (zkChain != address(0)) {
             canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
         } else {
-            revert ChainIdNotRegistered();
+            revert ChainIdNotRegistered(_chainId);
         }
     }
 

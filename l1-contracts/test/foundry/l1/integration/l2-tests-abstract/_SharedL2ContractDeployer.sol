@@ -35,7 +35,6 @@ import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps
 import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
 
-abstract contract SharedL2ContractDeployer is DeployUtils {
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./Utils.sol";

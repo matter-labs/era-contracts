@@ -292,7 +292,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             });
     }
 
-    ///  @inheritdoc IMailbox
+    ///  @inheritdoc IMailboxImpl
     function requestL2ServiceTransaction(
         address _contractL2,
         bytes calldata _l2Calldata
@@ -315,10 +315,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION),
+                _baseTokenAmount: 0,
+                _assetId: bytes32(0),
+                _amount: 0
             });
         }
     }

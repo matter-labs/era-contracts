@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.25;
 
 import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";

@@ -40,6 +40,8 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+    using stdStorage for StdStorage;
+
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -82,7 +84,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         prepare();
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
         stdstore
-            .target(address(ecosystemAddresses.bridgehub.assetTrackerProxy))
+            .target(address(addresses.ecosystemAddresses.bridgehub.assetTrackerProxy))
             .sig(IAssetTracker.chainBalance.selector)
             .with_key(eraZKChainId)
             .with_key(ETH_TOKEN_ASSET_ID)
@@ -211,12 +213,12 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
-        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-        interopCenter.requestL2TransactionDirect{value: 250000000000100}(
+        IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
+        addresses.interopCenter.requestL2TransactionDirect{value: 250000000000100}(
             L2TransactionRequestDirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
-                l2Contract: address(sharedBridge),
+                l2Contract: address(addresses.sharedBridge),
                 l2Value: 0,
                 l2Calldata: secondBridgeCalldata,
                 l2GasLimit: 1000000,

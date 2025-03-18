@@ -24,6 +24,7 @@ contract L1ContractDeployer is Test {
         address bridgehubProxyAddress;
         address bridgehubOwnerAddress;
         Bridgehub bridgehub;
+        IInteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
         L1Nullifier l1Nullifier;

@@ -475,6 +475,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            interopCenterBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readInteropCenterBytecode()
+            ),
+            assetTrackerBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readAssetTrackerBytecode()
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),

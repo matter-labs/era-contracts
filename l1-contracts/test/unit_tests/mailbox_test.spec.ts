@@ -23,7 +23,7 @@ import { Action, facetCut } from "../../src.ts/diamondCut";
 import {
   DEFAULT_REVERT_REASON,
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-  L2_TO_L1_MESSENGER,
+  L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   defaultFeeParams,
   getCallRevertReason,
@@ -147,7 +147,7 @@ describe("Mailbox tests", function () {
     const key = ethers.utils.hexZeroPad(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
     const HASHED_LOG = ethers.utils.solidityKeccak256(
       ["uint8", "bool", "uint16", "address", "bytes32", "bytes32"],
-      [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
+      [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, key, MESSAGE_HASH]
     );
 
     const MERKLE_PROOF = [

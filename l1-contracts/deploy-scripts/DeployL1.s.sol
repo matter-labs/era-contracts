@@ -11,6 +11,7 @@ import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
@@ -18,7 +19,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -56,6 +57,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -71,6 +73,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
@@ -173,7 +176,7 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
             "L1ERC20Bridge"
         );
-        (addresses.bridges.assetTrackerImplementation, addresses.bridges.assetTrackerProxy) = deployTuppWithContract(
+        (addresses.bridgehub.assetTrackerImplementation, addresses.bridgehub.assetTrackerProxy) = deployTuppWithContract(
             "AssetTracker"
         );
         updateSharedBridge();
@@ -345,9 +348,9 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function setBridgehubParams() internal {
-        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        MessageRoot messageRoot = MessageRoot(addresses.bridgehub.messageRootProxy);
-        InteropCenter interopCenter = InteropCenter(addresses.bridgehub.interopCenterProxy);
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
+        IInteropCenter interopCenter = IInteropCenter(addresses.bridgehub.interopCenterProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         bridgehub.setAddresses(
@@ -356,7 +359,7 @@ contract DeployL1Script is Script, DeployUtils {
             IMessageRoot(addresses.bridgehub.messageRootProxy),
             addresses.bridgehub.interopCenterProxy
         );
-        interopCenter.setAddresses(addresses.bridges.sharedBridgeProxy, addresses.bridgehub.assetTrackerProxy);
+        interopCenter.setAddresses(addresses.bridges.l1AssetRouterProxy, addresses.bridgehub.assetTrackerProxy);
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
         vm.stopBroadcast();
         console.log("SharedBridge registered");

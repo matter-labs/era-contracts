@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.25;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -28,7 +28,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             serverNotifier: serverNotifier
         });
 
-        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub));
+        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress);
 
         vm.expectRevert(err);
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(

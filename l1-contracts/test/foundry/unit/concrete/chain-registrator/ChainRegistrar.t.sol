@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-
+import {InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
 import "contracts/bridgehub/Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -27,6 +27,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
+    InteropCenter private interopCenter;
     DummyChainTypeManagerWBH private ctm;
     address private admin;
     address private deployer;
@@ -40,6 +41,7 @@ contract ChainRegistrarTest is Test {
 
     constructor() {
         bridgeHub = new DummyBridgehub();
+        interopCenter = new InteropCenter(IBridgehub(address(bridgeHub)), block.chainid, makeAddr("admin"));
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");
@@ -47,6 +49,7 @@ contract ChainRegistrarTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IBridgehub(address(bridgeHub)),
+            _interopCenter: (interopCenter),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });
@@ -54,6 +57,7 @@ contract ChainRegistrarTest is Test {
         assetRouter = new L1AssetRouter({
             _l1WethAddress: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
+            _interopCenter: address(interopCenter),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")

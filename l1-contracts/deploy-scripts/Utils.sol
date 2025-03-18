@@ -17,8 +17,8 @@ import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "./interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
 import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
@@ -547,7 +547,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal {
-        IBridgehub bridgehub = Bridgehub(bridgehubAddress);
+        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -697,7 +697,7 @@ library Utils {
             (l2TransactionRequest)
         );
 
-        address interopCenter = address(Bridgehub(bridgehubAddress).interopCenter());
+        address interopCenter = address(IBridgehub(bridgehubAddress).interopCenter());
         console.log("Executing transaction");
         vm.recordLogs();
         executeUpgrade(governor, salt, interopCenter, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
@@ -837,7 +837,7 @@ library Utils {
             IInteropCenter.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
-        IInteropCenter interopCenter = IInteropCenter(Bridgehub(bridgehubAddress).interopCenter());
+        IInteropCenter interopCenter = IInteropCenter(IBridgehub(bridgehubAddress).interopCenter());
 
         console.log("Executing transaction");
         vm.recordLogs();

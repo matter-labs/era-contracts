@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.25;
 
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {ForceDeployment} from "./interfaces/IContractDeployer.sol";

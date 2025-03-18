@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {IncrementalMerkleTest} from "contracts/dev-contracts/test/IncrementalMerkleTest.sol";
 import {DynamicIncrementalMerkle} from "contracts/common/libraries/DynamicIncrementalMerkle.sol";
 import {console} from "forge-std/console.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/l2-helpers/IL2Messenger.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 
 contract IncrementalMerkleTestTest is Test {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;

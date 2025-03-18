@@ -11,7 +11,7 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_MESSAGE_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
@@ -123,7 +123,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
         }
@@ -219,7 +219,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2LogsTreeRoot = logValue;
@@ -244,14 +244,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 }
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
                     revert MismatchL2DAValidator();
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2DAValidatorOutputHash = logValue;

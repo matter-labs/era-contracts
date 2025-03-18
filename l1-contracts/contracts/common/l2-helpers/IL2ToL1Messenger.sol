@@ -45,7 +45,7 @@ uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-interface IL2Messenger {
+interface IL2ToL1Messenger {
     // Possibly in the future we will be able to track the messages sent to L1 with
     // some hooks in the VM. For now, it is much easier to track them with L2 events.
     event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);

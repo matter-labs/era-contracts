@@ -7,7 +7,7 @@ import {Utils} from "../../Utils/Utils.sol";
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {L1DAValidatorOutput, PubdataSource} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL1Messenger} from "contracts/common/interfaces/IL1Messenger.sol";
+import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {PubdataInputTooSmall, L1DAValidatorInvalidSender} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -23,7 +23,7 @@ contract RelayedSLDAValidatorTest is Test {
         vm.etch(address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR), abi.encode(address(daValidator)));
         vm.mockCall(
             address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeWithSelector(IL1Messenger.sendToL1.selector),
+            abi.encodeWithSelector(IL2ToL1Messenger.sendToL1.selector),
             abi.encode(bytes32(0))
         );
         vm.mockCall(
