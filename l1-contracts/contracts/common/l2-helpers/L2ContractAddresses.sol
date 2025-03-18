@@ -39,7 +39,7 @@ IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(address(
 address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = IL2ToL1Messenger(
+IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
     address(SYSTEM_CONTRACTS_OFFSET + 0x08)
 );
 

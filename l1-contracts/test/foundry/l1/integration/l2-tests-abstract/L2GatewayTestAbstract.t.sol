@@ -14,7 +14,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSENGER} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -33,7 +33,8 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {ZKChainCommitment} from "contracts/common/Config.sol";
 
-import {SharedL2ContractDeployer, SystemContractsArgs} from "./_SharedL2ContractDeployer.sol";
+import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
+import {SystemContractsArgs} from "./Utils.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -80,8 +81,8 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         });
         vm.prank(ownerWallet);
         vm.mockCall(
-            address(L2_MESSENGER),
-            abi.encodeWithSelector(L2_MESSENGER.sendToL1.selector),
+            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1.selector),
             abi.encode(bytes(""))
         );
         l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
