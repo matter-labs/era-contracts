@@ -291,18 +291,23 @@ jobs:
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
 
-      # TODO: for some reason filtering directories stopped working.
-      # # To ignore coverage for certain directories modify the paths in this step as needed. The
-      # # below default ignores coverage results for the test and script directories. Alternatively,
-      # # to include coverage in all directories, comment out this step. Note that because this
-      # # filtering applies to the lcov file, the summary table generated in the previous step will
-      # # still include all files and directories.
-      # # The `--rc lcov_branch_coverage=1` part keeps branch info in the filtered report, since lcov
-      # # defaults to removing branch info.
-      # - name: Filter directories
-      #   run: |
-      #     sudo apt update && sudo apt install -y lcov
-      #     lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' '../lib/forge-std/*' '../lib/murky/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc lcov_branch_coverage=1
+      # Installing the specific version of `lcov` because of
+      # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
+      # https://github.com/zgosalvez/github-actions-report-lcov/issues/282
+      - name: Install LCOV
+        uses: hrishikesh-kadam/setup-lcov@6c1aa0cc9e1c02f9f58f01ac599f1064ccc83470 # v1.1.0
+        with:
+          ref: v1.16
+
+      # To ignore coverage for certain directories modify the paths in this step as needed. The
+      # below default ignores coverage results for the test and script directories. Alternatively,
+      # to include coverage in all directories, comment out this step. Note that because this
+      # filtering applies to the lcov file, the summary table generated in the previous step will
+      # still include all files and directories.
+      # The `--rc branch_coverage=1` part keeps branch info in the filtered report, since lcov
+      # defaults to removing branch info.
+      - name: Filter directories
+        run: lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' --output-file lcov.info --rc branch_coverage=1
 
       # # This step posts a detailed coverage report as a comment and deletes previous comments on
       # # each push. The below step is used to fail coverage if the specified coverage threshold is
@@ -317,67 +322,9 @@ jobs:
       #     lcov-file: ./l1-contracts/lcov.info
       #     github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
 
-      # - name: Verify minimum coverage
-      #   uses: zgosalvez/github-actions-report-lcov@v2
-      #   with:
-      #     coverage-files: ./l1-contracts/lcov.info
-      #     working-directory: l1-contracts
-      #     minimum-coverage: 85 # Set coverage threshold.
-
-  # FIXME: restore gas report CI
-  # gas-report:
-  #   needs: [build, lint]
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Checkout the repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         submodules: recursive
-
-  #     - name: Use Foundry
-  #       uses: foundry-rs/foundry-toolchain@v1
-
-  #     - name: Use Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 18.18.0
-  #         cache: yarn
-
-  #     - name: Install dependencies
-  #       run: yarn
-
-  #     - name: Restore artifacts cache
-  #       uses: actions/cache/restore@v3
-  #       with:
-  #         fail-on-cache-miss: true
-  #         key: artifacts-l1-${{ github.sha }}
-  #         path: |
-  #           da-contracts/out
-  #           l1-contracts/cache-forge
-  #           l1-contracts/out
-  #           l1-contracts/zkout
-  #           l2-contracts/cache-forge
-  #           l2-contracts/zkout
-  #           system-contracts/zkout
-
-  #     # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
-  #     - name: Run tests
-  #       run: yarn l1 test:foundry --gas-report | tee gasreport.ansi # <- this file name should be unique in your repository!
-
-  #     - name: Compare gas reports
-  #       uses: Rubilmax/foundry-gas-diff@v3.18
-  #       with:
-  #         summaryQuantile: 0.0 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
-  #         sortCriteria: avg,max # sort diff rows by criteria
-  #         sortOrders: desc,asc # and directions
-  #         ignore: test-foundry/**/*,l1-contracts/contracts/dev-contracts/**/*,l1-contracts/lib/**/*,l1-contracts/contracts/common/Dependencies.sol
-  #       id: gas_diff
-
-  #     - name: Add gas diff to sticky comment
-  #       if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
-  #       uses: marocchino/sticky-pull-request-comment@v2
-  #       with:
-  #         # delete the comment in case changes no longer impact gas costs
-  #         delete: ${{ !steps.gas_diff.outputs.markdown }}
-  #         message: ${{ steps.gas_diff.outputs.markdown }}
+      - name: Verify minimum coverage
+        uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
+        with:
+          coverage-files: ./l1-contracts/lcov.info
+          working-directory: l1-contracts
+          minimum-coverage: 85 # Set coverage threshold.
