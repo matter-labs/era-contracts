@@ -46,7 +46,7 @@ contract CelestiaL1DAValidatorTest is Test {
         }
 
         // Read and parse the JSON file
-        string memory json = vm.readFile("test_cases.json");
+        string memory json = vm.readFile("celestia_test_cases.json");
         string[] memory testCases = abi.decode(vm.parseJson(json), (string[]));
 
         console.log("Running", testCases.length, "test cases");
