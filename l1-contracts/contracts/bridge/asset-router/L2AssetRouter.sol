@@ -188,13 +188,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         onlyInteropCenter
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
-        return _bridgehubDeposit({
-            _chainId: _chainId,
-            _originalCaller: _originalCaller,
-            _value: _value,
-            _data: _data,
-            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
-        });
+        return
+            _bridgehubDeposit({
+                _chainId: _chainId,
+                _originalCaller: _originalCaller,
+                _value: _value,
+                _data: _data,
+                _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
+            });
     }
 
     function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyInteropCenter {

@@ -9,7 +9,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_ASSET_TRACKER_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "../../../../contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -20,7 +20,7 @@ import {ICTMDeploymentTracker} from "../../../../contracts/bridgehub/ICTMDeploym
 import {Bridgehub, IBridgehub} from "../../../../contracts/bridgehub/Bridgehub.sol";
 import {InteropCenter, IInteropCenter} from "../../../../contracts/bridgehub/InteropCenter.sol";
 import {InteropHandler, IInteropHandler} from "../../../../contracts/bridgehub/InteropHandler.sol";
-import {InteropAccount} from "../../../../contracts/bridgehub/InteropAccount.sol";
+// import {InteropAccount} from "../../../../contracts/bridgehub/InteropAccount.sol";
 import {MessageRoot} from "../../../../contracts/bridgehub/MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../../../contracts/common/Config.sol";
@@ -94,8 +94,9 @@ library L2Utils {
         forceDeployAssetRouter(_args);
         forceDeployNativeTokenVault(_args);
         forceDeployInteropCenter(_args);
-        forceDeployInteropAccount(_args);
-        forceDeployInteropHandler(_args);
+        // forceDeployInteropAccount(_args);
+        // forceDeployStandardTriggerAccount(_args);
+        // forceDeployInteropHandler(_args);
     }
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
@@ -140,9 +141,19 @@ library L2Utils {
 
     function forceDeployInteropAccount(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        new InteropAccount();
+        // new InteropAccount();
         forceDeployWithConstructor("InteropAccount", L2_INTEROP_ACCOUNT_ADDR, abi.encode(), _args.broadcast);
-        InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+    }
+
+    function forceDeployStandardTriggerAccount(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
+        // new StandardTriggerAccount();
+        forceDeployWithConstructor(
+            "StandardTriggerAccount",
+            L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
+            abi.encode(),
+            _args.broadcast
+        );
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
@@ -235,7 +246,7 @@ library L2Utils {
         bool _broadcast
     ) public {
         console.log(string.concat("Force deploying ", _contractName, string(abi.encode(_address))));
-        bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
+        bytes memory bytecode = getCreationCode(_contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
@@ -271,6 +282,22 @@ library L2Utils {
             revert DeployFailed();
         }
         return contractAddress;
+    }
+
+    function getCreationCode(string memory _contractName) internal view returns (bytes memory) {
+        if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("L2StandardTriggerAccount"))) {
+            return
+                abi.encodePacked(
+                    readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+                );
+        } else if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("InteropAccount"))) {
+            return
+                abi.encodePacked(
+                    readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+                );
+        }
+        bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
+        return bytecode;
     }
 
     function prankOrBroadcast(bool _broadcast, address _from) public {

@@ -8,11 +8,11 @@ import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IAccountCodeStorage} from "../common/l2-helpers/IAccountCodeStorage.sol";
 // import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 // import {IAccount} from "./interfaces/IAccount.sol";
-import {InteropAccount} from "./InteropAccount.sol";
+import {IInteropAccount} from "./IInteropAccount.sol";
 // import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 // import {DefaultAccount} from "./DefaultAccount.sol";
 // import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BASE_TOKEN_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_CONTRACT_DEPLOYER} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, L2Log, BUNDLE_IDENTIFIER} from "../common/Messaging.sol";
@@ -60,9 +60,6 @@ contract InteropHandler is IInteropHandler {
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
         InteropCall memory baseTokenCall = interopBundle.calls[0];
 
-        BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), baseTokenCall.value + 100000000000000000000);
-        BASE_TOKEN_SYSTEM_CONTRACT.mint(msg.sender, baseTokenCall.value + 100000000000000000000); // todo
-
         for (uint256 i = 1; i < interopBundle.calls.length; i++) {
             InteropCall memory interopCall = interopBundle.calls[i];
             // if (_skipEmptyCalldata && interopCall.data.length == 0) {
@@ -72,32 +69,37 @@ contract InteropHandler is IInteropHandler {
             // }
 
             address accountAddress = getAliasedAccount(interopCall.from, _proof.chainId);
-            InteropAccount account = InteropAccount(payable(accountAddress)); // kl todo add chainId
+            IInteropAccount account = IInteropAccount(payable(accountAddress)); // kl todo add chainId
             uint256 codeSize;
             assembly {
                 codeSize := extcodesize(accountAddress)
             }
             if (codeSize == 0) {
                 // kl todo use create3.
-                InteropAccount deployedAccount = new InteropAccount{
-                    salt: keccak256(abi.encode(interopCall.from, _proof.chainId))
-                }();
-                require(address(account) == address(deployedAccount), "calculated address incorrect");
+                address deployedAccount = deployInteropAccount(interopCall.from, _proof.chainId);
+                require(address(account) == deployedAccount, "calculated address incorrect");
             }
 
-            BASE_TOKEN_SYSTEM_CONTRACT.mint(address(account), interopCall.value);
+            L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(account), interopCall.value);
             account.forwardFromIC(interopCall.to, interopCall.value, interopCall.data);
         }
     }
 
+    function deployInteropAccount(address _sender, uint256 _chainId) public returns (address) {
+        // kl todo: use figure out deployment mode.
+        // return new InteropAccount{
+        //     salt: keccak256(abi.encode(interopCall.from, _proof.chainId))
+        // }();
+        return L2_CONTRACT_DEPLOYER.create2(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode());
+    }
+
     function getAliasedAccount(address _sender, uint256 _chainId) public view returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode()); // todo add constructor params.
         return
-            L2ContractHelper.computeCreate2Address(
+            L2_CONTRACT_DEPLOYER.getNewAddressCreate2(
                 address(this),
-                keccak256(abi.encode(_sender, _chainId)),
                 bytecodeHash,
-                constructorInputHash
+                keccak256(abi.encode(_sender, _chainId)),
+                abi.encode()
             );
     }
 }

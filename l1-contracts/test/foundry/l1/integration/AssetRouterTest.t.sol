@@ -16,7 +16,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, INSERT_MSG_ADDRESS_ON_DESTINATION} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -217,48 +217,6 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
                 refundRecipient: address(0)
-            })
-        );
-    }
-
-    function test_requestInterop() public {
-        depositToL1(ETH_TOKEN_ADDRESS);
-        bytes memory secondBridgeCalldata = bytes.concat(
-            NEW_ENCODING_VERSION,
-            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
-        );
-        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-
-        InteropCallStarter[] memory feePaymentCallStarters = new InteropCallStarter[](1);
-        uint256 value = 250000000000100;
-        feePaymentCallStarters[0] = InteropCallStarter({
-            directCall: true,
-            nextContract: INSERT_MSG_ADDRESS_ON_DESTINATION,
-            data: "",
-            value: 0,
-            requestedInteropCallValue: value
-        });
-        InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);
-        executionCallStarters[0] = InteropCallStarter({
-            directCall: false,
-            nextContract: address(sharedBridge),
-            data: secondBridgeCalldata,
-            value: 0,
-            requestedInteropCallValue: 0
-        });
-
-        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-        interopCenter.requestInterop{value: 250000000000100}(
-            eraZKChainId,
-            address(0),
-            feePaymentCallStarters,
-            executionCallStarters,
-            GasFields({
-                gasLimit: uint256(1000000),
-                gasPerPubdataByteLimit: uint256(REQUIRED_L2_GAS_PRICE_PER_PUBDATA),
-                refundRecipient: address(0),
-                paymaster: address(0),
-                paymasterInput: ""
             })
         );
     }

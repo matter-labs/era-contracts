@@ -10,7 +10,6 @@ import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, L2_INTEROP_HANDLER} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
-import {MessageInclusionProof, L2Message} from "./libraries/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -91,11 +90,6 @@ contract DefaultAccount is IAccount {
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
 
-        if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
-            magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
-            return magic;
-        }
-
         // Even though for the transaction types present in the system right now,
         // we always provide the suggested signed hash, this should not be
         // always expected. In case the bootloader has no clue what the default hash
@@ -115,24 +109,16 @@ contract DefaultAccount is IAccount {
         }
     }
 
-    /// @notice Method called by the bootloader to execute the transaction.
-    /// @param _transaction The transaction to execute.
-    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
-    /// the unique (canonical) hash of the transaction and the suggested signed
-    /// hash of the transaction.
+    /// @inheritdoc IAccount
     function executeTransaction(
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override ignoreNonBootloader ignoreInDelegateCall {
+    ) external payable virtual override ignoreNonBootloader ignoreInDelegateCall {
         _execute(_transaction);
     }
 
-    /// @notice Method that should be used to initiate a transaction from this account by an external call.
-    /// @dev The custom account is supposed to implement this method to initiate a transaction on behalf
-    /// of the account via L1 -> L2 communication. However, the default account can initiate a transaction
-    /// from L1, so we formally implement the interface method, but it doesn't execute any logic.
-    /// @param _transaction The transaction to execute.
+    /// @inheritdoc IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         // Behave the same as for fallback/receive, just execute nothing, returns nothing
     }
@@ -144,13 +130,6 @@ contract DefaultAccount is IAccount {
         uint128 value = Utils.safeCastToU128(_transaction.value);
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
-        if (to == (address((L2_INTEROP_HANDLER)))) {
-            (, bytes memory executionBundle) = abi.decode(_transaction.data, (bytes, bytes));
-            (, bytes memory executionProof) = abi.decode(_transaction.signature, (bytes, bytes));
-            MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
-            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof, false);
-            return;
-        }
 
         // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
         bool isSystemCall;
@@ -215,38 +194,26 @@ contract DefaultAccount is IAccount {
 
         address recoveredAddress = ecrecover(_hash, v, r, s);
 
-        return recoveredAddress == address(this) && recoveredAddress != address(0);
+        return recoveredAddress == _getVerificationAddress() && recoveredAddress != address(0);
     }
 
-    /// @notice Method for paying the bootloader for the transaction.
-    /// @param _transaction The transaction for which the fee is paid.
-    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
-    /// the unique (canonical) hash of the transaction and the suggested signed
-    /// hash of the transaction.
+    function _getVerificationAddress() internal view virtual returns (address) {
+        return address(this);
+    }
+
+    /// @inheritdoc IAccount
     function payForTransaction(
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
-        if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
-            (bytes memory paymasterBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
-            (bytes memory paymasterProof, ) = abi.decode(_transaction.signature, (bytes, bytes));
-            MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
-            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof, true);
-        }
         bool success = _transaction.payToTheBootloader();
         if (!success) {
             revert FailedToPayOperator();
         }
     }
 
-    /// @notice Method, where the user should prepare for the transaction to be
-    /// paid for by a paymaster.
-    /// @dev Here, the account should set the allowance for the smart contracts
-    /// @param _transaction The transaction.
-    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
-    /// the unique (canonical) hash of the transaction and the suggested signed
-    /// hash of the transaction.
+    /// @inheritdoc IAccount
     function prepareForPaymaster(
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash

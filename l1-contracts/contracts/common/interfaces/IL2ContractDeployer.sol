@@ -28,5 +28,12 @@ interface IL2ContractDeployer {
     /// @param _salt The create2 salt.
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata.
-    function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external;
+    function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
+
+    function getNewAddressCreate2(
+        address _sender,
+        bytes32 _bytecodeHash,
+        bytes32 _salt,
+        bytes calldata _input
+    ) external view returns (address newAddress);
 }

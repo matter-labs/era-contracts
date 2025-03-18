@@ -6,6 +6,7 @@ import {IBaseToken} from "./IBaseToken.sol";
 import {IL2Messenger} from "./IL2Messenger.sol";
 import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
 import {IL2MessageRootStorage} from "../interfaces/IL2MessageRootStorage.sol";
+import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 
 /// @dev The formal address of the initial program of the system: the bootloader
@@ -19,6 +20,8 @@ address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(0x8004);
 
 /// @dev The address of the L2 deployer system contract.
 address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(0x8006);
+
+IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(address(0x8006));
 
 /// @dev The special reserved L2 address. It is located in the system contracts space but doesn't have deployed
 /// bytecode.

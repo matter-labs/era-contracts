@@ -17,7 +17,7 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 
 import {L2_MESSENGER, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, INSERT_MSG_ADDRESS_ON_DESTINATION} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest, BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1} from "../common/L1ContractErrors.sol";
@@ -144,9 +144,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             bundleId,
             BundleMetadata({destinationChainId: _destinationChainId, sender: _sender, callCount: 0, totalValue: 0})
         );
-        TransientInterop.addBaseTokenCallToBundle(
-            bundleId
-        );
+        TransientInterop.addBaseTokenCallToBundle(bundleId);
     }
 
     function addCallToBundle(
@@ -270,7 +268,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @notice sends the interopTrigger
     /// @dev Dangerous to use by itself, the feeBundleId and executionBundleId are not checked for correctness.
-    /// @dev e.g. the bundles might not exist, point to wrong chains, etc. 
+    /// @dev e.g. the bundles might not exist, point to wrong chains, etc.
     function sendInteropTrigger(
         InteropTrigger memory _interopTrigger
     ) public override onlyL2NotToL1(_interopTrigger.destinationChainId) returns (bytes32 canonicalTxHash) {
@@ -329,7 +327,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 _feePaymentCallStarters,
                 _executionCallStarters,
                 _gasFields,
-                ExtraInputs({sender: msg.sender, executionAddress: _executionAddress, factoryDeps: new bytes[](0), refundRecipient: address(0)})
+                ExtraInputs({
+                    sender: msg.sender,
+                    executionAddress: _executionAddress,
+                    factoryDeps: new bytes[](0),
+                    refundRecipient: address(0)
+                })
             );
     }
 
@@ -466,7 +469,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         }
         feePaymentCallStarters[0] = InteropCallStarter({
             directCall: true,
-            nextContract: INSERT_MSG_ADDRESS_ON_DESTINATION,
+            nextContract: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
             data: "",
             value: _request.mintValue - _request.l2Value,
             requestedInteropCallValue: _request.l2Value
@@ -491,7 +494,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     paymaster: address(0),
                     paymasterInput: ""
                 }),
-                ExtraInputs({sender: _sender, executionAddress: L2_STANDARD_TRIGGER_ACCOUNT_ADDR, factoryDeps: new bytes[](0), refundRecipient: _request.refundRecipient})
+                ExtraInputs({
+                    sender: _sender,
+                    executionAddress: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
+                    factoryDeps: new bytes[](0),
+                    refundRecipient: _request.refundRecipient
+                })
             );
     }
 
@@ -515,7 +523,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 feeValue = _request.mintValue - _request.l2Value;
         feePaymentDirectCalls[0] = InteropCallStarter({
             directCall: true,
-            nextContract: INSERT_MSG_ADDRESS_ON_DESTINATION,
+            nextContract: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
             data: "0x",
             value: feeValue,
             requestedInteropCallValue: feeValue

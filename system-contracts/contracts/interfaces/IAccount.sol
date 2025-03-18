@@ -23,6 +23,11 @@ interface IAccount {
         Transaction calldata _transaction
     ) external payable returns (bytes4 magic);
 
+    /// @notice Method called by the bootloader to execute the transaction.
+    /// @param _transaction The transaction to execute.
+    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
+    /// the unique (canonical) hash of the transaction and the suggested signed
+    /// hash of the transaction.
     function executeTransaction(
         bytes32 _txHash,
         bytes32 _suggestedSignedHash,
@@ -31,14 +36,31 @@ interface IAccount {
 
     // There is no point in providing possible signed hash in the `executeTransactionFromOutside` method,
     // since it typically should not be trusted.
+    /// @notice Method that should be used to initiate a transaction from this account by an external call.
+    /// @dev The custom account is supposed to implement this method to initiate a transaction on behalf
+    /// of the account via L1 -> L2 communication. However, the default account can initiate a transaction
+    /// from L1, so we formally implement the interface method, but it doesn't execute any logic.
+    /// @param _transaction The transaction to execute.
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable;
 
+    /// @notice Method for paying the bootloader for the transaction.
+    /// @param _transaction The transaction for which the fee is paid.
+    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
+    /// the unique (canonical) hash of the transaction and the suggested signed
+    /// hash of the transaction.
     function payForTransaction(
         bytes32 _txHash,
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
     ) external payable;
 
+    /// @notice Method, where the user should prepare for the transaction to be
+    /// paid for by a paymaster.
+    /// @dev Here, the account should set the allowance for the smart contracts
+    /// @param _transaction The transaction.
+    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
+    /// the unique (canonical) hash of the transaction and the suggested signed
+    /// hash of the transaction.
     function prepareForPaymaster(
         bytes32 _txHash,
         bytes32 _possibleSignedHash,

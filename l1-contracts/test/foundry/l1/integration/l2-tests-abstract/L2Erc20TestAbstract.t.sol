@@ -160,12 +160,18 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             paymaster: address(0),
             paymasterInput: ""
         });
-        uint256 destinationChainId = 270;
+        uint256 destinationChainId = 271;
         vm.mockCall(
             address(L2_MESSENGER),
             abi.encodeWithSelector(L2_MESSENGER.sendToL1.selector),
             abi.encode(bytes(""))
         );
-        l2InteropCenter.requestInterop{value: 3 ether}(destinationChainId, address(0), feePaymentCalls, executionCalls, options);
+        l2InteropCenter.requestInterop{value: 3 ether}(
+            destinationChainId,
+            address(0),
+            feePaymentCalls,
+            executionCalls,
+            options
+        );
     }
 }

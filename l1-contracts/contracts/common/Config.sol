@@ -162,11 +162,6 @@ struct ZKChainCommitment {
     bool isPermanentRollup;
 }
 
-/// @dev The address that is used to signal that the provided msg.value should be sent to the msg.sender on the destination chain.
-address constant INSERT_MSG_ADDRESS_ON_DESTINATION = address(
-    uint160(uint256(keccak256("INSERT_MSG_ADDRESS_ON_DESTINATION")) - 1)
-);
-
 uint256 constant MAX_MSG_ROOTS_IN_BATCH = 100;
 
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;

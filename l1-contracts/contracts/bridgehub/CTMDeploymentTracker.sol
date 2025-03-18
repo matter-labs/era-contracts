@@ -26,7 +26,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
 
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
-    
+
     /// @dev Interop Center contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IInteropCenter public immutable override INTEROP_CENTER;
 
