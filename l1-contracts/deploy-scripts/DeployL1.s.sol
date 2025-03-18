@@ -519,7 +519,16 @@ contract DeployL1Script is Script, DeployUtils {
             "blob_versioned_hash_retriever_addr",
             addresses.blobVersionedHashRetriever
         );
-        vm.serializeAddress("deployed_addresses", "server_notifier", addresses.stateTransition.serverNotifierProxy);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "server_notifier_proxy_addr",
+            addresses.stateTransition.serverNotifierProxy
+        );
+        vm.serializeAddress(
+            "deployed_addresses",
+            "server_notifier_implementation_address",
+            addresses.stateTransition.serverNotifierImplementation
+        );
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 
