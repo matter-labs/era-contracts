@@ -122,22 +122,12 @@ describe("ContractDeployer tests", function () {
       );
     });
 
-    it("success from sequential to arbitrary", async () => {
+    it("reverts in any case", async () => {
       expect((await contractDeployer.getAccountInfo(contractDeployerSystemCall.address)).nonceOrdering).to.be.eq(
         NONCE_ORDERING_SEQUENTIAL
       );
-      await contractDeployerSystemCall.updateNonceOrdering(NONCE_ORDERING_ARBITRARY);
-      expect((await contractDeployer.getAccountInfo(contractDeployerSystemCall.address)).nonceOrdering).to.be.eq(
-        NONCE_ORDERING_ARBITRARY
-      );
-    });
-
-    it("failed from arbitrary to sequential", async () => {
-      expect((await contractDeployer.getAccountInfo(contractDeployerSystemCall.address)).nonceOrdering).to.be.eq(
-        NONCE_ORDERING_ARBITRARY
-      );
       await expect(
-        contractDeployerSystemCall.updateNonceOrdering(NONCE_ORDERING_SEQUENTIAL)
+        contractDeployerSystemCall.updateNonceOrdering(NONCE_ORDERING_ARBITRARY)
       ).to.be.revertedWithCustomError(contractDeployer, "InvalidNonceOrderingChange");
     });
   });
