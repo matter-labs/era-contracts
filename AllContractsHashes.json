@@ -985,11 +985,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x0100038187a977a5131962b6786ebae93607abba4d24b1b9d02f95138940ad29",
+    "zkBytecodeHash": "0x01000387604cf4113bb435fcc784a77140192439ebd8ecc0c50ad62737b67200",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0x3f39f5f5136da27d877ac4c153d2b880977122b62973f5859c0a5dcb21e246a3",
+    "evmBytecodeHash": "0x4c627c33cdb83b3de27474f7e9f2c0aaa85672379d114293d3fa084b59ff8765",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x79d45c2df1434ef7225a8786371ed2d53f4d38664f109c1d9dba79165ae882b8"
+    "evmDeployedBytecodeHash": "0x02eb6bccde9989cdc3836c2906bb2f5c6b964d38cdc9e7e6c929449af5f3d175"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
@@ -1706,7 +1706,7 @@
   {
     "contractName": "bootloader_test.yul",
     "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/contracts-preprocessed/bootloader/bootloader_test.yul.json",
-    "zkBytecodeHash": "0x010003cb761d8531001feff03d99f745e5e0d9f04405181310a8ef4a1d41b8de",
+    "zkBytecodeHash": "0x01000447547804e45feba0701a82ed1e007d73caa58ef7982497541ccc8c608b",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
