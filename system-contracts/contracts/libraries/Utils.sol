@@ -3,7 +3,9 @@
 pragma solidity ^0.8.20;
 
 import {EfficientCall} from "./EfficientCall.sol";
+import {RLPEncoder} from "./RLPEncoder.sol";
 import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
+import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG, CREATE2_EVM_PREFIX} from "../Constants.sol";
 
 /**
  * @author Matter Labs
@@ -43,15 +45,36 @@ library Utils {
         return uint24(_x);
     }
 
-    /// @return codeLength The bytecode length in bytes
-    function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLength) {
-        codeLength = bytecodeLenInWords(_bytecodeHash) << 5; // _bytecodeHash * 32
+    /// @return If this bytecode hash for EVM contract or not
+    function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
+        return (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG);
+    }
+
+    /// @return codeLengthInBytes The bytecode length in bytes
+    function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLengthInBytes) {
+        unchecked {
+            uint256 decodedCodeLength = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
+            if (isCodeHashEVM(_bytecodeHash)) {
+                // length is encoded in bytes
+                codeLengthInBytes = decodedCodeLength;
+            } else {
+                // length is encoded in words
+                codeLengthInBytes = decodedCodeLength << 5; // * 32
+            }
+        }
     }
 
     /// @return codeLengthInWords The bytecode length in machine words
     function bytecodeLenInWords(bytes32 _bytecodeHash) internal pure returns (uint256 codeLengthInWords) {
         unchecked {
-            codeLengthInWords = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
+            uint256 decodedCodeLength = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
+            if (isCodeHashEVM(_bytecodeHash)) {
+                // length is encoded in bytes
+                codeLengthInWords = (decodedCodeLength + 31) / 32; // rounded up
+            } else {
+                // length is encoded in words
+                codeLengthInWords = decodedCodeLength;
+            }
         }
     }
 
@@ -80,6 +103,8 @@ library Utils {
         return _bytecodeHash & ~IS_CONSTRUCTOR_BYTECODE_HASH_BIT_MASK;
     }
 
+    uint256 internal constant MAX_BYTECODE_LENGTH = (2 ** 16) - 1;
+
     /// @notice Validate the bytecode format and calculate its hash.
     /// @param _bytecode The bytecode to hash.
     /// @return hashedBytecode The 32-byte hash of the bytecode.
@@ -95,7 +120,7 @@ library Utils {
 
         uint256 lengthInWords = _bytecode.length / 32;
         // bytecode length must be less than 2^16 words
-        if (lengthInWords >= 2 ** 16) {
+        if (lengthInWords > MAX_BYTECODE_LENGTH) {
             revert MalformedBytecode(BytecodeError.NumberOfWords);
         }
         // bytecode length in words must be odd
@@ -106,8 +131,80 @@ library Utils {
             EfficientCall.sha(_bytecode) &
             0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
-        hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
+        hashedBytecode = (hashedBytecode | bytes32(uint256(ERA_VM_BYTECODE_FLAG) << 248));
         // Setting the length
         hashedBytecode = hashedBytecode | bytes32(lengthInWords << 224);
+    }
+
+    /// @notice Validate the bytecode format and calculate its hash.
+    /// @param _evmBytecodeLen The length of original EVM bytecode in bytes
+    /// @param _paddedBytecode The padded EVM bytecode to hash.
+    /// @return hashedEVMBytecode The 32-byte hash of the EVM bytecode.
+    /// Note: The function reverts the execution if the bytecode has non expected format:
+    /// - Bytecode bytes length is not a multiple of 32
+    /// - Bytecode bytes length is greater than 2^16 - 1 bytes
+    /// - Bytecode words length is not odd
+    function hashEVMBytecode(
+        uint256 _evmBytecodeLen,
+        bytes calldata _paddedBytecode
+    ) internal view returns (bytes32 hashedEVMBytecode) {
+        // Note that the length of the bytecode must be provided in 32-byte words.
+        if (_paddedBytecode.length % 32 != 0) {
+            revert MalformedBytecode(BytecodeError.Length);
+        }
+
+        if (_evmBytecodeLen > _paddedBytecode.length) {
+            revert MalformedBytecode(BytecodeError.EvmBytecodeLength);
+        }
+
+        // bytecode length must be less than 2^16 bytes
+        if (_evmBytecodeLen > MAX_BYTECODE_LENGTH) {
+            revert MalformedBytecode(BytecodeError.EvmBytecodeLengthTooBig);
+        }
+
+        uint256 lengthInWords = _paddedBytecode.length / 32;
+        // bytecode length in words must be odd
+        if (lengthInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
+
+        hashedEVMBytecode =
+            EfficientCall.sha(_paddedBytecode) &
+            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
+        // Setting the version of the hash
+        hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(EVM_BYTECODE_FLAG) << 248));
+        hashedEVMBytecode = hashedEVMBytecode | bytes32(_evmBytecodeLen << 224);
+    }
+
+    /// @notice Calculates the address of a deployed contract via create2 on the EVM
+    /// @param _sender The account that deploys the contract.
+    /// @param _salt The create2 salt.
+    /// @param _bytecodeHash The hash of the init code of the new contract.
+    /// @return newAddress The derived address of the account.
+    function getNewAddressCreate2EVM(
+        address _sender,
+        bytes32 _salt,
+        bytes32 _bytecodeHash
+    ) internal pure returns (address newAddress) {
+        bytes32 hash = keccak256(abi.encodePacked(bytes1(CREATE2_EVM_PREFIX), _sender, _salt, _bytecodeHash));
+
+        newAddress = address(uint160(uint256(hash)));
+    }
+
+    /// @notice Calculates the address of a deployed contract via create
+    /// @param _sender The account that deploys the contract.
+    /// @param _senderNonce The deploy nonce of the sender's account.
+    function getNewAddressCreateEVM(address _sender, uint256 _senderNonce) internal pure returns (address newAddress) {
+        bytes memory addressEncoded = RLPEncoder.encodeAddress(_sender);
+        bytes memory nonceEncoded = RLPEncoder.encodeUint256(_senderNonce);
+
+        uint256 listLength = addressEncoded.length + nonceEncoded.length;
+        bytes memory listLengthEncoded = RLPEncoder.encodeListLen(uint64(listLength));
+
+        bytes memory digest = bytes.concat(listLengthEncoded, addressEncoded, nonceEncoded);
+
+        bytes32 hash = keccak256(digest);
+        newAddress = address(uint160(uint256(hash)));
     }
 }
