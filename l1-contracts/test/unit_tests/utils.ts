@@ -222,12 +222,7 @@ export function createSystemLogs(
   l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
-    constructL2Log(
-      true,
-      L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY,
-      ethers.constants.HashZero
-    ),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
@@ -275,12 +270,7 @@ export function createSystemLogsWithUpgrade(
   l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
-    constructL2Log(
-      true,
-      L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY,
-      ethers.constants.HashZero
-    ),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,

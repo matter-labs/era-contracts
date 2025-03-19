@@ -2,6 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+bytes1 constant BUNDLE_IDENTIFIER = 0x01;
+bytes1 constant TRIGGER_IDENTIFIER = 0x02;
+
 /// @dev The enum that represents the transaction execution status
 /// @param Failure The transaction execution failed
 /// @param Success The transaction execution succeeded
@@ -162,10 +165,10 @@ struct InteropCall {
 
 struct BundleMetadata {
     uint256 destinationChainId;
-    address initiator;
+    address sender;
     uint256 callCount;
     // Note the total value is provided by the user.
-    // This is because we cannot guarantee atomicity of xL2 txs (just the atimicity of calls on the destination chain)
+    // This is because we cannot guarantee atomicity of xL2 txs (just the atomicity of calls on the destination chain)
     // So contracts cannot send their own value, only stamp the value that belongs to the user.
     uint256 totalValue;
 }
@@ -174,25 +177,27 @@ struct InteropBundle {
     uint256 destinationChainId;
     InteropCall[] calls;
     // If not set - anyone can execute it.
-    address[] executionAddresses;
-    // Who can 'cancel' this bundle.
-    address cancellationAddress;
+    address executionAddress;
 }
 
 struct GasFields {
     uint256 gasLimit;
     uint256 gasPerPubdataByteLimit;
     address refundRecipient;
+    address paymaster;
+    bytes paymasterInput;
 }
 
 struct InteropTrigger {
     uint256 destinationChainId;
     address sender;
+    address recipient;
     bytes32 feeBundleHash;
     bytes32 executionBundleHash;
     GasFields gasFields;
 }
 
+/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
 struct MessageInclusionProof {
     uint256 chainId;
     uint256 l1BatchNumber;
@@ -215,4 +220,12 @@ struct LeafInclusionProof {
     uint256 l2LeafProofMask;
     bytes32 leaf;
     bytes32[] proof;
+}
+
+struct MessageRoot {
+    uint256 chainId;
+    uint256 batchNumber;
+    // We double overloading this. The sides normally contain the root, as well as the sides. So the length is at least 2.
+    // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
+    bytes32[] sides;
 }

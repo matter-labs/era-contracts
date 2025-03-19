@@ -3,6 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 
@@ -65,6 +66,8 @@ interface IL1Nullifier {
     function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+
+    function l1AssetRouter() external view returns (IL1AssetRouter);
 
     function legacyBridge() external view returns (IL1ERC20Bridge);
 

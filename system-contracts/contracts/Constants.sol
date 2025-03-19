@@ -10,6 +10,7 @@ import {IImmutableSimulator} from "./interfaces/IImmutableSimulator.sol";
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {IBridgehub} from "./interfaces/IBridgehub.sol";
 import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
+import {IMessageVerification} from "./interfaces/IMessageVerification.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
@@ -121,6 +122,7 @@ address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACTS_OFFSET + 0x08));
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x09));
 IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x0b));
+IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x0c));
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR

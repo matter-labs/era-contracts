@@ -4,12 +4,13 @@ pragma solidity ^0.8.24;
 
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_HANDLER} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION} from "./Constants.sol";
 import {MessageInclusionProof, L2Message} from "./libraries/Messaging.sol";
 import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol";
 import {FailedToPayOperator} from "./SystemContractErrors.sol";
+import {InteropTrigger, GasFields, TRIGGER_IDENTIFIER} from "./libraries/Messaging.sol";
 
-event ReturnMessage(bytes indexed error);
+error MessageNotIncluded();
 
 /**
  * @author Matter Labs
@@ -100,22 +101,34 @@ contract StandardTriggerAccount is IAccount {
     ) external payable override ignoreNonBootloader ignoreInDelegateCall returns (bytes4 magic) {
         if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
             (bytes memory executionBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
-            (bytes memory paymasterBundle, , address sender, address refundRecipient, bytes memory triggerProof) = abi
+            (bytes memory paymasterBundle, , address sender, address refundRecipient, bytes memory triggerProofBytes) = abi
                 .decode(_transaction.signature, (bytes, bytes, address, address, bytes));
+            MessageInclusionProof memory triggerProof = abi.decode(triggerProofBytes, (MessageInclusionProof));
             InteropTrigger memory interopTrigger = InteropTrigger({
-                sender: _transaction.from,
+                sender: address(uint160(_transaction.from)),
                 recipient: address(this),
                 destinationChainId: block.chainid,
                 feeBundleHash: keccak256(paymasterBundle),
                 executionBundleHash: keccak256(executionBundle),
                 gasFields: GasFields({
                     gasLimit: _transaction.gasLimit,
-                    gasPerPubdataByteLimit: _transaction.customData.gasPerPubdataByteLimit,
+                    gasPerPubdataByteLimit: _transaction.gasPerPubdataByteLimit,
                     refundRecipient: refundRecipient,
                     paymaster: address(0),
                     paymasterInput: ""
                 })
             });
+            triggerProof.message.data = bytes.concat(TRIGGER_IDENTIFIER, abi.encode(interopTrigger));
+            bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
+                triggerProof.chainId,
+                triggerProof.l1BatchNumber,
+                triggerProof.l2MessageIndex,
+                triggerProof.message,
+                triggerProof.proof
+            );
+            if (!isIncluded) {
+                revert MessageNotIncluded();
+            }
             magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             return magic;
         }
