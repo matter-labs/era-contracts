@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.25;
+pragma solidity 0.8.24;
 
 import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER, L2_INTEROP_HANDLER, L2_ASSET_TRACKER_ADDRESS} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
@@ -59,8 +59,8 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         // Revert with the original revert reason if the call failed.
+        /// @dev Propagate the revert reason from the failed call.
         if (!success) {
-            /// @dev Propagate the revert reason from the failed call.
             assembly {
                 revert(add(returnData, 0x20), returndatasize())
             }

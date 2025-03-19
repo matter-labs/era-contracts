@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.25;
+pragma solidity 0.8.24;
 
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {Transaction, TransactionHelper, EIP_712_TX_TYPE, LEGACY_TX_TYPE, EIP_2930_TX_TYPE, EIP_1559_TX_TYPE} from "./libraries/TransactionHelper.sol";

@@ -7,8 +7,6 @@ import "hardhat-typechain";
 
 export default {
   zksolc: {
-    version: "1.5.7",
-    compilerSource: "binary",
     version: "1.5.11",
     settings: {
       enableEraVMExtensions: true,
