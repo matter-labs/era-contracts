@@ -74,23 +74,11 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         emit AccountVersionUpdated(msg.sender, _version);
     }
 
-    /// @notice Updates the nonce ordering of the account. Currently,
-    /// it only allows changes from sequential to arbitrary ordering.
-    /// @param _nonceOrdering The new nonce ordering to use.
-    function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external onlySystemCall {
-        AccountInfo memory currentInfo = accountInfo[msg.sender];
-
-        if (
-            _nonceOrdering != AccountNonceOrdering.Arbitrary ||
-            currentInfo.nonceOrdering != AccountNonceOrdering.Sequential
-        ) {
-            revert InvalidNonceOrderingChange();
-        }
-
-        currentInfo.nonceOrdering = _nonceOrdering;
-        _storeAccountInfo(msg.sender, currentInfo);
-
-        emit AccountNonceOrderingUpdated(msg.sender, _nonceOrdering);
+    /// @notice Updates the nonce ordering of the account. Since only `KeyedSequential`
+    /// is supported, currently this method always reverts.
+    function updateNonceOrdering(AccountNonceOrdering) external onlySystemCall {
+        revert InvalidNonceOrderingChange();
+        // NOTE: If this method is ever implemented, the `AccountNonceOrderingUpdated` event should be emitted.
     }
 
     /// @notice Calculates the address of a deployed contract via create2
@@ -322,7 +310,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             AccountInfo memory newAccountInfo;
             newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
             // Accounts have sequential nonces by default.
-            newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+            newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
             _storeAccountInfo(_deployment.newAddress, newAccountInfo);
 
             _constructContract({
@@ -447,7 +435,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
         // Accounts have sequential nonces by default.
-        newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+        newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
         _constructContract({
@@ -475,7 +463,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
         // Accounts have sequential nonces by default.
-        newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+        newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
         // Note, that for contracts the "nonce" is set as deployment nonce.
