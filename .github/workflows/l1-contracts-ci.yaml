@@ -3,6 +3,11 @@ name: L1 contracts CI
 on:
   pull_request:
 
+# We need this permissions for this CI to work with external contributions
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,6 +15,16 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -17,26 +32,25 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      - name: Install dependencies
-        run: yarn
+      - name: Build l1 contracts
+        working-directory: l1-contracts
+        run: |
+          forge build
 
-      - name: Build artifacts
-        run: yarn l1 build
-
-      - name: Build L2 artifacts
-        run: yarn l2 build
+      - name: Build l2 contracts
+        working-directory: l2-contracts
+        run: |
+          forge build --zksync --zk-enable-eravm-extensions
 
       - name: Create cache
         uses: actions/cache/save@v3
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
-            l1-contracts/artifacts
-            l1-contracts/cache
-            l1-contracts/typechain
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l2-contracts/cache-forge
+            l2-contracts/zkout
 
   lint:
     runs-on: ubuntu-latest
@@ -67,15 +81,19 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
           cache: yarn
 
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
       - name: Install dependencies
         run: yarn
 
@@ -123,7 +141,7 @@ jobs:
             l2-contracts/typechain
 
       - name: Run tests
-        run: yarn l1 test --no-compile
+        run: yarn l1 test
 
   check-verifier-generator:
     runs-on: ubuntu-latest
@@ -145,3 +163,84 @@ jobs:
 
       - name: Compare
         run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/Verifier.sol
+
+  coverage:
+    defaults:
+      run:
+        working-directory: l1-contracts
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
+
+      - name: Run coverage
+        run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
+
+      # Installing the specific version of `lcov` because of
+      # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
+      # https://github.com/zgosalvez/github-actions-report-lcov/issues/282
+      - name: Install LCOV
+        uses: hrishikesh-kadam/setup-lcov@6c1aa0cc9e1c02f9f58f01ac599f1064ccc83470 # v1.1.0
+        with:
+          ref: v1.16
+
+      # To ignore coverage for certain directories modify the paths in this step as needed. The
+      # below default ignores coverage results for the test and script directories. Alternatively,
+      # to include coverage in all directories, comment out this step. Note that because this
+      # filtering applies to the lcov file, the summary table generated in the previous step will
+      # still include all files and directories.
+      # The `--rc branch_coverage=1` part keeps branch info in the filtered report, since lcov
+      # defaults to removing branch info.
+      - name: Filter directories
+        run: lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' --output-file lcov.info --rc branch_coverage=1
+
+      # This step posts a detailed coverage report as a comment and deletes previous comments on
+      # each push. The below step is used to fail coverage if the specified coverage threshold is
+      # not met. The below step can post a comment (when it's `github-token` is specified) but it's
+      # not as useful, and this action cannot fail CI based on a minimum coverage threshold, which
+      # is why we use both in this way.
+      - name: Post coverage report
+        if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          delete-old-comments: true
+          lcov-file: ./l1-contracts/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
+
+      - name: Verify minimum coverage
+        uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
+        with:
+          coverage-files: ./l1-contracts/lcov.info
+          working-directory: l1-contracts
+          minimum-coverage: 85 # Set coverage threshold.

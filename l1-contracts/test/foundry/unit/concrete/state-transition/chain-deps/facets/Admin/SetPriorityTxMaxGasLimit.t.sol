@@ -3,9 +3,9 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
+import {Unauthorized, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
 
 contract SetPriorityTxMaxGasLimitTest is AdminTest {
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
@@ -15,8 +15,7 @@ contract SetPriorityTxMaxGasLimitTest is AdminTest {
         uint256 newPriorityTxMaxGasLimit = 100;
 
         vm.startPrank(nonStateTransitionManager);
-        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
-
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
         adminFacet.setPriorityTxMaxGasLimit(newPriorityTxMaxGasLimit);
     }
 
@@ -24,9 +23,8 @@ contract SetPriorityTxMaxGasLimitTest is AdminTest {
         address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         uint256 newPriorityTxMaxGasLimit = MAX_GAS_PER_TRANSACTION + 1;
 
-        vm.expectRevert(bytes.concat("n5"));
-
         vm.startPrank(stateTransitionManager);
+        vm.expectRevert(TooMuchGas.selector);
         adminFacet.setPriorityTxMaxGasLimit(newPriorityTxMaxGasLimit);
     }
 

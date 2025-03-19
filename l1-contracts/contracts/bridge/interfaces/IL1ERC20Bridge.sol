@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 import {IL1SharedBridge} from "./IL1SharedBridge.sol";
 
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Legacy Bridge interface before hyperchain migration, used for backward compatibility with zkSync Era
+/// @notice Legacy Bridge interface before hyperchain migration, used for backward compatibility with ZKsync Era
 interface IL1ERC20Bridge {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,

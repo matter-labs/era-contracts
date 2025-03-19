@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
@@ -21,10 +21,10 @@ bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e5202
 // TODO: change constant to the real root hash of empty Merkle tree (SMA-184)
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
-/// @dev Denotes the type of the zkSync transaction that came from L1.
+/// @dev Denotes the type of the ZKsync transaction that came from L1.
 uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 
-/// @dev Denotes the type of the zkSync transaction that is used for system upgrades.
+/// @dev Denotes the type of the ZKsync transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
 /// @dev The maximal allowed difference between protocol minor versions in an upgrade. The 100 gap is needed

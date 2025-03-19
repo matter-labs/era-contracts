@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
+// solhint-disable reason-string, gas-custom-errors
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";

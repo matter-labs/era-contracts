@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev

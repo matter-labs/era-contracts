@@ -31,8 +31,9 @@ describe("ImmutableSimulator tests", function () {
 
   describe("setImmutables", function () {
     it("non-deployer failed to call", async () => {
-      await expect(immutableSimulator.setImmutables(RANDOM_ADDRESS, IMMUTABLES_DATA)).to.be.revertedWith(
-        "Callable only by the deployer system contract"
+      await expect(immutableSimulator.setImmutables(RANDOM_ADDRESS, IMMUTABLES_DATA)).to.be.revertedWithCustomError(
+        immutableSimulator,
+        "Unauthorized"
       );
     });
 

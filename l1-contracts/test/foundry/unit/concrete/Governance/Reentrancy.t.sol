@@ -9,6 +9,7 @@ import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {ReenterGovernance} from "contracts/dev-contracts/test/ReenterGovernance.sol";
+import {OperationMustBeReady, OperationMustBePending} from "contracts/common/L1ContractErrors.sol";
 
 contract ReentrancyTest is GovernanceTest {
     using stdStorage for StdStorage;
@@ -88,7 +89,7 @@ contract ReentrancyTest is GovernanceTest {
         vm.startPrank(address(reenterGovernance));
 
         governance.scheduleTransparent(op, 0);
-        vm.expectRevert("Operation must be ready after execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -108,7 +109,7 @@ contract ReentrancyTest is GovernanceTest {
         vm.startPrank(address(reenterGovernance));
 
         governance.scheduleTransparent(op, 0);
-        vm.expectRevert("Operation must be pending after execution");
+        vm.expectRevert(OperationMustBePending.selector);
         governance.executeInstant(op);
     }
 
@@ -125,7 +126,7 @@ contract ReentrancyTest is GovernanceTest {
         vm.startPrank(address(reenterGovernance));
 
         governance.scheduleTransparent(op, 0);
-        vm.expectRevert("Operation must be ready after execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -145,7 +146,7 @@ contract ReentrancyTest is GovernanceTest {
         vm.startPrank(address(reenterGovernance));
 
         governance.scheduleTransparent(op, 0);
-        vm.expectRevert("Operation must be pending after execution");
+        vm.expectRevert(OperationMustBePending.selector);
         governance.executeInstant(op);
     }
 }
