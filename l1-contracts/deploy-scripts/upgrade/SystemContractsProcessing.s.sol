@@ -253,6 +253,7 @@ library SystemContractsProcessing {
             lang: Language.Solidity,
             isPrecompile: false
         });
+
         return systemContracts;
     }
 

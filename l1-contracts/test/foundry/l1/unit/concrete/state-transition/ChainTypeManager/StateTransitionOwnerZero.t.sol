@@ -26,7 +26,8 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
             owner: address(0),
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
-            protocolVersion: 0
+            protocolVersion: 0,
+            serverNotifier: serverNotifier
         });
 
         vm.expectRevert(ZeroAddress.selector);

@@ -23,6 +23,8 @@ contract TestBaseFacet is ZKChainBase {
 
     function functionWithOnlyAdminOrChainTypeManagerModifier() external onlyAdminOrChainTypeManager {}
 
+    function functionWithOnlyValidatorOrChainTypeManagerModifier() external onlyValidatorOrChainTypeManager {}
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
@@ -46,6 +48,7 @@ contract ZKChainBaseTest is Test {
         selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;
         selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
         selectors[4] = TestBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier.selector;
+        selectors[5] = TestBaseFacet.functionWithOnlyValidatorOrChainTypeManagerModifier.selector;
     }
 
     function setUp() public virtual {

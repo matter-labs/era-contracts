@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
 import {PlonkVerifierTest} from "contracts/dev-contracts/test/PlonkVerifierTest.sol";
 
 contract PlonkVerifierTestTest is Test {
@@ -14,7 +14,7 @@ contract PlonkVerifierTestTest is Test {
     uint256[] public serializedProof;
     uint256[] public recursiveAggregationInput;
 
-    VerifierPlonk public verifier;
+    L1VerifierPlonk public verifier;
 
     function setUp() public virtual {
         publicInputs.push(17257057577815541751225964212897374444694342989384539141520877492729);

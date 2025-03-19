@@ -84,15 +84,6 @@ function BYTECODE_LEN_OFFSET() -> offset {
     offset := add(MAX_STACK_SLOT_OFFSET(), 32)
 }
 
-function BYTECODE_OFFSET() -> offset {
-    offset := add(BYTECODE_LEN_OFFSET(), 32)
-}
-
-// reserved empty slot to simplify PUSH N opcodes
-function EMPTY_CODE_OFFSET() -> offset {
-    offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
-}
-
 function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
     max := 24576 // EIP-170
 }
@@ -102,7 +93,7 @@ function MAX_POSSIBLE_INIT_BYTECODE_LEN() -> max {
 }
 
 function MEM_LEN_OFFSET() -> offset {
-    offset := add(EMPTY_CODE_OFFSET(), 32)
+    offset := add(BYTECODE_LEN_OFFSET(), 32)
 }
 
 function MEM_OFFSET() -> offset {
@@ -130,7 +121,7 @@ function OVERHEAD() -> overhead { overhead := 2000 }
 
 function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
 
-function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+function MAX_POINTER_READ_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
 
 function EMPTY_KECCAK() -> value {  // keccak("")
     value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -268,17 +259,16 @@ function insufficientBalance(value) -> res {
 }
 
 // It is the responsibility of the caller to ensure that ip is correct
-function readIP(ip, bytecodeEndOffset) -> opcode {
-    if lt(ip, bytecodeEndOffset) {
-        opcode := and(mload(sub(ip, 31)), 0xff)
-    }
-    // STOP else
+function $llvm_AlwaysInline_llvm$_readIP(ip) -> opcode {
+    opcode := shr(248, activePointerLoad(ip))
 }
 
 // It is the responsibility of the caller to ensure that start and length is correct
 function readBytes(start, length) -> value {
-    value := shr(mul(8, sub(32, length)), mload(start))
-    // will be padded by zeroes if out of bounds (we have reserved EMPTY_CODE_OFFSET() slot)
+    let rawValue := activePointerLoad(start)
+
+    value := shr(mul(8, sub(32, length)), rawValue)
+    // will be padded by zeroes if out of bounds
 }
 
 function getCodeAddress() -> addr {
@@ -287,6 +277,18 @@ function getCodeAddress() -> addr {
 
 function loadReturndataIntoActivePtr() {
     verbatim_0i_0o("return_data_ptr_to_active")
+}
+
+function swapActivePointer(index0, index1) {
+    verbatim_2i_0o("active_ptr_swap", index0, index1)
+}
+
+function swapActivePointerWithEvmReturndataPointer() {
+    verbatim_2i_0o("active_ptr_swap", 0, 2)
+}
+
+function activePointerLoad(pos) -> res {
+    res := verbatim_1i_1o("active_ptr_data_load", pos)
 }
 
 function loadCalldataIntoActivePtr() {
@@ -314,6 +316,13 @@ function getIsStaticFromCallFlags() -> isStatic {
     isStatic := iszero(iszero(and(isStatic, 0x04)))
 }
 
+function loadFromReturnDataPointer(pos) -> res {
+    swapActivePointer(0, 1)
+    loadReturndataIntoActivePtr()
+    res := activePointerLoad(pos)
+    swapActivePointer(0, 1)
+}
+
 function fetchFromSystemContract(to, argSize) -> res {
     let success := staticcall(gas(), to, 0, argSize, 0, 0)
 
@@ -322,8 +331,7 @@ function fetchFromSystemContract(to, argSize) -> res {
         abortEvmEnvironment()
     }
 
-    returndatacopy(0, 0, 32)
-    res := mload(0) 
+    res := loadFromReturnDataPointer(0)
 }
 
 function isAddrEmpty(addr) -> isEmpty {
@@ -367,10 +375,7 @@ function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
 
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
 function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-    let rawCodeHash := getRawCodeHash(addr)
-    mstore(0, rawCodeHash)
-    
-    let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+    let success, rawCodeHash := fetchBytecode(addr)
     // it fails if we don't have any code deployed at this address
     if success {
         // The length of the bytecode is encoded in versioned bytecode hash
@@ -400,6 +405,13 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
     
         copiedLen := len
     } 
+}
+
+function fetchBytecode(addr) -> success, rawCodeHash {
+    rawCodeHash := getRawCodeHash(addr)
+    mstore(0, rawCodeHash)
+    
+    success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
 }
 
 function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
@@ -585,8 +597,7 @@ function warmSlot(key, currentValue) -> isWarm, originalValue {
     originalValue := currentValue
     if returndatasize() {
         isWarm := true
-        returndatacopy(0, 0, 32)
-        originalValue := mload(0)
+        originalValue := loadFromReturnDataPointer(0)
     }
 }
 
@@ -611,8 +622,7 @@ function consumeEvmFrame() -> passGas, isStatic, callerEVM {
         callerEVM := true
         mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
 
-        returndatacopy(0, 0, 32)
-        passGas := mload(0)
+        passGas := loadFromReturnDataPointer(0)
         
         isStatic := gt(_returndatasize, 32)
     }
@@ -1085,12 +1095,15 @@ function getMax(a, b) -> result {
 //////////// Returndata pointers operation ////////////
 
 function _saveReturndataAfterZkEVMCall() {
+    swapActivePointerWithEvmReturndataPointer()
     loadReturndataIntoActivePtr()
+    swapActivePointerWithEvmReturndataPointer()
     mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
 }
 
 function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
     let rtsz := returndatasize()
+    swapActivePointerWithEvmReturndataPointer()
     loadReturndataIntoActivePtr()
 
     // if (rtsz > 31)
@@ -1101,8 +1114,7 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             abortEvmEnvironment()
         }
         default {
-            returndatacopy(0, 0, 32)
-            _gasLeft := mload(0)
+            _gasLeft := activePointerLoad(0)
 
             // We copy as much returndata as possible without going over the 
             // returndata size.
@@ -1115,11 +1127,14 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             // Skip first 32 bytes of the returnData
             ptrAddIntoActive(32)
         }
+    swapActivePointerWithEvmReturndataPointer()
 }
 
 function _eraseReturndataPointer() {
+    swapActivePointerWithEvmReturndataPointer()
     let activePtrSize := getActivePtrDataSize()
     ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
+    swapActivePointerWithEvmReturndataPointer()
     mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
 }
 
@@ -1204,8 +1219,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
     let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
 
     if canBeDeployed {
-        returndatacopy(0, 0, 32)
-        addr := and(mload(0), ADDRESS_MASK())
+        addr := and(loadFromReturnDataPointer(0), ADDRESS_MASK())
         pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
         // so even if constructor reverts, nonce stays incremented and addr stays warm
 
@@ -1282,6 +1296,7 @@ function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> succes
 }
 
 function _saveConstructorReturnGas() -> gasLeft, addr {
+    swapActivePointerWithEvmReturndataPointer()
     loadReturndataIntoActivePtr()
 
     if lt(returndatasize(), 64) {
@@ -1290,9 +1305,10 @@ function _saveConstructorReturnGas() -> gasLeft, addr {
     }
 
     // ContractDeployer returns (uint256 gasLeft, address createdContract)
-    returndatacopy(0, 0, 64)
-    gasLeft := mload(0)
-    addr := mload(32)
+    gasLeft := activePointerLoad(0)
+    addr := activePointerLoad(32)
+
+    swapActivePointerWithEvmReturndataPointer()
 
     _eraseReturndataPointer()
 }

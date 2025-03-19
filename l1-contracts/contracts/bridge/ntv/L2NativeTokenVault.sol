@@ -103,8 +103,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     }
 
     /// @notice Sets the legacy token asset ID for the given L2 token address.
-    function setLegacyTokenAssetId(address _l2TokenAddress) public {
-        if (assetId[_l2TokenAddress] != bytes32(0)) {
+    function setLegacyTokenAssetId(address _l2TokenAddress) public override {
+        // some legacy tokens were bridged without setting the originChainId on testnets
+        bytes32 assetId = assetId[_l2TokenAddress];
+        if (assetId != bytes32(0) && originChainId[assetId] != 0) {
             revert AssetIdAlreadyRegistered();
         }
         if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
@@ -180,6 +182,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
+        originChainId[_assetId] = L1_CHAIN_ID;
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

@@ -9,7 +9,12 @@ const SOLIDITY_SOURCE_CODE_PATHS = ["system-contracts/", "l2-contracts/", "l1-co
 const YUL_SOURCE_CODE_PATHS = ["system-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
-const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test"];
+const SKIPPED_FOLDERS = [
+  "l1-contracts/deploy-scripts",
+  "l1-contracts/test",
+  "l1-contracts/contracts/dev-contracts",
+  "system-contracts/bootloader/tests/bootloader",
+];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
@@ -353,6 +358,11 @@ const readSystemContractsHashesFile = (path: string): ContractsInfo[] => {
     const parsedFile = JSON.parse(file);
     return parsedFile;
   } catch (err) {
+    if ((err as { code?: string })?.code === "ENOENT") {
+      console.warn(`File ${absolutePath} not found. Creating a new one.`);
+      fs.writeFileSync(absolutePath, "[]");
+      return [];
+    }
     const msg = err instanceof Error ? err.message : "Unknown error";
     throw new Error(`Failed to read file: ${absolutePath} Error: ${msg}`);
   }
@@ -401,7 +411,7 @@ const main = async () => {
   const args = process.argv;
   if (args.length > 3 || (args.length == 3 && !args.includes("--check-only"))) {
     console.log(
-      "This command can be used with no arguments or with the --check-only flag. Use the --check-only flag to check the hashes without updating the SystemContractsHashes.json file."
+      `This command can be used with no arguments or with the --check-only flag. Use the --check-only flag to check the hashes without updating the ${OUTPUT_FILE_PATH} file.`
     );
     process.exit(1);
   }
@@ -416,15 +426,15 @@ const main = async () => {
   const newSystemContractsHashes = systemContractsDetails;
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
   if (_.isEqual(newSystemContractsHashes, oldSystemContractsHashes)) {
-    console.log("Calculated hashes match the hashes in the SystemContractsHashes.json file.");
+    console.log(`Calculated hashes match the hashes in the ${OUTPUT_FILE_PATH} file.`);
     console.log("Exiting...");
     return;
   }
   const differences = findDifferences(newSystemContractsHashes, oldSystemContractsHashes);
-  console.log("Calculated hashes differ from the hashes in the SystemContractsHashes.json file. Differences:");
+  console.log(`Calculated hashes differ from the hashes in the ${OUTPUT_FILE_PATH} file. Differences:`);
   console.log(differences);
   if (checkOnly) {
-    console.log("You can use the `yarn calculate-hashes:fix` command to update the AllContractsHashes.json file.");
+    console.log(`You can use the \`yarn calculate-hashes:fix\` command to update the ${OUTPUT_FILE_PATH} file.`);
     console.log("Exiting...");
     process.exit(1);
   } else {
