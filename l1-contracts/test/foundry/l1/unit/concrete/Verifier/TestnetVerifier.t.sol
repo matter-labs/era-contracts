@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {VerifierTestTest} from "./Verifier.t.sol";
-import {DummyTestnetVerifier} from "contracts/dev-contracts/test/DummyTestnetVerifier.sol";
+import {PlonkVerifierTestTest} from "./PlonkVerifier.t.sol";
+import {DummyPlonkVerifier} from "contracts/dev-contracts/test/DummyPlonkVerifier.sol";
 
-contract TestnetVerifierTest is VerifierTestTest {
-    DummyTestnetVerifier testnetVerifier;
+contract TestnetVerifierTest is PlonkVerifierTestTest {
+    DummyPlonkVerifier testnetVerifier;
 
     function setUp() public override {
         super.setUp();
 
-        testnetVerifier = new DummyTestnetVerifier();
+        testnetVerifier = new DummyPlonkVerifier();
     }
 
     function test_revertWhen_blockChainIdIsOne() public {
         vm.chainId(1);
 
         vm.expectRevert();
-        new DummyTestnetVerifier();
+        new DummyPlonkVerifier();
     }
 
     function test_SucceedsWhen_proofIsEmpty() public {

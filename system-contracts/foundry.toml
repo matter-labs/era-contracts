@@ -3,13 +3,14 @@ src = "contracts-preprocessed"
 out = "out"
 libs = ["lib"]
 cache_path = "cache-forge"
-evm_version = "paris"
+evm_version = "cancun"
+solc_version = "0.8.24"
 remappings = [
     "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 
 [profile.default.zksync]
-zksolc = "1.5.7"
+zksolc = "1.5.11"
 enable_eravm_extensions = true
 suppressed_errors = ["sendtransfer"]

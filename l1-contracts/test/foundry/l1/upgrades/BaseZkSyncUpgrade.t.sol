@@ -7,7 +7,8 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncU
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionMinorDeltaTooBig, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, ProtocolVersionTooSmall, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {TooManyFactoryDeps, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -145,9 +146,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // Patch upgrade can't set upgrade txn
     function test_revertWhen_PatchCantSetUpgradeTxn() public {
-        // Change bootload and default account hashes to 0, to skip previous path only checks
+        // Change basic hashes to 0, to skip previous path only checks
         proposedUpgrade.bootloaderHash = bytes32(0);
         proposedUpgrade.defaultAccountHash = bytes32(0);
+        proposedUpgrade.evmEmulatorHash = bytes32(0);
 
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
         proposedUpgrade.newProtocolVersion = SemVer.packSemVer(0, 1, 1);

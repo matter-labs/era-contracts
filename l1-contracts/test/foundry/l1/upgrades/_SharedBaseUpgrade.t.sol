@@ -67,6 +67,7 @@ contract BaseUpgrade is Test {
             l2ProtocolUpgradeTx: l2CanonicalTransaction,
             bootloaderHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
             defaultAccountHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
+            evmEmulatorHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
             verifier: verifier,
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),

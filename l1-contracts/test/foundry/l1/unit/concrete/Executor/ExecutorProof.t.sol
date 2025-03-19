@@ -9,7 +9,9 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -45,7 +47,7 @@ contract TestExecutorFacet is ExecutorFacet {
 contract ExecutorProofTest is Test {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);
@@ -78,9 +80,12 @@ contract ExecutorProofTest is Test {
     // This test is based on a block generated in a local system.
     function test_Hashes() public {
         utilsFacet.util_setL2DefaultAccountBytecodeHash(
-            0x0100065d134a862a777e50059f5e0fbe68b583f3617a67820f7edda0d7f253a0
+            0x0100058d1abd41a9984b37939862f99c18237dc6951c3d5a3d81593c798a8f81
         );
-        utilsFacet.util_setL2BootloaderBytecodeHash(0x010009416e909e0819593a9806bbc841d25c5cdfed3f4a1523497c6814e5194a);
+        utilsFacet.util_setL2EvmEmulatorBytecodeHash(
+            0x01000f196acd122635a752fcb275be0cc95fd3bba348c1d0908a517fe316418e
+        );
+        utilsFacet.util_setL2BootloaderBytecodeHash(0x010008ddde4acc465cde1c420883701caadb41954567c0b4e3a0d1093a7afde7);
         utilsFacet.util_setZkPorterAvailability(false);
 
         bytes[] memory mockSystemLogs = Utils.createSystemLogsWithEmptyDAValidator();
@@ -91,7 +96,7 @@ contract ExecutorProofTest is Test {
             // ignored
             timestamp: 100,
             indexRepeatedStorageChanges: 84,
-            newStateRoot: 0x9cf7bb72401a56039ca097cabed20a72221c944ed9b0e515c083c04663ab45a6,
+            newStateRoot: 0x1df8761352f4d39602beaf619e6b7a96111d3a54550bcf21f2623860cf3ed3d8,
             // ignored
             numberOfLayer1Txs: 10,
             // ignored
@@ -116,13 +121,13 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0xc83d94049ae723b98705c52a4fdcd767b7818ccd229aa1738ac71dce0d4ff317,
+            0x6bf01db427f6af33a29a9505dfca9e1dd07b4e39ce7aee9be805c8f7115480f6,
             "nextCommitment computation failed"
         );
 
-        bytes32 prevCommitment = 0x6ebf945305689a8c3ac993df7f002d41d311a762cd6bf39bb054ead8d1f54404;
+        bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0xbe1803fdbeb40f12f953296979313339ac1d8289731a1e0dd3bcd39b, "getBatchProofPublicInput");
+        assertEq(result, 0xb93b40845ee564c7458db1e46299f558a6bb7bab01e142ca5f19b6f4, "getBatchProofPublicInput");
     }
 
     // add this to be excluded from coverage report

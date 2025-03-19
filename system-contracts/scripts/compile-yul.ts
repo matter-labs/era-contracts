@@ -1,21 +1,35 @@
 // hardhat import should be the first import in the file
+import { existsSync } from "fs";
 import type { CompilerPaths } from "./utils";
 import { spawn, compilerLocation, prepareCompilerPaths, needsRecompilation, setCompilationTime } from "./utils";
 import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
 
-const COMPILER_VERSION = "1.5.7";
+const COMPILER_VERSION = "1.5.11";
 const IS_COMPILER_PRE_RELEASE = false;
 const CONTRACTS_DIR = "contracts-preprocessed";
 const BOOTLOADER_DIR = "bootloader";
 const TIMESTAMP_FILE_YUL = "last_compilation_yul.timestamp";
 const TIMESTAMP_FILE_BOOTLOADER = "last_compilation_bootloader.timestamp";
+const LLVM_OPTIONS_FILE_EXTENSION = ".llvm.options";
 
 export async function compileYul(paths: CompilerPaths, file: string) {
   const zksolcLocation = await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
+
+  const filePath = `${paths.absolutePathSources}/${file}`;
+  const llvmOptionsFilePath = `${filePath}${LLVM_OPTIONS_FILE_EXTENSION}`;
+  let llvmOptions = "";
+  if (existsSync(llvmOptionsFilePath)) {
+    const llvmOptionsFileContent = (await fs.promises.readFile(llvmOptionsFilePath)).toString();
+    if (!llvmOptionsFileContent.startsWith("'") || !llvmOptionsFileContent.endsWith("'")) {
+      throw new Error(`Content in ${llvmOptionsFilePath} must start and end with a single quote.`);
+    }
+    llvmOptions = `--llvm-options=${llvmOptionsFileContent}`;
+  }
+
   await spawn(
-    `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 --enable-eravm-extensions --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
+    `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 ${llvmOptions} --enable-eravm-extensions --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
   );
 }
 

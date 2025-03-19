@@ -145,8 +145,8 @@ contract DeployL2Script is Script {
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
         config.erc20BridgeProxy = toml.readAddress("$.erc20_bridge");
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
-        config.chainRegistrar = toml.readAddress("$.chain_registrar");
-        config.proposalAuthor = toml.readAddress("$.proposal_author");
+        //config.chainRegistrar = toml.readAddress("$.chain_registrar");
+        //config.proposalAuthor = toml.readAddress("$.proposal_author");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
 
