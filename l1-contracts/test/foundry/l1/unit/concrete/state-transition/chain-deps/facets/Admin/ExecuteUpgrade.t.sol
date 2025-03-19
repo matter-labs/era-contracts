@@ -44,6 +44,7 @@ contract ExecuteUpgradeTest is AdminTest {
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: hex"",

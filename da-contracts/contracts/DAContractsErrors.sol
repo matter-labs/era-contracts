@@ -42,5 +42,3 @@ error BlobCommitmentNotPublished();
 
 // 0x5717f940
 error InvalidPubdataSource(uint8 pubdataSource);
-// 0x52595598
-error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
