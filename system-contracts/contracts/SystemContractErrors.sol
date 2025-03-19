@@ -68,8 +68,6 @@ error MalformedBytecode(BytecodeError);
 error NonceAlreadyUsed(address account, uint256 nonce);
 // 0x45ac24a6
 error NonceIncreaseError(uint256 max, uint256 proposed);
-// 0x13595475
-error NonceJumpError();
 // 0x1f2f8478
 error NonceNotUsed(address account, uint256 nonce);
 // 0x760a1568
@@ -102,8 +100,6 @@ error UnsupportedPaymasterFlow();
 error UnsupportedTxType(uint256);
 // 0x626ade30
 error ValueMismatch(uint256 expected, uint256 actual);
-// 0x6818f3f9
-error ZeroNonceError();
 // 0x4f2b5b33
 error SloadContractBytecodeUnknown();
 // 0x43197434
@@ -201,6 +197,9 @@ error TooMuchGas();
 
 // 0x8c13f15d
 error InvalidNewL2BlockNumber(uint256 l2BlockNumber);
+
+// 0xe0a0dd23
+error InvalidNonceKey(uint192 nonceKey);
 
 enum CodeHashReason {
     NotContractOnConstructor,
