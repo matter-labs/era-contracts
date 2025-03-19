@@ -1,9 +1,9 @@
-import { expect } from "chai";
+/*import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
 import { callFallback, deployContractYul } from "../shared/utils";
 
 // FIXME: re-enable once anvil-zksync supports precompiles.
-xdescribe("EcAdd tests", function () {
+describe("EcAdd tests", function () {
   let ecAdd: Contract;
 
   before(async () => {
@@ -187,3 +187,4 @@ xdescribe("EcAdd tests", function () {
     });
   });
 });
+*/
