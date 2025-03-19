@@ -1004,6 +1004,9 @@ function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
         or(gt(Esize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(Msize, MAX_MODEXP_INPUT_FIELD_SIZE()))
     )
 
+    // The limitated size of parameters also prevents overflows during gas calculations.
+    // The current value (32 bytes) violates EVM equivalence. This value comes from circuit limitations.
+
     switch inputIsTooBig
     case 1 {
         gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
