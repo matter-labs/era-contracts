@@ -76,6 +76,7 @@ contract ChainRegistrarTest is Test {
             }),
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
+            l2EvmEmulatorBytecodeHash: bytes32(0),
             priorityTxMaxGasLimit: 10,
             feeParams: FeeParams({
                 pubdataPricingMode: PubdataPricingMode.Rollup,

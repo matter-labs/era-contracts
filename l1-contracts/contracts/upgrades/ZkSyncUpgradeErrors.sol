@@ -24,18 +24,14 @@ error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
 error PatchUpgradeCantSetDefaultAccount();
 // 0x962fd7d0
 error PatchUpgradeCantSetBootloader();
+// 0xc231eccd
+error PatchUpgradeCantSetEvmEmulator();
 // 0x101ba748
 error PreviousUpgradeNotFinalized(bytes32 txHash);
 // 0xa0f47245
 error PreviousUpgradeNotCleaned();
-// 0x76da24b9
-error TooManyFactoryDeps();
 // 0x5cb29523
 error InvalidTxType(uint256 txType);
-// 0x08753982
-error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
-// 0xd92e233d
-error ZeroAddress();
 
 // 0x388b6f68
 error GatewayUpgradeFailed();

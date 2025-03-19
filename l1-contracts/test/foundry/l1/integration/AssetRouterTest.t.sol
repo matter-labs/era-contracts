@@ -36,7 +36,7 @@ import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/Bridg
 import {IBridgedStandardToken} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;

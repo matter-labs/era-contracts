@@ -10,8 +10,6 @@ import "forge-std/console.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -35,11 +33,12 @@ import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
+import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
-abstract contract SharedL2ContractDeployer is Test, DeployUtils {
+abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -243,4 +242,6 @@ abstract contract SharedL2ContractDeployer is Test, DeployUtils {
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;
     function deployL2Contracts(uint256 _l1ChainId) public virtual;
+
+    function test() internal virtual override {}
 }

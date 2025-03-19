@@ -23,7 +23,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenIsNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -103,8 +103,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     }
 
     /// @notice Sets the legacy token asset ID for the given L2 token address.
-    function setLegacyTokenAssetId(address _l2TokenAddress) public {
-        // some legacy tokens were bridged without setting the originCahinId on testnets
+    function setLegacyTokenAssetId(address _l2TokenAddress) public override {
+        // some legacy tokens were bridged without setting the originChainId on testnets
         bytes32 assetId = assetId[_l2TokenAddress];
         if (assetId != bytes32(0) && originChainId[assetId] != 0) {
             revert AssetIdAlreadyRegistered();
@@ -114,7 +114,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         if (l1TokenAddress == address(0)) {
-            revert TokenIsNotLegacy();
+            revert TokenNotLegacy();
         }
 
         _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
@@ -235,7 +235,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _tokenOriginChainId The chain id of the origin token.
-    /// @param _nonNativeToken The address of token on its origin chain..
+    /// @param _nonNativeToken The address of token on its origin chain.
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,

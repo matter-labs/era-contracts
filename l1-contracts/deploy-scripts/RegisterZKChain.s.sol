@@ -17,7 +17,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {Utils} from "./Utils.sol";
+import {Utils, ADDRESS_ONE} from "./Utils.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -31,7 +31,7 @@ import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.s
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
@@ -64,12 +64,13 @@ struct Config {
     address governance;
     address create2FactoryAddress;
     bytes32 create2Salt;
+    bool allowEvmEmulator;
+    address serverNotifierProxy;
 }
 
 contract RegisterZKChainScript is Script {
     using stdToml for string;
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
     struct Output {
@@ -158,6 +159,7 @@ contract RegisterZKChainScript is Script {
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
         config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr");
+        config.serverNotifierProxy = toml.readAddress("$.deployed_addresses.server_notifier_proxy_addr");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -183,6 +185,7 @@ contract RegisterZKChainScript is Script {
         config.governance = toml.readAddress("$.governance");
         config.create2FactoryAddress = toml.readAddress("$.create2_factory_address");
         config.create2Salt = toml.readBytes32("$.create2_salt");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function getConfig() public view returns (Config memory) {
@@ -211,6 +214,7 @@ contract RegisterZKChainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
+        config.serverNotifierProxy = toml.readAddress("$.deployed_addresses.server_notifier_proxy_addr");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -238,6 +242,7 @@ contract RegisterZKChainScript is Script {
         );
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function getOwnerAddress() public view returns (address) {
