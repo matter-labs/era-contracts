@@ -1080,7 +1080,7 @@ object "EvmEmulator" {
             switch inputIsTooBig
             case 1 {
                 gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
-                forbiddenPrecompile(0x0005)
+                //forbiddenPrecompile(0x0005)
             }
             default {
                 // 96 + Bsize, offset of the exponent value
@@ -4159,7 +4159,7 @@ object "EvmEmulator" {
                 switch inputIsTooBig
                 case 1 {
                     gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
-                    forbiddenPrecompile(0x0005)
+                    //forbiddenPrecompile(0x0005)
                 }
                 default {
                     // 96 + Bsize, offset of the exponent value
