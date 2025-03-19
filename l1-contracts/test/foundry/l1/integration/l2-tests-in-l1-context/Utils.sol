@@ -14,4 +14,5 @@ struct SystemContractsArgs {
     address aliasedOwner;
     bool contractsDeployedAlready;
     address l1CtmDeployer;
+    address weth;
 }
