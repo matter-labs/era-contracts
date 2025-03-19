@@ -24,7 +24,7 @@ import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {BurningNativeWETHNotSupported, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, InsufficientChainBalanceAssetTracker, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InvalidProof, NoFundsTransferred, DepositDoesNotExist, WithdrawalAlreadyFinalized, InvalidSelector,AddressAlreadySet, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {BurningNativeWETHNotSupported, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, InsufficientChainBalanceAssetTracker, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InvalidProof, NoFundsTransferred, DepositDoesNotExist, WithdrawalAlreadyFinalized, InvalidSelector, AddressAlreadySet, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 import {WrongCounterpart, EthTransferFailed, EmptyToken, NativeTokenVaultAlreadySet, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed} from "contracts/bridge/L1BridgeContractErrors.sol";

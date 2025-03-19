@@ -492,13 +492,14 @@ abstract contract DeployUtils is Script {
         } else if (compareStrings(contractName, "DiamondInit")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AssetTracker")) {
-            return abi.encode(
-                config.l1ChainId,
-                addresses.bridgehub.bridgehubProxy,
-                addresses.bridges.l1AssetRouterProxy,
-                addresses.vaults.l1NativeTokenVaultProxy,
-                addresses.bridgehub.messageRootProxy
-            );
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.vaults.l1NativeTokenVaultProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }

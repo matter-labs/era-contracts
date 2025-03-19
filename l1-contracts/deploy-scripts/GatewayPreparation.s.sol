@@ -27,8 +27,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L2AssetRouter, IL2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -36,7 +35,7 @@ import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddres
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -265,7 +264,7 @@ contract GatewayPreparation is Script {
     function governanceSetCTMAssetHandler(bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        L1AssetRouter sharedBridge = L1AssetRouter(config.sharedBridgeProxy);
+        IL1AssetRouter sharedBridge = IL1AssetRouter(config.sharedBridgeProxy);
         bytes memory data = abi.encodeCall(
             sharedBridge.setAssetDeploymentTracker,
             (bytes32(uint256(uint160(config.chainTypeManagerProxy))), address(config.ctmDeploymentTracker))
@@ -377,7 +376,7 @@ contract GatewayPreparation is Script {
         if (gatewayBaseTokenAssetId != ethTokenAssetId) {
             deployerAddress = msg.sender;
             uint256 amountForDistribution = 100000000000000000000;
-            L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
+            IL1AssetRouter l1AR = IL1AssetRouter(config.sharedBridgeProxy);
             IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
             address baseTokenAddress = nativeTokenVault.tokenAddress(gatewayBaseTokenAssetId);
             uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(gatewayBaseTokenAssetId);
@@ -498,7 +497,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
+        IL1Nullifier l1Nullifier = IL1Nullifier(config.l1NullifierProxy);
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         vm.broadcast();

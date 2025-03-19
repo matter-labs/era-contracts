@@ -2,7 +2,9 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {GatewayPreparation} from "deploy-scripts/GatewayPreparation.s.sol";
-
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 contract GatewayPreparationForTests is GatewayPreparation {
     using stdToml for string;
 
@@ -32,12 +34,13 @@ contract GatewayPreparationForTests is GatewayPreparation {
         path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));
         toml = vm.readFile(path);
 
-        config.gatewayChainAdmin = toml.readAddress("$.chain_admin_addr");
+        config.gatewayChainAdmin = IZKChain(IBridgehub(config.bridgehub).getZKChain(config.gatewayChainId)).getAdmin();
+        // toml.readAddress("$.chain_admin_addr");
         config.gatewayChainProxyAdmin = toml.readAddress("$.chain_proxy_admin_addr");
         config.gatewayAccessControlRestriction = toml.readAddress(
             "$.deployed_addresses.access_control_restriction_addr"
         );
-        config.l1NullifierProxy = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
+        config.l1NullifierProxy = address(IL1AssetRouter(IBridgehub(config.bridgehub).assetRouter()).L1_NULLIFIER());
 
         console.log("chain chain id = ", config.gatewayChainId);
 

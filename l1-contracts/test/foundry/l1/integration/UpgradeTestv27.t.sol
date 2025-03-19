@@ -79,7 +79,10 @@ contract UpgradeIntegrationTest is Test {
         // so it was tested in e2e local environment.
     }
 
-    function _upgradeChain(uint256 oldProtocolVersion, Diamond.DiamondCutData memory chainUpgradeInfo) internal virtual {}
+    function _upgradeChain(
+        uint256 oldProtocolVersion,
+        Diamond.DiamondCutData memory chainUpgradeInfo
+    ) internal virtual {}
 
     /// @dev Executes a series of governance calls.
     function _governanceMulticall(address governanceAddr, Call[] memory calls) internal {
@@ -112,7 +115,6 @@ contract UpgradeIntegrationTest is Test {
         // This data is generated before the protocol upgrade handler has received the ownership for the contracts.
         // Thus, we manually set it as its owner.
         // address newProtocolUpgradeHandler = generateUpgradeData.getProtocolUpgradeHandlerAddress();
-
         // _forceMoveOwnership(generateUpgradeData.getTransparentProxyAdmin(), newProtocolUpgradeHandler, false);
         // _forceMoveOwnership(generateUpgradeData.getBridgehub(), newProtocolUpgradeHandler, true);
         // _forceMoveOwnership(generateUpgradeData.getChainTypeManager(), newProtocolUpgradeHandler, true);

@@ -132,7 +132,7 @@ export async function deployContractOnAddress(
   input = "0x",
   artifact?: ZkSyncArtifact
 ) {
-  const artifact =  artifact || (await loadArtifact(name));
+  const artifact = artifact || (await loadArtifact(name));
   await setCode(address, artifact.bytecode, callConstructor, input);
 }
 

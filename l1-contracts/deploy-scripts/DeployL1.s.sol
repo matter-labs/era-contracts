@@ -147,9 +147,10 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
             "Bridgehub"
         );
-        (addresses.bridgehub.interopCenterImplementation, addresses.bridgehub.interopCenterProxy) = deployTuppWithContract(
-            "InteropCenter"
-        );
+        (
+            addresses.bridgehub.interopCenterImplementation,
+            addresses.bridgehub.interopCenterProxy
+        ) = deployTuppWithContract("InteropCenter");
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
             "MessageRoot"
         );
@@ -176,9 +177,10 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
             "L1ERC20Bridge"
         );
-        (addresses.bridgehub.assetTrackerImplementation, addresses.bridgehub.assetTrackerProxy) = deployTuppWithContract(
-            "AssetTracker"
-        );
+        (
+            addresses.bridgehub.assetTrackerImplementation,
+            addresses.bridgehub.assetTrackerProxy
+        ) = deployTuppWithContract("AssetTracker");
         updateSharedBridge();
         // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
         (

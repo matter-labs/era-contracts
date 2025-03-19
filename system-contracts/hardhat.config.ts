@@ -24,7 +24,7 @@ export default {
     settings: {
       evmVersion: "cancun",
       optimizer: {
-      enabled: true,
+        enabled: true,
         runs: 9999999,
       },
       outputSelection: {

@@ -222,7 +222,12 @@ export function createSystemLogs(
   l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
-    constructL2Log(true, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY,
+      ethers.constants.HashZero
+    ),
     constructL2Log(
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
@@ -249,13 +254,13 @@ export function createSystemLogs(
     ),
     constructL2Log(
       true,
-      L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+      L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
       l2DaValidatorOutputHash ? ethers.utils.hexlify(l2DaValidatorOutputHash) : ethers.constants.HashZero
     ),
     constructL2Log(
       true,
-      L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+      L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
       process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
     ),
@@ -270,7 +275,12 @@ export function createSystemLogsWithUpgrade(
   l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
-    constructL2Log(true, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY,
+      ethers.constants.HashZero
+    ),
     constructL2Log(
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
@@ -297,13 +307,13 @@ export function createSystemLogsWithUpgrade(
     ),
     constructL2Log(
       true,
-      L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+      L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
       ethers.utils.hexlify(l2DaValidatorOutputHash) || ethers.constants.HashZero
     ),
     constructL2Log(
       true,
-      L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+      L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
       process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
     ),

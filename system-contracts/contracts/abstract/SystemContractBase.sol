@@ -52,7 +52,6 @@ abstract contract SystemContractBase {
         _;
     }
 
-    
     /// can only be called from the EVM emulator using system call (unaccessible from EVM environment)
     modifier onlySystemCallFromEvmEmulator() {
         if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {

@@ -167,6 +167,12 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes(""))
         );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+        
         l2InteropCenter.requestInterop{value: 3 ether}(
             destinationChainId,
             address(0),

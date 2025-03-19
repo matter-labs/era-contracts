@@ -284,7 +284,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _refundRecipient
     ) internal returns (bytes32 canonicalTxHash) {
         emit InteropTriggerSent(_interopTrigger);
-        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
+        return
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -879,13 +880,17 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
-        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
-            _chainId,
-            BRIDGE_HUB.baseTokenAssetId(_chainId),
-            _baseTokenAmount,
-            false
-        );
-        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
+        if (_baseTokenAmount > 0) {
+            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
+                _chainId,
+                BRIDGE_HUB.baseTokenAssetId(_chainId),
+                _baseTokenAmount,
+                false
+            );
+        }
+        if (_amount > 0) {
+            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
+        }
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }

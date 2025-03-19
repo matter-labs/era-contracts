@@ -11,7 +11,7 @@ import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {OnlyBridgehub,OnlyInteropCenter, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyInteropCenter, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
 import {UnsupportedEncodingVersion, CTMNotRegistered} from "../common/L1ContractErrors.sol";
 
 /// @dev The encoding version of the data.
