@@ -50,6 +50,11 @@ object "EvmGasManager" {
                 value := sub(shl(88, 1), 1)
             }
 
+            function mloadFromReturndata(pos) -> res {
+                verbatim_0i_0o("return_data_ptr_to_active")
+                res := verbatim_1i_1o("active_ptr_data_load", pos)
+            }
+
             function $llvm_AlwaysInline_llvm$__getRawSenderCodeHash() -> hash {
                 // function getRawCodeHash(address _address)
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
@@ -62,8 +67,7 @@ object "EvmGasManager" {
                     revert(0, 0)
                 }
                 
-                returndatacopy(0, 0, 32)
-                hash := mload(0)
+                hash := mloadFromReturndata(0)
             }
 
             /// @dev Checks that the call is done by the EVM emulator in system mode.
