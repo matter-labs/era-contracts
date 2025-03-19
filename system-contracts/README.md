@@ -83,8 +83,10 @@ Also, when testing these contracts, some of them should also be deployed on the 
 - [Ecrecover.yul](contracts%2Fprecompiles%2FEcrecover.yul): uses precompile call instruction, which is address-dependent
 - [Keccak256.yul](contracts%2Fprecompiles%2FKeccak256.yul): uses precompile call instruction, which is address-dependent
 - [SHA256.yul](contracts%2Fprecompiles%2FSHA256.yul): uses precompile call instruction, which is address-dependent
-
-However, this is not the case for [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul) and [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul), so they can be deployed on any addresses, even outside kernel space.
+- [Modexp.yul](contracts%2Fprecompiles%2FModexp.yul): uses precompile call instruction, which is address-dependent
+- [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul): uses precompile call instruction, which is address-dependent
+- [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul): uses precompile call instruction, which is address-dependent
+- [EcPairing.yul](contracts%2Fprecompiles%2FEcPairing.yul): uses precompile call instruction, which is address-dependent
 
 #### Test contracts/features
 
@@ -147,12 +149,6 @@ merged back into the `dev` branch to keep it up-to-date.
 Since scripts, READMEs, etc., are code that is not subject to audits, these are to be merged directly into the `main`
 branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these
 changes.
-
-## License
-
-The ZKsync Era system-contracts are distributed under the terms of the MIT license.
-
-See [LICENSE-MIT](LICENSE-MIT) for details.
 
 ## Official Links
 

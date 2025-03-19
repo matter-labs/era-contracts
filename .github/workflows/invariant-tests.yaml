@@ -17,7 +17,7 @@ jobs:
         id: branches
         run: |
           if [[ ${{ github.event_name }} == "schedule" ]]; then
-            echo 'branches=["dev"]' >> "$GITHUB_OUTPUT"
+            echo 'branches=["main", "dev"]' >> "$GITHUB_OUTPUT"
           else
             echo "branches=[\"$GITHUB_REF\"]" >> "$GITHUB_OUTPUT"
           fi

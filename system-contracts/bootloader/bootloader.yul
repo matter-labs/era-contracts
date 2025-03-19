@@ -193,7 +193,7 @@ object "Bootloader" {
 
             /// @dev The maximum number of new factory deps that are allowed in a transaction
             function MAX_NEW_FACTORY_DEPS() -> ret {
-                ret := 32
+                ret := 64
             }
 
             /// @dev Besides the factory deps themselves, we also need another 4 slots for:
@@ -403,7 +403,7 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 59000000 / 32 VM words.
+            /// @dev The memory page consists of 63800000 / 32 VM words.
             /// Each execution result is a single boolean, but
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
@@ -1094,12 +1094,12 @@ object "Bootloader" {
                 gasPerPubdata,
                 basePubdataSpent
             ) -> canonicalL1TxHash, gasUsedOnPreparation {
+                let gasBeforePreparation := gas()
+                debugLog("gasBeforePreparation", gasBeforePreparation)
+
                 let innerTxDataOffset := add(txDataOffset, 32)
 
                 setPubdataInfo(gasPerPubdata, basePubdataSpent)
-
-                let gasBeforePreparation := gas()
-                debugLog("gasBeforePreparation", gasBeforePreparation)
 
                 // Even though the smart contracts on L1 should make sure that the L1->L2 provide enough gas to generate the hash
                 // we should still be able to do it even if this protection layer fails.
@@ -2473,7 +2473,7 @@ object "Bootloader" {
 
                 let ptr := NEW_FACTORY_DEPS_BEGIN_BYTE()
                 // Selector
-                mstore(ptr, {{MARK_BATCH_AS_REPUBLISHED_SELECTOR}})
+                mstore(ptr, {{MARK_FACTORY_DEPS_SELECTOR}})
                 ptr := add(ptr, 32)
 
                 // Saving whether the dependencies should be sent on L1
@@ -2676,15 +2676,23 @@ object "Bootloader" {
             function l1MessengerPublishingCall() {
                 let ptr := OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_BEGIN_BYTE()
                 debugLog("Publishing batch data to L1", 0)
+                
+                setHook(VM_HOOK_PUBDATA_REQUESTED())
+
                 // First slot (only last 4 bytes) -- selector
                 mstore(ptr, {{PUBLISH_PUBDATA_SELECTOR}})
-                // Second slot -- offset
-                mstore(add(ptr, 32), 32)
-                setHook(VM_HOOK_PUBDATA_REQUESTED())
+                // Second slot is occupied by the address of the L2 DA validator.
+                // The operator can provide any one it wants. It will be the responsibility of the 
+                // L1Messenger system contract to send the corresponding log to L1.
+                // 
+                // Third slot -- offset. The correct value must be equal to 64
+                assertEq(mload(add(ptr, 64)), 64, "offset for L1Messenger is not 64")
+
                 // Third slot -- length of pubdata
-                let len := mload(add(ptr, 64))
-                // 4 bytes for selector, 32 bytes for array offset and 32 bytes for array length
-                let fullLen := add(len, 68)
+                let len := mload(add(ptr, 96))
+                // 4 bytes for selector, 32 bytes for ABI-encoded L2 DA validator address,
+                // 32 bytes for array offset and 32 bytes for array length
+                let fullLen := add(len, 100)
 
                 // ptr + 28 because the function selector only takes up the last 4 bytes in the first slot.
                 let success := call(
@@ -3126,7 +3134,7 @@ object "Bootloader" {
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
 
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
@@ -3151,9 +3159,8 @@ object "Bootloader" {
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
-
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
@@ -3176,7 +3183,7 @@ object "Bootloader" {
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
@@ -3195,7 +3202,7 @@ object "Bootloader" {
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                     }
@@ -3892,17 +3899,17 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function chainedPriorityTxnHashLogKey() -> ret {
-                ret := 5
+                ret := 2
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function numberOfLayer1TxsLogKey() -> ret {
-                ret := 6
+                ret := 3
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 13
+                ret := 7
             }
 
             ////////////////////////////////////////////////////////////////////////////

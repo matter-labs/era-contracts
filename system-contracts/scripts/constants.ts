@@ -53,6 +53,12 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     lang: Language.Yul,
     path: "precompiles",
   },
+  modexp: {
+    address: "0x0000000000000000000000000000000000000005",
+    codeName: "Modexp",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
   ecAdd: {
     address: "0x0000000000000000000000000000000000000006",
     codeName: "EcAdd",
@@ -172,6 +178,62 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // this is a zkEVM create2 factory.
     address: "0x0000000000000000000000000000000000010000",
     codeName: "Create2Factory",
+    lang: Language.Solidity,
+  },
+  L2GenesisUpgrade: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010001",
+    codeName: "L2GenesisUpgrade",
+    lang: Language.Solidity,
+  },
+  L2BridgeHub: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010002",
+    codeName: "Bridgehub",
+    lang: Language.Solidity,
+  },
+  L2AssetRouter: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010003",
+    codeName: "L2AssetRouter",
+    lang: Language.Solidity,
+  },
+  L2NativeTokenVault: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010004",
+    codeName: "L2NativeTokenVault",
+    lang: Language.Solidity,
+  },
+  L2MessageRoot: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010005",
+    codeName: "MessageRoot",
+    lang: Language.Solidity,
+  },
+  SloadContract: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010006",
+    codeName: "SloadContract",
+    lang: Language.Solidity,
+  },
+  L2WrappedBaseTokenImplementation: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010007",
+    codeName: "L2WrappedBaseToken",
     lang: Language.Solidity,
   },
 } as const;
