@@ -71,3 +71,17 @@ Now the protocol upgrade verification tool can be run against anvil and the outp
 ```sh
 cargo run -- --ecosystem-yaml $ZKSYNC_HOME/contracts/l1-contracts/script-out/v27-stage-output.yaml --l1-rpc http://localhost:8545  --era-chain-id 270 --bridgehub-address 0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE
 ```
+
+## Finalization of the upgrade
+
+This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
+
+### Deploying the multicall with gas contract
+
+Firstly, you should deploy the `MulticallWithGas` contract.
+
+After that you should use the zkstack_cli tool to get the calldata for the `FinalizeUpgrade`'s `finalizeInit` function:
+
+```sh
+forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
+```
