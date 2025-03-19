@@ -61,12 +61,12 @@ contract AccountCodeStorage is IAccountCodeStorage {
     function markAccountCodeHashAsConstructed(address _address) external override onlyDeployer {
         bytes32 codeHash = getRawCodeHash(_address);
 
+        // Get the bytecode hash with "isConstructor" flag equal to false
+        bytes32 constructedBytecodeHash = Utils.constructedBytecodeHash(codeHash);
+
         if (!Utils.isContractConstructing(codeHash)) {
             revert InvalidCodeHash(CodeHashReason.NotContractOnConstructor);
         }
-
-        // Get the bytecode hash with "isConstructor" flag equal to false
-        bytes32 constructedBytecodeHash = Utils.constructedBytecodeHash(codeHash);
 
         _storeCodeHash(_address, constructedBytecodeHash);
     }
