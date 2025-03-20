@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -21,11 +23,13 @@ import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {L2SharedBridgeLegacyDev} from "contracts/dev-contracts/L2SharedBridgeLegacyDev.sol";
 
 import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
 
@@ -131,6 +135,32 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
         ) = deployTuppWithContract("ChainTypeManager");
+    }
+
+    function deployL2SharedBridgeLegacy(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _aliasedOwner,
+        address _l1SharedBridge,
+        bytes32 _l2TokenProxyBytecodeHash
+    ) internal virtual override returns (address) {
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+
+        L2SharedBridgeLegacyDev bridge = new L2SharedBridgeLegacyDev();
+        console.log("bridge", address(bridge));
+        address proxyAdmin = address(0x1);
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(bridge),
+            proxyAdmin,
+            abi.encodeWithSelector(
+                L2SharedBridgeLegacy.initialize.selector,
+                _l1SharedBridge,
+                _l2TokenProxyBytecodeHash,
+                _aliasedOwner
+            )
+        );
+        console.log("proxy", address(proxy));
+        return address(proxy);
     }
 
     // add this to be excluded from coverage report

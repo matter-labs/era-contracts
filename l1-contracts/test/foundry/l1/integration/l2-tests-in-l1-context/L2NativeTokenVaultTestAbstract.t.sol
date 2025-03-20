@@ -142,9 +142,6 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
             abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
             abi.encode(originToken)
         );
-        // fails on the following line without this `mockCall`
-        // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
         vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
         IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 

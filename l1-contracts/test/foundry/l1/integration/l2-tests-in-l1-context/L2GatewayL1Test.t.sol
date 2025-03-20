@@ -52,6 +52,22 @@ contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstr
         super.deployL2Contracts(_l1ChainId);
     }
 
+    function deployL2SharedBridgeLegacy(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _aliasedOwner,
+        address _l1SharedBridge,
+        bytes32 _l2TokenProxyBytecodeHash
+    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) returns (address) {
+        super.deployL2SharedBridgeLegacy({
+            _l1ChainId: _l1ChainId,
+            _eraChainId: _eraChainId,
+            _aliasedOwner: _aliasedOwner,
+            _l1SharedBridge: _l1SharedBridge,
+            _l2TokenProxyBytecodeHash: _l2TokenProxyBytecodeHash
+        });
+    }
+
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (FacetCut[] memory) {
