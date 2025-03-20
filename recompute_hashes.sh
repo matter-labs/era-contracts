@@ -8,7 +8,7 @@ EXPECTED_COMMIT="27360d4c8"
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
   echo "Foundry is not installed. Please install it using foundryup-zksync with commit ${EXPECTED_COMMIT}."
-  return 1
+  exit 1
 fi
 
 # Get installed Foundry version
@@ -20,8 +20,9 @@ INSTALLED_COMMIT=$(echo "$FORGE_OUTPUT" | awk -F'[()]' '{print $2}' | awk '{prin
 if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ] || [ "$INSTALLED_COMMIT" != "$EXPECTED_COMMIT" ]; then
   echo "Incorrect Foundry version."
   echo "Expected: forge ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
-  echo "Found:    forge ${INSTALLED_VERSION} (${INSTALLED_COMMIT})"
-  return 1
+  echo "Found:    ${FORGE_OUTPUT})"
+  echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
+  exit 1
 fi
 
 # Update submodules (just in case)
