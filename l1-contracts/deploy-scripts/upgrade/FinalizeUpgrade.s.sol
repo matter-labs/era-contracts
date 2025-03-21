@@ -107,7 +107,7 @@ contract FinalizeUpgrade is Script {
         return _callIndex + 1; // increment the pointer
     }
 
-    function saturatingSub(uint256 x, uint256 y) internal pure returns (uint256)  {
+    function saturatingSub(uint256 x, uint256 y) internal pure returns (uint256) {
         if (x < y) {
             return 0;
         } else {
@@ -125,9 +125,7 @@ contract FinalizeUpgrade is Script {
         uint256[] pairChainId;
     }
 
-    function finalizeInitInner(
-        FinalizeInitParams memory params
-    ) internal {
+    function finalizeInitInner(FinalizeInitParams memory params) internal {
         // We'll build up an array of aggregator calls in memory.
         // Because memory arrays in Solidity are fixed-length once created,
         // we'll do an approach that increments a pointer until we hit the max,
@@ -138,8 +136,10 @@ contract FinalizeUpgrade is Script {
 
         // Preventing stack too deep error
         {
-
-            console.log("Total number of items to process: ", params.tokens.length + params.chains.length + params.pairToken.length);
+            console.log(
+                "Total number of items to process: ",
+                params.tokens.length + params.chains.length + params.pairToken.length
+            );
             console.log("Tokens: ", params.tokens.length);
             console.log("Chains: ", params.chains.length);
             console.log("Pairs: ", params.pairToken.length);
@@ -158,7 +158,10 @@ contract FinalizeUpgrade is Script {
                 console.log("Processing chain: ", params.chains[i]);
                 if (bh.baseTokenAssetId(params.chains[i]) == bytes32(0)) {
                     // Register legacy chain if needed
-                    bytes memory data = abi.encodeWithSelector(Bridgehub.registerLegacyChain.selector, params.chains[i]);
+                    bytes memory data = abi.encodeWithSelector(
+                        Bridgehub.registerLegacyChain.selector,
+                        params.chains[i]
+                    );
 
                     // Add call to aggregator calls array
                     callIndex = addCall(calls, callIndex, params.bridgehub, data);
@@ -285,7 +288,7 @@ contract FinalizeUpgrade is Script {
         uint256[] calldata pairChainId
     ) external {
         // Using an inner function to prevent "stack too deep" error.
-        // I do not use struct rightaway as it makes it harder to encode the input 
+        // I do not use struct rightaway as it makes it harder to encode the input
         // via rust-rs.
         finalizeInitInner(
             FinalizeInitParams({
