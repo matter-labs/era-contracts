@@ -64,14 +64,23 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
-            _chainId: s.chainId,
-            _batchNumber: uint256(_newBatch.batchNumber),
-            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
-            _operatorDAInput: _newBatch.operatorDAInput,
-            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        });
-
+        ///
+        /// DEBUG SUPPORT START
+        ///
+        // L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+        //     _chainId: s.chainId,
+        //     _batchNumber: uint256(_newBatch.batchNumber),
+        //     _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+        //     _operatorDAInput: _newBatch.operatorDAInput,
+        //     _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        // });
+        L1DAValidatorOutput memory daOutput;
+        daOutput.stateDiffHash = bytes32(_newBatch.operatorDAInput);
+        daOutput.blobsOpeningCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        daOutput.blobsLinearHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        ///
+        /// DEBUG SUPPORT END
+        ///
         ///
          /// DEBUG SUPPORT START
          ///
@@ -243,9 +252,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
-                    revert MismatchL2DAValidator();
-                }
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
+                //     revert MismatchL2DAValidator();
+                // }
+                ///
+                /// DEBUG SUPPORT END
+                ///
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
