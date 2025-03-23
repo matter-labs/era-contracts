@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 import {StdStorage, stdStorage, stdToml, Test} from "forge-std/Test.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR, L2_MESSAGE_VERIFICATION, L2_MESSAGE_ROOT_STORAGE, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR, L2_MESSAGE_VERIFICATION, L2_MESSAGE_ROOT_STORAGE, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
 
 import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
@@ -24,6 +24,7 @@ import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2Messag
 import {DummyL2MessageRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2MessageRootStorage.sol";
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {DummyL2BaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
+import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
 import {Utils} from "../../../../../deploy-scripts/Utils.sol";
 import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -82,6 +83,8 @@ library L2UtilsBase {
             vm.etch(address(L2_MESSAGE_ROOT_STORAGE), l2MessageRootStorage.code);
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
             vm.etch(L2_STANDARD_TRIGGER_ACCOUNT_ADDR, l2StandardTriggerAccount.code);
+            address l2InteropAccount = address(new DummyL2InteropAccount());
+            vm.etch(L2_INTEROP_ACCOUNT_ADDR, l2InteropAccount.code);
         }
 
         {

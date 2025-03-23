@@ -6,10 +6,17 @@ import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "../common/Messaging.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-
+import {IBridgehub} from "./IBridgehub.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
+
+    event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
+    event InteropTriggerSent(InteropTrigger _interopTrigger);
+
+    function BRIDGE_HUB() external view returns (IBridgehub);
+    function assetTracker() external view returns (IAssetTracker);
+
     function setAddresses(address assetRouter, address assetTracker) external;
     /// Mailbox forwarder
 
@@ -95,9 +102,6 @@ interface IInteropCenter {
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
-    event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
-    event InteropTriggerSent(InteropTrigger _interopTrigger);
-
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -106,6 +110,4 @@ interface IInteropCenter {
         bytes32 _assetId,
         uint256 _amount
     ) external;
-
-    function assetTracker() external view returns (IAssetTracker);
 }

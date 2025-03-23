@@ -15,6 +15,16 @@ enum AllowedBytecodeTypes {
  * @notice System smart contract that is responsible for deploying other smart contracts on a ZK chain.
  */
 interface IL2ContractDeployer {
+    /// @notice Defines the version of the account abstraction protocol
+    /// that a contract claims to follow.
+    /// - `None` means that the account is just a contract and it should never be interacted
+    /// with as a custom account
+    /// - `Version1` means that the account follows the first version of the account abstraction protocol
+    enum AccountAbstractionVersion {
+        None,
+        Version1
+    }
+
     /// @notice A struct that describes a forced deployment on an address.
     /// @param bytecodeHash The bytecode hash to put on an address.
     /// @param newAddress The address on which to deploy the bytecodehash to.
@@ -51,4 +61,11 @@ interface IL2ContractDeployer {
         bytes32 _salt,
         bytes calldata _input
     ) external view returns (address newAddress);
+
+    function create2Account(
+        bytes32 _salt,
+        bytes32 _bytecodeHash,
+        bytes calldata _input,
+        AccountAbstractionVersion _aaVersion
+    ) external payable returns (address newAddress);
 }

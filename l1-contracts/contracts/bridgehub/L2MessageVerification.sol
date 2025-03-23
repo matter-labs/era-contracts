@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
 import {MessageHashing, ProofVerificationResult} from "../common/libraries/MessageHashing.sol";
 import {L2_MESSAGE_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, MessageRootMissing, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../state-transition/L1StateTransitionErrors.sol";
 
 contract L2MessageVerification is MessageVerification {
     function _proveL2LeafInclusion(

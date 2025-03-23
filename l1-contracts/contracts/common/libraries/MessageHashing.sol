@@ -4,10 +4,10 @@ pragma solidity ^0.8.24;
 
 import {Merkle} from "./Merkle.sol";
 import {SUPPORTED_PROOF_METADATA_VERSION} from "../Config.sol";
-import {MerklePathEmpty, BatchNotExecuted} from "../L1ContractErrors.sol";
+import {MerklePathEmpty} from "../L1ContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
 
-import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../state-transition/L1StateTransitionErrors.sol";
+import {UnsupportedProofMetadataVersion} from "../../state-transition/L1StateTransitionErrors.sol";
 import {InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
 
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");

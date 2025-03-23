@@ -2,22 +2,14 @@
 
 pragma solidity ^0.8.24;
 
-// import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
-// import {Utils} from "./libraries/Utils.sol";
+import {console} from "forge-std/console.sol";
+
 import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
-import {IAccountCodeStorage} from "../common/l2-helpers/IAccountCodeStorage.sol";
-// import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
-// import {IAccount} from "./interfaces/IAccount.sol";
+import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IInteropAccount} from "./IInteropAccount.sol";
-// import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-// import {DefaultAccount} from "./DefaultAccount.sol";
-// import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_CONTRACT_DEPLOYER} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
-import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, L2Log, BUNDLE_IDENTIFIER} from "../common/Messaging.sol";
-// import {L2_MESSAGE_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {MessageHashing, ProofVerificationResult} from "../common/libraries/MessageHashing.sol";
+import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, BUNDLE_IDENTIFIER} from "../common/Messaging.sol";
 
 error MessageNotIncluded();
 error BundleAlreadyExecuted(bytes32 bundleHash);
@@ -90,7 +82,7 @@ contract InteropHandler is IInteropHandler {
         // return new InteropAccount{
         //     salt: keccak256(abi.encode(interopCall.from, _proof.chainId))
         // }();
-        return L2_CONTRACT_DEPLOYER.create2(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode());
+        return L2_CONTRACT_DEPLOYER.create2Account(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode(), IL2ContractDeployer.AccountAbstractionVersion.Version1);
     }
 
     function getAliasedAccount(address _sender, uint256 _chainId) public view returns (address) {

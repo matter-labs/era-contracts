@@ -34,7 +34,7 @@ import {TransientInterop} from "./TransientInterop.sol";
 /// facilitating interactions between end user and bridges.
 contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice The bridgehub, responsible for registering chains.
-    IBridgehub public immutable BRIDGE_HUB;
+    IBridgehub public immutable override BRIDGE_HUB;
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
