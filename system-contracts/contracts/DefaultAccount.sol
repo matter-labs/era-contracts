@@ -114,7 +114,7 @@ contract DefaultAccount is IAccount {
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable virtual override ignoreNonBootloader ignoreInDelegateCall {
+    ) external payable override ignoreNonBootloader ignoreInDelegateCall {
         _execute(_transaction);
     }
 

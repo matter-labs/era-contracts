@@ -5,4 +5,6 @@ pragma solidity ^0.8.20;
 interface IL2MessageRootStorage {
     // function getAggregatedRoot() external view returns (bytes32);
     function addMessageRoot(uint256 chainId, uint256 blockNumber, bytes32 msgRoot) external;
+
+    function msgRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 }

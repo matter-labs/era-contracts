@@ -113,6 +113,9 @@ interface IContractDeployer {
     /// @notice Can be called by an account to update its account version
     function updateAccountVersion(AccountAbstractionVersion _version) external;
 
+    /// @notice Can be called by an account to update its account version
+    function updateInteropAccountVersion(AccountAbstractionVersion _version) external;
+
     /// @notice Can be called by an account to update its nonce ordering
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external;
 

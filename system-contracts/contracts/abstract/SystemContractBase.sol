@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_HANDLER, L2_INTEROP_CENTER} from "../Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_HANDLER, L2_INTEROP_CENTER, FORCE_DEPLOYER, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../Constants.sol";
 import {SystemCallFlagRequired, Unauthorized, CallerMustBeSystemContract, CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeInteropCenter} from "../SystemContractErrors.sol";
 
 /**
@@ -21,6 +21,15 @@ abstract contract SystemContractBase {
     modifier onlySystemCall() {
         if (!SystemContractHelper.isSystemCall() && !SystemContractHelper.isSystemContract(msg.sender)) {
             revert SystemCallFlagRequired();
+        }
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called via a system call.
+    modifier onlyStandardTriggerAccount() {
+        if (msg.sender != L2_STANDARD_TRIGGER_ACCOUNT_ADDR) {
+            // revert SystemCallFlagRequired();
         }
         _;
     }

@@ -123,7 +123,9 @@ IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACT
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x09));
 IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x0b));
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x0c));
+address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
+address constant L2_INTEROP_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0f);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

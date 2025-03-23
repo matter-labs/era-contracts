@@ -132,8 +132,8 @@ export async function deployContractOnAddress(
   input = "0x",
   artifact?: ZkSyncArtifact
 ) {
-  const artifact = artifact || (await loadArtifact(name));
-  await setCode(address, artifact.bytecode, callConstructor, input);
+  const artifactLoaded = artifact || (await loadArtifact(name));
+  await setCode(address, artifactLoaded.bytecode, callConstructor, input);
 }
 
 export async function publishBytecode(bytecode: BytesLike) {

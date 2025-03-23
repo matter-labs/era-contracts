@@ -2,14 +2,10 @@
 
 pragma solidity ^0.8.24;
 
-
-
-import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
-import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {IInteropAccount} from "./IInteropAccount.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_CONTRACT_DEPLOYER} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IInteropHandler} from "./IInteropHandler.sol";
-import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, BUNDLE_IDENTIFIER} from "../common/Messaging.sol";
+import {TransactionHelper} from "../libraries/TransactionHelper.sol";
+import {IInteropAccount} from "../interfaces/IInteropAccount.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT} from "../Constants.sol";
+import {InteropCall, InteropBundle, MessageInclusionProof, L2Message, BUNDLE_IDENTIFIER} from "../libraries/Messaging.sol";
 
 error MessageNotIncluded();
 error BundleAlreadyExecuted(bytes32 bundleHash);
@@ -19,7 +15,7 @@ error BundleAlreadyExecuted(bytes32 bundleHash);
  * @custom:security-contact security@matterlabs.dev
  * @notice The contract that handles the interop bundles.
  */
-contract InteropHandler is IInteropHandler {
+contract DummyInteropHandler {
     bytes32 public bytecodeHash;
 
     /// @notice The balances of the users.
@@ -72,7 +68,7 @@ contract InteropHandler is IInteropHandler {
                 require(address(account) == deployedAccount, "calculated address incorrect");
             }
 
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(account), interopCall.value);
+            BASE_TOKEN_SYSTEM_CONTRACT.mint(address(account), interopCall.value);
             account.forwardFromIC(interopCall.to, interopCall.value, interopCall.data);
         }
     }
@@ -82,12 +78,12 @@ contract InteropHandler is IInteropHandler {
         // return new InteropAccount{
         //     salt: keccak256(abi.encode(interopCall.from, _proof.chainId))
         // }();
-        return L2_CONTRACT_DEPLOYER.create2Account(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode(), IL2ContractDeployer.AccountAbstractionVersion.Version1);
+        return DEPLOYER_SYSTEM_CONTRACT.create2(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode());
     }
 
     function getAliasedAccount(address _sender, uint256 _chainId) public view returns (address) {
         return
-            L2_CONTRACT_DEPLOYER.getNewAddressCreate2(
+            DEPLOYER_SYSTEM_CONTRACT.getNewAddressCreate2(
                 address(this),
                 bytecodeHash,
                 keccak256(abi.encode(_sender, _chainId)),
