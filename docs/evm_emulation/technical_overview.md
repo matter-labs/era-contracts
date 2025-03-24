@@ -1,3 +1,5 @@
+# EVM emulation technical overview
+
 ## Intro
 
 The EraVM differs from the EVM in several ways: it has a distinct set of instructions and a different overall design. As a result, while Solidity and Vyper can be compiled to bytecode for the EraVM, there are several peculiarities and behavioral differences that may require developers to modify their smart contracts. These differences can negatively impact the developer experience, especially due to inconsistencies in the tooling.
@@ -33,7 +35,7 @@ The target version of EVM is **Cancun.**
 
 [EVM emulator: differences from EVM (Cancun)](./differences_from_cancun_evm.md)
 
-# Internals of deploying EVM contract
+## Internals of deploying EVM contract
 
 EVM contracts can be deployed with a transaction without field `to` (as in Ethereum). In this case `data` field will be interpreted as init code for the constructor.
 
@@ -98,7 +100,7 @@ Note, that while for native contracts the knowledge of the preimage for the vers
 
 Before we did not allow `null` to be a valid address for type 0-2 transactions. This was not needed since EVM-like CREATE was not supported. With EVM emulator, we allow CREATE operations from EOA, similar to Ethereum. These have `_transaction.reserved[1]` field as non-zero.
 
-# EraVM → EVM calls internal overview
+## EraVM → EVM calls internal overview
 
 Whenever a EraVM contract calls an EVM one (note that, the first contract to be ever executed is bootloader written in EraVM code, so execution of EVM contracts always starts by being called by a EraVM one), the following steps happen:
 
@@ -107,11 +109,11 @@ Whenever a EraVM contract calls an EVM one (note that, the first contract to be 
 3. We calculate the amount of EVM gas that is given to this frame. Note, that since each EVM opcode has to be emulated by EraVM, each EVM gas necessarily costs several EraVM one (ergs). We currently use a linear ratio to calculate the amount of received EVM gas.
 4. Then, the emulation starts as usual and the `returndata` is returned via standard EraVM means.
 
-# EVM → EraVM calls internal overview
+## EVM → EraVM calls internal overview
 
 Whenever a EVM contract calls an EraVM one it is treated as simple native EraVM call. The EVM gas passed from EVM environment is converted into ergs using a fixed ratio.
 
-# Ensuring the same behavior within EVM context.
+## Ensuring the same behavior within EVM context.
 
 In the previous sections we’ve discussed on how to deploy an EVM contract and how to call one. Next we will discuss some special aspects of emulation.
 
@@ -119,7 +121,7 @@ In the previous sections we’ve discussed on how to deploy an EVM contract and 
 
 ## Static calls
 
-The `isStatic` context is set off by EraVM for calls to EVM contracts. Emulator gets info wether context is static or non-static from call flags. This is needed because `EvmGasManager` need to perform writes to transient storage to emulate cold/warm access mechanics for accounts and storage slots.
+The `isStatic` context is set off by EraVM for calls to EVM contracts. Emulator gets info whether context is static or non-static from call flags. This is needed because `EvmGasManager` need to perform writes to transient storage to emulate cold/warm access mechanics for accounts and storage slots.
 
 Thus, it is entirely up to the emulator to ensure that no other state changes occur in the static execution mode.
 
@@ -133,7 +135,7 @@ While most of the context parameters (`this`/`msg.sender`/`msg.value`, etc) are 
 
 ## Managing storage
 
-For managing storage we reuse the same primitivies that EraVM provides:
+For managing storage we reuse the same primitives that EraVM provides:
 
 - `SSTORE`/`SLOAD` , `TSTORE`/`TLOAD` are done using the same opcodes as EraVM
 - Whenever there is a need to revert a frame, we reuse the same `REVERT` opcode as used by EraVM.
@@ -205,9 +207,9 @@ Then, there are three cases
 2. If the execution is not successful, the standard `revert` will be used and propagated. If the deployer is an EVM contract, the pair of `(gas_left, returndata)` will be returned.
 3. If the execution failed due to `out-of-ergs`, aborting panic will be propagated.
 
-# Notes on the architecture of the EvmEmulator
+## Notes on the architecture of the EvmEmulator
 
-## Memory layout
+### Memory layout
 
 The EVM emulator has the following areas in memory:
 
@@ -223,7 +225,7 @@ The EVM emulator has the following areas in memory:
 
 For returndata we keep returned fat pointer as active and copy from it if needed.
 
-## Managing returndata & calldata
+### Managing returndata & calldata
 
 For calldata we just reuse the standard calldata available inside the interpreter.
 
@@ -234,16 +236,16 @@ However for returndata the situation is a bit harder. Let’s imagine the follow
 
 If a user inside the EVM will ask to provide the returndata, we need to provide `R` and not `R2`. That’s why we use the active pointer feature of the zksolc compiler and we store the “correct” EVM returndata in the active pointer, allowing us to ensure that the returndata will always behave the same as on EVM.
 
-## Aborting the whole EVM execution frames chain
+### Aborting the whole EVM execution frames chain
 
 If any EVM emulator frame returns with unexpected amount of returndata (e.g. `revert(0, 0)` or `out-of-ergs`) it will be treated by caller EVM frame as abort signal and propagated. Thus, the whole EVM calls chain should revert.
 
-# Limitations
+## Limitations
 
-## EraVM <> EVM delegatecalls
+### EraVM <> EVM delegatecalls
 
 Calls between EraVM and EVM calls are supported, but delegatecalls are not. Since it would compromise the features that only should be allowed for the interpreter itself (e.g. warming slots). Our VM limitations doesn’t allow us to enable cross-VM delegate calls at this step.
 
-## Other differences from EVM and limitations
+### Other differences from EVM and limitations
 
 More detailed info about differences from EVM and limitations: [Differences from EVM (Cancun)](./differences_from_cancun_evm.md)

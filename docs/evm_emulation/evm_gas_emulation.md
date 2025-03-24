@@ -1,8 +1,8 @@
-## EVM gas emulation overview
+# EVM gas emulation overview
 
 The gas model can be one of the most tricky topics regarding EVM emulation since there are two interacting executions are supported at the same time. This document is intended to explain in more detail how the emulation of the EVM gas works.
 
-### EVM emulation execution flow
+## EVM emulation execution flow
 
 From the point of view of EraVM, the EVM emulator is (almost) a regular EraVM contract. This contract is predefined and can be changed only during protocol upgrades. When an EVM contract is called, EraVM invokes the emulator code. The emulator loads the corresponding EVM bytecode and interprets it.
 
@@ -12,7 +12,7 @@ Thus, the emulation is executed on top of EraVM, uses EraVM opcodes and, most im
 
 This means that **ergs** are used to pay for all operations on EraVM (and therefore on ZK Chains). Gas and gaslimit values signed in user's transactions are specified in **ergs**. All refunds are also made by the virtual machine in ergs.
 
-### EVM gas model emulation
+## EVM gas model emulation
 
 Full EVM gas equivalence is necessary to provide an EVM-compatible environment and meet the assumptions made in contracts. However, the cost of EraVM operations differs, and EVM emulation requires multiple EraVM operations for each EVM operation. As a result, we emulate the EVM gas model.
 
@@ -20,17 +20,17 @@ As mentioned in the previous section, the EVM environment is virtual: it operate
 
 ⚠️ EVM gas is used only for compatibility in the EVM emulation mode. Underlying virtual machine is not aware about EVM gas and uses native ergs.
 
-### Ergs to gas conversion rate for gas limit
+## Ergs to gas conversion rate for gas limit
 
 EVM gas units are not equivalent to EraVM ergs. And both the EVM and EraVM do not provide mechanisms for an EOA or contract to specify how to convert gas from one unit to another. For practical use in the emulator, a predefined constant is used to convert gas limit from one unit to another.
 
-⚠️ Current EraVM -> EVM gas limit convertion ratio is 5:1.
+⚠️ Current EraVM -> EVM gas limit conversion ratio is 5:1.
 
 This means that if a user made a call to an EVM contract with 100,000 ergs, the EVM emulator will start execution with 20,000 EVM gas. At the same time, underlying EraVM will have all 100,000 ergs available for use and will refund any unused ergs at the end of transaction.
 
 In the other direction, when calling an EraVM contract from EVM context, if 20,000 gas is provided, the emulator will <ins>try</ins> to pass 100,000 ergs (or less, if amount of ergs left is not enough).
 
-### Out-of-ergs situation
+## Out-of-ergs situation
 
 Because EVM gas is virtual and it is not equivalent to EraVM ergs, situations are possible in which emulator has enough EVM gas to continue execution, but encounters `out-of-ergs` panic from EraVM. In this case we simply propagate special internal kind of panic and revert the **whole** EVM frames chain.
 

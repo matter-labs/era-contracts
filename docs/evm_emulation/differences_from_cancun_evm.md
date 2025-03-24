@@ -1,16 +1,16 @@
-## General differences from Ethereum
+# General differences from Ethereum
 
 This feature allows EVM emulation on top of EraVM. This mode is not fully equivalent to native EVM and is limited by the EraVM design. This page describes the known differences between emulation and EVM (Cancun).
 
-### Gas behavior differences
+## Gas behavior differences
 
 - EVM emulation is executed on top of EraVM and all transactions start in EraVM environment. So gas and gaslimit values signed in the transaction correspond to the native **EraVM** gas, not **EVM** gas. For that reason presigned/keyless transactions created for Ethereum may be not compatible with ZK Chains. For detailed info: [Gas emulation](./evm_gas_emulation.md).
-- Our “Intristic gas costs” are different from EVM.
+- Our “Intrinsic gas costs” are different from EVM.
 - We do not implement the gas refunds logic from **EVM**. Because users pay for EraVM gas and EVM gas is virtual, we use EraVM gas refunds logic instead of EVM one. It does not affect contracts behavior (refunds happen in the end of transaction).
 - We do not charge EVM gas for tx calldata.
 - Access lists are not supported (EIP-2930).
 
-### Limitations
+## Limitations
 
 - `DELEGATECALL` between EVM and native EraVM contracts will be reverted.
 - Calls to empty addresses in kernel space (address < 2^16) will fail.
@@ -23,11 +23,11 @@ Unsupported opcodes:
 - `BLOBHASH`
 - `BLOBBASEFEE`
 
-### Precompiles
+## Precompiles
 
 EVM emulation supports the same precompiles that are supported by EraVM.
 
-### Technical differences
+## Technical differences
 
 _These changes are unlikely to have an impact on the developer experience_
 

@@ -1,4 +1,4 @@
-## EVM predeploys
+# EVM predeploys
 
 Some important EVM contracts can be deployed to predefined addresses if EVM emulation is enabled on the chain. It can be done using [DeployEvmPredeploys.s.sol](../../l1-contracts/deploy-scripts/evm-predeploys/DeployEvmPredeploys.s.sol) script.
 
