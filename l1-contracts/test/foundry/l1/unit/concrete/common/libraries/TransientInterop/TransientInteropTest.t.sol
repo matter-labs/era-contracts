@@ -38,7 +38,13 @@ contract TransientInteropTest is Test {
     }
 
     function test_addCallToBundle() public {
-        InteropCall memory interopCall = InteropCall({directCall: true, to: address(1), from: address(2), value: 1, data: "test"});
+        InteropCall memory interopCall = InteropCall({
+            directCall: true,
+            to: address(1),
+            from: address(2),
+            value: 1,
+            data: "test"
+        });
         TransientInterop.addCallToBundle(bundleId, interopCall);
         InteropCall memory bundleCall = TransientInterop.getBundleCall(bundleId, 0);
         assertEq(bundleCall.to, address(1));
@@ -52,7 +58,13 @@ contract TransientInteropTest is Test {
     }
 
     function test_add2CallsToBundle() public {
-        InteropCall memory interopCall = InteropCall({directCall: true, to: address(1), from: address(2), value: 1, data: "test"});
+        InteropCall memory interopCall = InteropCall({
+            directCall: true,
+            to: address(1),
+            from: address(2),
+            value: 1,
+            data: "test"
+        });
         TransientInterop.addCallToBundle(bundleId, interopCall);
         TransientInterop.addCallToBundle(bundleId, interopCall);
         InteropCall memory bundleCall = TransientInterop.getBundleCall(bundleId, 1);

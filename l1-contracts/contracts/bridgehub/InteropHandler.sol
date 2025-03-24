@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-
-
 import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IInteropAccount} from "./IInteropAccount.sol";
@@ -55,7 +53,7 @@ contract InteropHandler is IInteropHandler {
             InteropCall memory interopCall = interopBundle.calls[i];
             if (_skipEmptyCalldata && interopCall.data.length == 0) {
                 // kl todo: we skip calls in the account validation phase for now, as empty contracts cannot be called.
-                // remove with 7786 support. 
+                // remove with 7786 support.
                 L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(interopCall.to, interopCall.value);
                 continue;
             }
@@ -82,7 +80,13 @@ contract InteropHandler is IInteropHandler {
         // return new InteropAccount{
         //     salt: keccak256(abi.encode(interopCall.from, _proof.chainId))
         // }();
-        return L2_CONTRACT_DEPLOYER.create2Account(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode(_sender), IL2ContractDeployer.AccountAbstractionVersion.Version1);
+        return
+            L2_CONTRACT_DEPLOYER.create2Account(
+                keccak256(abi.encode(_sender, _chainId)),
+                bytecodeHash,
+                abi.encode(_sender),
+                IL2ContractDeployer.AccountAbstractionVersion.Version1
+            );
     }
 
     function getAliasedAccount(address _sender, uint256 _chainId) public view returns (address) {

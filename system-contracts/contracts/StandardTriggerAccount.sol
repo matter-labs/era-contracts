@@ -83,9 +83,9 @@ contract StandardTriggerAccount is IAccount {
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
         if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
-            (bytes memory paymasterBundle, bytes memory paymasterProof, ,, ) = abi.decode(
+            (bytes memory paymasterBundle, bytes memory paymasterProof, , , ) = abi.decode(
                 _transaction.signature,
-                (bytes, bytes, address,address, bytes)
+                (bytes, bytes, address, address, bytes)
             );
             MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
             L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof, true);

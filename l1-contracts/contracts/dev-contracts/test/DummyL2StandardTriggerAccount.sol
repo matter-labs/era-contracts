@@ -54,7 +54,7 @@ contract DummyL2StandardTriggerAccount {
         {
             (bytes memory paymasterBundle, bytes memory paymasterProof, , , ) = abi.decode(
                 _transaction.signature,
-                (bytes, bytes, address,address, bytes)
+                (bytes, bytes, address, address, bytes)
             );
             MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
             L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof, true);

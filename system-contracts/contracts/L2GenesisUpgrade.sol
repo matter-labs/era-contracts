@@ -35,7 +35,10 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
             address(DEPLOYER_SYSTEM_CONTRACT),
             L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
-            abi.encodeCall(IContractDeployer.updateInteropAccountVersion, (IContractDeployer.AccountAbstractionVersion.Version1))
+            abi.encodeCall(
+                IContractDeployer.updateInteropAccountVersion,
+                (IContractDeployer.AccountAbstractionVersion.Version1)
+            )
         );
 
         // Revert with the original revert reason if the call failed.

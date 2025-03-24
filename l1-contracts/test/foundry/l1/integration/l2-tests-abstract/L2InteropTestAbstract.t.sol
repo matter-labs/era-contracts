@@ -70,13 +70,21 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             hex"17aa3cac6d09962014c3a1c5e40ed20a777050befb2157c43872de18dcbb21ee"
         );
         vm.mockCall(address(0x000000000000000000000000000000000000800A), emptyData, emptyData);
-        vm.mockCall(address(0x0000000000000000000000000000000000008006), emptyData, abi.encode(L2_INTEROP_ACCOUNT_ADDR));
-        vm.mockCall(address(0x000000000000000000000000000000000001000b), emptyData, hex"fcb04e9c324c5900cb7006a8361d76b1add5e16f992241b77ba7cb0d83d4449f");
+        vm.mockCall(
+            address(0x0000000000000000000000000000000000008006),
+            emptyData,
+            abi.encode(L2_INTEROP_ACCOUNT_ADDR)
+        );
+        vm.mockCall(
+            address(0x000000000000000000000000000000000001000b),
+            emptyData,
+            hex"fcb04e9c324c5900cb7006a8361d76b1add5e16f992241b77ba7cb0d83d4449f"
+        );
         // Note: print this out from interop.test.ts integration test.
         Transaction memory txData = Transaction({
             txType: 113,
             from: uint256(uint160(0x000000000000000000000000000000000001000d)),
-            to: uint256(uint160(0x0000000000000000000000000000000000010009)), 
+            to: uint256(uint160(0x0000000000000000000000000000000000010009)),
             gasLimit: 600000000,
             gasPerPubdataByteLimit: 800,
             maxFeePerGas: 200000000,
@@ -95,5 +103,4 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         bool success = account.process(txData);
         require(success);
     }
-
 }

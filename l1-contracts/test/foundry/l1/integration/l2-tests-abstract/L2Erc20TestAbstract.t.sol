@@ -172,7 +172,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
             abi.encode(baseTokenAssetId)
         );
-        
+
         l2InteropCenter.requestInterop{value: 3 ether}(
             destinationChainId,
             address(0),
