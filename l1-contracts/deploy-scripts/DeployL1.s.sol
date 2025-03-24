@@ -714,7 +714,7 @@ contract DeployL1Script is Script, DeployUtils {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return type(ChainRegistrar).creationCode;
         } else if (compareStrings(contractName, "Bridgehub")) {
-            return type(Bridgehub).creationCode;
+            return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
         } else if (compareStrings(contractName, "MessageRoot")) {
             return type(MessageRoot).creationCode;
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {

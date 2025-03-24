@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {BytecodeAlreadyPublished} from "../common/L1ContractErrors.sol";
