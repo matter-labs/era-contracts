@@ -9,26 +9,13 @@ As an option to unblock developers that depend on EVM bytecode support, EVM exec
 
 The main invariant that emulation aims to preserve:
 
-<aside>
-💡
-
-Behavior inside emulated EVM environment (i.e. not only within one contract, but during any sort of EVM <> EVM contracts interaction chain) is the same as it would’ve been on widespread EVM implementation (Geth, REVM, etc.).
-
-</aside>
+❗ Behavior inside emulated EVM environment (i.e. not only within one contract, but during any sort of EVM <> EVM contracts interaction chain) is the same as it would’ve been on widespread EVM implementation (Geth, REVM, etc.).
 
 Note, that during EraVM <> EVM or EVM <> EraVM contract interaction can be different, but it is expected that this interaction does not break major security invariants. 
 
-<aside>
-💡
+❗ The EVM environment is agnostic about EraVM.
 
-The EVM environment is agnostic about EraVM.
-
-</aside>
-
-> ⚠️ This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. 
-
-A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code.
-> 
+⚠️ _This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code._
 
 ## Prerequisites
 
@@ -57,11 +44,7 @@ Additionally EVM contracts can be deployed from EraVM environment using **system
 
 They use the same address derivation schemes as corresponding EVM opcodes. To derive the deployed contract’s address for EOAs we use the main nonce for this operation, while for contracts we use their deployment nonce. You can read more about the two types of nonces in the [NonceHolder system contract’s documentation](https://docs.zksync.io/build/developer-reference/era-contracts/system-contracts#nonceholder).
 
-<aside>
-💡
-Note, that these two functions are not used (and can’t be used!) from the EVM environment. EVM smart contracts can’t perform **system** calls. EVM opcodes `CREATE` and `CREATE2` should be used instead.
-
-</aside>
+❗ Note, that these two functions are not used (and can’t be used!) from the EVM environment. EVM smart contracts can’t perform **system** calls. EVM opcodes `CREATE` and `CREATE2` should be used instead.
 
 EvmEmulator internally uses `precreateEvmAccountFromEmulator` and `createEvmFromEmulator` functions to guarantee the same creation flow as in EVM.
 
@@ -132,11 +115,7 @@ Whenever a EVM contract calls an EraVM one it is treated as simple native EraVM 
 
 In the previous sections we’ve discussed on how to deploy an EVM contract and how to call one. Next we will discuss some special aspects of emulation.
 
-<aside>
-💡
-remember, that our EVM is emulated and for each EVM frame there is a corresponding EraVM one
-
-</aside>
+❗ remember, that our EVM is emulated and for each EVM frame there is a corresponding EraVM one
 
 ## Static calls
 
@@ -201,12 +180,7 @@ However, returning data is more complicated. Whenever an EVM contract needs to r
 
 The actual cost of executing instructions differs from the fixed ratio between the EVM gas and the EraVM gas. For this reason, situations are possible in which emulator has enough EVM gas to continue execution, but encounters `out-of-ergs` panic. In this case we simply propagate special internal kind of panic and revert the **whole** EVM frames chain.
 
-<aside>
-💡
-
-EVM emulation can only be executed completely, up to returning from the EVM context (incl. EVM reverts), or completely rolled back.
-
-</aside>
+❗ EVM emulation can only be executed completely, up to returning from the EVM context (incl. EVM reverts), or completely rolled back.
 
 This does not happen when calling native contracts. For this reason, the possible `out-of-ergs` panic must be taken into account when calling native contracts from EVM environment. Technically, this problem is one of the versions of classic gas-griefing vulnerabilities in EVM contracts, if not handled appropriately.
 
