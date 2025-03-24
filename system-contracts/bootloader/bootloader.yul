@@ -121,6 +121,10 @@ object "Bootloader" {
                 ret := {{MAX_TRANSACTIONS_IN_BATCH}}
             }
 
+            function MAX_MSG_ROOTS_IN_BATCH() -> ret {
+                ret := 100
+            }
+
             /// @dev The slot from which the scratch space starts.
             /// Scratch space is used for various temporary values
             function SCRATCH_SPACE_BEGIN_SLOT() -> ret {
@@ -296,6 +300,21 @@ object "Bootloader" {
                 ret := mul(add(MAX_TRANSACTIONS_IN_BATCH(), 1), TX_OPERATOR_L2_BLOCK_INFO_SLOT_SIZE())
             }
 
+            function MESSAGE_ROOT_BEGIN_SLOT() -> ret {
+                ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
+            }
+
+            function MESSAGE_ROOT_SLOT_SIZE() -> ret {
+                // We will have to increase this to add merkle proofs. 
+                ret := 100
+
+            }
+
+            function MESSAGE_ROOT_SLOTS() -> ret {
+                // Is it a problem if we have
+                ret := mul(add(MAX_MSG_ROOTS_IN_BATCH(), 1), MESSAGE_ROOT_SLOT_SIZE())
+            }
+
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
             /// Each compressed bytecode is provided in the following format:
             /// - 32 byte formatted bytecode hash
@@ -307,7 +326,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
+                ret := add(MESSAGE_ROOT_BEGIN_SLOT(), MESSAGE_ROOT_SLOTS())
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -496,6 +515,14 @@ object "Bootloader" {
 
             function BOOTLOADER_UTILITIES() -> ret {
                 ret := 0x000000000000000000000000000000000000800c
+            }
+
+            function L2_MESSAGE_ROOT_STORAGE() -> ret {
+                ret := 0x000000000000000000000000000000000001000b
+            }
+
+            function L2_STANDARD_TRIGGER_ACCOUNT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000d
             }
 
             function BYTECODE_COMPRESSOR_ADDR() -> ret {
@@ -1874,7 +1901,8 @@ object "Bootloader" {
                 ) {
                     // If not enough gas for pubdata was provided, we revert all the state diffs / messages
                     // that caused the pubdata to be published
-                    nearCallPanic()
+                    // debugLog("Reverting due to pubdata", 0)
+                    // nearCallPanic()
                 }
             }
 
@@ -2145,10 +2173,13 @@ object "Bootloader" {
                 // Currently only two versions are supported: 1 or 0, which basically
                 // mean whether the contract is an account or not.
                 if iszero(supportedVersion) {
+                    // kl todo initialize address as account instead
+                    if iszero(eq(addr, L2_STANDARD_TRIGGER_ACCOUNT_ADDR())) {
                     revertWithReason(
-                        FROM_IS_NOT_AN_ACCOUNT_ERR_CODE(),
-                        0
-                    )
+                            FROM_IS_NOT_AN_ACCOUNT_ERR_CODE(),
+                            0
+                        )
+                    }
                 }
             }
 
@@ -2923,6 +2954,87 @@ object "Bootloader" {
                 }
             }
 
+            function setMessageRoots() {
+                debugLog("Setting message roots", 0)
+                let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
+                let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
+                debugLog("Setting message roots 1", msgRootSlot)
+                for {let i := 0} true {i := add(i, 1)} {
+                    debugLog("Setting message roots 2", i)
+                    debugLog("slot", add(msgRootSlot, mul(i, msgRootSlotSize)))
+                    let messageRootStartSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
+                    let chainId  := mload(messageRootStartSlot) 
+                    let blockNumber := mload(add(messageRootStartSlot, 32))
+                    let sidesLength := mload(add(messageRootStartSlot, 64))
+
+                    debugLog("Setting message roots 3", chainId)
+                    debugLog("Setting message roots 4", blockNumber)
+                    debugLog("Setting message roots 5", sidesLength)
+
+                    if iszero(sidesLength) {
+                        break
+                    }
+
+                    mstore(0, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
+                    mstore(4, chainId)
+                    mstore(36, blockNumber)
+                    mstore(68, 96)
+                    mstore(100, sidesLength)
+                    for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
+                        debugLog("Setting message roots 6", j)
+                        debugLog("Setting message roots 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(132, mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                    }
+                    // todo add merkle proof
+
+                    debugLog("Tried to set messageRoot: ", 0)
+
+                    let success := call(
+                        gas(),
+                        L2_MESSAGE_ROOT_STORAGE(),
+                        0,
+                        0,
+                        add(132, mul(sidesLength, 32)),
+                        0,
+                        0
+                    )
+                    debugLog("Tried to set messageRoot: ", 1)
+
+                    if iszero(success) {
+                        debugLog("Failed to set messageRoot: ", 1)
+                        // revertWithReason(FAILED_TO_SET_L2_BLOCK(), 1)
+                    }
+                    debugLog("Tried to set messageRoot: ", 2)
+
+                    // for single messageRoots that are not really sides, we send them to L1 here.
+                    if lt(sidesLength, 2) {
+                        sendToL1Native(true, messageRootLogKey(i), chainId)
+                        sendToL1Native(true, add(messageRootLogKey(i), 1), blockNumber)
+                        sendToL1Native(true, add(messageRootLogKey(i), 2), sidesLength)
+                        sendToL1Native(true, add(messageRootLogKey(i), 3), mload(add(messageRootStartSlot, 96)))
+                    }
+                }
+
+
+                debugLog("Tried to clear pending messageRootIds: ", 0)
+
+                let success := call(
+                    gas(),
+                    L2_MESSAGE_ROOT_STORAGE(),
+                    0,
+                    0,
+                    4,
+                    0,
+                    0
+                )
+                debugLog("Tried to clear pending messageRootIds: ", 1)
+                if iszero(success) {
+                    debugLog("Failed to clear pending messageRootIds: ", 1)
+                    // revertWithReason(FAILED_TO_SET_L2_BLOCK(), 1)
+                }
+                debugLog("Tried to clear pending messageRootIds: ", 2)
+            }
+
             /// @notice Appends the transaction hash to the current L2 block.
             /// @param txHash The hash of the transaction to append.
             /// @param isL1Tx Whether the transaction is an L1 transaction. If it is an L1 transaction,
@@ -3131,7 +3243,7 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
 
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3157,7 +3269,7 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3179,7 +3291,7 @@ object "Bootloader" {
                         <!-- @endif -->
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -3199,7 +3311,7 @@ object "Bootloader" {
                         }
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3211,7 +3323,7 @@ object "Bootloader" {
                     }
                     case 255 {
                         // Double-check that the operator doesn't try to do an upgrade transaction via L1 -> L2 transaction.
-                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         // L1 transaction, no need to validate as it is validated on L1.
                     }
                     default {
@@ -3912,10 +4024,18 @@ object "Bootloader" {
                 ret := 7
             }
 
+
+
+            function messageRootLogKey(id) -> ret {
+                let logPerMessageRoot := 3
+                ret := add(8, mul(id, logPerMessageRoot))
+            }
+
             ////////////////////////////////////////////////////////////////////////////
             //                      Main Transaction Processing
             ////////////////////////////////////////////////////////////////////////////
 
+            function main() {
             /// @notice the address that will be the beneficiary of all the fees
             let OPERATOR_ADDRESS := mload(0)
 
@@ -4009,6 +4129,8 @@ object "Bootloader" {
             // At start storing keccak256("") as `chainedPriorityTxsHash` and 0 as `numberOfLayer1Txs`
             mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), EMPTY_STRING_KECCAK())
             mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), 0)
+
+            setMessageRoots()
 
             // Iterating through transaction descriptions
             let transactionIndex := 0
@@ -4117,6 +4239,8 @@ object "Bootloader" {
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
 
             l1MessengerPublishingCall()
+            }
+            main()
         }
     }
 }

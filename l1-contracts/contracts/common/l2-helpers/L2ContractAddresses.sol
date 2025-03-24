@@ -2,6 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
+import {IL2MessageRootStorage} from "../interfaces/IL2MessageRootStorage.sol";
+
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
@@ -26,9 +29,10 @@ address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFF
 /// `diamond-initializers` contracts.
 address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 
+address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = IL2ToL1Messenger(
-    address(SYSTEM_CONTRACTS_OFFSET + 0x08)
+IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
 
 /// @dev The address of the eth token system contract
@@ -63,22 +67,4 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
 
-/**
- * @author Matter Labs
- * @custom:security-contact security@matterlabs.dev
- * @notice Smart contract for sending arbitrary length messages to L1
- * @dev by default ZkSync can send fixed-length messages on L1.
- * A fixed length message has 4 parameters `senderAddress`, `isService`, `key`, `value`,
- * the first one is taken from the context, the other three are chosen by the sender.
- * @dev To send a variable-length message we use this trick:
- * - This system contract accepts an arbitrary length message and sends a fixed length message with
- * parameters `senderAddress == this`, `isService == true`, `key == msg.sender`, `value == keccak256(message)`.
- * - The contract on L1 accepts all sent messages and if the message came from this system contract
- * it requires that the preimage of `value` be provided.
- */
-interface IL2ToL1Messenger {
-    /// @notice Sends an arbitrary length message to L1.
-    /// @param _message The variable length message to be sent to L1.
-    /// @return Returns the keccak256 hashed value of the message.
-    function sendToL1(bytes calldata _message) external returns (bytes32);
-}
+IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x0b));

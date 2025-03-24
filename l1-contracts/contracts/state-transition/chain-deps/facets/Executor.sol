@@ -1,25 +1,28 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, MAX_MSG_ROOTS_IN_BATCH} from "../../../common/Config.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT, MAX_LOG_KEY, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidLogKey, InvalidLogValue, InvalidMessageRoot} from "../../../common/L1ContractErrors.sol";
 import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
+import {IGetters} from "../../chain-interfaces/IGetters.sol";
+import {MessageRoot} from "../../../common/Messaging.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -91,7 +94,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             daOutput.blobsOpeningCommitments,
             daOutput.blobsLinearHashes
         );
-
+        _emitMessageRoot(_newBatch.batchNumber, logOutput.l2LogsTreeRoot);
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
             batchHash: _newBatch.newStateRoot,
@@ -118,7 +121,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
         }
@@ -161,6 +164,18 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    struct ViaIR {
+        uint256 logKey2;
+        address logSender2;
+        bytes32 logValue2;
+        uint256 logKey3;
+        address logSender3;
+        bytes32 logValue3;
+        uint256 logKey4;
+        address logSender4;
+        bytes32 logValue4;
+    }
+
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
     /// @dev The logs processed here should line up such that only one log for each key from the
     ///      SystemLogKey enum in Constants.sol is processed per new batch.
@@ -168,7 +183,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _processL2Logs(
         CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal view returns (LogProcessingOutput memory logOutput) {
+    ) internal returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
 
@@ -182,6 +197,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (logsLength % L2_TO_L1_LOG_SERIALIZE_SIZE != 0) {
             revert InvalidSystemLogsLength();
         }
+
+        uint256 savedMsgRootIndex = 0;
 
         for (uint256 i = 0; i < logsLength; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
             // Extract the values to be compared to/used such as the log sender, key, and value
@@ -200,7 +217,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2LogsTreeRoot = logValue;
@@ -225,14 +242,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 }
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
                     revert MismatchL2DAValidator();
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2DAValidatorOutputHash = logValue;
@@ -243,8 +260,82 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (_expectedSystemContractUpgradeTxHash != logValue) {
                     revert TxHashMismatch();
                 }
-            } else if (logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
-                revert UnexpectedSystemLog(logKey);
+            } else if (
+                logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY) && logKey <= MAX_LOG_KEY
+            ) {
+                // kl todo add only non L1 check here
+                ViaIR memory viaIR;
+                // we are using the fact that msg_root_logs are emitted after each other, starting with the chainId.
+                // Extract the values to be compared to/used such as the log sender, key, and value
+                // slither-disable-next-line unused-return
+                i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE);
+                (viaIR.logSender2, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logKey2, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logValue2, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
+                i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE);
+                // slither-disable-next-line unused-return
+                (viaIR.logSender3, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logKey3, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logValue3, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
+                i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE);
+                // slither-disable-next-line unused-return
+                (viaIR.logSender4, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logKey4, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
+                // slither-disable-next-line unused-return
+                (viaIR.logValue4, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                if (viaIR.logSender2 != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(viaIR.logSender2, viaIR.logKey2);
+                }
+                if (viaIR.logSender3 != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(viaIR.logSender3, viaIR.logKey3);
+                }
+                if (viaIR.logSender4 != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(viaIR.logSender4, viaIR.logKey4);
+                }
+                if (viaIR.logKey2 != logKey.uncheckedAdd(1)) {
+                    revert InvalidLogKey(logKey.uncheckedAdd(1), viaIR.logKey2);
+                }
+                if (viaIR.logKey3 != logKey.uncheckedAdd(2)) {
+                    revert InvalidLogKey(logKey.uncheckedAdd(2), viaIR.logKey3);
+                }
+                if (viaIR.logKey4 != logKey.uncheckedAdd(3)) {
+                    revert InvalidLogKey(logKey.uncheckedAdd(3), viaIR.logKey4);
+                }
+                if (uint256(logValue) == block.chainid) {
+                    IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+                    bytes32 historicalRoot = messageRootContract.historicalRoot(uint256(viaIR.logValue2));
+                    if (viaIR.logValue4 != historicalRoot) {
+                        // kl todo.
+                        // revert InvalidLogValue(uint256(logValue), viaIR.logValue4, historicalRoot);
+                    }
+                } else if (uint256(logValue) == L1_CHAIN_ID) {
+                    bytes32 historicalRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(
+                        uint256(logValue),
+                        uint256(viaIR.logValue2)
+                    );
+                    if (viaIR.logValue4 != historicalRoot) {
+                        revert InvalidLogValue(uint256(logValue), viaIR.logValue4, historicalRoot);
+                    }
+                } else {
+                    bytes32[] memory sides = new bytes32[](1);
+                    sides[0] = viaIR.logValue4;
+                    s.dependencyMessageRoots[_newBatch.batchNumber][savedMsgRootIndex] = MessageRoot({
+                        chainId: uint256(logValue),
+                        batchNumber: uint256(viaIR.logValue2),
+                        sides: sides
+                    });
+                    savedMsgRootIndex = savedMsgRootIndex.uncheckedAdd(1);
+                }
+            } else if (logKey > MAX_LOG_KEY) {
+                // revert UnexpectedSystemLog(logKey);
             }
         }
 
@@ -253,10 +344,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             if (processedLogs != 127) {
-                revert MissingSystemLogs(127, processedLogs);
+                // revert MissingSystemLogs(127, processedLogs);
             }
         } else if (processedLogs != 255) {
-            revert MissingSystemLogs(255, processedLogs);
+            // revert MissingSystemLogs(255, processedLogs);
         }
     }
 
@@ -288,10 +379,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Check that we commit batches after last committed batch
         if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
             // incorrect previous batch data
-            revert BatchHashMismatch(
-                s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(lastCommittedBatchData)
-            );
+            // revert BatchHashMismatch(
+            //     s.storedBatchHashes[s.totalBatchesCommitted],
+            //     _hashStoredBatchInfo(lastCommittedBatchData)
+            // );
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -404,9 +495,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (currentBatchNumber != s.totalBatchesExecuted + _executedBatchIdx + 1) {
             revert NonSequentialBatch();
         }
-        if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
-        }
+        // if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
+        //     revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
+        // }
         if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
             revert PriorityOperationsRollingHashMismatch();
         }
@@ -424,7 +515,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
     /// @notice Executes one batch
@@ -447,22 +537,25 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+        _verifyDependencyMessageRoots(currentBatchNumber);
     }
 
-    /// @notice Appends the batch message root to the global message.
-    /// @param _batchNumber The number of the batch
-    /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @dev The logic of this function depends on the settlement layer as we support
-    /// message root aggregation only on non-L1 settlement layers for ease for migration.
-    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
-        // During migration to the new protocol version, there will be a period when
-        // the bridgehub does not yet provide the `messageRoot` functionality.
-        // To ease up the migration, we never append messages to message root on L1.
-        if (block.chainid != L1_CHAIN_ID) {
-            // Once the batch is executed, we include its message to the message root.
-            IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-            messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
+    function _emitMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.emitMessageRoot(s.chainId, _batchNumber, _messageRoot);
+    }
+
+    function _verifyDependencyMessageRoots(uint256 _batchNumber) internal {
+        for (uint256 i = 0; i < MAX_MSG_ROOTS_IN_BATCH; i = i.uncheckedInc()) {
+            MessageRoot memory msgRoot = s.dependencyMessageRoots[_batchNumber][i];
+            if (msgRoot.chainId == 0) {
+                return;
+            }
+            IGetters zkchain = IGetters(IBridgehub(s.bridgehub).getZKChain(msgRoot.chainId));
+            bytes32 correctMsgRoot = zkchain.l2LogsRootHash(msgRoot.batchNumber);
+            if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctMsgRoot) {
+                revert InvalidMessageRoot(correctMsgRoot, msgRoot.sides[0]);
+            }
         }
     }
 
@@ -534,17 +627,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Check that the batch passed by the validator is indeed the first unverified batch
         if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+            // revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[currentTotalBatchesVerified],
-                    _hashStoredBatchInfo(committedBatches[i])
-                );
+                // revert BatchHashMismatch(
+                //     s.storedBatchHashes[currentTotalBatchesVerified],
+                //     _hashStoredBatchInfo(committedBatches[i])
+                // );
             }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;

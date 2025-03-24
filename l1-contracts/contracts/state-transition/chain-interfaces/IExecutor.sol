@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
+import {L2Log} from "../../common/Messaging.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
@@ -19,6 +20,10 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
+uint256 constant MAX_MSG_ROOTS_IN_BATCH = 100;
+uint256 constant LOGS_PER_MSG_ROOT = 3;
+uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max) + MAX_MSG_ROOTS_IN_BATCH * LOGS_PER_MSG_ROOT;
+
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
     bytes32 chainedPriorityTxsHash;
@@ -28,6 +33,15 @@ struct LogProcessingOutput {
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
     bytes32 l2DAValidatorOutputHash;
+}
+
+struct ProcessLogsInput {
+    L2Log[] logs;
+    bytes[] messages;
+    uint256 chainId;
+    uint256 batchNumber;
+    bytes32 chainBatchRoot;
+    bytes32 messageRoot;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)

@@ -8,7 +8,7 @@ import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Up
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "..//common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 

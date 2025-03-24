@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {MalformedBytecode, BytecodeError, LengthIsNotDivisibleBy32} from "contracts/common/L1ContractErrors.sol";
 
 contract L2ContractHelperTest is Test {

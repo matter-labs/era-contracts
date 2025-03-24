@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
+
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
-import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, OnlyBridgehubOwner} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -35,6 +36,9 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     event Preimage(bytes32 one, bytes32 two);
 
+    // event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, bytes32 indexed root);
+    event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -53,6 +57,11 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev The incremental merkle tree storing the chain message roots.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
+    /// @notice The mapping from block number to the global message root.
+    // kl todo this approach does not work, each block might have multiple txs that bump the historical root.
+    // And on chains, we could set it when we seal the batch, but then we need to get the batch number..
+    mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
+
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
@@ -66,6 +75,13 @@ contract MessageRoot is IMessageRoot, Initializable {
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        }
+        _;
+    }
+
+    modifier onlyBridgehubOwner() {
+        if (msg.sender != Ownable(address(BRIDGE_HUB)).owner()) {
+            revert OnlyBridgehubOwner(msg.sender, Ownable(address(BRIDGE_HUB)).owner());
         }
         _;
     }
@@ -114,6 +130,22 @@ contract MessageRoot is IMessageRoot, Initializable {
         emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+        bytes32 sharedTreeRoot = sharedTree.root();
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = sharedTreeRoot;
+        emit NewMessageRoot(block.chainid, block.number, 0, _sides);
+        historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    /// @dev emit a new message root when committing a new batch
+    function emitMessageRoot(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes32 _chainBatchRoot
+    ) external onlyChain(_chainId) {
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = _chainBatchRoot;
+        emit NewMessageRoot(_chainId, _batchNumber, 0, _sides);
     }
 
     /// @dev Gets the aggregated root of all chains.
@@ -138,6 +170,11 @@ contract MessageRoot is IMessageRoot, Initializable {
         }
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
+        bytes32 newRoot = sharedTree.root();
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = newRoot;
+        emit NewMessageRoot(block.chainid, block.number, 0, _sides);
+        historicalRoot[block.number] = newRoot;
     }
 
     function _initialize() internal {

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 // import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-
+import {MessageRoot} from "../../common/Messaging.sol";
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
 /// @param Transparent Fully transparent upgrade is initiated, upgrade data is publicly known
@@ -172,7 +172,9 @@ struct ZKChainStorage {
     /// @dev Whether the chain is a permanent rollup. Note, that it only enforces the DA validator pair, but
     /// it does not enforce any other parameters, e.g. `pubdataPricingMode`
     bool isPermanentRollup;
-    /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
+    /// @dev The dependency message roots
+    mapping(uint256 batchNumber => mapping(uint256 index => MessageRoot messageRoot)) dependencyMessageRoots;
+    /// @notice Bytecode hash of evm emulator.
 }

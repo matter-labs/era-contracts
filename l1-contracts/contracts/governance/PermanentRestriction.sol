@@ -6,7 +6,7 @@ import {TooHighDeploymentNonce, CallNotAllowed, RemovingPermanentRestriction, Ze
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
