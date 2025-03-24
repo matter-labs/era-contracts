@@ -17,7 +17,7 @@ Note, that during EraVM <> EVM or EVM <> EraVM contract interaction can be diffe
 
 ❗ The EVM environment is agnostic about EraVM.
 
-⚠️ *This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code.*
+⚠️ This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code.
 
 ## Prerequisites
 
