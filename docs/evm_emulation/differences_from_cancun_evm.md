@@ -12,7 +12,7 @@ This feature allows EVM emulation on top of EraVM. This mode is not fully equiva
 
 ### Limitations
 
-- `DELEGATECALL` to native EraVM contracts will be reverted.
+- `DELEGATECALL` between EVM and native EraVM contracts will be reverted.
 - Calls to empty addresses in kernel space (address < 2^16) will fail.
 - `GASLIMIT` opcode returns the same fixed constant as EraVM and should not be used.
   
