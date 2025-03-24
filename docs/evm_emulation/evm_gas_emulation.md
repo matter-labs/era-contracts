@@ -8,7 +8,7 @@ From the point of view of EraVM, the EVM emulator is (almost) a regular EraVM co
 
 Thus, the emulation is executed on top of EraVM, uses EraVM opcodes and, most importantly, **pays for EraVM operations in native gas (ergs)**.
 
-⚠️ To avoid confusion, native EraVM gas will be referred to as "ergs" further in the text. ⚠️
+⚠️ To avoid confusion, native EraVM gas will be referred to as "ergs" further in the text.
 
 This means that **ergs** are used to pay for all operations on EraVM (and therefore on ZK Chains). Gas and gaslimit values signed in user's transactions are specified in **ergs**. All refunds are also made by the virtual machine in ergs.
 
@@ -18,7 +18,7 @@ Full EVM gas equivalence is necessary to provide an EVM-compatible environment a
 
 As mentioned in the previous section, the EVM environment is virtual: it operates on top of EraVM and incurs costs for execution in EraVM ergs. The EVM emulator, however, has its own internal gas accounting system that corresponds to the EVM gas model. Each EVM opcode consumes a predefined amount of gas, according to the EVM specification. And if there is insufficient gas for an operation, the frame will be reverted.
 
-⚠️ EVM gas is used only for compatibility in the EVM emulation mode. Underlying virtual machine is not aware about EVM gas and uses native ergs.⚠️
+⚠️ EVM gas is used only for compatibility in the EVM emulation mode. Underlying virtual machine is not aware about EVM gas and uses native ergs.
 
 ### Ergs to gas conversion rate for gas limit
 
@@ -37,6 +37,7 @@ Because EVM gas is virtual and it is not equivalent to EraVM ergs, situations ar
 ⚠️ EVM emulation can only be executed completely, up to returning from the EVM context (incl. EVM reverts), or completely rolled back.
 
 This fact should be taken into account by smart contract developers:
+
 ❗**It is <ins>highly</ins> discouraged to use try-catch patterns with unknown contracts in EVM environment**❗
 
 Technically, this problem is similar to classic gas-griefing issues in EVM contracts, if not handled appropriately.
