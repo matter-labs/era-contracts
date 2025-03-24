@@ -6,7 +6,7 @@ import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-inter
 import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR} from "../..//common/l2-helpers/L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {BlobHashBlobCommitmentMismatchValue, L1DAValidatorInvalidSender, InvalidPubdataSource} from "../L1StateTransitionErrors.sol";
 
 /// @dev The version that is used for the `RelayedSLDAValidator` calldata.
