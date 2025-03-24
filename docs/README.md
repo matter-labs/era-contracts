@@ -37,6 +37,11 @@ The order of the files here only roughly represents the order of reading. A lot 
   - [L3->L1 messaging via gateway](./gateway/nested_l3_l1_messaging.md)
   - [Gateway protocol versioning](./gateway/gateway_protocol_upgrades.md)
   - [DA handling on Gateway](./gateway/gateway_da.md)
+- EVM emulation
+  - [General overview](./evm_emulation/overview.md)
+  - [Gas emulation](./evm_emulation/evm_gas_emulation.md)
+  - [Differences from EVM (Cancun)](./evm_emulation/differences_from_cancun_evm.md)
+  - [EVM predeploys list](./evm_emulation/evm_predeploys_list.md)
 - Upgrade history
   - [Gateway upgrade diff](./upgrade_history/gateway_preparation_upgrade/gateway_diff_review.md)
   - [Gateway upgrade process](<./upgrade_history/gateway_preparation_upgrade/upgrade_process_(no_gateway_chain).md>)
