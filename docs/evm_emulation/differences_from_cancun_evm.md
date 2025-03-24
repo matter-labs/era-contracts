@@ -17,10 +17,10 @@ This feature allows EVM emulation on top of EraVM. This mode is not fully equiva
 - `GASLIMIT` opcode returns the same fixed constant as EraVM and should not be used.
   
 Unsupported opcodes:
-- CALLCODE
-- SELFDESTRUCT
-- BLOBHASH
-- BLOBBASEFEE
+- `CALLCODE`
+- `SELFDESTRUCT`
+- `BLOBHASH`
+- `BLOBBASEFEE`
 
 ### Precompiles
 
