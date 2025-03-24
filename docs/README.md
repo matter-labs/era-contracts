@@ -38,7 +38,7 @@ The order of the files here only roughly represents the order of reading. A lot 
   - [Gateway protocol versioning](./gateway/gateway_protocol_upgrades.md)
   - [DA handling on Gateway](./gateway/gateway_da.md)
 - EVM emulation
-  - [General overview](./evm_emulation/overview.md)
+  - [Technical overview](./evm_emulation/technical_overview.md)
   - [Gas emulation](./evm_emulation/evm_gas_emulation.md)
   - [Differences from EVM (Cancun)](./evm_emulation/differences_from_cancun_evm.md)
   - [EVM predeploys list](./evm_emulation/evm_predeploys_list.md)
