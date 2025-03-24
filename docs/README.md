@@ -43,8 +43,11 @@ The order of the files here only roughly represents the order of reading. A lot 
   - [Differences from EVM (Cancun)](./evm_emulation/differences_from_cancun_evm.md)
   - [EVM predeploys list](./evm_emulation/evm_predeploys_list.md)
 - Upgrade history
-  - [Gateway upgrade diff](./upgrade_history/gateway_preparation_upgrade/gateway_diff_review.md)
-  - [Gateway upgrade process](<./upgrade_history/gateway_preparation_upgrade/upgrade_process_(no_gateway_chain).md>)
+  - Gateway
+    - [Gateway upgrade diff](./upgrade_history/gateway_preparation_upgrade/gateway_diff_review.md)
+    - [Gateway upgrade process](<./upgrade_history/gateway_preparation_upgrade/upgrade_process_(no_gateway_chain).md>)
+  - EVM emulator
+    - [Upgrade process and changes](<./upgrade_history/v27_evm_emulation/v27-evm-emulation.md)
 
 ![Reading order](./img/reading_order.png)
 
