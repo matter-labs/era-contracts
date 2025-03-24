@@ -49,11 +49,6 @@ function getPaddedSelector(contractName: string, method: string): string {
   return padZeroRight(result, PADDED_SELECTOR_LENGTH);
 }
 
-// function getLeftPaddedSelector(contractName: string, method: string): string {
-//   const result = getSelector(contractName, method);
-//   return ethers.utils.hexlify(ethers.utils.zeroPad(result, 32));
-// }
-
 function getSystemContextCodeHash() {
   let bytecode;
   try {
@@ -92,11 +87,6 @@ const params = {
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
   RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2BaseToken", "mint"),
-  // RIGHT_PADDED_MARK_AS_EXECUTED_SELECTOR: getPaddedSelector("L2Nullifier", "markAsExecuted"),
-  // LEFT_PADDED_CALCULATE_XL2_MERKLE_PROOF_TX_SELECTOR: getLeftPaddedSelector(
-  //   "BootloaderUtilities",
-  //   "calculateXL2MerkleProof"
-  // ),
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
@@ -114,10 +104,6 @@ const params = {
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
   RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR: getPaddedSelector("L2MessageRootStorage", "addMessageRoot"),
-  // RIGHT_PADDED_CLEAR_PENDING_MESSAGE_ROOT_IDS_SELECTOR: getPaddedSelector(
-  //   "L2MessageRootStorage",
-  //   "clearPendingMessageRootIds"
-  // ),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
