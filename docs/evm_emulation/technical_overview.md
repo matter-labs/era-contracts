@@ -17,12 +17,12 @@ Note, that during EraVM <> EVM or EVM <> EraVM contract interaction can be diffe
 
 ❗ The EVM environment is agnostic about EraVM.
 
-⚠️ *This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code.*
+⚠️ _This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code._
 
 ## Prerequisites
 
 This document requires that the reader is aware of ZKsync Era internal design.
-General docs: https://docs.zksync.io/build/developer-reference
+General docs: [Developer reference](https://docs.zksync.io/build/developer-reference)
 
 The emulator related changes actively use some features of EraVM, including:
 
@@ -90,9 +90,7 @@ The first 3 steps are the same as pre-EVM emulator:
 2. If it is empty, it invokes DefaultAccount.
 3. If it has version 1, it treats it as a native EraVM contract, and uses the preimage for this versioned hash as EraVM bytecode for the contract.
 
-But now we have the new path:
-
-4. If it has version 2, it interprets it as a EVM contract, and uses the bytecode of `EvmEmulator` as the EraVM bytecode of the contract.
+But now we have the new path: if it has version 2, it interprets it as a EVM contract, and uses the bytecode of `EvmEmulator` as the EraVM bytecode of the contract.
 
 Note, that while for native contracts the knowledge of the preimage for the versioned hash is crucial (since it is _the_ bytecode that will be used), for bytecodes with version 2 it does not really matter since `EvmEmulator` is the bytecode that will be used. This is why when we are constructing a contract, we put a temporary “dummy” versioned hash, the job of which is only to ensure that the `EvmEmulator` is the one executing its logic.
 
@@ -113,7 +111,7 @@ Whenever a EraVM contract calls an EVM one (note that, the first contract to be 
 
 Whenever a EVM contract calls an EraVM one it is treated as simple native EraVM call. The EVM gas passed from EVM environment is converted into ergs using a fixed ratio.
 
-## Ensuring the same behavior within EVM context.
+## Ensuring the same behavior within EVM context
 
 In the previous sections we’ve discussed on how to deploy an EVM contract and how to call one. Next we will discuss some special aspects of emulation.
 
@@ -188,18 +186,18 @@ This does not happen when calling native contracts. For this reason, the possibl
 
 ## Caveats about EVM contract deployment internals
 
-We want to support the same logic for EVM contract deployment as Ethereum. This, for instance, includes that a failed deploy should still increase the nonce of a contract, which is not the case on Era EraVM: https://docs.zksync.io/build/developer-reference/differences-with-ethereum.html#nonces.
+We want to support the same logic for EVM contract deployment as Ethereum. This, for instance, includes that a failed deploy should still increase the nonce of a contract, which is not the case on Era EraVM: [differences-with-ethereum nonces](https://docs.zksync.io/build/developer-reference/differences-with-ethereum.html#nonces).
 
 For this, for EVM<>EVM deployments have two big steps: precheck and deploy.
 
 The flow of EVM <> EVM deployment is the following:
 
-1.  The EVM emulator checks the memory offsets are valid. Also it checks that size of initCode is valid and charges dynamic gas costs. In case of error creator frame is reverted consuming all remaining EVM gas.
-2.  The EVM emulator checks that the `value` is valid. Otherwise creation considered as failed, all passed EVM gas refunded. Caller frame is not reverted.
-3.  The EVM emulator calls the `ContractDeployer.precreateEvmAccountFromEmulator`. This call derives new contract address and performs collision check. If it fails, creation is considered as failed, all passed EVM gas consumed. Caller frame is not reverted.
-4.  The EVM emulator creates a new `EVMFrame`, and calls the `ContractDeployer.createEvmFromEmulator`. This call should fail only if constructor of the new contract was reverted.
-5.  The `ContractDeployer` sets a dummy version 2 hash on the deployed address to ensure that when it will be called, the `EvmEmulator` will be activated.
-6.  The `EvmEmulator`'s constructor is invoked. The initCode is passed inside the calldata.
+1. The EVM emulator checks the memory offsets are valid. Also it checks that size of initCode is valid and charges dynamic gas costs. In case of error creator frame is reverted consuming all remaining EVM gas.
+2. The EVM emulator checks that the `value` is valid. Otherwise creation considered as failed, all passed EVM gas refunded. Caller frame is not reverted.
+3. The EVM emulator calls the `ContractDeployer.precreateEvmAccountFromEmulator`. This call derives new contract address and performs collision check. If it fails, creation is considered as failed, all passed EVM gas consumed. Caller frame is not reverted.
+4. The EVM emulator creates a new `EVMFrame`, and calls the `ContractDeployer.createEvmFromEmulator`. This call should fail only if constructor of the new contract was reverted.
+5. The `ContractDeployer` sets a dummy version 2 hash on the deployed address to ensure that when it will be called, the `EvmEmulator` will be activated.
+6. The `EvmEmulator`'s constructor is invoked. The initCode is passed inside the calldata.
 
 Then, there are three cases
 

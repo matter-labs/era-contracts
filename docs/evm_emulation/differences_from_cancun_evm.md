@@ -29,7 +29,9 @@ EVM emulation supports the same precompiles that are supported by EraVM.
 
 ## Technical differences
 
-_These changes are unlikely to have an impact on the developer experience_
+_These changes are unlikely to have an impact on the developer experience._
+
+Differences:
 
 - `JUMPDEST` analysis is simplified. It is not checked that `JUMPDEST` is not a part of `PUSH` instruction.
 - No force of call stack depth limit. It is implicitly implemented by 63/64 gas rule.
