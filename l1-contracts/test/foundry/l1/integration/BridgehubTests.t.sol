@@ -560,7 +560,11 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
         }
 
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, currentUser, amountToWithdraw);
+        bytes memory message = abi.encodePacked(
+            IMailboxImpl.finalizeEthWithdrawal.selector,
+            currentUser,
+            amountToWithdraw
+        );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
