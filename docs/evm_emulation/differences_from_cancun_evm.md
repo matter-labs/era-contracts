@@ -15,8 +15,9 @@ This feature allows EVM emulation on top of EraVM. This mode is not fully equiva
 - `DELEGATECALL` between EVM and native EraVM contracts will be reverted.
 - Calls to empty addresses in kernel space (address < 2^16) will fail.
 - `GASLIMIT` opcode returns the same fixed constant as EraVM and should not be used.
-  
+
 Unsupported opcodes:
+
 - `CALLCODE`
 - `SELFDESTRUCT`
 - `BLOBHASH`
@@ -28,7 +29,8 @@ EVM emulation supports the same precompiles that are supported by EraVM.
 
 ### Technical differences
 
-*These changes are unlikely to have an impact on the developer experience*
+_These changes are unlikely to have an impact on the developer experience_
+
 - `JUMPDEST` analysis is simplified. It is not checked that `JUMPDEST` is not a part of `PUSH` instruction.
 - No force of call stack depth limit. It is implicitly implemented by 63/64 gas rule.
 - Account storage is not destroyed during contract deployment.

@@ -4,18 +4,18 @@ The EraVM differs from the EVM in several ways: it has a distinct set of instruc
 
 As an option to unblock developers that depend on EVM bytecode support, EVM execution mode is added as an emulation on top of EraVM:
 
-- The core of the system is EraVM: EVM emulator is only a complementary functionality. It is still possible to deploy native EraVM contracts and the main unit of gas is EraVM one (it will be called ***ergs*** further so as not to confuse it with EVM gas).
+- The core of the system is EraVM: EVM emulator is only a complementary functionality. It is still possible to deploy native EraVM contracts and the main unit of gas is EraVM one (it will be called **_ergs_** further so as not to confuse it with EVM gas).
 - However, it is also possible to deploy and execute EVM contracts. These contracts’ bytecode hash is marked with a special marker. Whenever an EVM bytecode is invoked, instead of decommiting and executing EraVM bytecode, virtual machine uses fixed and predefined EvmEmulator bytecode. Internally, this emulator loads, interprets and executes EVM bytecode in accordance with the EVM rules (as close as possible).
 
 The main invariant that emulation aims to preserve:
 
 ❗ Behavior inside emulated EVM environment (i.e. not only within one contract, but during any sort of EVM <> EVM contracts interaction chain) is the same as it would’ve been on widespread EVM implementation (Geth, REVM, etc.).
 
-Note, that during EraVM <> EVM or EVM <> EraVM contract interaction can be different, but it is expected that this interaction does not break major security invariants. 
+Note, that during EraVM <> EVM or EVM <> EraVM contract interaction can be different, but it is expected that this interaction does not break major security invariants.
 
 ❗ The EVM environment is agnostic about EraVM.
 
-⚠️ _This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code._
+⚠️ *This document is meant to cover the high level of the EVM emulation design as well as some of its rough edges and is not meant to be a full specification of it. A proper understanding of the EVM emulation requires reading the corresponding comments in the contracts code.*
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ The emulator related changes actively use some features of EraVM, including:
 
 The target version of EVM is **Cancun.**
 
-[EVM emulator: differences from EVM  (Cancun)](./differences_from_cancun_evm.md) 
+[EVM emulator: differences from EVM (Cancun)](./differences_from_cancun_evm.md)
 
 # Internals of deploying EVM contract
 
@@ -40,7 +40,7 @@ EVM contracts can be deployed with a transaction without field `to` (as in Ether
 Additionally EVM contracts can be deployed from EraVM environment using **system** call to the following functions in ContractDeployer system contract:
 
 - `createEVM` - `CREATE`-like behavior
-- `create2EVM`  - `CREATE2`-like behavior
+- `create2EVM` - `CREATE2`-like behavior
 
 They use the same address derivation schemes as corresponding EVM opcodes. To derive the deployed contract’s address for EOAs we use the main nonce for this operation, while for contracts we use their deployment nonce. You can read more about the two types of nonces in the [NonceHolder system contract’s documentation](https://docs.zksync.io/build/developer-reference/era-contracts/system-contracts#nonceholder).
 
@@ -58,7 +58,7 @@ After creation, the `deployedBytecode` is saved and any call to the created cont
 
 ### New type of versioned code hash
 
-In EraVM we use special *versioned hash* format for interacting with bytecodes: it is a 32-byte value with the following structure (indexed in bytes):
+In EraVM we use special _versioned hash_ format for interacting with bytecodes: it is a 32-byte value with the following structure (indexed in bytes):
 
 - hash[0] — version (0x01 for EraVM)
 - hash[1] — whether the contract is being constructed
@@ -67,7 +67,7 @@ In EraVM we use special *versioned hash* format for interacting with bytecodes: 
 
 For each native EraVM contract with address `A` this version hash is stored under the key `A` inside the `AccountCodeStorage` system contract. Whenever a call is performed to an address `A`, the EraVM will read its versioned bytecode hash, check its correct versioned format and “unpack” the bytecode that corresponds to that versioned hash inside the code memory page.
 
- Also that versioned hash value is used as `extcodehash` value in **EraVM** context (but not in the EVM context!).
+Also that versioned hash value is used as `extcodehash` value in **EraVM** context (but not in the EVM context!).
 
 In order to support EVM bytecode, we introduced a new hash version for EVM contracts (0x02):
 
@@ -78,9 +78,9 @@ In order to support EVM bytecode, we introduced a new hash version for EVM contr
 
 Versioned hash value is **not** used as `extcodehash` value of EVM contracts in EVM context.
 
-Besides the version, these formats are different in the fact that the first version stored the length of the bytecode in *32-byte words,* while the second one does it in *bytes*. This was done mostly for historical reasons during the development of this version. However, it perfectly fits the maximal allowed bytecode size for an EVM contract (i.e. 24,576 bytes can easily fit into the 2^16 - 1 bytes).
+Besides the version, these formats are different in the fact that the first version stored the length of the bytecode in _32-byte words,_ while the second one does it in _bytes_. This was done mostly for historical reasons during the development of this version. However, it perfectly fits the maximal allowed bytecode size for an EVM contract (i.e. 24,576 bytes can easily fit into the 2^16 - 1 bytes).
 
-EraVM now has the following logic whenever a contract with address `A` is called: 
+EraVM now has the following logic whenever a contract with address `A` is called:
 
 The first 3 steps are the same as pre-EVM emulator:
 
@@ -90,9 +90,9 @@ The first 3 steps are the same as pre-EVM emulator:
 
 But now we have the new path:
 
-4. If it has version 2, it interprets it as a EVM contract, and uses the bytecode of `EvmEmulator` as the EraVM bytecode of the contract. 
+4. If it has version 2, it interprets it as a EVM contract, and uses the bytecode of `EvmEmulator` as the EraVM bytecode of the contract.
 
-Note, that while for native contracts the knowledge of the preimage for the versioned hash is crucial (since it is *the* bytecode that will be used), for bytecodes with version 2 it does not really matter since `EvmEmulator` is the bytecode that will be used. This is why when we are constructing a contract, we put a temporary “dummy” versioned hash, the job of which is only to ensure that the `EvmEmulator` is the one executing its logic.
+Note, that while for native contracts the knowledge of the preimage for the versioned hash is crucial (since it is _the_ bytecode that will be used), for bytecodes with version 2 it does not really matter since `EvmEmulator` is the bytecode that will be used. This is why when we are constructing a contract, we put a temporary “dummy” versioned hash, the job of which is only to ensure that the `EvmEmulator` is the one executing its logic.
 
 ### Support for null `to` address in contract creation transactions
 
@@ -103,7 +103,7 @@ Before we did not allow `null` to be a valid address for type 0-2 transactions. 
 Whenever a EraVM contract calls an EVM one (note that, the first contract to be ever executed is bootloader written in EraVM code, so execution of EVM contracts always starts by being called by a EraVM one), the following steps happen:
 
 1. Once the EraVM sees that the callee has versioned hash with version 2, it uses `EvmEmulator` as the “EraVM” bytecode for this contract’s frame. Note, that `this` address is the address of the contract itself, i.e. all the `sstore` operations will be performed against the storage of the interpreted contract.
-2. The only public function provided by `EvmEmulator` is fallback, so the execution will start there. 
+2. The only public function provided by `EvmEmulator` is fallback, so the execution will start there.
 3. We calculate the amount of EVM gas that is given to this frame. Note, that since each EVM opcode has to be emulated by EraVM, each EVM gas necessarily costs several EraVM one (ergs). We currently use a linear ratio to calculate the amount of received EVM gas.
 4. Then, the emulation starts as usual and the `returndata` is returned via standard EraVM means.
 
@@ -119,7 +119,7 @@ In the previous sections we’ve discussed on how to deploy an EVM contract and 
 
 ## Static calls
 
-The `isStatic` context is set off by EraVM for calls to EVM contracts. Emulator gets info wether context is static or non-static from call flags. This is needed because `EvmGasManager` need to perform writes to transient storage to emulate cold/warm access mechanics for accounts and storage slots. 
+The `isStatic` context is set off by EraVM for calls to EVM contracts. Emulator gets info wether context is static or non-static from call flags. This is needed because `EvmGasManager` need to perform writes to transient storage to emulate cold/warm access mechanics for accounts and storage slots.
 
 Thus, it is entirely up to the emulator to ensure that no other state changes occur in the static execution mode.
 
@@ -142,9 +142,9 @@ For managing storage we reuse the same primitivies that EraVM provides:
 
 ### Managing hot/cold storage slots & accounts
 
-Whenever an account is accessed for the first time on EVM, the users are charged extra for the I/O costs incurred by it. Also, additional costs are incurred for state growth (when a slot goes from 0 to some other values). 
+Whenever an account is accessed for the first time on EVM, the users are charged extra for the I/O costs incurred by it. Also, additional costs are incurred for state growth (when a slot goes from 0 to some other values).
 
-To support the same behavior as on EVM, we maintain a registry of whether a slot or account is warm or cold. This registry is located in the `EvmGasManager` system contract. In order to ensure that this registry gets erased after each transaction, transient storage is used for it. 
+To support the same behavior as on EVM, we maintain a registry of whether a slot or account is warm or cold. This registry is located in the `EvmGasManager` system contract. In order to ensure that this registry gets erased after each transaction, transient storage is used for it.
 
 By default, the following addresses are considered hot:
 
@@ -188,20 +188,20 @@ This does not happen when calling native contracts. For this reason, the possibl
 
 We want to support the same logic for EVM contract deployment as Ethereum. This, for instance, includes that a failed deploy should still increase the nonce of a contract, which is not the case on Era EraVM: https://docs.zksync.io/build/developer-reference/differences-with-ethereum.html#nonces.
 
-For this, for EVM<>EVM deployments have two big steps: precheck and deploy. 
+For this, for EVM<>EVM deployments have two big steps: precheck and deploy.
 
 The flow of EVM <> EVM deployment is the following:
 
-1.  The EVM emulator checks the memory offsets are valid. Also it checks that size of initCode is valid and charges dynamic gas costs.  In case of error creator frame is reverted consuming all remaining EVM gas.
-2. The EVM emulator checks that the `value` is valid. Otherwise creation considered as failed, all passed EVM gas refunded. Caller frame is not reverted.
-3. The EVM emulator calls the `ContractDeployer.precreateEvmAccountFromEmulator`. This call derives new contract address and performs collision check. If it fails, creation is considered as failed, all passed EVM gas consumed. Caller frame is not reverted.
-4. The EVM emulator creates a new `EVMFrame`, and calls the `ContractDeployer.createEvmFromEmulator`. This call should fail only if constructor of the new contract was reverted.
-5. The `ContractDeployer` sets a dummy version 2 hash on the deployed address to ensure that when it will be called, the `EvmEmulator` will be activated.
-6. The `EvmEmulator`'s constructor is invoked. The initCode is passed inside the calldata. 
+1.  The EVM emulator checks the memory offsets are valid. Also it checks that size of initCode is valid and charges dynamic gas costs. In case of error creator frame is reverted consuming all remaining EVM gas.
+2.  The EVM emulator checks that the `value` is valid. Otherwise creation considered as failed, all passed EVM gas refunded. Caller frame is not reverted.
+3.  The EVM emulator calls the `ContractDeployer.precreateEvmAccountFromEmulator`. This call derives new contract address and performs collision check. If it fails, creation is considered as failed, all passed EVM gas consumed. Caller frame is not reverted.
+4.  The EVM emulator creates a new `EVMFrame`, and calls the `ContractDeployer.createEvmFromEmulator`. This call should fail only if constructor of the new contract was reverted.
+5.  The `ContractDeployer` sets a dummy version 2 hash on the deployed address to ensure that when it will be called, the `EvmEmulator` will be activated.
+6.  The `EvmEmulator`'s constructor is invoked. The initCode is passed inside the calldata.
 
 Then, there are three cases
 
-1. If the execution of the initCode is successful, the `EvmEmulator`  will pad the new bytecode to the correct form for the code oracle and return to the ContractDeployer system contract together with remaining EVM gas. This will publish the deployed contract’s bytecode and set the correct code hash for the account.
+1. If the execution of the initCode is successful, the `EvmEmulator` will pad the new bytecode to the correct form for the code oracle and return to the ContractDeployer system contract together with remaining EVM gas. This will publish the deployed contract’s bytecode and set the correct code hash for the account.
 2. If the execution is not successful, the standard `revert` will be used and propagated. If the deployer is an EVM contract, the pair of `(gas_left, returndata)` will be returned.
 3. If the execution failed due to `out-of-ergs`, aborting panic will be propagated.
 
@@ -216,7 +216,7 @@ The EVM emulator has the following areas in memory:
 - Next slot is used to store the size of the last returndata
 - Next 1024 slots are dedicated for the EVM stack.
 - Next slot is used to store the bytecode size of executing contract
-- Next `MAX_POSSIBLE_ACTIVE_BYTECODE` bytes are used to store active bytecode. This value is 24576 for deployed contracts and 24576*2 for initCode in constructor.
+- Next `MAX_POSSIBLE_ACTIVE_BYTECODE` bytes are used to store active bytecode. This value is 24576 for deployed contracts and 24576\*2 for initCode in constructor.
 - Next slot is empty. It is needed to simplify PUSH N opcodes
 - Next slot is used to store the size of memory used in EVM
 - All the memory after that is used as the EVM memory, i.e. all `mload/mstore` operations that are done by the user are performed at that location.
