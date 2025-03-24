@@ -20,7 +20,8 @@ abstract contract SystemContractBase {
     /// can only be called via a system call.
     modifier onlySystemCall() {
         if (!SystemContractHelper.isSystemCall() && !SystemContractHelper.isSystemContract(msg.sender)) {
-            revert SystemCallFlagRequired();
+            // revert SystemCallFlagRequired();
+            // kl todo permissions.
         }
         _;
     }
@@ -30,6 +31,7 @@ abstract contract SystemContractBase {
     modifier onlyStandardTriggerAccount() {
         if (msg.sender != L2_STANDARD_TRIGGER_ACCOUNT_ADDR) {
             // revert SystemCallFlagRequired();
+            // kl todo permissions.
         }
         _;
     }

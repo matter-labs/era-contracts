@@ -144,7 +144,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             bundleId,
             BundleMetadata({destinationChainId: _destinationChainId, sender: _sender, callCount: 0, totalValue: 0})
         );
-        TransientInterop.addBaseTokenCallToBundle(bundleId);
     }
 
     function addCallToBundle(

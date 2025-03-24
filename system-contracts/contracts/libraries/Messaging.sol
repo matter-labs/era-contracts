@@ -157,6 +157,7 @@ struct InteropCallStarter {
 }
 
 struct InteropCall {
+    bool directCall;
     address to;
     address from;
     uint256 value;

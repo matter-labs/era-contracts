@@ -68,4 +68,8 @@ contract DummyL2StandardTriggerAccount {
         }
         return true;
     }
+
+    receive() external payable {
+        // If the contract is called directly, behave like an EOA
+    }
 }

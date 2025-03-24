@@ -50,15 +50,15 @@ contract InteropHandler is IInteropHandler {
         bundleExecuted[bundleHash] = true;
 
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
-        InteropCall memory baseTokenCall = interopBundle.calls[0];
 
-        for (uint256 i = 1; i < interopBundle.calls.length; i++) {
+        for (uint256 i = 0; i < interopBundle.calls.length; i++) {
             InteropCall memory interopCall = interopBundle.calls[i];
-            // if (_skipEmptyCalldata && interopCall.data.length == 0) {
-            //     // kl todo: we skip calls in the account validation phase for now, as empty contracts cannot be called.
-            //     BASE_TOKEN_SYSTEM_CONTRACT.mint(interopCall.to, interopCall.value);
-            //     continue;
-            // }
+            if (_skipEmptyCalldata && interopCall.data.length == 0) {
+                // kl todo: we skip calls in the account validation phase for now, as empty contracts cannot be called.
+                // remove with 7786 support. 
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(interopCall.to, interopCall.value);
+                continue;
+            }
 
             address accountAddress = getAliasedAccount(interopCall.from, _proof.chainId);
             IInteropAccount account = IInteropAccount(payable(accountAddress)); // kl todo add chainId
@@ -82,7 +82,7 @@ contract InteropHandler is IInteropHandler {
         // return new InteropAccount{
         //     salt: keccak256(abi.encode(interopCall.from, _proof.chainId))
         // }();
-        return L2_CONTRACT_DEPLOYER.create2Account(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode(), IL2ContractDeployer.AccountAbstractionVersion.Version1);
+        return L2_CONTRACT_DEPLOYER.create2Account(keccak256(abi.encode(_sender, _chainId)), bytecodeHash, abi.encode(_sender), IL2ContractDeployer.AccountAbstractionVersion.Version1);
     }
 
     function getAliasedAccount(address _sender, uint256 _chainId) public view returns (address) {
@@ -91,7 +91,7 @@ contract InteropHandler is IInteropHandler {
                 address(this),
                 bytecodeHash,
                 keccak256(abi.encode(_sender, _chainId)),
-                abi.encode()
+                abi.encode(_sender)
             );
     }
 }

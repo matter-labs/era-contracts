@@ -4,13 +4,15 @@ pragma solidity ^0.8.24;
 
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, INonceHolder} from "./Constants.sol";
 import {MessageInclusionProof, L2Message} from "./libraries/Messaging.sol";
 import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol";
 import {FailedToPayOperator} from "./SystemContractErrors.sol";
 import {InteropTrigger, GasFields, TRIGGER_IDENTIFIER} from "./libraries/Messaging.sol";
+import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 
 error MessageNotIncluded();
+event MessageNotIncluded2();
 
 /**
  * @author Matter Labs
@@ -81,9 +83,9 @@ contract StandardTriggerAccount is IAccount {
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
         if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
-            (bytes memory paymasterBundle, bytes memory paymasterProof, , ) = abi.decode(
+            (bytes memory paymasterBundle, bytes memory paymasterProof, ,, ) = abi.decode(
                 _transaction.signature,
-                (bytes, bytes, address, bytes)
+                (bytes, bytes, address,address, bytes)
             );
             MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
             L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof, true);
@@ -99,13 +101,24 @@ contract StandardTriggerAccount is IAccount {
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
     ) external payable override ignoreNonBootloader ignoreInDelegateCall returns (bytes4 magic) {
+        SystemContractsCaller.systemCallWithPropagatedRevert(
+            uint32(gasleft()),
+            address(NONCE_HOLDER_SYSTEM_CONTRACT),
+            0,
+            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
+        );
         if (_transaction.to == uint256(uint160(address(L2_INTEROP_HANDLER)))) {
             (bytes memory executionBundle, ) = abi.decode(_transaction.data, (bytes, bytes));
-            (bytes memory paymasterBundle, , address sender, address refundRecipient, bytes memory triggerProofBytes) = abi
-                .decode(_transaction.signature, (bytes, bytes, address, address, bytes));
+            (
+                bytes memory paymasterBundle,
+                ,
+                address sender,
+                address refundRecipient,
+                bytes memory triggerProofBytes
+            ) = abi.decode(_transaction.signature, (bytes, bytes, address, address, bytes));
             MessageInclusionProof memory triggerProof = abi.decode(triggerProofBytes, (MessageInclusionProof));
             InteropTrigger memory interopTrigger = InteropTrigger({
-                sender: address(uint160(_transaction.from)),
+                sender: address(uint160(sender)),
                 recipient: address(this),
                 destinationChainId: block.chainid,
                 feeBundleHash: keccak256(paymasterBundle),
@@ -129,8 +142,7 @@ contract StandardTriggerAccount is IAccount {
             if (!isIncluded) {
                 revert MessageNotIncluded();
             }
-            magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
-            return magic;
+            return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
 
         // magic = super._validateTransaction(_suggestedSignedHash, _transaction);
@@ -146,5 +158,9 @@ contract StandardTriggerAccount is IAccount {
 
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         // Behave the same as for fallback/receive, just execute nothing, returns nothing
+    }
+
+    receive() external payable {
+        // If the contract is called directly, behave like an EOA
     }
 }
