@@ -19,7 +19,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {SystemContractsCaller} from "contracts/common/libraries/SystemContractsCaller.sol";
+import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 
