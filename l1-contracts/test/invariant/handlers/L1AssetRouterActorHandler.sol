@@ -2,63 +2,81 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
-import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
-import {UserActorHandler} from "./UserActorHandler.sol";
+import {TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
+import {ActorHandler} from "./ActorHandler.sol";
+import {Token} from "../common/Types.sol";
 
 // no cheatcodes here because they won't work with `--zksync`
 // forge 0.0.2 (27360d4 2024-12-02T00:28:35.872943000Z)
-contract L1AssetRouterActorHandler is Test {
-    UserActorHandler[] public receivers;
+contract L1AssetRouterActorHandler is ActorHandler {
+    address[] public receivers;
 
     uint256 public ghost_totalDeposits;
 
     error ReceiversArrayIsEmpty();
 
-    constructor(UserActorHandler[] memory _receivers) {
+    constructor(address[] memory _receivers, Token[] memory _tokens) ActorHandler(_tokens) {
         if (_receivers.length == 0) {
             revert ReceiversArrayIsEmpty();
         }
         receivers = _receivers;
     }
 
-    function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex) public {
-        _amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
+    function finalizeDeposit(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _tokenIndex) public {
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
+        uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
 
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
+
+        uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
+        bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
+
+        _assumeNonZero(l1Token);
+
+        console.log("l1Token", l1Token);
+
+        l2AssetRouter.finalizeDeposit({
             _l1Sender: _sender,
-            _l2Receiver: address(receivers[receiverIndex]),
-            _l1Token: L1_TOKEN_ADDRESS,
-            _amount: _amount,
+            _l2Receiver: receivers[receiverIndex],
+            _l1Token: l1Token,
+            _amount: amount,
             _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
-        ghost_totalDeposits += _amount;
+        ghost_totalDeposits += amount;
     }
 
-    function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex) public {
-        uint256 l1ChainId = L2AssetRouter(L2_ASSET_ROUTER_ADDR).L1_CHAIN_ID();
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, L1_TOKEN_ADDRESS);
+    function finalizeDepositV2(uint256 _amount, address _sender, uint256 _receiverIndex, uint256 _tokenIndex) public {
         uint256 receiverIndex = bound(_receiverIndex, 0, receivers.length - 1);
+        uint256 tokenIndex = bound(_tokenIndex, 0, tokens.length - 1);
         uint256 amount = bound(_amount, 0, AMOUNT_UPPER_BOUND);
+
+        uint256 l1ChainId = l2AssetRouter.L1_CHAIN_ID();
+        (address l1Token, address l2Token) = _getL1TokenAndL2Token(tokens[tokenIndex]);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(l1ChainId, l1Token);
+        bytes32 baseTokenAssetId = l2AssetRouter.BASE_TOKEN_ASSET_ID();
+
         bytes memory data = DataEncoding.encodeBridgeMintData({
             _originalCaller: _sender,
-            _remoteReceiver: address(receivers[receiverIndex]),
-            _originToken: L1_TOKEN_ADDRESS,
+            _remoteReceiver: receivers[receiverIndex],
+            _originToken: l1Token,
             _amount: amount,
             _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
 
+        _assumeNonZero(l1Token);
+
+        console.log("l1Token", l1Token);
+
         // the 1st parameter is unused by `L2AssetRouter`
         // https://github.com/matter-labs/era-contracts/blob/ac11ba99e3f2c3365a162f587b17e35b92dc4f24/l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol#L132
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit(0, assetId, data);
+        l2AssetRouter.finalizeDeposit(0, assetId, data);
 
         ghost_totalDeposits += amount;
     }

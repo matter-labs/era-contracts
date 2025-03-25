@@ -1129,11 +1129,11 @@
   },
   {
     "contractName": "l1-contracts/L2SharedBridgeLegacy",
-    "zkBytecodeHash": "0x01000191999ee415698988ded48cef858b7452336ad5e51c6387d987b19ff676",
+    "zkBytecodeHash": "0x01000191567a474da927e05ac4f27dc56d4df4c59cd63a8d43a91850b42c66c4",
     "zkBytecodePath": "/l1-contracts/zkout/L2SharedBridgeLegacy.sol/L2SharedBridgeLegacy.json",
-    "evmBytecodeHash": "0x1e4444348b6cddb27465b249de4843699805954ce7b55f543fb9ab37085b843c",
+    "evmBytecodeHash": "0x2aec95ac260d80068f5888022da3a8f3871f29a1a0fb5887920b8e4d7771ccb2",
     "evmBytecodePath": "/l1-contracts/out/L2SharedBridgeLegacy.sol/L2SharedBridgeLegacy.json",
-    "evmDeployedBytecodeHash": "0x3a415777d9713ef5c002da601dc337564e17aafd6cfe1b9d5de150b3517d8789"
+    "evmDeployedBytecodeHash": "0xd53f4aa093986cbb04ad1acb9aa3d8c6a52cc60cb459ac73e2efceba8105517b"
   },
   {
     "contractName": "l1-contracts/L2VerifierFflonk",
