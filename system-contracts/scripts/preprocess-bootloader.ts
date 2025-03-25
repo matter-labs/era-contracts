@@ -49,11 +49,6 @@ function getPaddedSelector(contractName: string, method: string): string {
   return padZeroRight(result, PADDED_SELECTOR_LENGTH);
 }
 
-// function getLeftPaddedSelector(contractName: string, method: string): string {
-//   const result = getSelector(contractName, method);
-//   return ethers.utils.hexlify(ethers.utils.zeroPad(result, 32));
-// }
-
 function getSystemContextCodeHash() {
   let bytecode;
   try {
