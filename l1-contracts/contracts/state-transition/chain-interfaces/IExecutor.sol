@@ -16,15 +16,6 @@ struct LogProcessingOutput {
     bytes32 l2DAValidatorOutputHash;
 }
 
-struct ProcessLogsInput {
-    L2Log[] logs;
-    bytes[] messages;
-    uint256 chainId;
-    uint256 batchNumber;
-    bytes32 chainBatchRoot;
-    bytes32 messageRoot;
-}
-
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
 
