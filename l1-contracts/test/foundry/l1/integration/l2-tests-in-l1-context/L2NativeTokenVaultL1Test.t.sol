@@ -59,7 +59,7 @@ contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeT
         address _l1SharedBridge,
         bytes32 _l2TokenProxyBytecodeHash
     ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) returns (address) {
-        super.deployL2SharedBridgeLegacy({
+        return super.deployL2SharedBridgeLegacy({
             _l1ChainId: _l1ChainId,
             _eraChainId: _eraChainId,
             _aliasedOwner: _aliasedOwner,
