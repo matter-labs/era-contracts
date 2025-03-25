@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";

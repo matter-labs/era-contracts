@@ -2,8 +2,11 @@
 
 pragma solidity ^0.8.24;
 
-import {Unauthorized} from "./SystemContractErrors.sol";
-import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
+
+event MessageRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, bytes32[] sides);
+error SidesLengthNotOne();
+error MessageRootAlreadyExists();
 
 /**
  * @author Matter Labs
@@ -11,10 +14,8 @@ import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
  * @notice MessageRootStorage contract for imported L2 message roots..
  * @dev
  */
-contract L2MessageRootStorage {
+contract L2MessageRootStorage is SystemContractBase {
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 msgRoot)) public msgRoots;
-    mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
-    mapping(bytes32 msgRoot => uint256 chainId) public chainIdFromMsgRoot;
 
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
     uint256 public pendingMessageRootIdsLength;
@@ -23,34 +24,26 @@ contract L2MessageRootStorage {
         uint256 batchNumber;
     }
     mapping(uint256 index => PendingMessageRootId) public pendingMessageRootIds;
-    // mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
 
-    event MessageRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, bytes32[] sides);
-
-    function addMessageRoot(uint256 chainId, uint256 batchNumber, bytes32[] memory sides) external {
-        emit MessageRootAdded(chainId, batchNumber, sides);
-        // kl todo add access control, onlyBootloader
-        if (sides.length == 1) {
-            // kl todo make sure we cannot have duplicates here.
-            msgRoots[chainId][batchNumber] = sides[0];
-            batchNumberFromMsgRoot[sides[0]] = batchNumber;
-            chainIdFromMsgRoot[sides[0]] = chainId;
-        } else {
-            // msgRootSides[chainId][batchNumber] = sides;
-            // pendingMessageRootIds[pendingMessageRootIdsLength] = PendingMessageRootId({
-            //     chainId: chainId,
-            //     batchNumber: batchNumber
-            // });
-            // pendingMessageRootIdsLength++;
-            // kl todo add linking here
+    function addMessageRoot(
+        uint256 chainId,
+        uint256 batchNumber,
+        bytes32[] memory sides
+    ) external onlyCallFromBootloader {
+        if (sides.length != 1) {
+            revert SidesLengthNotOne();
         }
+        if (msgRoots[chainId][batchNumber] != bytes32(0)) {
+            revert MessageRootAlreadyExists();
+        }
+        msgRoots[chainId][batchNumber] = sides[0];
+
+        emit MessageRootAdded(chainId, batchNumber, sides);
     }
 
     // kl todo figure out how the executor works with MsgRoot, this on GW.
     function addThisChainMessageRoot(uint256 batchNumber, bytes32[] memory sides) external {
         // kl todo add access control, onlyL1Messenger
         msgRoots[block.chainid][batchNumber] = sides[0];
-        batchNumberFromMsgRoot[sides[0]] = batchNumber;
-        chainIdFromMsgRoot[sides[0]] = block.chainid;
     }
 }

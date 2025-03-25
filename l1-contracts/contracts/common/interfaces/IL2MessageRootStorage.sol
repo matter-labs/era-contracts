@@ -10,6 +10,4 @@ interface IL2MessageRootStorage {
     function addMessageRoot(uint256 chainId, uint256 blockNumber, bytes32 msgRoot) external;
 
     function msgRoots(uint256 chainId, uint256 blockNumber) external view returns (bytes32);
-    function blockNumberFromMsgRoot(bytes32 msgRoot) external view returns (uint256);
-    function chainIdFromMsgRoot(bytes32 msgRoot) external view returns (uint256);
 }
