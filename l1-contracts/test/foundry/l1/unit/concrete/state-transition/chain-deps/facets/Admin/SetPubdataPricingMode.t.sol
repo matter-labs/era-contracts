@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+pragma solidity 0.8.28;
+
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Unauthorized, ChainAlreadyLive} from "contracts/common/L1ContractErrors.sol";

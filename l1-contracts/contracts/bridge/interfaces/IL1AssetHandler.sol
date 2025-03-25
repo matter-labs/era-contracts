@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 /// @title L1 Asset Handler contract interface
 /// @author Matter Labs

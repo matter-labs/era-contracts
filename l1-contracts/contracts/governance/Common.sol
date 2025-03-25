@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 /// @dev Represents a call to be made during multicall.
 /// @param target The address to which the call will be made.

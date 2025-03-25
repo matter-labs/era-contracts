@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -522,9 +522,9 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
-        assertTrue(bridgehub.assetRouter() == address(0), "Shared bridge is already there");
-        assertTrue(bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
-        assertTrue(bridgehub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
+        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
+        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
+        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
 
         vm.prank(bridgeOwner);
         bridgehub.setAddresses(
@@ -534,7 +534,7 @@ contract ExperimentalBridgeTest is Test {
             address(interopCenter)
         );
 
-        assertTrue(bridgehub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
+        assertTrue(bridgeHub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
         assertTrue(
             bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
@@ -1062,9 +1062,9 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgehub.baseTokenAssetId(l2TxnReqDirect.chainId) != ETH_TOKEN_ASSET_ID);
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
 
-        assertTrue(bridgehub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
-        console.log(IL1AssetRouter(bridgehub.assetRouter()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
-        assertTrue(bridgehub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
+        assertTrue(bridgeHub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
+        console.log(IL1AssetRouter(bridgeHub.assetRouter()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
+        assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgehub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
         canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));

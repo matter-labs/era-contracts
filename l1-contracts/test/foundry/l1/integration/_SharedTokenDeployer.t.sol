@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {DeployErc20Script} from "deploy-scripts/DeployErc20.s.sol";

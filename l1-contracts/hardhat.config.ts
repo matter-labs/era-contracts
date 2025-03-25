@@ -28,11 +28,11 @@ const zkSyncBaseNetworkEnv =
 export default {
   defaultNetwork: "env",
   solidity: {
-    version: "0.8.25",
+    version: "0.8.28",
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 28000,
       },
       outputSelection: {
         "*": {

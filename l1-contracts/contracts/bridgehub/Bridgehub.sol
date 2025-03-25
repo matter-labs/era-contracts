@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
@@ -877,7 +877,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //     return getZKChain(_chainId);
     // }
 
-    /// @notice return the asset router
+    // /// @notice return the asset router
     // function sharedBridge() public view returns (address) {
     //     return assetRouter;
     // }

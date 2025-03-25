@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
-
-import {console} from "forge-std/console.sol";
+pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {L2Message, L2Log, L2CanonicalTransaction, MessageInclusionProof} from "contracts/common/Messaging.sol";

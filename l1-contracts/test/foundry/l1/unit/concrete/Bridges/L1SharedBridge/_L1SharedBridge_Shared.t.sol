@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";

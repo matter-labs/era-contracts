@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {CalldataDA, BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES} from "./CalldataDA.sol";
 import {PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {AdminFacet} from "../../state-transition/chain-deps/facets/Admin.sol";
 import {RollupDAManager} from "../../state-transition/data-availability/RollupDAManager.sol";

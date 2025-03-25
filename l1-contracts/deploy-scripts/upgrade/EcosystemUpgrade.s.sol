@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -68,7 +68,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";

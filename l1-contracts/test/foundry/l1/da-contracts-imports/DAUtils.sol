@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 // This file is intended to be an exact copy of `da-contracts/contracts/DAContractsErrors.sol`.
 // We can not import the file directly due to issues during imports from folders outside of the project.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {MailboxFacet} from "./facets/Mailbox.sol";
 import {ExecutorFacet} from "./facets/Executor.sol";

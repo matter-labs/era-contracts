@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.25;
+pragma solidity 0.8.28;
+
 
 import {L2VerifierPlonk} from "../../state-transition/verifiers/L2VerifierPlonk.sol";
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {GettersFacet} from "../../state-transition/chain-deps/facets/Getters.sol";

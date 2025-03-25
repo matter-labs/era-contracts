@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 
@@ -15,9 +15,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";

@@ -2,7 +2,7 @@
 
 // solhint-disable one-contract-per-file
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {MSG_VALUE_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";
 

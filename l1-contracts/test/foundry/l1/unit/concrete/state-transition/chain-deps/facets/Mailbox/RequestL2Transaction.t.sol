@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
@@ -11,8 +11,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {OnlyEraSupported, TooManyFactoryDeps, MsgValueTooLow, GasPerPubdataMismatch} from "contracts/common/L1ContractErrors.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;

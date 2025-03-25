@@ -74,6 +74,8 @@ error DirectCallNonEmptyValue(address nextContract);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
 
+error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
+
 // 0x693cd3dc
 error NotOwnerViaRouter(address msgSender, address originalCaller);
 

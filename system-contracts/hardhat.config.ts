@@ -18,7 +18,7 @@ export default {
     ethNetwork: "http://localhost:8545",
   },
   solidity: {
-    version: "0.8.24",
+    version: "0.8.28",
     settings: {
       evmVersion: "cancun",
       optimizer: {

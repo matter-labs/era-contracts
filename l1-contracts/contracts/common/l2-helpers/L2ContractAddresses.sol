@@ -2,10 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
-import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
 import {IL2MessageRootStorage} from "../interfaces/IL2MessageRootStorage.sol";
+import {IBaseToken} from "./IBaseToken.sol";
+import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 
@@ -40,8 +40,8 @@ IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(address(
 /// `diamond-initializers` contracts.
 address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 
-/// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
 address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
+/// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
 IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
