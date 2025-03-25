@@ -18,9 +18,7 @@ contract AssetRouterTest is
     AssetRouter_ActorHandler_Deployer,
     AssetRouter_Token_Deployer
 {
-    function deployL2Contracts(
-        uint256 _l1ChainId
-    ) public virtual override {
+    function deployL2Contracts(uint256 _l1ChainId) public virtual override {
         super.deployL2Contracts(_l1ChainId);
 
         vm.label(L2_ASSET_ROUTER_ADDR, "L2AssetRouter");
