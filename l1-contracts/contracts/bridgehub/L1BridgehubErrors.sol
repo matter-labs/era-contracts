@@ -66,9 +66,6 @@ error OnlyInteropCenter(address msgSender, address interopCenter);
 error OnlyAssetTracker(address, address);
 
 //
-error OnlyBridgehubOwner(address, address);
-
-//
 error DirectCallNonEmptyValue(address nextContract);
 
 // 0x73fe6c1b
