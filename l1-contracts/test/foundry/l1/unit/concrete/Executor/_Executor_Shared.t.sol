@@ -265,6 +265,12 @@ contract ExecutorTest is Test {
         vm.prank(address(owner));
         admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
 
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(DummyBridgehub.getZKChain.selector),
+            abi.encode(address(diamondProxy))
+        );
+
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
