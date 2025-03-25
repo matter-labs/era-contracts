@@ -59,13 +59,14 @@ contract L2Erc20L1Test is Test, SharedL2ContractL1Deployer, L2Erc20TestAbstract 
         address _l1SharedBridge,
         bytes32 _l2TokenProxyBytecodeHash
     ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) returns (address) {
-        super.deployL2SharedBridgeLegacy({
-            _l1ChainId: _l1ChainId,
-            _eraChainId: _eraChainId,
-            _aliasedOwner: _aliasedOwner,
-            _l1SharedBridge: _l1SharedBridge,
-            _l2TokenProxyBytecodeHash: _l2TokenProxyBytecodeHash
-        });
+        return
+            super.deployL2SharedBridgeLegacy({
+                _l1ChainId: _l1ChainId,
+                _eraChainId: _eraChainId,
+                _aliasedOwner: _aliasedOwner,
+                _l1SharedBridge: _l1SharedBridge,
+                _l2TokenProxyBytecodeHash: _l2TokenProxyBytecodeHash
+            });
     }
 
     function getFacetCuts(
