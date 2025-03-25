@@ -4,10 +4,10 @@ pragma solidity ^0.8.21;
 
 import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
 import {IL2MessageRootStorage} from "../interfaces/IL2MessageRootStorage.sol";
+import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
 import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
-import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15

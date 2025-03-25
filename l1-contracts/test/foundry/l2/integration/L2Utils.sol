@@ -22,9 +22,6 @@ import {InteropHandler, IInteropHandler} from "contracts/bridgehub/InteropHandle
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
