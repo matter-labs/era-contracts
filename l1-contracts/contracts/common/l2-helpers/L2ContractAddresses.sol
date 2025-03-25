@@ -79,18 +79,18 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
 
+IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+
+IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
+
 /// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x08);
+address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x09);
+address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
 
 /// @dev the address of the L2 interop account
-address constant L2_INTEROP_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
-
-IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x0b));
-
-IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x0c));
+address constant L2_INTEROP_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
 
 /// @dev the address of the L2 standard trigger account
 address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
