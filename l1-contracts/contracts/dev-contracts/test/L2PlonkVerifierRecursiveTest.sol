@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-
 import {L2VerifierPlonk} from "../../state-transition/verifiers/L2VerifierPlonk.sol";
 
 /// @author Matter Labs

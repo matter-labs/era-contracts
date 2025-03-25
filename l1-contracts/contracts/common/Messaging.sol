@@ -230,4 +230,3 @@ struct LeafInclusionProof {
     bytes32 leaf;
     bytes32[] proof;
 }
-

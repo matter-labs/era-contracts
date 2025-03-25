@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 
 /* solhint-disable max-line-length */

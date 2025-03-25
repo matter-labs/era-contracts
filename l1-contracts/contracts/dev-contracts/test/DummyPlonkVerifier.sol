@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-
 import {L1VerifierPlonk} from "../../state-transition/verifiers/L1VerifierPlonk.sol";
 
 contract DummyPlonkVerifier is L1VerifierPlonk {

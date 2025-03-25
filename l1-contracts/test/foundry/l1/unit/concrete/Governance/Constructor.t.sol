@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";

@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 
 /// @title Fflonk Verifier Implementation

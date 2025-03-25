@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-
 import {L2PlonkVerifierTestTest} from "./L2PlonkVerifier.t.sol";
 import {L2PlonkVerifierRecursiveTest} from "contracts/dev-contracts/test/L2PlonkVerifierRecursiveTest.sol";
 contract L2PlonkVerifierRecursiveTestTest is L2PlonkVerifierTestTest {
