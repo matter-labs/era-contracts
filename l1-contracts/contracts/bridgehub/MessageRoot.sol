@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, OnlyBridgehubOwner} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -75,13 +75,6 @@ contract MessageRoot is IMessageRoot, Initializable {
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
-        }
-        _;
-    }
-
-    modifier onlyBridgehubOwner() {
-        if (msg.sender != Ownable(address(BRIDGE_HUB)).owner()) {
-            revert OnlyBridgehubOwner(msg.sender, Ownable(address(BRIDGE_HUB)).owner());
         }
         _;
     }
