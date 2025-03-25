@@ -9,7 +9,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {OnlyEraSupported} from "contracts/common/L1ContractErrors.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 contract MailboxFinalizeWithdrawal is MailboxTest {
     bytes32[] proof;
@@ -23,7 +23,7 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
         L1AssetRouter = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(L1AssetRouter);
 
-        vm.mockCall(bridgehub, abi.encodeCall(Bridgehub.sharedBridge, ()), abi.encode(baseTokenBridgeAddress));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehub.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
 
         proof = new bytes32[](0);
         message = "message";
