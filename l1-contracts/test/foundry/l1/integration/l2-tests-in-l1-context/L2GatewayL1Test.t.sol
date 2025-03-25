@@ -59,7 +59,7 @@ contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstr
         address _l1SharedBridge,
         bytes32 _l2TokenProxyBytecodeHash
     ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) returns (address) {
-        return super.deployL2SharedBridgeLegacy({
+        super.deployL2SharedBridgeLegacy({
             _l1ChainId: _l1ChainId,
             _eraChainId: _eraChainId,
             _aliasedOwner: _aliasedOwner,
