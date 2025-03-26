@@ -117,9 +117,9 @@ object "Modexp" {
             }
 
             // To achieve homogeneity of the circuit, we always return the max supported bytes of the modulus (e.g. 256).
-            // It is assumed to be right-padded with zeros, thus we simply cut the modLen part to conform the specification.
+            // It is assumed to be left-padded with zeros, thus we simply cut the modLen part to conform the specification.
             // See: https://eips.ethereum.org/EIPS/eip-198.
-            return(sub(32, modLen), modLen)
+            return(sub(MAX_MOD_BYTES_SUPPORTED(), modLen), modLen)
         }
     }
 }
