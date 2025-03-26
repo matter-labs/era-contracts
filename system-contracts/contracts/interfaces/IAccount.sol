@@ -23,17 +23,11 @@ interface IAccount {
         Transaction calldata _transaction
     ) external payable returns (bytes4 magic);
 
-    ///
-    /// FOUNDRY SUPPORT START
-    ///
     function executeTransaction(
         bytes32 _txHash,
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
-    ) external payable returns (bytes memory returnData);
-    ///
-    /// FOUNDRY SUPPORT END
-    ///
+    ) external payable;
 
     // There is no point in providing possible signed hash in the `executeTransactionFromOutside` method,
     // since it typically should not be trusted.

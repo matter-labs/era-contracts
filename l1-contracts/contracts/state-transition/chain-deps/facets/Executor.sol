@@ -72,15 +72,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         });
 
-        ///
-         /// DEBUG SUPPORT START
-         ///
- //        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
- //            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
- //        }
-         ///
-         /// DEBUG SUPPORT END
-         ///
+        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+        }
         // Check that the priority operation hash in the L2 logs is as expected
         if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
             revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
@@ -156,24 +150,18 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
 
-         ///
-         /// DEBUG SUPPORT START
-         ///
- //        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
- //        // So here we need to only double check that:
- //        // - The timestamp of the batch is not too small.
- //        // - The timestamp of the last L2 block is not too big.
- //        // New batch timestamp is too small
- //        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
- //            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
- //        }
- //        // The last L2 block timestamp is too big
- //        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
- //            revert L2TimestampTooBig();
- //        }
-         ///
-         /// DEBUG SUPPORT END
-         ///
+        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
+        // So here we need to only double check that:
+        // - The timestamp of the batch is not too small.
+        // - The timestamp of the last L2 block is not too big.
+        // New batch timestamp is too small
+        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
+            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+        }
+        // The last L2 block timestamp is too big
+        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+            revert L2TimestampTooBig();
+        }
     }
 
     struct ViaIR {

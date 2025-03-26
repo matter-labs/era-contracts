@@ -109,9 +109,6 @@ contract DefaultAccount is IAccount {
         }
     }
 
-    ///
-    /// FOUNDRY SUPPORT START
-    ///
     /// @notice Method called by the bootloader to execute the transaction.
     /// @param _transaction The transaction to execute.
     /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
@@ -121,12 +118,8 @@ contract DefaultAccount is IAccount {
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override ignoreNonBootloader ignoreInDelegateCall returns (bytes memory returnData) {
+    ) external payable override ignoreNonBootloader ignoreInDelegateCall {
         _execute(_transaction);
-         returnData = bytes("");
-        ///
-        /// FOUNDRY SUPPORT END
-        ///
     }
 
     /// @notice Method that should be used to initiate a transaction from this account by an external call.
