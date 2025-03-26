@@ -10,6 +10,11 @@ export enum Language {
   Zasm = "zasm",
 }
 
+export enum SourceLocation {
+  L1Contracts,
+  SystemContracts
+}
+
 export interface SystemContractDescription {
   address: string;
   codeName: string;
@@ -28,6 +33,7 @@ export interface ZasmContractDescription extends SystemContractDescription {
 
 export interface SolidityContractDescription extends SystemContractDescription {
   lang: Language.Solidity;
+  location: SourceLocation;
 }
 
 interface ISystemContracts {
@@ -40,6 +46,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000000000",
     codeName: "EmptyContract",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   ecrecover: {
     address: "0x0000000000000000000000000000000000000001",
@@ -76,56 +83,67 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000008001",
     codeName: "EmptyContract",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   accountCodeStorage: {
     address: "0x0000000000000000000000000000000000008002",
     codeName: "AccountCodeStorage",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   nonceHolder: {
     address: "0x0000000000000000000000000000000000008003",
     codeName: "NonceHolder",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   knownCodesStorage: {
     address: "0x0000000000000000000000000000000000008004",
     codeName: "KnownCodesStorage",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   immutableSimulator: {
     address: "0x0000000000000000000000000000000000008005",
     codeName: "ImmutableSimulator",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   contractDeployer: {
     address: "0x0000000000000000000000000000000000008006",
     codeName: "ContractDeployer",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   l1Messenger: {
     address: "0x0000000000000000000000000000000000008008",
     codeName: "L1Messenger",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   msgValueSimulator: {
     address: "0x0000000000000000000000000000000000008009",
     codeName: "MsgValueSimulator",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   L2BaseToken: {
     address: "0x000000000000000000000000000000000000800a",
     codeName: "L2BaseToken",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   systemContext: {
     address: "0x000000000000000000000000000000000000800b",
     codeName: "SystemContext",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   bootloaderUtilities: {
     address: "0x000000000000000000000000000000000000800c",
     codeName: "BootloaderUtilities",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   eventWriter: {
     address: "0x000000000000000000000000000000000000800d",
@@ -137,11 +155,13 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x000000000000000000000000000000000000800e",
     codeName: "Compressor",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   complexUpgrader: {
     address: "0x000000000000000000000000000000000000800f",
     codeName: "ComplexUpgrader",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   keccak256: {
     address: "0x0000000000000000000000000000000000008010",
@@ -165,6 +185,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000008011",
     codeName: "PubdataChunkPublisher",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   create2Factory: {
     // This is explicitly a non-system-contract address.
@@ -173,6 +194,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010000",
     codeName: "Create2Factory",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   L2GenesisUpgrade: {
     // This is explicitly a non-system-contract address.
@@ -181,6 +203,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010001",
     codeName: "L2GenesisUpgrade",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   L2BridgeHub: {
     // This is explicitly a non-system-contract address.
@@ -189,6 +212,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010002",
     codeName: "Bridgehub",
     lang: Language.Solidity,
+    location: SourceLocation.L1Contracts
   },
   L2AssetRouter: {
     // This is explicitly a non-system-contract address.
@@ -197,6 +221,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010003",
     codeName: "L2AssetRouter",
     lang: Language.Solidity,
+    location: SourceLocation.L1Contracts
   },
   L2NativeTokenVault: {
     // This is explicitly a non-system-contract address.
@@ -205,6 +230,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010004",
     codeName: "L2NativeTokenVault",
     lang: Language.Solidity,
+    location: SourceLocation.L1Contracts
   },
   L2MessageRoot: {
     // This is explicitly a non-system-contract address.
@@ -213,6 +239,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010005",
     codeName: "MessageRoot",
     lang: Language.Solidity,
+    location: SourceLocation.L1Contracts
   },
   SloadContract: {
     // This is explicitly a non-system-contract address.
@@ -221,6 +248,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010006",
     codeName: "SloadContract",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts
   },
   L2WrappedBaseTokenImplementation: {
     // This is explicitly a non-system-contract address.
@@ -229,6 +257,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000010007",
     codeName: "L2WrappedBaseToken",
     lang: Language.Solidity,
+    location: SourceLocation.L1Contracts
   },
 } as const;
 
