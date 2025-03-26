@@ -119,7 +119,7 @@ object "EcPairing" {
                 revert(0, 0)
             }
             default {
-                return(32, 64)
+                return(32, 32)
             }
 
         }
