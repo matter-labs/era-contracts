@@ -10,7 +10,16 @@ object "EcMul" {
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @dev The gas cost of processing ecmul circuit precompile.
+            /// @dev The gas cost for this precompile is computed as:
+            ///      BASE_CIRCUIT_GAS / cycles_per_<precompile>_circuit
+            ///
+            /// @notice `BASE_CIRCUIT_GAS` is a protocol-level constant set to 80_000.
+            ///         This value represents the gas allocated per full ZK circuit iteration.
+            ///         It is used to align gas costs of precompiles with circuit constraints
+            ///         in the ZKSync VM (ZK-friendly execution model).
+            ///
+            /// @note The division factor (e.g. 15, 25) is derived from the number of cycles
+            ///       needed to execute one instance of the corresponding precompile in the circuit.
             function ECMUL_GAS_COST() -> ret {
                 // Currently geometry is set to cycles_per_ecmul_circuit: 15,
                 // so 80'000 / 15 == 5333

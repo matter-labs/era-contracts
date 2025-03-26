@@ -10,14 +10,21 @@ object "EcPairing" {
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @dev The basic gas cost of processing ecpairing circuit precompile.
+            /// @dev The base gas cost of the ECPAIRING precompile.
+            /// @notice This base cost is *not charged* per call, because each pairing
+            ///         operation fully occupies one circuit slot. Hence, the base cost is 0.
             function ECPAIRING_BASE_GAS_COST() -> ret {
-                // We currently put 1 ECPairing pair per circuit. There is no additional cost.
+                /// In this circuit design, we execute exactly 1 pairing per circuit.
+                /// So there's no need for a separate base cost per invocation.
                 ret := 0
             }
 
-            /// @dev The additional gas cost of processing ecpairing circuit precompile.
-            /// @dev Added per pair.
+            /// @dev The per-pair gas cost of ECPAIRING precompile.
+            /// @notice Each pairing occupies an entire circuit, and is charged the full
+            ///         circuit budget of `BASE_CIRCUIT_GAS = 80_000`.
+            ///         This ensures gas accounting aligns with ZK circuit usage.
+            ///
+            /// @return ret The gas cost per G1-G2 pairing operation.
             function ECPAIRING_PAIR_GAS_COST() -> ret {
                 ret := 80000
             }
@@ -98,7 +105,7 @@ object "EcPairing" {
 
             let precompileParams := unsafePackPrecompileParams(
                 0,              // input offset in words
-                mul(6, pairs),  // input length in words multiples of (p_x, p_x, q_x_a, q_x_b, q_y_a, q_y_b)
+                mul(6, pairs),  // input length in words multiples of (p_x, p_y, q_x_a, q_x_b, q_y_a, q_y_b)
                 0,              // output offset in words
                 2,              // output length in words with success (pairing check boolean)
                 pairs           // number of pairs
