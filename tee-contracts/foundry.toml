@@ -1,0 +1,20 @@
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.27"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 999999
+# https://github.com/foundry-rs/foundry/issues/6780
+via_ir = true
+fs_permissions = [{ access = "read", path = "./"}]
+remappings = [
+    "forge-std/=lib/forge-std/src/",
+    "@automata-network/on-chain-pccs/=lib/automata-network-on-chain-pccs/src/",
+    "automata-network/dcap-attestation/=lib/automata-network-dcap-attestation/",
+    "solady/=lib/solady/src/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts-v5/contracts/",
+    "risc0/=lib/risc0-ethereum/contracts/src/",
+    "@sp1-contracts/=lib/sp1-contracts/contracts/src/"
+]
