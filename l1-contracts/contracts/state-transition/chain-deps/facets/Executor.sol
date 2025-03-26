@@ -90,12 +90,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         bytes32 auxiliaryOutputHash;
         bytes32 commitment;
         // TODO: commented for ZKOS testing
-//        (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) = _createBatchCommitment(
-//            _newBatch,
-//            daOutput.stateDiffHash,
-//            daOutput.blobsOpeningCommitments,
-//            daOutput.blobsLinearHashes
-//        );
+        //        (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) = _createBatchCommitment(
+        //            _newBatch,
+        //            daOutput.stateDiffHash,
+        //            daOutput.blobsOpeningCommitments,
+        //            daOutput.blobsLinearHashes
+        //        );
 
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
