@@ -518,7 +518,7 @@ object "Bootloader" {
             }
 
             function L2_MESSAGE_ROOT_STORAGE() -> ret {
-                ret := 0x000000000000000000000000000000000001000b
+                ret := 0x0000000000000000000000000000000000010008
             }
 
             function BYTECODE_COMPRESSOR_ADDR() -> ret {
