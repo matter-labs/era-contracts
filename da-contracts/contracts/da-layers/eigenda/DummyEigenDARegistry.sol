@@ -3,12 +3,12 @@
 pragma solidity 0.8.24;
 
 contract DummyEigenDARegistry {
-    mapping(uint256 => bytes32) public hashes;
-    function isVerified(uint256 batchNumber) external view returns (bool, bytes32) {
-        return (true, hashes[batchNumber]);
+    mapping(bytes => bytes32) public hashes;
+    function isVerified(bytes calldata inclusion_data) external view returns (bool, bytes32) {
+        return (true, hashes[inclusion_data]);
     }
 
-    function verify(uint256 batchNumber, bytes32 eigenDAHash) external {
-        hashes[batchNumber] = eigenDAHash;
+    function verify(bytes calldata inclusion_data, bytes32 eigenDAHash) external {
+        hashes[inclusion_data] = eigenDAHash;
     }
 }

@@ -6,11 +6,12 @@ import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
 import {OperatorDAInputTooSmall} from "../../DAContractsErrors.sol";
 
 interface IEigenDABlobProofRegistry {
-    function isVerified(uint256 batchNumber) external view returns (bool, bytes32);
+    function isVerified(bytes calldata inclusion_data) external view returns (bool, bytes32);
 }
 
 contract EigenDAL1Validator is IL1DAValidator {
     error InvalidValidatorOutputHash();
+    error ProofNotVerified();
 
     IEigenDABlobProofRegistry public eigenDARegistry;
 
@@ -20,7 +21,7 @@ contract EigenDAL1Validator is IL1DAValidator {
 
     function checkDA(
         uint256, // _chainId
-        uint256 batchNumber,
+        uint256, // _batchNumber,
         bytes32 l2DAValidatorOutputHash,
         bytes calldata operatorDAInput,
         uint256 maxBlobsSupported
@@ -30,14 +31,9 @@ contract EigenDAL1Validator is IL1DAValidator {
         }
         bytes32 stateDiffHash = abi.decode(operatorDAInput[:32], (bytes32));
 
-        // It is a bit weird that we don't need the rest of operatorDAInput (The BlobInfo)
+        (bool isVerified, bytes32 eigenDAHash) = eigenDARegistry.isVerified(operatorDAInput[32:]);
 
-        (bool isVerified, bytes32 eigenDAHash) = eigenDARegistry.isVerified(batchNumber);
-
-        if (!isVerified) {
-            // We should actually retry here
-            revert("EigenDAL1Validator: blob proof is not verified");
-        }
+        if (!isVerified) revert ProofNotVerified();
 
         if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(stateDiffHash, eigenDAHash)))
             revert InvalidValidatorOutputHash();

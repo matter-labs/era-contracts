@@ -211,8 +211,8 @@ abstract contract DeployUtils is Script {
             config.contracts.eigenDAL1Validator = toml.readAddress("$.contracts.eigenda_l1_validator");
         }
 
-        if (vm.keyExistsToml(toml, "$.contracts.eigenda_registry")) {
-            config.contracts.eigenDARegistry = toml.readAddress("$.contracts.eigenda_registry");
+        if (vm.keyExistsToml(toml, "$.contracts.eigenda_registry_addr")) {
+            config.contracts.eigenDARegistry = toml.readAddress("$.contracts.eigenda_registry_addr");
         }
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
