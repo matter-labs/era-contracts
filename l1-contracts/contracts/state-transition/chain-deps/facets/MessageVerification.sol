@@ -21,7 +21,14 @@ abstract contract MessageVerification is IMessageVerification {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
-        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _l2MessageToLog(_message), _proof);
+        return
+            _proveL2LogInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _l2MessageToLog(_message),
+                _proof: _proof
+            });
     }
 
     /// @inheritdoc IMessageVerification
@@ -32,7 +39,14 @@ abstract contract MessageVerification is IMessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        return _proveL2LeafInclusion(_chainId, _batchNumber, _leafProofMask, _leaf, _proof);
+        return
+            _proveL2LeafInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
+            });
     }
 
     function _proveL2LeafInclusion(
@@ -67,7 +81,14 @@ abstract contract MessageVerification is IMessageVerification {
 
         // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
 
-        return _proveL2LeafInclusion(_chainId, _batchNumber, _index, hashedLog, _proof);
+        return
+            _proveL2LeafInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _leafProofMask: _index,
+                _leaf: hashedLog,
+                _proof: _proof
+            });
     }
 
     /// @dev Convert arbitrary-length message to the raw L2 log
@@ -91,6 +112,13 @@ abstract contract MessageVerification is IMessageVerification {
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view returns (bool) {
-        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _log, _proof);
+        return
+            _proveL2LogInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 }

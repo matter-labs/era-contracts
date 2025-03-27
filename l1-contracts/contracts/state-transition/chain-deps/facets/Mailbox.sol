@@ -77,7 +77,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
-        return _proveL2LogInclusion(0, _batchNumber, _index, _l2MessageToLog(_message), _proof);
+        return
+            _proveL2LogInclusion({
+                _chainId: 0,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _l2MessageToLog(_message),
+                _proof: _proof
+            });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -87,7 +94,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view returns (bool) {
-        return _proveL2LogInclusion(0, _batchNumber, _index, _log, _proof);
+        return
+            _proveL2LogInclusion({_chainId: 0, _batchNumber: _batchNumber, _index: _index, _log: _log, _proof: _proof});
     }
 
     /// @inheritdoc IMailboxImpl
@@ -117,7 +125,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             key: _l2TxHash,
             value: bytes32(uint256(_status))
         });
-        return _proveL2LogInclusion(0, _l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
+        return
+            _proveL2LogInclusion({
+                _chainId: 0,
+                _batchNumber: _l2BatchNumber,
+                _index: _l2MessageIndex,
+                _log: l2Log,
+                _proof: _merkleProof
+            });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -127,23 +142,31 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external view returns (bool) {
-        return _proveL2LeafInclusion(0, _batchNumber, _leafProofMask, _leaf, _proof);
+        return
+            _proveL2LeafInclusion({
+                _chainId: uint256(0),
+                _batchNumber: _batchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
+            });
     }
 
     function _proveL2LeafInclusion(
-        uint256, // _chainId
+        // solhint-disable-next-line no-unused-vars
+        uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
-            s.chainId,
-            _batchNumber,
-            _leafProofMask,
-            _leaf,
-            _proof
-        );
+        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof({
+            _chainId: s.chainId,
+            _batchNumber: _batchNumber,
+            _leafProofMask: _leafProofMask,
+            _leaf: _leaf,
+            _proof: _proof
+        });
 
         // If the `finalProofNode` is true, then we assume that this is L1 contract of the top-level
         // in the aggregation, i.e. the batch root is stored here on L1.

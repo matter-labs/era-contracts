@@ -165,14 +165,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     struct ViaIR {
-        uint256 logKey2;
         address logSender2;
+        address logSender3;
+        address logSender4;
+        uint256 logKey2;
         bytes32 logValue2;
         uint256 logKey3;
-        address logSender3;
         bytes32 logValue3;
         uint256 logKey4;
-        address logSender4;
         bytes32 logValue4;
     }
 

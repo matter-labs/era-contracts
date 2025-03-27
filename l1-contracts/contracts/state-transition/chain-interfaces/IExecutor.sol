@@ -3,7 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
-import {L2Log} from "../../common/Messaging.sol";
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
