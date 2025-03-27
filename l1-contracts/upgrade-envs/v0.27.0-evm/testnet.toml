@@ -5,8 +5,7 @@ governance_upgrade_timer_initial_delay = 86400
 # FIXME
 # original owner that was used to create bridgehub
 # 0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7 ?? 
-# owner_address = "0x0000000000000000000000000000000000000001"
-owner_address = "0x0000000000000000000000000000000000000000"
+owner_address = "0x0000000000000000000000000000000000000001"
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
 
