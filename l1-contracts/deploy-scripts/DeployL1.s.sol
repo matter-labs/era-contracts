@@ -273,19 +273,13 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
 
-        // TODO: Use deploySimpleContract
         if (config.contracts.eigenDAL1Validator == address(0)) {
             if (config.contracts.eigenDARegistry == address(0)) {
-                addresses.daAddresses.eigenDARegistry = deployViaCreate2(Utils.readEigenDADummyRegistryBytecode(), "");
-                console.log("DummyEigenDARegistry deployed at:", addresses.daAddresses.eigenDARegistry);
+                addresses.daAddresses.eigenDARegistry = deploySimpleContract("DummyEigenDARegistry");
             } else {
                 addresses.daAddresses.eigenDARegistry = config.contracts.eigenDARegistry;
             }
-            addresses.daAddresses.eigenDAL1Validator = deployViaCreate2(
-                Utils.readEigenDAL1ValidatorBytecode(),
-                abi.encode(addresses.daAddresses.eigenDARegistry)
-            );
-            console.log("EigenDAL1Validator deployed at:", addresses.daAddresses.eigenDAL1Validator);
+            addresses.daAddresses.eigenDAL1Validator = deploySimpleContract("EigenDAL1Validator");
         } else {
             addresses.daAddresses.eigenDAL1Validator = config.contracts.eigenDAL1Validator;
         }
@@ -782,6 +776,10 @@ contract DeployL1Script is Script, DeployUtils {
             return Utils.readAvailL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return Utils.readDummyAvailBridgeBytecode();
+        } else if (compareStrings(contractName, "DummyEigenDARegistry")) {
+            return Utils.readDummyEigenDARegistryBytecode();
+        } else if (compareStrings(contractName, "EigenDAL1Validator")) {
+            return Utils.readEigenDAL1ValidatorBytecode();
         } else if (compareStrings(contractName, "Verifier")) {
             if (config.testnetVerifier) {
                 return type(TestnetVerifier).creationCode;
