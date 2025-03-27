@@ -60,10 +60,13 @@ contract CelestiaL1DAValidatorTest is Test {
             
             // Convert hex string to bytes
             bytes memory operatorDAInput = vm.parseBytes(testCases[i]);
+            console.log("Parsed input");
 
             // Decode the input
             CelestiaZKStackInput memory decodedInput = abi.decode(operatorDAInput, (CelestiaZKStackInput));
+            console.log("Decoded input");
             (bytes32 eqKeccakHash, bytes32 eqDataRoot) = abi.decode(decodedInput.publicValues, (bytes32, bytes32));
+            console.log("Decoded public values");
 
             console.log("eqKeccakHash", vm.toString(eqKeccakHash));
             console.log("eqDataRoot", vm.toString(eqDataRoot));

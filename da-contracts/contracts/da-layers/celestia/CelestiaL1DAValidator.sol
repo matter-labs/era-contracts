@@ -78,7 +78,14 @@ contract CelestiaL1DAValidator is IL1DAValidator {
     ) external returns (L1DAValidatorOutput memory output) {
         CelestiaZKStackInput memory input = abi.decode(_operatorDAInput, (CelestiaZKStackInput));
 
-        (bytes32 eqKeccakHash, bytes32 eqDataRoot) = abi.decode(input.publicValues, (bytes32, bytes32));
+        bytes memory publicValues = input.publicValues;  // get reference to bytes
+        bytes32 eqKeccakHash;
+        bytes32 eqDataRoot;
+        assembly {
+            let ptr := add(publicValues, 32)  // skip length prefix
+            eqKeccakHash := mload(ptr)        // first bytes32
+            eqDataRoot := mload(add(ptr, 32)) // second bytes32
+        }
 
         // First verify the equivalency proof (im assuming this call reverts if the proof ins invalid, so we move onward from here)
         ISP1Verifier(SP1_GROTH_16_VERIFIER).verifyProof(eqsVkey, input.publicValues, input.equivalenceProof);
