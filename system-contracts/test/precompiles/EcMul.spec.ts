@@ -1,4 +1,4 @@
-/*import { expect } from "chai";
+import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
 import { callFallback, deployContractYul } from "../shared/utils";
 
@@ -398,4 +398,3 @@ describe("EcMul tests", function () {
     });
   });
 });
-*/
