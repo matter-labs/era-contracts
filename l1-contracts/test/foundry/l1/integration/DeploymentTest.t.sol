@@ -92,7 +92,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(chainIds[0], chainId);
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
-        assertEq(protocolVersion, 25);
+        assertEq(protocolVersion, 120259084288);
     }
 
     function test_bridgehubSetter() public {

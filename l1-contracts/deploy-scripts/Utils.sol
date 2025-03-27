@@ -496,7 +496,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) internal {
+    ) internal returns (bytes32 txHash) {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -524,7 +524,17 @@ library Utils {
         }
 
         vm.broadcast();
+        vm.recordLogs();
         bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
     }
 
     function runGovernanceL1L2DirectTransaction(

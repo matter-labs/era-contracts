@@ -17,7 +17,7 @@ abstract contract MessageVerification is IMessageVerification {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
-        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _L2MessageToLog(_message), _proof);
+        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _l2MessageToLog(_message), _proof);
     }
 
     /// @inheritdoc IMessageVerification
@@ -66,8 +66,8 @@ abstract contract MessageVerification is IMessageVerification {
         return _proveL2LeafInclusion(_chainId, _batchNumber, _index, hashedLog, _proof);
     }
 
-    /// @dev Convert arbitrary-length message to the raw l2 log
-    function _L2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
+    /// @dev Convert arbitrary-length message to the raw L2 log
+    function _l2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
         return
             L2Log({
                 l2ShardId: 0,

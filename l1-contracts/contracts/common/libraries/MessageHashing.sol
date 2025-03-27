@@ -116,7 +116,7 @@ library MessageHashing {
             result.batchSettlementRoot = batchSettlementRoot;
             result.finalProofNode = proofMetadata.finalProofNode;
 
-            if (proofMetadata.batchLeafProofLen == 0) {
+            if (proofMetadata.finalProofNode) {
                 return result;
             }
             // Now, we'll have to check that the Gateway included the message.
