@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The interface of the L2 MessageRootStorage contract, 
+ * @notice The interface of the L2 MessageRootStorage contract,
  * responsible for storing the message roots of other chains on the L2.
  */
 interface IL2MessageRootStorage {
