@@ -136,7 +136,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         public
         payable
         override(AssetRouterBase, IAssetRouterBase)
-        // onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
+        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
         nonReentrant
     {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
