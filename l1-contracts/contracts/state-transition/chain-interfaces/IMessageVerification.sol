@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {L2Log, L2Message} from "../../common/Messaging.sol";
 
-/// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
+/// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMessageVerification {

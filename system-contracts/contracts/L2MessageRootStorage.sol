@@ -11,7 +11,7 @@ error MessageRootAlreadyExists();
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice MessageRootStorage contract for imported L2 message roots..
+ * @notice MessageRootStorage contract responsible for storing the message roots of other chains on the L2.
  * @dev
  */
 contract L2MessageRootStorage is SystemContractBase {
