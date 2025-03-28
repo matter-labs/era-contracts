@@ -86,22 +86,20 @@ After that you should use the zkstack_cli tool to get the calldata for the `Fina
 forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpgrade --ffi --rpc-url <rpc-url> --gas-limit 20000000000 --broadcast --slow
 ```
 
-
 ## Exact steps for testnet
 
-* Create output/testnet directory
-
+- Create output/testnet directory
 
 ```shell
 # (XXXX is your API key from alchemy)
-export SEPOLIA="https://eth-sepolia.g.alchemy.com/v2/XXXXXX 
+export SEPOLIA="https://eth-sepolia.g.alchemy.com/v2/XXXXXX
 
 UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/testnet.toml  UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem-testnet.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000
 
 ```
 
-* Get all the 'forge verify-call' entries from the logs, and put them in verification-logs file in the output dir
-* for stage & testnet - you have to also add the '--chain sepolia` to the end of each line
+- Get all the 'forge verify-call' entries from the logs, and put them in verification-logs file in the output dir
+- for stage & testnet - you have to also add the '--chain sepolia` to the end of each line
 
 Now it is time to actually send some data to sepolia - you'll need your own $WALLET_ADDRESS and $PRIVATE_TESTNET_KEY for this wallet
 
@@ -120,7 +118,7 @@ Now generate the "yaml" file with all the data
 YAML_OUTPUT_FILE=upgrade-envs/v0.27.0-evm/output/testnet/v27-ecosystem.yaml UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem-testnet.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json yarn upgrade-yaml-output-generator
 ```
 
-**IMPORTANT**  If you have to re-run generation it in the future, please manually include previous tx hashes from the yaml file into the new one. (this is due to the fact that bytecodes that were already published would not be re-sent - and the verification tool would not be able to confirm their correctness without the original  tx that created it).
+**IMPORTANT** If you have to re-run generation it in the future, please manually include previous tx hashes from the yaml file into the new one. (this is due to the fact that bytecodes that were already published would not be re-sent - and the verification tool would not be able to confirm their correctness without the original tx that created it).
 
 Afterwards, please verify the contracts:
 
