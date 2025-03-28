@@ -2,23 +2,22 @@ era_chain_id = 270
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 86400
 
-# FIXME
-# original owner that was used to create bridgehub
-# 0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7 ?? 
-owner_address = "0x0000000000000000000000000000000000000001"
+# Not used in this upgrade
+# TODO: should be clarified and refined in next upgrades
+owner_address = "0x0000000000000000000000000000000000000000"
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
 
 old_protocol_version = 0x1a00000000
 
 [contracts]
-# FIXME
+# Not used in this upgrade
 governance_min_delay = 0
 
 max_number_of_chains = 100
 create2_factory_salt = "0x1000000000000000000000000000000000000000000000000000000000000001"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-validator_timelock_execution_delay = 0
+validator_timelock_execution_delay = 0 # Not used in this upgrade
 genesis_root = "0xb192c5937e91363c0b880faf0568b0621a3b16010cb2df42b588972516c1d4fe"
 genesis_rollup_leaf_index = 76
 genesis_batch_commitment = "0xe23f2436b09ef15ba64ec3f30dc26833dda86d6dd6bef7ba6f8274e434801d05"
