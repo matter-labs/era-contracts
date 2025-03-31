@@ -2,8 +2,31 @@ import fetch from "node-fetch";
 
 // It includes all contracts being compiled
 import BASE_REQUEST = require("./base-verification-request-v26.json");
+import { sleep } from "zksync-ethers/build/utils";
 
 export type HttpMethod = "POST" | "GET";
+
+async function waitForVerificationResult(requestId: number) {
+  let retries = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (retries > 500) {
+      throw new Error("Too many retries");
+    }
+
+    const statusObject = await query("GET", `${VERIFICATION_URL}/${requestId}`);
+
+    if (statusObject.status == "successful") {
+      break;
+    } else if (statusObject.status == "failed") {
+      throw new Error(statusObject.error);
+    } else {
+      retries += 1;
+      await sleep(1000);
+    }
+  }
+}
 
 /**
  * Performs an API call to the Contract verification API.
@@ -40,23 +63,25 @@ export async function query(
 
   const response = await fetch(url, init);
   try {
-    return await response.json();
+    return await response.clone().json();
   } catch (e) {
     throw {
-      error: "Could not decode JSON in response",
+      error: `Could not decode JSON in response: ${await response.text()}`,
       status: `${response.status} ${response.statusText}`,
     };
   }
 }
 
-const EXPLORER_URL = process.env.VERIFICATION_URL!;
+const VERIFICATION_URL = process.env.VERIFICATION_URL!;
 
 async function verifyContract(addr: string, fullName: string) {
   const requestClone = JSON.parse(JSON.stringify(BASE_REQUEST));
   requestClone.contractAddress = addr;
   requestClone.contractName = fullName;
-  const result = await query("POST", EXPLORER_URL, {}, requestClone);
+  const result = await query("POST", VERIFICATION_URL, {}, requestClone);
   console.log(`Request for address ${addr} under id ${result}`);
+  await waitForVerificationResult(result);
+  console.log('Verification was successful.');
 }
 
 async function main() {
@@ -75,4 +100,9 @@ async function main() {
   );
 }
 
-main();
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Error:", err.message || err);
+    process.exit(1);
+  });

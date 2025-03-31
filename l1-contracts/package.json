@@ -74,6 +74,7 @@
     "token-info": "ts-node scripts/token-info.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "verify": "hardhat run --network env scripts/verify.ts",
+    "verify-l2-contracts": "ts-node scripts/verify-l2-contracts.ts",
     "read-variable": "ts-node scripts/read-variable.ts",
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",

@@ -148,6 +148,26 @@ Since scripts, READMEs, etc., are code that is not subject to audits, these are 
 branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these
 changes.
 
+## Verification of contracts
+
+To verify contracts deployed on a chain, ensure to firstly build all the contracts locally:
+
+```
+yarn build:foundry
+```
+
+and run the verification script afterward:
+
+```
+VERIFICATION_URL=<explorer-verification-url> yarn verify-on-explorer
+```
+
+For example, for zksync Era testnet environment it would look the following way:
+
+```
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-explorer
+```
+
 ## Official Links
 
 - [Website](https://zksync.io/)

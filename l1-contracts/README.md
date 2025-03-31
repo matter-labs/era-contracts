@@ -41,3 +41,17 @@ If you identify a false positive in your code, please make sure to highlight thi
 
 We also utilize `typos` and `codespell` spell checkers to minimize the occurrence of accidental typos.
 If you need to add a word to the databases of these tools please insert it into `../codespell/wordlist.txt` and `../_typos.toml`.
+
+### Verifying contracts on L2
+
+Some of the contracts inside the `l1-contracts` folder are predeployed on all ZK Chains. In order to verify those on explorer, build the contracts via `yarn build:foundry` and then run the following command:
+
+```
+VERIFICATION_URL=<explorer-verification-url> yarn verify-l2-contracts 
+```
+
+For example, for zksync Era testnet environment it would look the following way:
+
+```
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-l2-contracts
+```
