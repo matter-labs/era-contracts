@@ -51,7 +51,7 @@ export async function query(
     }
 }
 
-const EXPLORER_URL = 'https://zksync2-mainnet-explorer.zksync.io/contract_verification';
+const EXPLORER_URL = process.env.VERIFICATION_URL!;
 
 async function verifyContract(
     addr: string,

@@ -7,7 +7,7 @@ import { Command } from "commander";
 import * as fs from "fs";
 import { sleep } from "zksync-ethers/build/utils";
 
-const VERIFICATION_URL = 'https://explorer.sepolia.era.zksync.dev/contract_verification';
+const VERIFICATION_URL = process.env.VERIFICATION_URL!;
 const ZKSOLC_VERSION = 'v1.5.7';
 const COMPILER_SOLC_VERSION = 'zkVM-0.8.24-1.0.1';
 
