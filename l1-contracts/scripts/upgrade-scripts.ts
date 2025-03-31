@@ -32,24 +32,23 @@ program
     .command('startUpgrade')
     .description('Starts the protocol upgrade on L1 by submitting the upgrade proposal')
     .requiredOption('--l2tx <txHash>', 'L2 transaction hash')
-    .requiredOption('--handler <address>', 'Protocol upgrade handler contract address')
+    .requiredOption('--protocolUpgradeHandler <address>', 'Protocol upgrade handler contract address')
     .requiredOption('--l2-rpc-url <url>', 'L2 RPC URL for zkSync Stage2 provider')
     .requiredOption('--l1-rpc-url <url>', 'L1 RPC URL (e.g., Sepolia) provider')
     .requiredOption('--pk <privateKey>', 'L1 wallet private key')
     .option('--message-id <number>', 'ID (index) of the message from the transaction receipt to use', '0')
     .action(async (options) => {
         try {
-            const { l2tx, handler, l2RpcUrl, l1RpcUrl, pk, messageId } = options;
+            const { l2tx, protocolUpgradeHandler, l2RpcUrl, l1RpcUrl, pk, messageId } = options;
 
             // Initialize providers and wallet.
             const zksyncProvider = new ZkSyncProvider(l2RpcUrl);
-            
             const l1Provider = new ethers.providers.JsonRpcProvider(l1RpcUrl);
             const l1Wallet = new ethers.Wallet(pk, l1Provider);
 
             // Instantiate the protocol upgrade handler contract.
             const l1ProtocolUpgradeHandler = new ethers.Contract(
-                handler.toLowerCase(),
+                protocolUpgradeHandler.toLowerCase(),
                 TESTNET_PROTOCOL_UPGRADE_HANDLER_ABI,
                 l1Wallet
             );
@@ -92,14 +91,14 @@ program
     .command('executeUpgrade')
     .description('Executes the protocol upgrade on L1 using the upgrade proposal')
     .requiredOption('--l2tx <txHash>', 'L2 transaction hash')
-    .requiredOption('--handler <address>', 'Protocol upgrade handler contract address')
+    .requiredOption('--protocolUpgradeHandler <address>', 'Protocol upgrade handler contract address')
     .requiredOption('--l2-rpc-url <url>', 'L2 RPC URL for zkSync Stage2 provider')
     .requiredOption('--l1-rpc-url <url>', 'L1 RPC URL (e.g., Sepolia) provider')
     .requiredOption('--pk <privateKey>', 'L1 wallet private key')
     .option('--message-id <number>', 'ID (index) of the message from the transaction receipt to use', '0')
     .action(async (options) => {
         try {
-            const { l2tx, handler, l2RpcUrl, l1RpcUrl, pk, messageId } = options;
+            const { l2tx, protocolUpgradeHandler, l2RpcUrl, l1RpcUrl, pk, messageId } = options;
 
             // Initialize providers and wallet.
             const zksyncProvider = new ZkSyncProvider(l2RpcUrl);
@@ -108,7 +107,7 @@ program
 
             // Instantiate the protocol upgrade handler contract.
             const l1ProtocolUpgradeHandler = new ethers.Contract(
-                handler.toLowerCase(),
+                protocolUpgradeHandler.toLowerCase(),
                 TESTNET_PROTOCOL_UPGRADE_HANDLER_ABI,
                 l1Wallet
             );
