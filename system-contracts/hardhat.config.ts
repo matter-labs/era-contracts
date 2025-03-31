@@ -9,7 +9,7 @@ import "hardhat-typechain";
 export default {
   zksolc: {
     compilerSource: "binary",
-    version: '1.5.7',
+    version: "1.5.7",
     settings: {
       isSystem: true,
     },
@@ -58,7 +58,7 @@ export default {
       url: "https://z2-dev-api.zksync.dev/",
       ethNetwork: "sepolia",
       zksync: true,
-    }
+    },
   },
   defaultNetwork: "mainnet",
   paths: {

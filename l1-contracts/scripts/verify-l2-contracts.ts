@@ -1,11 +1,9 @@
-
 import fetch from "node-fetch";
 
 // It includes all contracts being compiled
-const BASE_REQUEST = require("./base-verification-request-v26.json");
+import BASE_REQUEST = require("./base-verification-request-v26.json");
 
 export type HttpMethod = "POST" | "GET";
-
 
 /**
  * Performs an API call to the Contract verification API.
@@ -16,78 +14,65 @@ export type HttpMethod = "POST" | "GET";
  * @returns API response parsed as a JSON.
  */
 export async function query(
-    method: HttpMethod,
-    endpoint: string,
-    queryParams?: { [key: string]: string },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    requestBody?: any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Promise<any> {
-    const url = new URL(endpoint);
-    // Iterate through query params and add them to URL.
-    if (queryParams) {
-      Object.entries(queryParams).forEach(([key, value]) => url.searchParams.set(key, value));
-    }
-  
-    const init = {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
+  method: HttpMethod,
+  endpoint: string,
+  queryParams?: { [key: string]: string },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  requestBody?: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  const url = new URL(endpoint);
+  // Iterate through query params and add them to URL.
+  if (queryParams) {
+    Object.entries(queryParams).forEach(([key, value]) => url.searchParams.set(key, value));
+  }
+
+  const init = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  };
+  if (requestBody) {
+    init.body = JSON.stringify(requestBody);
+  }
+
+  const response = await fetch(url, init);
+  try {
+    return await response.json();
+  } catch (e) {
+    throw {
+      error: "Could not decode JSON in response",
+      status: `${response.status} ${response.statusText}`,
     };
-    if (requestBody) {
-      init.body = JSON.stringify(requestBody);
-    }
-  
-    const response = await fetch(url, init);
-    try {
-      return await response.json();
-    } catch (e) {
-      throw {
-        error: "Could not decode JSON in response",
-        status: `${response.status} ${response.statusText}`,
-      };
-    }
+  }
 }
 
 const EXPLORER_URL = process.env.VERIFICATION_URL!;
 
-async function verifyContract(
-    addr: string,
-    fullName: string
-) {
-    const requestClone = JSON.parse(JSON.stringify(BASE_REQUEST));
-    requestClone.contractAddress = addr;
-    requestClone.contractName = fullName;
-    const result = await query(
-        'POST',
-        EXPLORER_URL,
-        {},
-        requestClone
-    )
-    console.log(`Request for address ${addr} under id ${result}`);
+async function verifyContract(addr: string, fullName: string) {
+  const requestClone = JSON.parse(JSON.stringify(BASE_REQUEST));
+  requestClone.contractAddress = addr;
+  requestClone.contractName = fullName;
+  const result = await query("POST", EXPLORER_URL, {}, requestClone);
+  console.log(`Request for address ${addr} under id ${result}`);
 }
 
 async function main() {
-    await verifyContract(
-        '0x0000000000000000000000000000000000010003',
-        'contracts/bridge/asset-router/L2AssetRouter.sol:L2AssetRouter'
-    );
-    await verifyContract(
-        '0x0000000000000000000000000000000000010004',
-        'contracts/bridge/ntv/L2NativeTokenVault.sol:L2NativeTokenVault'
-    );
-    await verifyContract(
-        '0x0000000000000000000000000000000000010005',
-        'contracts/bridgehub/MessageRoot.sol:MessageRoot'
-    );
-    await verifyContract(
-        '0x0000000000000000000000000000000000010007',
-        'contracts/bridge/L2WrappedBaseToken.sol:L2WrappedBaseToken'
-    );
-}   
+  await verifyContract(
+    "0x0000000000000000000000000000000000010003",
+    "contracts/bridge/asset-router/L2AssetRouter.sol:L2AssetRouter"
+  );
+  await verifyContract(
+    "0x0000000000000000000000000000000000010004",
+    "contracts/bridge/ntv/L2NativeTokenVault.sol:L2NativeTokenVault"
+  );
+  await verifyContract("0x0000000000000000000000000000000000010005", "contracts/bridgehub/MessageRoot.sol:MessageRoot");
+  await verifyContract(
+    "0x0000000000000000000000000000000000010007",
+    "contracts/bridge/L2WrappedBaseToken.sol:L2WrappedBaseToken"
+  );
+}
 
 main();
-
-  
