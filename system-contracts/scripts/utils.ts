@@ -364,10 +364,10 @@ export async function query(
 
   const response = await fetch(url, init);
   try {
-    return await response.json();
+    return await response.clone().json();
   } catch (e) {
     throw {
-      error: "Could not decode JSON in response",
+      error: `Could not decode JSON in response: ${await response.text()}`,
       status: `${response.status} ${response.statusText}`,
     };
   }
