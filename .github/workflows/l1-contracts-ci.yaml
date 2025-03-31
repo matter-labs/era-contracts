@@ -232,17 +232,29 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.72.0
-
       - name: Generate Verifier.sol
         working-directory: tools
         run: cargo run
 
       - name: Compare
         run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/Verifier.sol
+
+  check-verifier-generator-l2:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Generate Verifier.sol
+        working-directory: tools
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --input_path data/scheduler_key.json --l2_mode
+
+      - name: Compare
+        run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/L2Verifier.sol
 
   coverage:
     defaults:
@@ -291,8 +303,11 @@ jobs:
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
 
-      - name: Setup LCOV
-        uses: hrishikesh-kadam/setup-lcov@v1
+      # Installing the specific version of `lcov` because of
+      # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
+      # https://github.com/zgosalvez/github-actions-report-lcov/issues/282
+      - name: Install LCOV
+        uses: hrishikesh-kadam/setup-lcov@6c1aa0cc9e1c02f9f58f01ac599f1064ccc83470 # v1.1.0
         with:
           ref: v1.16
 
@@ -301,7 +316,7 @@ jobs:
       # to include coverage in all directories, comment out this step. Note that because this
       # filtering applies to the lcov file, the summary table generated in the previous step will
       # still include all files and directories.
-      # The `--rc lcov_branch_coverage=1` part keeps branch info in the filtered report, since lcov
+      # The `--rc branch_coverage=1` part keeps branch info in the filtered report, since lcov
       # defaults to removing branch info.
       - name: Filter directories
         run: |
@@ -321,7 +336,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
 
       - name: Verify minimum coverage
-        uses: zgosalvez/github-actions-report-lcov@v4
+        uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts

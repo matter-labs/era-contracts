@@ -74,6 +74,12 @@ contract DeployL1Script is Script, DeployUtils {
 
     function runForTest() public {
         runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+
+        // In the production environment, there will be a separate script dedicated to accepting the adminship
+        // but for testing purposes we'll have to do it here.
+        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        vm.broadcast(addresses.chainAdmin);
+        bridgehub.acceptAdmin();
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
