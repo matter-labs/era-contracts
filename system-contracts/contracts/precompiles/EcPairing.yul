@@ -45,9 +45,21 @@ object "EcPairing" {
             //                      HELPER FUNCTIONS
             //////////////////////////////////////////////////////////////////
 
-            // @dev Packs precompile parameters into one word.
-            // Note: functions expect to work with 32/64 bits unsigned integers.
-            // Caller should ensure the type matching before!
+            /// @dev Packs precompile parameters into one word.
+            /// Note: functions expect to work with 32/64 bits unsigned integers.
+            /// Caller should ensure the type matching before!
+            ///
+            /// @notice The layout is as follows (from least to most significant bits):
+            /// - [0..32)    uint32_inputOffsetInWords
+            /// - [32..64)   uint32_inputLengthInWords
+            /// - [64..96)   uint32_outputOffsetInWords
+            /// - [96..128)  uint32_outputLengthInWords
+            /// - [128..192) Reserved (e.g. memoryPageToRead / memoryPageToWrite) — currently unused and left as 0
+            /// - [192..256) uint64_perPrecompileInterpreted (left-aligned in the 256-bit word)
+            ///
+            /// All fields except the last are packed contiguously into the lower 128 bits.
+            /// The final `uint64_perPrecompileInterpreted` is left-aligned (i.e., stored in the top 64 bits),
+            /// as memoryPageToRead and memoryPageToWrite are assumed to be zero and not used.
             function unsafePackPrecompileParams(
                 uint32_inputOffsetInWords,
                 uint32_inputLengthInWords,
@@ -59,6 +71,7 @@ object "EcPairing" {
                 rawParams := or(rawParams, shl(32, uint32_inputLengthInWords))
                 rawParams := or(rawParams, shl(64, uint32_outputOffsetInWords))
                 rawParams := or(rawParams, shl(96, uint32_outputLengthInWords))
+                // memoryPageToRead and memoryPageToWrite left as zero (bits 128..192)
                 rawParams := or(rawParams, shl(192, uint64_perPrecompileInterpreted))
             }
 
