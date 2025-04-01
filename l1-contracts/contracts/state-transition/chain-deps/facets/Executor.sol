@@ -267,8 +267,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 ViaIR memory viaIR;
                 // we are using the fact that msg_root_logs are emitted after each other, starting with the chainId.
                 // Extract the values to be compared to/used such as the log sender, key, and value
-                // slither-disable-next-line unused-return
                 i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE);
+                // slither-disable-next-line unused-return
                 (viaIR.logSender2, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
                 // slither-disable-next-line unused-return
                 (viaIR.logKey2, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);

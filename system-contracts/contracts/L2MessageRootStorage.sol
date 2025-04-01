@@ -20,7 +20,7 @@ contract L2MessageRootStorage is SystemContractBase {
     function addMessageRoot(
         uint256 chainId,
         uint256 batchNumber,
-        bytes32[] memory sides
+        bytes32[] calldata sides
     ) external onlyCallFromBootloader {
         if (sides.length != 1) {
             revert SidesLengthNotOne();
