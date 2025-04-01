@@ -81,7 +81,7 @@ async function verifyContract(addr: string, fullName: string) {
   const result = await query("POST", VERIFICATION_URL, {}, requestClone);
   console.log(`Request for address ${addr} under id ${result}`);
   await waitForVerificationResult(result);
-  console.log('Verification was successful.');
+  console.log("Verification was successful.");
 }
 
 async function main() {

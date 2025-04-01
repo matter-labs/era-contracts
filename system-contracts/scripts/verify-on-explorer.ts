@@ -8,8 +8,8 @@ import * as fs from "fs";
 import { sleep } from "zksync-ethers/build/utils";
 
 const VERIFICATION_URL = process.env.VERIFICATION_URL!;
-const ZKSOLC_VERSION = 'v1.5.7';
-const COMPILER_SOLC_VERSION = 'zkVM-0.8.24-1.0.1';
+const ZKSOLC_VERSION = "v1.5.7";
+const COMPILER_SOLC_VERSION = "zkVM-0.8.24-1.0.1";
 
 async function waitForVerificationResult(requestId: number) {
   let retries = 0;
@@ -33,11 +33,13 @@ async function waitForVerificationResult(requestId: number) {
   }
 }
 
-const CHAIN = 'zksync';
+const CHAIN = "zksync";
 
 async function verifySolFoundry(contractInfo: SolidityContractDescription) {
   const codeNameWithPath = `contracts-preprocessed/${contractInfo.codeName}.sol:${contractInfo.codeName}`;
-  await spawn(`forge verify-contract --zksync --chain ${CHAIN} --watch --verifier zksync --verifier-url ${VERIFICATION_URL} --constructor-args 0x ${contractInfo.address} ${codeNameWithPath}`);
+  await spawn(
+    `forge verify-contract --zksync --chain ${CHAIN} --watch --verifier zksync --verifier-url ${VERIFICATION_URL} --constructor-args 0x ${contractInfo.address} ${codeNameWithPath}`
+  );
 }
 
 async function verifyYul(contractInfo: YulContractDescription) {
@@ -58,8 +60,8 @@ async function verifyYul(contractInfo: YulContractDescription) {
   try {
     const requestId = await query("POST", VERIFICATION_URL, undefined, requestBody);
     await waitForVerificationResult(requestId);
-    console.log('Verification was successful.');
-  } catch(e) {
+    console.log("Verification was successful.");
+  } catch (e) {
     console.log(`Failed to process verification request. Error ${JSON.stringify(e)}`);
   }
 }
@@ -75,20 +77,18 @@ async function main() {
   for (const contractName in SYSTEM_CONTRACTS) {
     const contractInfo = SYSTEM_CONTRACTS[contractName];
 
-    if (contractInfo.lang == 'solidity' && contractInfo.location == SourceLocation.L1Contracts) {
+    if (contractInfo.lang == "solidity" && contractInfo.location == SourceLocation.L1Contracts) {
       console.log(`Skipped verification of ${contractInfo.codeName} since it is located in l1-contracts`);
       continue;
     }
-  
+
     console.log(`Verifying ${contractInfo.codeName} on ${contractInfo.address} address..`);
     if (contractInfo.lang == "solidity") {
-      if(contractInfo.location == SourceLocation.L1Contracts) {
+      if (contractInfo.location == SourceLocation.L1Contracts) {
         continue;
       }
-  
-      await verifySolFoundry(
-        contractInfo
-      );
+
+      await verifySolFoundry(contractInfo);
     } else if (contractInfo.lang == "yul") {
       await verifyYul(contractInfo);
     } else {
