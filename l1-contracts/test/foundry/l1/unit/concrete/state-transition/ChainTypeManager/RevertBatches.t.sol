@@ -197,23 +197,23 @@ contract revertBatchesTest is ChainTypeManagerTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
-        assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
+        assertEq(entries.length, 2);
+        assertEq(entries[1].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[1].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries[1].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
 
         uint256 totalBatchesCommitted = gettersFacet.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 1,
-            batchHash: entries[0].topics[2],
+            batchHash: entries[1].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: currentTimestamp,
-            commitment: entries[0].topics[3]
+            commitment: entries[1].topics[3]
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);

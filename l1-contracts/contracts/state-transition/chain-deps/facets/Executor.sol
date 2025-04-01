@@ -335,7 +335,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     savedMsgRootIndex = savedMsgRootIndex.uncheckedAdd(1);
                 }
             } else if (logKey > MAX_LOG_KEY) {
-                // revert UnexpectedSystemLog(logKey);
+                revert UnexpectedSystemLog(logKey);
             }
         }
 
@@ -344,10 +344,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             if (processedLogs != 127) {
-                // revert MissingSystemLogs(127, processedLogs);
+                revert MissingSystemLogs(127, processedLogs);
             }
         } else if (processedLogs != 255) {
-            // revert MissingSystemLogs(255, processedLogs);
+            revert MissingSystemLogs(255, processedLogs);
         }
     }
 

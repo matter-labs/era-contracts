@@ -227,7 +227,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(defaultBlobVersionedHashes);
 
-        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 255, 253));
+        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 127, 125));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
@@ -360,7 +360,7 @@ contract CommittingTest is ExecutorTest {
         bytes memory wrongL2Logs = abi.encodePacked(
             Utils.encodePacked(l2Logs),
             // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(bytes2(0x0001), bytes2(0x0000), L2_SYSTEM_CONTEXT_ADDRESS, uint256(119), bytes32(""))
+            abi.encodePacked(bytes2(0x0001), bytes2(0x0000), L2_SYSTEM_CONTEXT_ADDRESS, uint256(1234), bytes32(""))
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
@@ -371,7 +371,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(abi.encodeWithSelector(UnexpectedSystemLog.selector, uint256(119)));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedSystemLog.selector, uint256(1234)));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
@@ -425,8 +425,8 @@ contract CommittingTest is ExecutorTest {
 
             vm.prank(validator);
 
-            uint256 allLogsProcessed = uint256(255);
-            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 255, allLogsProcessed ^ (1 << i)));
+            uint256 allLogsProcessed = uint256(127);
+            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i)));
             (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
