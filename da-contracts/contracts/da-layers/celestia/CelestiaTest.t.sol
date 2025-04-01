@@ -35,7 +35,11 @@ contract CelestiaL1DAValidatorTest is Test {
         }
 
         // Deploy the validator contract
-        validator = new CelestiaL1DAValidator();
+        validator = new CelestiaL1DAValidator(
+            0x397A5f7f3dBd538f23DE225B51f532c34448dA9B, // SP1Groth16Verifier
+            0xF0c6429ebAB2e7DC6e05DaFB61128bE21f13cb1e, // Blobstream
+            0x005a902e725cde951470b808cc74ba08d2470219e281b82aec0a1c239da7db7e // EQS Vkey
+        );
     }
 
     function testMultipleCases() public {
