@@ -31,7 +31,7 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
     ) external returns (L1DAValidatorOutput memory output) {
-        CelestiaZKStackInput memory input = abi.decode(_operatorDAInput, (CelestiaZKStackInput));
+        CelestiaZKStackInput memory input = abi.decode(_operatorDAInput[32:], (CelestiaZKStackInput));
 
         bytes memory publicValues = input.publicValues;  // get reference to bytes
         bytes32 eqKeccakHash;

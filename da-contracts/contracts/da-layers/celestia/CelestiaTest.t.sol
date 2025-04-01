@@ -63,12 +63,19 @@ contract CelestiaL1DAValidatorTest is Test {
             console.log("\nTesting case", i);
             
             // Convert hex string to bytes
-            bytes memory operatorDAInput = vm.parseBytes(testCases[i]);
+            // first 32 bytes of real-world operator DA input contains state diff hash
+            bytes memory testCase = vm.parseBytes(testCases[i]);
+
+            // first 32 bytes of real-world operator DA input contains state diff hash
+            bytes memory operatorDAInput = bytes.concat(new bytes(32), testCase);
             console.log("Parsed input");
 
+
             // Decode the input
-            CelestiaZKStackInput memory decodedInput = abi.decode(operatorDAInput, (CelestiaZKStackInput));
+            CelestiaZKStackInput memory decodedInput = abi.decode(testCase, (CelestiaZKStackInput));
             console.log("Decoded input");
+            // In the real world, the "eqKeccakHash" comes from the L2 DA contract
+            // we know it's valid because it's proved in the zkEVM.
             (bytes32 eqKeccakHash, bytes32 eqDataRoot) = abi.decode(decodedInput.publicValues, (bytes32, bytes32));
             console.log("Decoded public values");
 
