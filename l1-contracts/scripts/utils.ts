@@ -60,7 +60,12 @@ export function web3Provider() {
 
 export function readBatchBootloaderBytecode() {
   const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts/bootloader");
-  return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul.zbin`);
+
+  return readBytecodeUtf8(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
+}
+
+export function readBytecodeUtf8(path: string) {
+  return ethers.utils.hexlify(fs.readFileSync(path).toString(), { allowMissingPrefix: true });
 }
 
 export function readSystemContractsBytecode(fileName: string) {
@@ -69,6 +74,13 @@ export function readSystemContractsBytecode(fileName: string) {
     `${systemContractsPath}/artifacts-zk/contracts-preprocessed/${fileName}.sol/${fileName}.json`
   );
   return JSON.parse(artifact.toString()).bytecode;
+}
+
+export function readEvmEmulatorbytecode() {
+  const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts");
+  return readBytecodeUtf8(
+    `${systemContractsPath}/contracts-preprocessed/artifacts/EvmEmulator.yul/EvmEmulator.yul.zbin`
+  );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

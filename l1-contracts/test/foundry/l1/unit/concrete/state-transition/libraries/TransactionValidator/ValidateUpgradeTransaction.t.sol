@@ -45,6 +45,22 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
+    function test_RevertWhen_MaxFeePerGasIsNotZero() public {
+        L2CanonicalTransaction memory testTx = createUpgradeTransaction();
+        // MaxFeePerGas must be 0 - otherwise we revert.
+        testTx.maxFeePerGas = 1;
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxFeePerGas));
+        TransactionValidator.validateUpgradeTransaction(testTx);
+    }
+
+    function test_RevertWhen_MaxPriorityFeePerGasIsNotZero() public {
+        L2CanonicalTransaction memory testTx = createUpgradeTransaction();
+        // MaxPriorityFeePerGas must be 0 - otherwise we revert.
+        testTx.maxPriorityFeePerGas = 1;
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxPriorityFeePerGas));
+        TransactionValidator.validateUpgradeTransaction(testTx);
+    }
+
     function test_RevertWhen_Reserved0IsNonZero() public {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // reserved 0 must be 0 - otherwise we revert.

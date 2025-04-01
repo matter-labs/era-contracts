@@ -8,6 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
@@ -34,7 +35,11 @@ contract DeployL2Script is Script {
         address bridgehubAddress;
         address governance;
         address erc20BridgeProxy;
+        address chainRegistrar;
+        address proposalAuthor;
         DAValidatorType validatorType;
+        // The owner of the contract sets the validator/attester weights.
+        // Can be the developer multisig wallet on mainnet.
         address consensusRegistryOwner;
     }
 
@@ -123,6 +128,14 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployL2DAValidator() public {
+        initializeConfig();
+
+        deployL2DaValidator();
+
+        saveOutput();
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
@@ -132,6 +145,8 @@ contract DeployL2Script is Script {
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
         config.erc20BridgeProxy = toml.readAddress("$.erc20_bridge");
         config.consensusRegistryOwner = toml.readAddress("$.consensus_registry_owner");
+        //config.chainRegistrar = toml.readAddress("$.chain_registrar");
+        //config.proposalAuthor = toml.readAddress("$.proposal_author");
         config.chainId = toml.readUint("$.chain_id");
         config.eraChainId = toml.readUint("$.era_chain_id");
 
