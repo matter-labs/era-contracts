@@ -1079,7 +1079,7 @@ object "EvmEmulator" {
                 switch gt(eSize, 32)
                 case 0 { // if exponent_length <= 32
                     let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
-                    exponent := shr(sub(32, eSize), exponent) // shift to the right if eSize not 32 bytes
+                    exponent := shr(mul(8, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
         
                     // if exponent == 0: iteration_count = 0
                     // else: iteration_count = exponent.bit_length() - 1
@@ -1116,7 +1116,7 @@ object "EvmEmulator" {
         
             if lt(memoryBound, add(index, 32)) {
                 memoryBound := getMax(index, memoryBound)
-                let shift := sub(add(index, 32), memoryBound)
+                let shift := mul(8, sub(add(index, 32), memoryBound))
                 value := shl(shift, shr(shift, value))
             }
         }
@@ -4142,7 +4142,7 @@ object "EvmEmulator" {
                     switch gt(eSize, 32)
                     case 0 { // if exponent_length <= 32
                         let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
-                        exponent := shr(sub(32, eSize), exponent) // shift to the right if eSize not 32 bytes
+                        exponent := shr(mul(8, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
             
                         // if exponent == 0: iteration_count = 0
                         // else: iteration_count = exponent.bit_length() - 1
@@ -4179,7 +4179,7 @@ object "EvmEmulator" {
             
                 if lt(memoryBound, add(index, 32)) {
                     memoryBound := getMax(index, memoryBound)
-                    let shift := sub(add(index, 32), memoryBound)
+                    let shift := mul(8, sub(add(index, 32), memoryBound))
                     value := shl(shift, shr(shift, value))
                 }
             }
