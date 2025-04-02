@@ -17,10 +17,12 @@ export default {
     compilerSource: "binary",
     settings: {
       isSystem: true,
+      enableEraVMExtensions: true,
     },
   },
   solidity: {
     version: "0.8.28",
+    eraVersion: "1.5.11",
   },
   defaultNetwork: "localhost",
   networks: {
