@@ -179,8 +179,6 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     function getDeploymentNonce(address _address) external view returns (uint256 deploymentNonce) {
         uint256 addressAsKey = uint256(uint160(_address));
         (deploymentNonce, ) = _splitRawNonce(rawNonces[addressAsKey]);
-
-        return deploymentNonce;
     }
 
     /// @notice Increments the deployment nonce for the account and returns the previous one.

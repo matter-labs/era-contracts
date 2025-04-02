@@ -37,7 +37,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Returns information about a certain account.
-    function getAccountInfo(address _address) external view returns (AccountInfo memory info) {
+    function getAccountInfo(address _address) external view returns (AccountInfo memory) {
         return accountInfo[_address];
     }
 
@@ -213,8 +213,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             // Create case
             newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
         }
-
-        return newAddress;
     }
 
     /// @notice Method used by EVM emulator to deploy contracts.
@@ -414,7 +412,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
         // solhint-disable-next-line reason-string, gas-custom-errors
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_newAddress) == 0x0);
-        return _performDeployOnAddressEVM(_sender, _newAddress, AccountAbstractionVersion.None, _initCode);
+        constructorReturnEvmGas = _performDeployOnAddressEVM(
+            _sender,
+            _newAddress,
+            AccountAbstractionVersion.None,
+            _initCode
+        );
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -470,14 +473,13 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
 
         // We will store dummy constructing bytecode hash to trigger EVM emulator in constructor call
-        return
-            _constructEVMContract({
-                _sender: _sender,
-                _newAddress: _newAddress,
-                _versionedBytecodeHash: bytes32(0), // Ignored since we will call constructor
-                _input: _input,
-                _callConstructor: true
-            });
+        constructorReturnEvmGas = _constructEVMContract({
+            _sender: _sender,
+            _newAddress: _newAddress,
+            _versionedBytecodeHash: bytes32(0), // Ignored since we will call constructor
+            _input: _input,
+            _callConstructor: true
+        });
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
