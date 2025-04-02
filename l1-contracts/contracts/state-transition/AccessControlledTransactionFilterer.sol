@@ -6,8 +6,7 @@ import {ITransactionFilterer} from "./chain-interfaces/ITransactionFilterer.sol"
 
 /**
  * @title Permissioned Transaction Filterer
- * @notice All calls to the Contract Deployer are blocked.
- *         Other addresses must have the WHITELISTED_ROLE to be allowed.
+ * @notice All calls to the are blocked unless addresses have the WHITELISTED_ROLE to be allowed.
  */
 contract AccessControlledTransactionFilterer is ITransactionFilterer, AccessControl {
     // Whitelist role for L2 contracts
