@@ -22,8 +22,7 @@ contract AccessControlledTransactionFilterer is ITransactionFilterer, AccessCont
     /**
      * @notice Check if the transaction is allowed.
      * @dev The transaction is allowed only if:
-     *      1) contractL2 is not the special Contract Deployer address, AND
-     *      2) contractL2 has the WHITELISTED_ROLE.
+     *      contractL2 has the WHITELISTED_ROLE.
      */
     function isTransactionAllowed(
         address /* sender */,
