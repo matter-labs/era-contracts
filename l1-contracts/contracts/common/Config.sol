@@ -37,7 +37,10 @@ uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 uint256 constant PRIORITY_EXPIRATION = 0 days;
 
 /// @dev Timestamp - seconds since unix epoch.
-uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
+uint256 constant MAINNET_COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
+
+/// @dev Timestamp - seconds since unix epoch.
+uint256 constant TESTNET_COMMIT_TIMESTAMP_NOT_OLDER = 30 days;
 
 /// @dev Maximum available error between real commit batch timestamp and analog used in the verifier (in seconds)
 /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 12 seconds)
