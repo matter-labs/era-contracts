@@ -80,10 +80,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @param _value The number by which to increase the minimal nonce for msg.sender.
     /// @return oldMinNonce The value of the minimal nonce for msg.sender before the increase.
     function increaseMinNonce(uint256 _value) public onlySystemCall returns (uint256 oldMinNonce) {
-        if (_value == 0) {
-            revert NonceIncreaseError(1, MAXIMAL_MIN_NONCE_INCREMENT, _value);
-        }
-        if (_value > MAXIMAL_MIN_NONCE_INCREMENT) {
+        if (_value == 0 || _value > MAXIMAL_MIN_NONCE_INCREMENT) {
             revert NonceIncreaseError(1, MAXIMAL_MIN_NONCE_INCREMENT, _value);
         }
 
