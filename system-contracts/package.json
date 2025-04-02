@@ -53,7 +53,7 @@
   },
   "scripts": {
     "build": "yarn build:system-contracts && yarn build:bootloader",
-    "build:foundry": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync && yarn preprocess:bootloader && forge build --zksync",
+    "build:foundry": "yarn preprocess:emulator && yarn preprocess:system-contracts && forge build --zksync && yarn build:bootloader && forge build --zksync",
     "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
     "build:system-contracts": "yarn preprocess:emulator && yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
     "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",
