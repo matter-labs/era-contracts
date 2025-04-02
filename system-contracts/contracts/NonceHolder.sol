@@ -116,7 +116,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @param _nonceValue The lower 64 bits of the nonce -- the nonce value.
     /// @return The full 256-bit keyed nonce.
     function _combineKeyedNonce(uint192 _nonceKey, uint64 _nonceValue) private pure returns (uint256) {
-        return (uint256(_nonceKey) << 64) + _nonceValue;
+        return (uint256(_nonceKey) << 64) + uint256(_nonceValue);
     }
 
     /// @notice A convenience method to increment the minimal nonce if it is equal
