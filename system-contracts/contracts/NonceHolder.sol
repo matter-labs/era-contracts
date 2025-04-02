@@ -128,7 +128,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// unintentionally allowing keyed nonces to be used.
     /// @param _expectedNonce The expected minimal nonce for the account.
     function incrementMinNonceIfEquals(uint256 _expectedNonce) external onlySystemCall {
-        (uint192 nonceKey, ) = _splitKeyedNonce(_expectedNonce);
+        (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_expectedNonce);
         if (nonceKey != 0) {
             revert InvalidNonceKey(nonceKey);
         }
@@ -137,8 +137,8 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         uint256 oldRawNonce = rawNonces[addressAsKey];
 
         (, uint256 oldMinNonce) = _splitRawNonce(oldRawNonce);
-        if (oldMinNonce != _expectedNonce) {
-            revert ValueMismatch(_expectedNonce, oldMinNonce);
+        if (oldMinNonce != nonceValue) {
+            revert ValueMismatch(nonceValue, oldMinNonce);
         }
 
         // Although unrealistic in practice, we still forbid `minNonce` overflow
@@ -169,7 +169,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         }
 
         unchecked {
-            keyedNonces[addressAsKey][nonceKey] = nonceValue + 1;
+            keyedNonces[addressAsKey][nonceKey] = oldNonceValue + 1;
         }
     }
 
@@ -207,11 +207,10 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     function isNonceUsed(address _address, uint256 _nonce) public view returns (bool) {
         uint256 addressAsKey = uint256(uint160(_address));
         (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_nonce);
+        bool belowMinimum = (nonceKey == 0 && nonceValue < getMinNonce(_address)) ||
+            (nonceKey != 0 && nonceValue < keyedNonces[addressAsKey][nonceKey]);
         // We keep the `nonceValues` check here, until it is confirmed that this mapping has never been used by anyone.
-        return
-            _nonce < getMinNonce(_address) ||
-            nonceValue < keyedNonces[addressAsKey][nonceKey] ||
-            __DEPRECATED_nonceValues[addressAsKey][_nonce] > 0;
+        return belowMinimum || __DEPRECATED_nonceValues[addressAsKey][_nonce] > 0;
     }
 
     /// @notice Checks and reverts based on whether the nonce is used (not used).
