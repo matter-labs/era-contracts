@@ -45,10 +45,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
-        // Allow testnet operators to submit batches with older timestamps 
+        // Allow testnet operators to submit batches with older timestamps
         // compared to mainnet. This quality-of-life improvement is intended for
         // testnets, where outages may be resolved slower.
-        if(L1_CHAIN_ID == 1) {
+        if (L1_CHAIN_ID == 1) {
             COMMIT_TIMESTAMP_NOT_OLDER = MAINNET_COMMIT_TIMESTAMP_NOT_OLDER;
         } else {
             COMMIT_TIMESTAMP_NOT_OLDER = TESTNET_COMMIT_TIMESTAMP_NOT_OLDER;
