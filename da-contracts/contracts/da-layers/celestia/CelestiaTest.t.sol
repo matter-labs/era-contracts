@@ -70,7 +70,6 @@ contract CelestiaL1DAValidatorTest is Test {
             bytes memory operatorDAInput = bytes.concat(new bytes(32), testCase);
             console.log("Parsed input");
 
-
             // Decode the input
             CelestiaZKStackInput memory decodedInput = abi.decode(testCase, (CelestiaZKStackInput));
             console.log("Decoded input");
