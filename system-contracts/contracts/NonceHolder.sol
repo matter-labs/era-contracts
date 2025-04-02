@@ -80,8 +80,11 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @param _value The number by which to increase the minimal nonce for msg.sender.
     /// @return oldMinNonce The value of the minimal nonce for msg.sender before the increase.
     function increaseMinNonce(uint256 _value) public onlySystemCall returns (uint256 oldMinNonce) {
+        if (_value == 0) {
+            revert NonceIncreaseError(1, MAXIMAL_MIN_NONCE_INCREMENT, _value);
+        }
         if (_value > MAXIMAL_MIN_NONCE_INCREMENT) {
-            revert NonceIncreaseError(MAXIMAL_MIN_NONCE_INCREMENT, _value);
+            revert NonceIncreaseError(1, MAXIMAL_MIN_NONCE_INCREMENT, _value);
         }
 
         uint256 addressAsKey = uint256(uint160(msg.sender));
@@ -92,7 +95,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         // to prevent collisions with keyed nonces.
         if (oldMinNonce + _value > type(uint64).max) {
             uint256 maxAllowedIncrement = type(uint64).max - oldMinNonce;
-            revert NonceIncreaseError(maxAllowedIncrement, _value);
+            revert NonceIncreaseError(1, maxAllowedIncrement, _value);
         }
 
         unchecked {
@@ -144,7 +147,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         // Although unrealistic in practice, we still forbid `minNonce` overflow
         // to prevent collisions with keyed nonces.
         if (oldMinNonce + 1 > type(uint64).max) {
-            revert NonceIncreaseError(0, 1);
+            revert NonceIncreaseError(1, 0, 1);
         }
 
         unchecked {
