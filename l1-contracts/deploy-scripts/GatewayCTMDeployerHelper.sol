@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
@@ -70,7 +71,48 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
+        contracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternal(
+            "ProxyAdmin",
+            "ProxyAdmin.sol",
+            hex"",
+            innerConfig
+        );
+
+        contracts.stateTransition.serverNotifierProxy = _deployServerNotifier(
+            salt,
+            contracts,
+            innerConfig,
+            ctmDeployerAddress
+        );
+
         contracts = _deployCTM(salt, config, contracts, innerConfig);
+    }
+
+    function _deployServerNotifier(
+        bytes32 _salt,
+        DeployedContracts memory _deployedContracts,
+        InnerDeployConfig memory innerConfig,
+        address ctmDeployerAddress
+    ) internal returns (address) {
+        address serverNotifierImplementation = _deployInternal(
+            "ServerNotifier",
+            "ServerNotifier.sol",
+            abi.encode(true),
+            innerConfig
+        );
+
+        address serverNotifier = _deployInternal(
+            "TransparentUpgradeableProxy",
+            "TransparentUpgradeableProxy.sol",
+            abi.encode(
+                serverNotifierImplementation,
+                _deployedContracts.stateTransition.chainTypeManagerProxyAdmin,
+                abi.encodeCall(ServerNotifier.initialize, (ctmDeployerAddress))
+            ),
+            innerConfig
+        );
+
+        return serverNotifier;
     }
 
     function _deployFacetsAndUpgrades(
@@ -139,18 +181,24 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
+        address verifierFflonk = _deployInternal("L2VerifierFflonk", "L2VerifierFflonk.sol", hex"", innerConfig);
+
+        address verifierPlonk = _deployInternal("L2VerifierPlonk", "L2VerifierPlonk.sol", hex"", innerConfig);
+
+        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
+
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
                 "TestnetVerifier",
                 "TestnetVerifier.sol",
-                hex"",
+                constructorParams,
                 innerConfig
             );
         } else {
             _deployedContracts.stateTransition.verifier = _deployInternal(
-                "Verifier",
-                "Verifier.sol",
-                hex"",
+                "DualVerifier",
+                "DualVerifier.sol",
+                constructorParams,
                 innerConfig
             );
         }
@@ -234,6 +282,7 @@ library GatewayCTMDeployerHelper {
             verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
             feeParams: _config.feeParams,
             blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR
@@ -260,7 +309,8 @@ library GatewayCTMDeployerHelper {
             owner: _config.aliasedGovernanceAddress,
             validatorTimelock: _deployedContracts.stateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: _config.protocolVersion
+            protocolVersion: _config.protocolVersion,
+            serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
         _deployedContracts.stateTransition.chainTypeManagerProxy = _deployInternal(
@@ -268,7 +318,7 @@ library GatewayCTMDeployerHelper {
             "TransparentUpgradeableProxy.sol",
             abi.encode(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
-                proxyAdmin,
+                _deployedContracts.stateTransition.chainTypeManagerProxyAdmin,
                 abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
             ),
             innerConfig
@@ -297,7 +347,7 @@ library GatewayCTMDeployerHelper {
     /// @notice List of factory dependencies needed for the correct execution of
     /// CTMDeployer and healthy functionaling of the system overall
     function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 18;
+        uint256 totalDependencies = 21;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -312,9 +362,11 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L2VerifierFflonk.sol", "L2VerifierFflonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L2VerifierPlonk.sol", "L2VerifierPlonk");
         // Include both verifiers since we cannot determine which one will be used
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("Verifier.sol", "Verifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
@@ -324,6 +376,7 @@ library GatewayCTMDeployerHelper {
         );
         // Not used in scripts, but definitely needed for CTM to work
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondProxy.sol", "DiamondProxy");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
 
         return dependencies;
     }
