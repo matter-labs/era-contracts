@@ -16,6 +16,9 @@ interface INonceHolder {
     /// @dev Returns the current minimal nonce for account.
     function getMinNonce(address _address) external view returns (uint256);
 
+    /// @notice Returns the current keyed nonce for account given its nonce key.
+    function getKeyedNonce(address _address, uint192 _key) external view returns (uint256);
+
     /// @dev Returns the raw version of the current minimal nonce
     /// (equal to minNonce + 2^128 * deployment nonce).
     function getRawNonce(address _address) external view returns (uint256);
