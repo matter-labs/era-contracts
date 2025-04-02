@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
@@ -40,8 +40,19 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
+    /// @dev Timestamp - seconds since unix epoch.
+    uint256 internal immutable COMMIT_TIMESTAMP_NOT_OLDER;
+
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;
+        // Allow testnet operators to submit batches with older timestamps 
+        // compared to mainnet. This quality-of-life improvement is intended for
+        // testnets, where outages may be resolved slower.
+        if(L1_CHAIN_ID == 1) {
+            COMMIT_TIMESTAMP_NOT_OLDER = MAINNET_COMMIT_TIMESTAMP_NOT_OLDER;
+        } else {
+            COMMIT_TIMESTAMP_NOT_OLDER = TESTNET_COMMIT_TIMESTAMP_NOT_OLDER;
+        }
     }
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo

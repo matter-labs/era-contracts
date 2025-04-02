@@ -745,11 +745,11 @@
   },
   {
     "contractName": "l1-contracts/AdminFacet",
-    "zkBytecodeHash": "0x010006b3070a1b52c65e294c74be21cb6149723956ef6fd88e7f1fa0fce6b5f2",
+    "zkBytecodeHash": "0x010006b38f6d2adfc5f66d62e9b6aeff296a473fa5977ffb7a8638de2a500797",
     "zkBytecodePath": "/l1-contracts/zkout/Admin.sol/AdminFacet.json",
-    "evmBytecodeHash": "0xa81625ef504059a1b541c1b9bae5f700242709cb914728f5c89e43e861aa1485",
+    "evmBytecodeHash": "0xd47dc32e360b9ffae2ef532a8ad4847c9cd2e4a9f8093f38908b4cafd4c3dc5c",
     "evmBytecodePath": "/l1-contracts/out/Admin.sol/AdminFacet.json",
-    "evmDeployedBytecodeHash": "0x4681a4e0efdb917bcbe7ddf76bbd417f9763ee6b3906e9bfbe58bb5c5acb030d"
+    "evmDeployedBytecodeHash": "0x643970f8c2306bfb967cacb47c624a27703a19e26b04e43dc35d9344a87220d0"
   },
   {
     "contractName": "l1-contracts/Arrays",
@@ -761,11 +761,11 @@
   },
   {
     "contractName": "l1-contracts/BatchDecoder",
-    "zkBytecodeHash": "0x01000007f0fd7fc462e968232ecef53359747c8ac7676f82d0ce697051c6167f",
+    "zkBytecodeHash": "0x010000079b4ba3f07e3e0fb43f0254b20ff2a268ebed7a53edd93a5145bd05b5",
     "zkBytecodePath": "/l1-contracts/zkout/BatchDecoder.sol/BatchDecoder.json",
-    "evmBytecodeHash": "0x2d2d9db353d3592d905606c092a78dff819b486bacd6878650a0df251a60e0a4",
+    "evmBytecodeHash": "0xd597b6bd8077d6f6bd023b1d0e0bb71627e03554103a95972cdd74de626aa433",
     "evmBytecodePath": "/l1-contracts/out/BatchDecoder.sol/BatchDecoder.json",
-    "evmDeployedBytecodeHash": "0x3bb147b849a13f208bc9827a793202c21b48a15a0523aafac39f70d81bee502c"
+    "evmDeployedBytecodeHash": "0xbaed036c3d00ddbecef087bb8838a19107771f274df1660cc726336ef5ad7ca9"
   },
   {
     "contractName": "l1-contracts/BeaconProxy",
@@ -777,11 +777,11 @@
   },
   {
     "contractName": "l1-contracts/BridgeHelper",
-    "zkBytecodeHash": "0x010000073c3014c9ebda49c103ad4e9c1e731271774c9b5f0ac85f567b361913",
+    "zkBytecodeHash": "0x010000078cc94d728ff6822adb210e7850697972c926316ec852de245e59d235",
     "zkBytecodePath": "/l1-contracts/zkout/BridgeHelper.sol/BridgeHelper.json",
-    "evmBytecodeHash": "0xf5d4ca7155ca639c113ee3fe76f0d60fa15d908e93b4fed49b3d84cf31122805",
+    "evmBytecodeHash": "0xdba28dceb9ffe6c9ede61a519ca8de2a289f6042829087fe7a55fcd56393f1e9",
     "evmBytecodePath": "/l1-contracts/out/BridgeHelper.sol/BridgeHelper.json",
-    "evmDeployedBytecodeHash": "0x5f5f58ffb7b10b6dc1725909917ad343cdfe86dc290bcb9db7ea3fbefec3996b"
+    "evmDeployedBytecodeHash": "0x240e7a0d9b9b1890b9fa8a87d644fbf29bc945d476df506e2d9afecf0289ee2d"
   },
   {
     "contractName": "l1-contracts/BridgedStandardERC20",
@@ -793,11 +793,11 @@
   },
   {
     "contractName": "l1-contracts/Bridgehub",
-    "zkBytecodeHash": "0x010009d5c08d170f8454406170cd611ff9158049a726e72ef2d0d54c53adbd5c",
+    "zkBytecodeHash": "0x010009d58c987bd3736e9e3cce8ff6a6b164092b6be6bb177a4f6e3a76e24d3b",
     "zkBytecodePath": "/l1-contracts/zkout/Bridgehub.sol/Bridgehub.json",
-    "evmBytecodeHash": "0xa5309d8232806e14c8093f37f4d0236b1bba030fbd9b5a0f1c10ca1066e3224b",
+    "evmBytecodeHash": "0xfcff2d5ac464e8251b9e34407df5fb8cbd49c165969737a5ea6ba4eef398a699",
     "evmBytecodePath": "/l1-contracts/out/Bridgehub.sol/Bridgehub.json",
-    "evmDeployedBytecodeHash": "0x00c859e74d0ed22bbe93596ae61f11d5964c3575ede2d0312f2299e876b437e2"
+    "evmDeployedBytecodeHash": "0xcf6796a44969ef4853e76fa35b2efb6e1d0405642ed5721e92cc6376460197e3"
   },
   {
     "contractName": "l1-contracts/BytecodesSupplier",
@@ -809,11 +809,11 @@
   },
   {
     "contractName": "l1-contracts/CTMDeploymentTracker",
-    "zkBytecodeHash": "0x01000177f9d9a859a14e4b0e05f7042b5c81e5c7491f71fd61eb533b119ddc48",
+    "zkBytecodeHash": "0x010001778869048a046cae29b8ca10d4031555e9f37edc173ee4d90abc00cfbd",
     "zkBytecodePath": "/l1-contracts/zkout/CTMDeploymentTracker.sol/CTMDeploymentTracker.json",
-    "evmBytecodeHash": "0xc341ad4fd87fa1f78efcb5c29fd8dd0593068d06dc157bf67c8b483e3b1d38e2",
+    "evmBytecodeHash": "0xf2b0808277a6260b76833ee91583888abe3e1234ed1406316baef72d7926997b",
     "evmBytecodePath": "/l1-contracts/out/CTMDeploymentTracker.sol/CTMDeploymentTracker.json",
-    "evmDeployedBytecodeHash": "0x9b5f64b43d53128a11d1d9606fa5f00903f5929f7f2c78682e75d40d246b0db1"
+    "evmDeployedBytecodeHash": "0x543269bff3d21433817779f81c5d1e0738e594c3975b33e96f37521fc1ce3dbe"
   },
   {
     "contractName": "l1-contracts/ChainAdmin",
@@ -825,27 +825,27 @@
   },
   {
     "contractName": "l1-contracts/ChainAdminOwnable",
-    "zkBytecodeHash": "0x010001212d0c7e6f67d5bfc6149052a3dab3f2d2b92a6c3fb92ab073bdee3234",
+    "zkBytecodeHash": "0x010001218fa7abc3d872309ef636a26d2fcd6dab2bb5156153fa3732c9060990",
     "zkBytecodePath": "/l1-contracts/zkout/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmBytecodeHash": "0xbceb864954d26a417415bf864c62bf46996085b0bbbe73b59b4dc64afb035611",
+    "evmBytecodeHash": "0x1e4417855ed1cd4ed2ec421695cfd8299ea7b0d06e05a19305c27adfb0d7e58e",
     "evmBytecodePath": "/l1-contracts/out/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmDeployedBytecodeHash": "0x8cb7dea8634d90c209dbd2518cea5076fdb5cc37603080059a1422b2ce54eb3f"
+    "evmDeployedBytecodeHash": "0xd83aa9bc2fb50152a8c38a64df0d90af3d7447113497fd6ff95126f1130b6733"
   },
   {
     "contractName": "l1-contracts/ChainRegistrar",
-    "zkBytecodeHash": "0x010001fbdf3b9d4d563d98492d96b8cc01be70a80159507b70d3f37270bda7e0",
+    "zkBytecodeHash": "0x010001fbed951831264fac6703ef2954ad4016cc57e4612d63b36d33cd49b6f6",
     "zkBytecodePath": "/l1-contracts/zkout/ChainRegistrar.sol/ChainRegistrar.json",
-    "evmBytecodeHash": "0x24783000014752e33cb31068305bb7f876daa615ddb27feac9efa7bd18c718ae",
+    "evmBytecodeHash": "0x822248dc14365678c58d2ac1035840af008812b468c68d1563904b9b0e96d17e",
     "evmBytecodePath": "/l1-contracts/out/ChainRegistrar.sol/ChainRegistrar.json",
-    "evmDeployedBytecodeHash": "0xd876da2d033248d90f3b4ea69eae75ca51b2f1bd5270efc40038301073655289"
+    "evmDeployedBytecodeHash": "0x84dc74aa2cea3edc3571541d26637570f3c87d39c06c20ef0a7813aac65caf02"
   },
   {
     "contractName": "l1-contracts/ChainTypeManager",
-    "zkBytecodeHash": "0x010006ed8ed2f5dc646bc93e87c205b66600c135577c3433de27556a0916c8dd",
+    "zkBytecodeHash": "0x010006edd9f9049f55357df088a66e2db0930e7b2c218274ded39cf1adf6b24e",
     "zkBytecodePath": "/l1-contracts/zkout/ChainTypeManager.sol/ChainTypeManager.json",
-    "evmBytecodeHash": "0xcca0c4d71c064958ba94c48d58b065d979ce9b08bbaf7634df4cbd66ee74c7ce",
+    "evmBytecodeHash": "0x488624b3d5b2a83aa3b8113e30ed5410443bb95d340705f20c5750112f1477ae",
     "evmBytecodePath": "/l1-contracts/out/ChainTypeManager.sol/ChainTypeManager.json",
-    "evmDeployedBytecodeHash": "0x005a0744078882ff448fbe73f13bacbc68af88402d43012e5b86876ea603db18"
+    "evmDeployedBytecodeHash": "0xcf623272b6e437ea07da07909dbc7956a62828fcfe64d966e62b54aa86b1005e"
   },
   {
     "contractName": "l1-contracts/CountersUpgradeable",
@@ -873,11 +873,11 @@
   },
   {
     "contractName": "l1-contracts/DefaultUpgrade",
-    "zkBytecodeHash": "0x010002c1b3042819252c95f9ab5f46e517fe289252fe8b50e56723eba61d4177",
+    "zkBytecodeHash": "0x010002c1340da56e3818af24397114d28c8069ddf9f773fdcb349471841e855d",
     "zkBytecodePath": "/l1-contracts/zkout/DefaultUpgrade.sol/DefaultUpgrade.json",
-    "evmBytecodeHash": "0xff710fc102e0fba52026517db3463f8900a76e217cdb263d9c4eafe2718158ad",
+    "evmBytecodeHash": "0x1bbad790d668b84dba84fed0192dae4570ebcc10a8ff8caa9761ce3ae48f02d7",
     "evmBytecodePath": "/l1-contracts/out/DefaultUpgrade.sol/DefaultUpgrade.json",
-    "evmDeployedBytecodeHash": "0x65a5916935cc49d65810e2e4d584dc4e8d26164972a5a0eb42cb870c48d7ffda"
+    "evmDeployedBytecodeHash": "0x4ee2fb85a1474be7251249b42c94bbfd2190d21f598e8f3215ce31dcea662e6c"
   },
   {
     "contractName": "l1-contracts/Diamond",
@@ -889,11 +889,11 @@
   },
   {
     "contractName": "l1-contracts/DiamondInit",
-    "zkBytecodeHash": "0x0100006f6cfda0346bcb8b15368f7ca15e2a4b45d15e03330bd2d0b6dcaa61d1",
+    "zkBytecodeHash": "0x0100006f1ccbd7a934e5c01f6dfffe8c646a6f92412b4e4f0cef66be31fde64d",
     "zkBytecodePath": "/l1-contracts/zkout/DiamondInit.sol/DiamondInit.json",
-    "evmBytecodeHash": "0x39b2b5aff53f9e4c89990b93f931dc6c0b7f9125419f838e4373a049012dbd9f",
+    "evmBytecodeHash": "0xa4332c8e1615f56f73345d1fcd7ab2ff57103e85762aea7fb37ccc6c44f7c45f",
     "evmBytecodePath": "/l1-contracts/out/DiamondInit.sol/DiamondInit.json",
-    "evmDeployedBytecodeHash": "0x13a8b25d386664c2c94c415621f30658c1ac2945beb0d5e0264faf54b88b915a"
+    "evmDeployedBytecodeHash": "0x18cedee9d4a8c3bf3d5752153cb08aa25195b7d24e7eec852154791518c33c12"
   },
   {
     "contractName": "l1-contracts/DiamondProxy",
@@ -969,11 +969,11 @@
   },
   {
     "contractName": "l1-contracts/ExecutorFacet",
-    "zkBytecodeHash": "0x0100063bdac28fe0836dc8afb6402f470c3ced2d9cde53cf9270d4b6b412aa69",
+    "zkBytecodeHash": "0x0100064772827c9dbf176ff00ddb5c8c1916e53ca8b7ee43638907747326fac5",
     "zkBytecodePath": "/l1-contracts/zkout/Executor.sol/ExecutorFacet.json",
-    "evmBytecodeHash": "0xaabdaf480c90e6f099768882f1df292aa81a5dd40e43a072f8ed54141917f5a5",
+    "evmBytecodeHash": "0x16c53217d3bfa25c79573dd75e85670db550decbb8f7154eb5c6f74944655c52",
     "evmBytecodePath": "/l1-contracts/out/Executor.sol/ExecutorFacet.json",
-    "evmDeployedBytecodeHash": "0xce1e8691390dae794bad3f9d75830e745d1b6b50790bacd16a6715364dfb0f72"
+    "evmDeployedBytecodeHash": "0xd1ddec60218286f1a4e51ec50d12b687d9e88090e055aeac3301777de58e25c4"
   },
   {
     "contractName": "l1-contracts/FullMerkle",
@@ -985,11 +985,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x010003c125dbf75365e77f72942d3ec911b4e8a4178090cefce431b05b021033",
+    "zkBytecodeHash": "0x010003c1f5c58494e35d3d0ded0c35b1bbc1d45fdedca24b57a3c671d4c14c92",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0x16b87244e6341853491bbcb762c612b50d877958231c6d5e32faa4b4141620e3",
+    "evmBytecodeHash": "0xb1dc4fa4080280a95882ca5c7ceca32a7c1988ea0b9dcc4a8b349d2681acf959",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x3b40e1b4f85bda26526958aae6fd6101f6cbd3f3e763bd8eb1b5c33a8315a8eb"
+    "evmDeployedBytecodeHash": "0x7bc4a379702a6d9f46cc2b204470b0eee1300b518068ed75e35db60cfbe82f88"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
@@ -1001,19 +1001,19 @@
   },
   {
     "contractName": "l1-contracts/GatewayUpgrade",
-    "zkBytecodeHash": "0x0100057d557e2106afce1091922539b224629ea74561705eb4cdfc5e6dceb0dd",
+    "zkBytecodeHash": "0x0100057d4df51562f1cef900e009028d0abaef7c58d5e9f8bb54c6194badeedd",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayUpgrade.sol/GatewayUpgrade.json",
-    "evmBytecodeHash": "0x35f4e0b31357cd37d216acb6a5b0c0b5dbcabcae2893ebe4e50ad9f760b0a373",
+    "evmBytecodeHash": "0xe546bb39b2f11455884c8fab35c13df5504d2dfd9e4ee7ad7bbd5234ec626d87",
     "evmBytecodePath": "/l1-contracts/out/GatewayUpgrade.sol/GatewayUpgrade.json",
-    "evmDeployedBytecodeHash": "0x5ecfc2a8085929fce231c1a878ce58e5f1cac77b37a0f812146e01a790f278cc"
+    "evmDeployedBytecodeHash": "0x71b0c0e889bdf8990781b15c956279d12372a419eb5f1875c3348299bf399117"
   },
   {
     "contractName": "l1-contracts/GettersFacet",
-    "zkBytecodeHash": "0x010001b56c35cafddc88130f822c6af48af080aec4b7f39e7acfd58765f26049",
+    "zkBytecodeHash": "0x010001b51ad61bbcb0be409643a860f2fae629242bf57eb16b798f2945fc78de",
     "zkBytecodePath": "/l1-contracts/zkout/Getters.sol/GettersFacet.json",
-    "evmBytecodeHash": "0x8308d72dc8be95528cdf697790955e2a1b5682cf3e86e4e2f59f41e17d3738c9",
+    "evmBytecodeHash": "0x639ded6cb6315f92a8606556f2a2e8ce2663509feeb382d9763270943531cb49",
     "evmBytecodePath": "/l1-contracts/out/Getters.sol/GettersFacet.json",
-    "evmDeployedBytecodeHash": "0x2595ea5ff24c69379ca37dc443f23f167d83f8116f2c4e35e18981734532d225"
+    "evmDeployedBytecodeHash": "0x00e544edc1dcc6cd8c5c9dd63e41b8b18b311a7d0a502af3aef1abbc3778592b"
   },
   {
     "contractName": "l1-contracts/Governance",
@@ -1033,43 +1033,43 @@
   },
   {
     "contractName": "l1-contracts/L1AssetRouter",
-    "zkBytecodeHash": "0x010008373c6346fe83aaf3334d50419272dfa3eb8ef1a0599ef7ac5f2c6c4558",
+    "zkBytecodeHash": "0x0100083789a6a97d79b94574666f470483fc5e43e6e230d489a4b4309ddc2a9c",
     "zkBytecodePath": "/l1-contracts/zkout/L1AssetRouter.sol/L1AssetRouter.json",
-    "evmBytecodeHash": "0xb212663d765d5bd79cdb057694cf239d2877e87b9ac4e693de8ec5adec3def0c",
+    "evmBytecodeHash": "0xbff85a2c9629e108273cb70e3eaaf0a3308c21b83a4966cc44b714a13fb025df",
     "evmBytecodePath": "/l1-contracts/out/L1AssetRouter.sol/L1AssetRouter.json",
-    "evmDeployedBytecodeHash": "0x15a5c8b0840299875e834e9a92e89f39ad4b4c77cffa41a6bd610ed9f4a15181"
+    "evmDeployedBytecodeHash": "0x499538d4aa6a1a04c169a8a84a8a8d607c6e21951eb7affb4bd32d07be273b2b"
   },
   {
     "contractName": "l1-contracts/L1ERC20Bridge",
-    "zkBytecodeHash": "0x010002e931cebf7f5aead36417b67b38e25e529bca7df1735d7959b1a29ca036",
+    "zkBytecodeHash": "0x010002e99d76058af145e2bc527f2d7d937903bfe77d508240e7b130f100d6ba",
     "zkBytecodePath": "/l1-contracts/zkout/L1ERC20Bridge.sol/L1ERC20Bridge.json",
-    "evmBytecodeHash": "0xaea29f16f31708d2852b13df5460f84a90c9987d1314046ee14c520377da32bf",
+    "evmBytecodeHash": "0xf32233e37e6e15c33e1420cf8aab6756e843ff22fd1b2e50c25bc38725218de2",
     "evmBytecodePath": "/l1-contracts/out/L1ERC20Bridge.sol/L1ERC20Bridge.json",
-    "evmDeployedBytecodeHash": "0xbfe166021eac63eeea414c2656fce5c7836879d368848138293bc42bb13acc52"
+    "evmDeployedBytecodeHash": "0x3a657fa4df3f7039f8209d2111cac45d12cfe8349ae8ea977734d55f33d8f3cb"
   },
   {
     "contractName": "l1-contracts/L1GenesisUpgrade",
-    "zkBytecodeHash": "0x010006c730a40df01dcbd82c1cd60082b97f65d57425eaad9c9b79b8278044b8",
+    "zkBytecodeHash": "0x010006c7b53d5f69e2fae6848120ce418424921e87433a6fd0a88cdbcf79e73e",
     "zkBytecodePath": "/l1-contracts/zkout/L1GenesisUpgrade.sol/L1GenesisUpgrade.json",
-    "evmBytecodeHash": "0x50f0bc005dc9069984e00d1b908bd43a1502c13877c87c39ea76909e4d597595",
+    "evmBytecodeHash": "0x7f9b95076c1b25ed4bcef3aa271253f8ce2ab0ed601977a4f8ff1cb346284b32",
     "evmBytecodePath": "/l1-contracts/out/L1GenesisUpgrade.sol/L1GenesisUpgrade.json",
-    "evmDeployedBytecodeHash": "0x071205d074506ef8f14ea32bcc39534ed9bd2fc3fa4eb30a9586a4235a0169e6"
+    "evmDeployedBytecodeHash": "0x879d3b45cbe15e2d44313dc12603b41344699d716b2bfd633e1f04d9135ce54f"
   },
   {
     "contractName": "l1-contracts/L1NativeTokenVault",
-    "zkBytecodeHash": "0x0100098961243cac4cd99edf175543282a187f648523c0d8f83bfc22be797c6f",
+    "zkBytecodeHash": "0x010009898cb78091d99eed537fe7a2c8945a6f04aa6f6e814013fa831a90aa3a",
     "zkBytecodePath": "/l1-contracts/zkout/L1NativeTokenVault.sol/L1NativeTokenVault.json",
-    "evmBytecodeHash": "0x0d35c2958f5f2d17042ff2a99b835f1a39ec4e63a56d7dde390efbcb135d1533",
+    "evmBytecodeHash": "0x5ccc830aaccbf01fdc60a8d05361c923433b650df4032f62d05e5ddbf96f5465",
     "evmBytecodePath": "/l1-contracts/out/L1NativeTokenVault.sol/L1NativeTokenVault.json",
-    "evmDeployedBytecodeHash": "0xa5d8714ecb370b1c86ac178c227fb3aa6b911a284c1f3032917573f3c4eb09ce"
+    "evmDeployedBytecodeHash": "0x3b662e7138906fb419ebcd49bf27e9ab15c7b88a53d756f8877aa08ffd3e8f1a"
   },
   {
     "contractName": "l1-contracts/L1Nullifier",
-    "zkBytecodeHash": "0x01000659e2af6e5e6879d8fe24c184c9fc414515522a7a4725ee5edce32055b8",
+    "zkBytecodeHash": "0x0100065902370878b60c2f7dbc205f54d0f07a134dc9e1d93586dc2c06e7d3f5",
     "zkBytecodePath": "/l1-contracts/zkout/L1Nullifier.sol/L1Nullifier.json",
-    "evmBytecodeHash": "0x8efe78a32e6445156d8b8707463995528d238f43b41ddc7455845c68c3dab6b0",
+    "evmBytecodeHash": "0xfbdeeb2f37699b30ea6236e00ae875ba53328aee0b18b41074fc9911e121263d",
     "evmBytecodePath": "/l1-contracts/out/L1Nullifier.sol/L1Nullifier.json",
-    "evmDeployedBytecodeHash": "0xb756b4d1e08467a5179c92ef0a0a3a6dba428499f9dfa8a79dda02dca629fb29"
+    "evmDeployedBytecodeHash": "0x766a1d0ac1428c8f1ab433f1f7b910bbed864d54adc0e715e8ccf31a984a9bc0"
   },
   {
     "contractName": "l1-contracts/L1VerifierFflonk",
@@ -1113,11 +1113,11 @@
   },
   {
     "contractName": "l1-contracts/L2NativeTokenVault",
-    "zkBytecodeHash": "0x0100084f2886061c815d89a5a09a231658dd752aa2a9fd5663aa406f92c1744f",
+    "zkBytecodeHash": "0x0100084f7ba31cb4d5ffaaa3f0597537c9520bfb3f4bfd0a81f4eff81c4bcc3a",
     "zkBytecodePath": "/l1-contracts/zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmBytecodeHash": "0x3a606aeddb6337e35d5d1d5590b184f96f4e2eaf00744258cf24c26c37f5e099",
+    "evmBytecodeHash": "0xcf4f388ad83e3ba0ab3017a0297df72b2f22da4fcd5a178b6475a1b42ba1ceab",
     "evmBytecodePath": "/l1-contracts/out/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmDeployedBytecodeHash": "0xf7cc9a404d8d7f57e8a3dfa11da0ad1412a5f029b271626629c617289207d9c5"
+    "evmDeployedBytecodeHash": "0x49b860d0e53d896650002290a330e31054f1813771ee0b695125bdc091b82d9d"
   },
   {
     "contractName": "l1-contracts/L2ProxyAdminDeployer",
@@ -1177,11 +1177,11 @@
   },
   {
     "contractName": "l1-contracts/MailboxFacet",
-    "zkBytecodeHash": "0x01000631bc7368e94c285d8386ab44e56386e19a33f92a6c99ad49cbd9d6f76b",
+    "zkBytecodeHash": "0x01000631661104fc699baad217ace597c5385f58f9c727472a5cdd9daed73b08",
     "zkBytecodePath": "/l1-contracts/zkout/Mailbox.sol/MailboxFacet.json",
-    "evmBytecodeHash": "0x649b239671f4245c424657338e96325d82915014e56f2b36fe04992d2c549aaa",
+    "evmBytecodeHash": "0x7ca8d9229cf34f57814aebe7c79c063d0365990fd36b8278dba8a0724bc07177",
     "evmBytecodePath": "/l1-contracts/out/Mailbox.sol/MailboxFacet.json",
-    "evmDeployedBytecodeHash": "0xbbcdafcaf32e2d152e429d12d54e391b6ce0bd8de4c0843053a0f889c23b3afd"
+    "evmDeployedBytecodeHash": "0xb1f78a8126aef54eb83df3a891155c9682865aa20a5273a790be1eded28864f1"
   },
   {
     "contractName": "l1-contracts/Math",
@@ -1225,11 +1225,11 @@
   },
   {
     "contractName": "l1-contracts/PermanentRestriction",
-    "zkBytecodeHash": "0x01000311efd91ebe73dc3b10aad3f30bffc96269821a3a58dc578516b603d209",
+    "zkBytecodeHash": "0x01000311c3e5d5afd0d3f802b276925b21d09796cf1a0f9483239614110e2117",
     "zkBytecodePath": "/l1-contracts/zkout/PermanentRestriction.sol/PermanentRestriction.json",
-    "evmBytecodeHash": "0x2dc4979e8cae8de5a8631270ff0050ef10a253daf9c7e7031b013578e44c9d84",
+    "evmBytecodeHash": "0x140c009a6caf4ee7febbb824ed521843c1b9d25d55798b1ad72716b7e3189d09",
     "evmBytecodePath": "/l1-contracts/out/PermanentRestriction.sol/PermanentRestriction.json",
-    "evmDeployedBytecodeHash": "0xd1a09376bc8e40815ca735afee12bfd1aa46f45eea9e3cc267a7ee6383af7ff0"
+    "evmDeployedBytecodeHash": "0x37babc4a6c7003ddf758fdb30c92e85512d17f99767a52b898f8d993ccf1052b"
   },
   {
     "contractName": "l1-contracts/PriorityQueue",
@@ -1241,11 +1241,11 @@
   },
   {
     "contractName": "l1-contracts/PriorityTree",
-    "zkBytecodeHash": "0x01000007771e93f5b388603fafebacef3a756aedcc1a48161411fa65fdb3cc26",
+    "zkBytecodeHash": "0x01000007714093eee685d7c623cf66a78ea482534cdfd57bca8787db05860151",
     "zkBytecodePath": "/l1-contracts/zkout/PriorityTree.sol/PriorityTree.json",
-    "evmBytecodeHash": "0x35dab23895683a3c80507b87cc4349cd9a3bcd718141811dbb1b24107e5b2465",
+    "evmBytecodeHash": "0x390b54a78de3fa030e6e9b8666ed905a17426cc7bab9e539147ea37b29ded3cf",
     "evmBytecodePath": "/l1-contracts/out/PriorityTree.sol/PriorityTree.json",
-    "evmDeployedBytecodeHash": "0x67d1d640bbadc50b422dbeb7135372e47069df4b3ece2294affc5fa46b0823a6"
+    "evmDeployedBytecodeHash": "0x7bc2c765e8850a57d6ddf0224cfae4d2d832abd528765acb09f32b2f3a1dbe43"
   },
   {
     "contractName": "l1-contracts/ProxyAdmin",
@@ -1321,11 +1321,11 @@
   },
   {
     "contractName": "l1-contracts/ServerNotifier",
-    "zkBytecodeHash": "0x010000b991c3aadeb1b08b89a62875c20809bd6ba6485017e3345f34fdf90069",
+    "zkBytecodeHash": "0x010000b941ff435d0d69d78ac943789049d1408ad2aceb0674ee89f8cdc45c1a",
     "zkBytecodePath": "/l1-contracts/zkout/ServerNotifier.sol/ServerNotifier.json",
-    "evmBytecodeHash": "0xbbf56a3820456bc835c2829697ddee0027bbc61b0081a3bd87a1842c481bfc1f",
+    "evmBytecodeHash": "0xe19121dd6df545351440593c11bf23f5c419d1178d66d70d04b22434cc01458c",
     "evmBytecodePath": "/l1-contracts/out/ServerNotifier.sol/ServerNotifier.json",
-    "evmDeployedBytecodeHash": "0xc55c47324a3b9ac5f947f21b8e380f66025ececb2f45917713b2938c20e44b00"
+    "evmDeployedBytecodeHash": "0x1969865822d98e6cbe2e7cf39e071069fee969faa2b798bf47e34161ca650740"
   },
   {
     "contractName": "l1-contracts/SignedMath",
@@ -1393,11 +1393,11 @@
   },
   {
     "contractName": "l1-contracts/TransactionValidator",
-    "zkBytecodeHash": "0x010000076d7c8bd20c6744e9a512235bbcacf282a1c9883f8c1614e2beabe13e",
+    "zkBytecodeHash": "0x010000072d1cd8e9a2b46adabefcd26a528178a033433e654e24572d36ece92d",
     "zkBytecodePath": "/l1-contracts/zkout/TransactionValidator.sol/TransactionValidator.json",
-    "evmBytecodeHash": "0x943c208ded81e370da42ee45078b3674793af9d2ec13fcc39bfc8533a6b2414f",
+    "evmBytecodeHash": "0x42dc60223991a2f39262e11ddb9b6de4673e47552df3f04af777611a31b92a75",
     "evmBytecodePath": "/l1-contracts/out/TransactionValidator.sol/TransactionValidator.json",
-    "evmDeployedBytecodeHash": "0x1800fb4a8b9d31808d4c19a2807a8b7be4a4446b951bf4c9ebbe54cfce62947b"
+    "evmDeployedBytecodeHash": "0x18970cda7f2ef89858c128bd358d3a2a8983229976ac95fc07ee7ff447569eb5"
   },
   {
     "contractName": "l1-contracts/TransitionaryOwner",
@@ -1441,11 +1441,11 @@
   },
   {
     "contractName": "l1-contracts/ValidatorTimelock",
-    "zkBytecodeHash": "0x010001fb6bc8fcf9e54054fa6ade36b4377abf07cd4f138b106850e7120ab978",
+    "zkBytecodeHash": "0x010001fb5b9c693f28ec50d41539c7cc7157a779a7ba03463b95bbbf3eddf3f7",
     "zkBytecodePath": "/l1-contracts/zkout/ValidatorTimelock.sol/ValidatorTimelock.json",
-    "evmBytecodeHash": "0x5a80ee09393fa9f2b2072e82d8403ffc1cbddaad1c599e92143f5d14a61c23f2",
+    "evmBytecodeHash": "0x4d6a749e81f646a8c2efb50ece8422d32d98300b54641bee3e609886f695b758",
     "evmBytecodePath": "/l1-contracts/out/ValidatorTimelock.sol/ValidatorTimelock.json",
-    "evmDeployedBytecodeHash": "0xe916c314267a5187a31189f90ee71a677562186a93d0f9d2cae63da099aff980"
+    "evmDeployedBytecodeHash": "0xc31cb01ec62774c6178e35ac11e5da735211283e6c9199a82fe6f3ae9ec97430"
   },
   {
     "contractName": "l1-contracts/ValidiumL1DAValidator",
@@ -1457,11 +1457,11 @@
   },
   {
     "contractName": "l1-contracts/ZKChainBase",
-    "zkBytecodeHash": "0x0100000729c275ce4059398b41d34a70093db13f081d68ad08aa24ad9430779f",
+    "zkBytecodeHash": "0x01000007747ed713a9df0d51efca360a5f24a9dffb8278e1ab5e70681c9ebed5",
     "zkBytecodePath": "/l1-contracts/zkout/ZKChainBase.sol/ZKChainBase.json",
-    "evmBytecodeHash": "0xbb44b0cbf1fda1cf719068546f6fd3fc3766f6c850d17e334ea9e2a8719c3357",
+    "evmBytecodeHash": "0xac4c068f2a095caaa478c693f0336cb43814ba28c53e6f3e131c15e79a2335d3",
     "evmBytecodePath": "/l1-contracts/out/ZKChainBase.sol/ZKChainBase.json",
-    "evmDeployedBytecodeHash": "0x699031ab535790c85c2a229eea5cbca097ab69845c80ba7883fc059cadbb5c5f"
+    "evmDeployedBytecodeHash": "0xfe2ef322941bb4ec3d369868b31f37f7a44a6869618a86adb16f3c64a9c035da"
   },
   {
     "contractName": "l1-contracts/Create2AndTransfer",
