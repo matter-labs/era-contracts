@@ -93,13 +93,8 @@ contract PrepareMainnetRegistrationPlanV26 is Script {
         address l2TimestampAsserter;
     }
 
-    struct ContractsBytecodes {
-        bytes l2DaValidator;
-    }
-
     Config internal config;
     Output internal output;
-    ContractsBytecodes bytecodes;
 
     function run() public {
         initializeConfig();
