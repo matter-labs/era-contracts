@@ -25,12 +25,12 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
-          cache: yarn
+          cache: yarn install --frozen-lockfile
 
       - name: Build artifacts
         working-directory: system-contracts
         run: |
-          yarn install
+          yarn install --frozen-lockfile
           yarn build:foundry
           yarn build
 
