@@ -191,6 +191,7 @@ contract ExecutorTest is Test {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
             commitment: bytes32("")
@@ -288,6 +289,7 @@ contract ExecutorTest is Test {
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            dependencyRootsRollingHash: bytes32(0),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,

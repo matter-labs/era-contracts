@@ -171,6 +171,7 @@ library Utils {
                 indexRepeatedStorageChanges: 0,
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: keccak256(""),
+                dependencyRootsRollingHash: bytes32(0),
                 l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
                 timestamp: 0,
                 commitment: bytes32("")
@@ -186,6 +187,7 @@ library Utils {
                 newStateRoot: randomBytes32("newStateRoot"),
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: keccak256(""),
+                dependencyRootsRollingHash: bytes32(0),
                 bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
                 eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
                 systemLogs: abi.encode(randomBytes32("systemLogs")),

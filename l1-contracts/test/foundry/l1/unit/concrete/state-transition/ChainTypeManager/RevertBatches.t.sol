@@ -66,6 +66,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: bytes32(uint256(0x01))
         });
@@ -78,6 +79,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            dependencyRootsRollingHash: bytes32(0),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,
@@ -212,6 +214,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
         });

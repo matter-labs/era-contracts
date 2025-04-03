@@ -10,6 +10,7 @@ import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
+/// @dev All calls go through via the _proveL2LeafInclusion function, which is different on L1 and L2. 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 abstract contract MessageVerification is IMessageVerification {
