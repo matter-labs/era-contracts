@@ -6,11 +6,14 @@ import {ITransactionFilterer} from "./chain-interfaces/ITransactionFilterer.sol"
 
 /**
  * @title Permissioned Transaction Filterer
- * @notice All calls to the are blocked unless addresses have the WHITELISTED_ROLE to be allowed.
+ * @notice All calls are blocked unless the target contract has the WHITELISTED_ROLE,
+ *         or the sender has the SUPERUSER_ROLE.
  */
 contract AccessControlledTransactionFilterer is ITransactionFilterer, AccessControl {
-    // Whitelist role for L2 contracts
+    /// @notice Role for contracts allowed to receive L2 transactions
     bytes32 public constant WHITELISTED_ROLE = keccak256("WHITELISTED_ROLE");
+    /// @notice Role for privileged senders who can bypass whitelist checks
+    bytes32 public constant SUPERUSER_ROLE = keccak256("SUPERUSER_ROLE");
 
     /**
      * @dev Grant the DEFAULT_ADMIN_ROLE to the deployer so they can manage roles.
@@ -21,18 +24,18 @@ contract AccessControlledTransactionFilterer is ITransactionFilterer, AccessCont
 
     /**
      * @notice Check if the transaction is allowed.
-     * @dev The transaction is allowed only if:
-     *      contractL2 has the WHITELISTED_ROLE.
+     * @dev Allowed if:
+     *      - `contractL2` has WHITELISTED_ROLE, or
+     *      - `sender` has SUPERUSER_ROLE.
      */
     function isTransactionAllowed(
-        address /* sender */,
+        address sender,
         address contractL2,
         uint256 /* mintValue */,
         uint256 /* l2Value */,
         bytes memory /* l2Calldata */,
         address /* refundRecipient */
     ) external view override returns (bool) {
-        // Only allow calls if contractL2 has been explicitly granted WHITELISTED_ROLE
-        return hasRole(WHITELISTED_ROLE, contractL2);
+        return hasRole(WHITELISTED_ROLE, contractL2) || hasRole(SUPERUSER_ROLE, sender);
     }
 }
