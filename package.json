@@ -26,7 +26,8 @@
     "markdownlint-cli": "^0.33.0",
     "prettier-plugin-solidity": "^1.1.3",
     "prettier": "^3.0.3",
-    "solhint": "4.5.4"
+    "solhint": "4.5.4",
+    "ts-node": "^10.1.0"
   },
   "scripts": {
     "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",

@@ -28,9 +28,11 @@ jobs:
           cache: yarn
 
       - name: Build artifacts
+        working-directory: system-contracts
         run: |
-          yarn sc build:foundry
-          yarn sc build
+          yarn install
+          yarn build:foundry
+          yarn build
 
       - name: Create cache
         uses: actions/cache/save@v3
