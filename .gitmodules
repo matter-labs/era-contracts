@@ -12,3 +12,22 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "lib/automata-network-on-chain-pccs"]
+	path = lib/automata-network-on-chain-pccs
+	url = https://github.com/automata-network/automata-on-chain-pccs
+[submodule "lib/automata-network-dcap-attestation"]
+	path = lib/automata-network-dcap-attestation
+	url = https://github.com/automata-network/automata-dcap-attestation
+[submodule "lib/solady"]
+	path = lib/solady
+	url = https://github.com/Vectorized/solady
+[submodule "lib/openzeppelin-contracts-v5"]
+	path = lib/openzeppelin-contracts-v5
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+	branch = release-v5.3
+[submodule "lib/sp1-contracts"]
+	path = lib/sp1-contracts
+	url = https://github.com/succinctlabs/sp1-contracts
+[submodule "lib/risc0-ethereum"]
+	path = lib/risc0-ethereum
+	url = https://github.com/risc0/risc0-ethereum
