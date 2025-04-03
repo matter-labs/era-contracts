@@ -23,6 +23,7 @@ import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -97,6 +98,8 @@ library Utils {
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
+    uint256 internal constant L1_GAS_PRICE = 4_000_000_000;
+    address internal constant L2_REFUND_RECIPIENT = 0x58551793BEeDca08a861c394258E0457e48A2FCc;
 
     /**
      * @dev Get all selectors from the bytecode.
@@ -293,8 +296,15 @@ library Utils {
     ) internal returns (address) {
         (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
 
+        address aliasedSender = msg.sender;
+        if (isEOA(msg.sender)) {
+            aliasedSender = msg.sender;
+        } else {
+            aliasedSender = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+        }
+
         address contractAddress = L2ContractHelper.computeCreate2Address(
-            msg.sender,
+            aliasedSender,
             create2salt,
             bytecodeHash,
             keccak256(constructorargs)
@@ -405,7 +415,7 @@ library Utils {
             l2GasLimit: params.l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             factoryDeps: params.factoryDeps,
-            refundRecipient: msg.sender
+            refundRecipient: L2_REFUND_RECIPIENT
         });
     }
 
@@ -433,7 +443,7 @@ library Utils {
             l2Value: 0,
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            refundRecipient: msg.sender,
+            refundRecipient: L2_REFUND_RECIPIENT,
             secondBridgeAddress: secondBridgeAddress,
             secondBridgeValue: secondBridgeValue,
             secondBridgeCalldata: secondBridgeCalldata
@@ -459,7 +469,7 @@ library Utils {
             uint256 requiredValueToDeploy
         ) = prepareL1L2Transaction(
                 PrepareL1L2TransactionParams({
-                    l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
+                    l1GasPrice: L1_GAS_PRICE,
                     l2Calldata: l2Calldata,
                     l2GasLimit: l2GasLimit,
                     l2Value: l2Value,
@@ -1120,6 +1130,14 @@ library Utils {
 
     function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
+    }
+
+    function isEOA(address _addr) internal view returns (bool) {
+        uint32 size;
+        assembly {
+            size := extcodesize(_addr)
+        }
+        return (size == 0);
     }
 
     // add this to be excluded from coverage report
