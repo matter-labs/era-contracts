@@ -54,6 +54,7 @@ contract RevertingTest is ExecutorTest {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
