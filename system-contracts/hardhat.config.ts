@@ -20,7 +20,6 @@ export default {
   },
   solidity: {
     version: "0.8.28",
-    eraVersion: "1.5.11",
     settings: {
       evmVersion: "cancun",
       optimizer: {
