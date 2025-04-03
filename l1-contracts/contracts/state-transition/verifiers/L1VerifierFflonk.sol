@@ -9,6 +9,7 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 /// @notice FFT inspired version of PlonK to optimize on-chain gas cost
 /// @dev For better understanding of the protocol follow the below papers:
 /// * Fflonk Paper: https://eprint.iacr.org/2021/1167
+/// @dev Contract was generated from a verification key with a hash of 0xbf0d46733786b8620e65777a7ec89971f6d438951cef725c3b235a6f63370836
 /// @custom:security-contact security@matterlabs.dev
 contract L1VerifierFflonk is IVerifierV2 {
     // ================Constants================
