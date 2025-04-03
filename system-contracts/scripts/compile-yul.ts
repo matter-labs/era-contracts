@@ -6,7 +6,7 @@ import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
 
-const COMPILER_VERSION = "1.5.11";
+const COMPILER_VERSION = "1.5.12";
 const IS_COMPILER_PRE_RELEASE = false;
 const CONTRACTS_DIR = "contracts-preprocessed";
 const BOOTLOADER_DIR = "bootloader";
