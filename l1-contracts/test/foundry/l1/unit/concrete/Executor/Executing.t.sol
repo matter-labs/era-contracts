@@ -7,9 +7,10 @@ import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "contracts/common/Config.sol";
 import {PriorityOperationsRollingHashMismatch, BatchHashMismatch, NonSequentialBatch, CantExecuteUnprovenBatches, QueueIsEmpty, TxHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ExecutingTest is ExecutorTest {
@@ -123,13 +124,13 @@ contract ExecutingTest is ExecutorTest {
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 1,
-            batchHash: entries[0].topics[2],
+            batchHash: entries[1].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: priorityOpsHashes.length,
             priorityOperationsHash: correctRollingHash,
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
-            commitment: entries[0].topics[3]
+            commitment: entries[1].topics[3]
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
@@ -250,10 +251,10 @@ contract ExecutingTest is ExecutorTest {
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
-        correctNewStoredBatchInfo.batchHash = entries[0].topics[2];
+        correctNewStoredBatchInfo.batchHash = entries[1].topics[2];
         correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
         correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
-        correctNewStoredBatchInfo.commitment = entries[0].topics[3];
+        correctNewStoredBatchInfo.commitment = entries[1].topics[3];
 
         IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;
@@ -329,10 +330,10 @@ contract ExecutingTest is ExecutorTest {
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
-        correctNewStoredBatchInfo.batchHash = entries[0].topics[2];
+        correctNewStoredBatchInfo.batchHash = entries[1].topics[2];
         correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
         correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
-        correctNewStoredBatchInfo.commitment = entries[0].topics[3];
+        correctNewStoredBatchInfo.commitment = entries[1].topics[3];
 
         IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;

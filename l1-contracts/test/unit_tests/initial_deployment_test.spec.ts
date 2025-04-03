@@ -88,7 +88,7 @@ describe("Initial deployment test", function () {
     expect(chainAddress1.toLowerCase()).equal(chainAddress3.toLowerCase());
 
     const assetRouterAddress1 = deployer.addresses.Bridges.SharedBridgeProxy;
-    const assetRouterAddress2 = await bridgehub.sharedBridge();
+    const assetRouterAddress2 = await bridgehub.assetRouter();
     const assetRouterAddress3 = await l1NativeTokenVault.ASSET_ROUTER();
     const assetRouterAddress4 = await l1Nullifier.l1AssetRouter();
     expect(assetRouterAddress1.toLowerCase()).equal(assetRouterAddress2.toLowerCase());

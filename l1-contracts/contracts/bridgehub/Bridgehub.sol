@@ -54,14 +54,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(address chainTypeManager => bool) public chainTypeManagerIsRegistered;
 
     /// @notice we store registered tokens (for arbitrary base token)
-    mapping(address baseToken => bool) public __DEPRECATED_tokenIsRegistered;
+    mapping(address baseToken => bool) internal __DEPRECATED_tokenIsRegistered;
 
     /// @notice chainID => ChainTypeManager contract address, CTM that is managing rules for a given ZKchain.
     mapping(uint256 chainId => address) public chainTypeManager;
 
     /// @notice chainID => baseToken contract address, token that is used as 'base token' by a given child chain.
     // slither-disable-next-line uninitialized-state
-    mapping(uint256 chainId => address) public __DEPRECATED_baseToken;
+    mapping(uint256 chainId => address) internal __DEPRECATED_baseToken;
 
     /// @dev used to manage non critical updates
     address public admin;
@@ -936,12 +936,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //////////////////////////////////////////////////////////////*/
 
     /// @notice return the ZK chain contract for a chainId
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        return getZKChain(_chainId);
-    }
+    // function getHyperchain(uint256 _chainId) public view returns (address) {
+    //     return getZKChain(_chainId);
+    // }
 
-    /// @notice return the asset router
-    function sharedBridge() public view returns (address) {
-        return assetRouter;
-    }
+    // /// @notice return the asset router
+    // function sharedBridge() public view returns (address) {
+    //     return assetRouter;
+    // }
 }

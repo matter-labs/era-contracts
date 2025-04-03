@@ -21,19 +21,20 @@ contract AdminTest is Test {
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](13);
-        selectors[0] = IAdmin.setPendingAdmin.selector;
-        selectors[1] = IAdmin.acceptAdmin.selector;
-        selectors[2] = IAdmin.setValidator.selector;
-        selectors[3] = IAdmin.setPorterAvailability.selector;
-        selectors[4] = IAdmin.setPriorityTxMaxGasLimit.selector;
-        selectors[5] = IAdmin.changeFeeParams.selector;
-        selectors[6] = IAdmin.setTokenMultiplier.selector;
-        selectors[7] = IAdmin.upgradeChainFromVersion.selector;
-        selectors[8] = IAdmin.executeUpgrade.selector;
-        selectors[9] = IAdmin.freezeDiamond.selector;
-        selectors[10] = IAdmin.unfreezeDiamond.selector;
-        selectors[11] = IAdmin.setTransactionFilterer.selector;
-        selectors[12] = IAdmin.setPubdataPricingMode.selector;
+        uint256 i = 0;
+        selectors[i++] = IAdmin.setPendingAdmin.selector;
+        selectors[i++] = IAdmin.acceptAdmin.selector;
+        selectors[i++] = IAdmin.setValidator.selector;
+        selectors[i++] = IAdmin.setPorterAvailability.selector;
+        selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = IAdmin.changeFeeParams.selector;
+        selectors[i++] = IAdmin.setTokenMultiplier.selector;
+        selectors[i++] = IAdmin.upgradeChainFromVersion.selector;
+        selectors[i++] = IAdmin.executeUpgrade.selector;
+        selectors[i++] = IAdmin.freezeDiamond.selector;
+        selectors[i++] = IAdmin.unfreezeDiamond.selector;
+        selectors[i++] = IAdmin.setTransactionFilterer.selector;
+        selectors[i++] = IAdmin.setPubdataPricingMode.selector;
         return selectors;
     }
 

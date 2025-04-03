@@ -21,7 +21,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -489,7 +489,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
-        assertTrue(bridgeHub.sharedBridge() == address(0), "Shared bridge is already there");
+        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
 
@@ -500,7 +500,7 @@ contract ExperimentalBridgeTest is Test {
             IMessageRoot(randomMessageRoot)
         );
 
-        assertTrue(bridgeHub.sharedBridge() == randomAssetRouter, "Shared bridge is already there");
+        assertTrue(bridgeHub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
         assertTrue(
             bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
@@ -524,7 +524,7 @@ contract ExperimentalBridgeTest is Test {
             IMessageRoot(randomMessageRoot)
         );
 
-        assertTrue(bridgeHub.sharedBridge() == address(0), "Shared bridge is already there");
+        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
         assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
         assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
     }
@@ -1024,7 +1024,7 @@ contract ExperimentalBridgeTest is Test {
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
 
         assertTrue(bridgeHub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
-        console.log(IL1AssetRouter(bridgeHub.sharedBridge()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
+        console.log(IL1AssetRouter(bridgeHub.assetRouter()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
         assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));

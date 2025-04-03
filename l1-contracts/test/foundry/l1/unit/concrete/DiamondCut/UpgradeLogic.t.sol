@@ -31,17 +31,18 @@ contract UpgradeLogicTest is DiamondCutTest {
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](11);
-        selectors[0] = adminFacet.setPendingAdmin.selector;
-        selectors[1] = adminFacet.acceptAdmin.selector;
-        selectors[2] = adminFacet.setValidator.selector;
-        selectors[3] = adminFacet.setPorterAvailability.selector;
-        selectors[4] = adminFacet.setPriorityTxMaxGasLimit.selector;
-        selectors[5] = adminFacet.changeFeeParams.selector;
-        selectors[6] = adminFacet.setTokenMultiplier.selector;
-        selectors[7] = adminFacet.upgradeChainFromVersion.selector;
-        selectors[8] = adminFacet.executeUpgrade.selector;
-        selectors[9] = adminFacet.freezeDiamond.selector;
-        selectors[10] = adminFacet.unfreezeDiamond.selector;
+        uint256 i = 0;
+        selectors[i++] = adminFacet.setPendingAdmin.selector;
+        selectors[i++] = adminFacet.acceptAdmin.selector;
+        selectors[i++] = adminFacet.setValidator.selector;
+        selectors[i++] = adminFacet.setPorterAvailability.selector;
+        selectors[i++] = adminFacet.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = adminFacet.changeFeeParams.selector;
+        selectors[i++] = adminFacet.setTokenMultiplier.selector;
+        selectors[i++] = adminFacet.upgradeChainFromVersion.selector;
+        selectors[i++] = adminFacet.executeUpgrade.selector;
+        selectors[i++] = adminFacet.freezeDiamond.selector;
+        selectors[i++] = adminFacet.unfreezeDiamond.selector;
         return selectors;
     }
 
