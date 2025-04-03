@@ -23,8 +23,8 @@ contract L2VerifierFflonk is IVerifierV2 {
     // ================Verification Key================
     uint256 internal constant VK_NUM_INPUTS = 1;
     // [C0]1 = qL(X^8)+ X*qR(X^8)+ X^2*qO(X^8)+ X^3*qM(X^8)+ X^4*qC(X^8)+ X^5*Sσ1(X^8)+ X^6*Sσ2(X^8)+ X^7*Sσ3(X^8)
-    uint256 internal constant VK_C0_G1_X = 0x146c490b673b3679fa6143548cd90ecb2da85895a04494fef50391aa6897e105;
-    uint256 internal constant VK_C0_G1_Y = 0x25e7bb363dab113de8490e742512a29a1094fa5ee2084570d4de714e795428fd;
+    uint256 internal constant VK_C0_G1_X = 0x1ce8417498f45585c59d13813e01856f60d9116a0915879ff6e9ec4c417f2e7b;
+    uint256 internal constant VK_C0_G1_Y = 0x261a64d5d66b5b9a7c0deb745ae12a75ac744a56b65133256919219a0e5f3eac;
 
     // k1 = 5, k2 = 7
     uint256 internal constant VK_NON_RESIDUES_0 = 0x05;
