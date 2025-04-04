@@ -45,15 +45,14 @@ import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} 
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 
+import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+
+
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-/// @dev IMPORTANT: this script is not intended to be used in production.
-/// TODO(EVM-925): support secure gateway deployment.
 contract GatewayCTMFromL1 is Script {
     using stdToml for string;
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
-
-    address deployerAddress;
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
@@ -85,7 +84,7 @@ contract GatewayCTMFromL1 is Script {
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
-        address expectedRollupL2DAValidator;
+        address expectedRollupL2DAValidator; 
         bytes forceDeploymentsData;
     }
 
@@ -95,11 +94,17 @@ contract GatewayCTMFromL1 is Script {
         bytes diamondCutData;
         address relayedSLDAValidator;
         address validiumDAValidator;
+        address whitelistedBytecodesFactory;
+        address rollupDAManager;
     }
 
     Config internal config;
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
     Output internal output;
+
+    function getOutput() external returns (Output memory) {
+        return output;
+    }
 
     function prepareAddresses() external {
         initializeConfig();
@@ -110,7 +115,8 @@ contract GatewayCTMFromL1 is Script {
         (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
-        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
+        bytes memory whitelistedBytecodesFactory = Utils.readZKFoundryBytecodeL1("WhitelistedBytecodeFactory.sol", "WhitelistedBytecodeFactory");
+        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts, Utils.getL2AddressViaCreate2Factory(gatewayCTMDeployerConfig.salt, L2ContractHelper.hashL2Bytecode(whitelistedBytecodesFactory), constructorArgs););
         saveOutput();
     }
 
@@ -148,11 +154,26 @@ contract GatewayCTMFromL1 is Script {
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
-        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
+        address whitelistedBytecodesFactory = deployWhitelistedBytecodeFactory();
+
+        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts, whitelistedBytecodesFactory);
         saveOutput();
     }
 
-    function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {
+    function deployWhitelistedBytecodeFactory() internal returns (address) {
+        return Utils.deployThroughL1Deterministic(
+            Utils.readZKFoundryBytecodeL1("WhitelistedBytecodeFactory.sol", "WhitelistedBytecodeFactory"), 
+            abi.encode(AddressAliasHelper.applyL1ToL2Alias(_admin)), 
+            gatewayCTMDeployerConfig.salt, 
+            72_000_000, 
+            new bytes[](0), 
+            config.chainChainId, 
+            config.bridgehub, 
+            config.sharedBridgeProxy
+        );
+    }
+
+    function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts, address _whitelistedBytecodesFactory) internal {
         output = Output({
             gatewayStateTransition: StateTransitionDeployedAddresses({
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
@@ -178,14 +199,15 @@ contract GatewayCTMFromL1 is Script {
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
             relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
-            validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator
+            validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator,
+            rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
+            whitelistedBytecodesFactory: _whitelistedBytecodesFactory
         });
     }
 
     function initializeConfig() internal {
-        deployerAddress = msg.sender;
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-gateway-ctm.toml");
+        string memory path = string.concat(root, vm.envString("DEPLOY_GATEWAY_CTM_CONFIG"));
         string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
@@ -265,7 +287,6 @@ contract GatewayCTMFromL1 is Script {
     }
 
     function distributeBaseToken() internal {
-        deployerAddress = msg.sender;
         uint256 amountForDistribution = 100000000000000000000;
         L1AssetRouter l1AR = L1AssetRouter(config.sharedBridgeProxy);
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AR.nativeTokenVault()));
@@ -339,213 +360,5 @@ contract GatewayCTMFromL1 is Script {
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-gateway-ctm.toml");
         vm.writeToml(toml, path);
-    }
-
-    function _deployInternal(bytes memory bytecode, bytes memory constructorargs) internal returns (address) {
-        return
-            Utils.deployThroughL1({
-                bytecode: bytecode,
-                constructorargs: constructorargs,
-                create2salt: bytes32(0),
-                l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-                factoryDeps: new bytes[](0),
-                chainId: config.chainChainId,
-                bridgehubAddress: config.bridgehub,
-                l1SharedBridgeProxy: config.sharedBridgeProxy
-            });
-    }
-
-    function deployGatewayFacets() internal {
-        address adminFacet = address(
-            _deployInternal(L2ContractsBytecodesLib.readAdminFacetBytecode(), abi.encode(config.l1ChainId))
-        );
-        console.log("Admin facet deployed at", adminFacet);
-
-        address mailboxFacet = address(
-            _deployInternal(
-                L2ContractsBytecodesLib.readMailboxFacetBytecode(),
-                abi.encode(config.l1ChainId, config.eraChainId)
-            )
-        );
-        console.log("Mailbox facet deployed at", mailboxFacet);
-
-        address executorFacet = address(
-            _deployInternal(L2ContractsBytecodesLib.readExecutorFacetBytecode(), abi.encode(config.l1ChainId))
-        );
-        console.log("ExecutorFacet facet deployed at", executorFacet);
-
-        address gettersFacet = address(_deployInternal(L2ContractsBytecodesLib.readGettersFacetBytecode(), hex""));
-        console.log("Getters facet deployed at", gettersFacet);
-
-        output.gatewayStateTransition.adminFacet = adminFacet;
-        output.gatewayStateTransition.mailboxFacet = mailboxFacet;
-        output.gatewayStateTransition.executorFacet = executorFacet;
-        output.gatewayStateTransition.gettersFacet = gettersFacet;
-    }
-
-    function deployGatewayVerifier() internal returns (address verifier) {
-        address verifierFflonk = address(
-            _deployInternal(L2ContractsBytecodesLib.readL2VerifierFflonkBytecode(), hex"")
-        );
-        console.log("VerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(_deployInternal(L2ContractsBytecodesLib.readL2VerifierPlonkBytecode(), hex""));
-        console.log("VerifierPlonk deployed at", verifierPlonk);
-
-        if (config.testnetVerifier) {
-            verifier = address(
-                _deployInternal(L2ContractsBytecodesLib.readL2TestnetVerifierBytecode(), abi.encode(config.l1ChainId))
-            );
-        } else {
-            verifier = address(
-                _deployInternal(
-                    L2ContractsBytecodesLib.readL2VerifierBytecode(),
-                    abi.encode(verifierFflonk, verifierPlonk)
-                )
-            );
-        }
-
-        console.log("Verifier deployed at", verifier);
-    }
-
-    function deployValidatorTimelock() internal returns (address validatorTimelock) {
-        // address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-        // TODO(EVM-745): eventually the governance should be moved to the governance contract
-        // Note: we do not apply alias because the deployer is an EOA.
-        validatorTimelock = address(
-            _deployInternal(
-                L2ContractsBytecodesLib.readValidatorTimelockBytecode(),
-                abi.encode(deployerAddress, 0, config.eraChainId)
-            )
-        );
-        console.log("Validator timelock deployed at", validatorTimelock);
-    }
-
-    function deployGatewayChainTypeManager() internal {
-        // We need to publish the bytecode of the diamdon proxy contract,
-        // we can only do it via deploying its dummy version.
-        // We could've published the dependency separately, but we just repeated the code that would be
-        // used for pure L2 execution.
-        address dp = address(_deployInternal(L2ContractsBytecodesLib.readDiamondProxyBytecode(), hex""));
-        console.log("Dummy diamond proxy deployed at", dp);
-
-        output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(L2ContractsBytecodesLib.readChainTypeManagerBytecode(), abi.encode(L2_BRIDGEHUB_ADDRESS))
-        );
-        console.log(
-            "StateTransitionImplementation deployed at",
-            output.gatewayStateTransition.chainTypeManagerImplementation
-        );
-
-        // TODO(EVM-745): eventually a proxy admin or something should be deplyoed here
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: output.gatewayStateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectorsForFacet("Admin")
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: output.gatewayStateTransition.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectorsForFacet("Getters")
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: output.gatewayStateTransition.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectorsForFacet("Mailbox")
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: output.gatewayStateTransition.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectorsForFacet("Executor")
-        });
-
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-        });
-
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: config.diamondInitPubdataPricingMode,
-            batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
-            maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
-            maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
-            priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
-            minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
-        });
-
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(output.gatewayStateTransition.verifier),
-            verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: config.bootloaderHash,
-            l2DefaultAccountBytecodeHash: config.defaultAAHash,
-            l2EvmEmulatorBytecodeHash: config.evmEmulatorHash,
-            priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
-            feeParams: feeParams,
-            // We can not provide zero value there. At the same time, there is no such contract on gateway
-            blobVersionedHashRetriever: ADDRESS_ONE
-        });
-
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: output.gatewayStateTransition.diamondInit,
-            initCalldata: abi.encode(initializeData)
-        });
-
-        output.diamondCutData = abi.encode(diamondCut);
-
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: output.gatewayStateTransition.genesisUpgrade,
-            genesisBatchHash: config.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            // Note, it is the same as for contracts that are based on L2
-            forceDeploymentsData: config.forceDeploymentsData
-        });
-
-        ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
-            owner: msg.sender,
-            validatorTimelock: output.gatewayStateTransition.validatorTimelock,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: config.latestProtocolVersion,
-            serverNotifier: output.gatewayStateTransition.serverNotifierProxy
-        });
-
-        output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(
-            L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
-            abi.encode(
-                output.gatewayStateTransition.chainTypeManagerImplementation,
-                deployerAddress,
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
-            )
-        );
-
-        console.log("ChainTypeManagerProxy deployed at:", output.gatewayStateTransition.chainTypeManagerProxy);
-        output.gatewayStateTransition.chainTypeManagerProxy = output.gatewayStateTransition.chainTypeManagerProxy;
-    }
-
-    function setChainTypeManagerInValidatorTimelock() internal {
-        bytes memory data = abi.encodeCall(
-            ValidatorTimelock.setChainTypeManager,
-            (IChainTypeManager(output.gatewayStateTransition.chainTypeManagerProxy))
-        );
-
-        Utils.runL1L2Transaction({
-            l2Calldata: data,
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            l2Value: 0,
-            factoryDeps: new bytes[](0),
-            dstAddress: output.gatewayStateTransition.validatorTimelock,
-            chainId: config.chainChainId,
-            bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
-        });
-
-        console.log("ChainTypeManager set in ValidatorTimelock");
     }
 }

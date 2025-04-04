@@ -27,12 +27,12 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
         }
     }
 
-    function initialize(address _admin) public reentrancyGuardInitializer {
-        if (_admin == address(0)) {
+    function initialize(address _initialOwner) public reentrancyGuardInitializer {
+        if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }
 
-        _transferOwnership(_admin);
+        _transferOwnership(_initialOwner);
     }
 
     function setChainTypeManager(IChainTypeManager _chainTypeManager) external onlyOwner {

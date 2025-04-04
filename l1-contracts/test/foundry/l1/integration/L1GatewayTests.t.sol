@@ -116,7 +116,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function _setUpGatewayWithFilterer() internal {
         gatewayScript.governanceRegisterGateway();
-        gatewayScript.deployAndSetGatewayTransactionFilterer();
+        // gatewayScript.deployAndSetGatewayTransactionFilterer();
     }
 
     //

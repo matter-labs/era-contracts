@@ -10,6 +10,11 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
+/// @dev We want to ensure that only whitelisted contracts can ever be deployed, 
+/// while allowing anyone to call any other method. Thus, we disallow calls that can deploy contracts
+/// (i.e. calls to the predeployed Create2Factory or ContractDeployer). 
+address constant MIN_ALLOWED_ADDRESS = address(0x20000);
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Filters transactions received by the Mailbox
@@ -73,7 +78,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
         address sender,
-        address,
+        address contractL2,
         uint256,
         uint256,
         bytes calldata l2Calldata,
@@ -95,6 +100,11 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             return _checkCTMAssetId(decodedAssetId);
         }
 
+        if (contractL2 > MIN_ALLOWED_ADDRESS) {
+            return true;
+        }
+
+        // Only whitelisted senders are allowed to use any built-in contracts.
         return whitelistedSenders[sender];
     }
 
