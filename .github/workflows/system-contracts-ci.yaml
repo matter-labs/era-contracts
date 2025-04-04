@@ -30,7 +30,7 @@ jobs:
       - name: Build artifacts
         working-directory: system-contracts
         run: |
-          yarn install --frozen-lockfile
+          yarn install
           yarn build:foundry
           yarn build
 
