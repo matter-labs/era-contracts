@@ -10,7 +10,7 @@ describe("EcPairing tests", function () {
   before(async () => {
     ecPairing = await createPrecompileContractAtAddress(EC_PAIRING_ADDRESS);
   });
-  
+
   describe("Ethereum tests", function () {
     it("ecpairing_empty_data_insufficient_gas", async () => {
       const returnData = await callFallback(ecPairing, "");

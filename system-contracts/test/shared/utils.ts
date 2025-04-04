@@ -37,10 +37,10 @@ const RICH_WALLETS = [
 
 const fallbackAbi = [
   {
-      "type": "fallback",
-      "stateMutability": "payable"
-  }
-]
+    type: "fallback",
+    stateMutability: "payable",
+  },
+];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const provider = new Provider((hre.network.config as any).url);
@@ -50,7 +50,7 @@ const wallet = new Wallet(RICH_WALLETS[0].privateKey, provider);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const deployer = new Deployer(hre, wallet as any);
 
-export function createPrecompileContractAtAddress(precompileAddress: string){
+export function createPrecompileContractAtAddress(precompileAddress: string) {
   return new zksync.Contract(precompileAddress, fallbackAbi, wallet);
 }
 
