@@ -182,6 +182,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault");
 
         deployStateTransitionDiamondFacets();
+        deployBlobVersionedHashRetriever();
+
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
 
         upgradeConfig.ecosystemContractsDeployed = true;
