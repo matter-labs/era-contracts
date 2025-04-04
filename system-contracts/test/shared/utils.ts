@@ -35,6 +35,13 @@ const RICH_WALLETS = [
   },
 ];
 
+const fallbackAbi = [
+  {
+      "type": "fallback",
+      "stateMutability": "payable"
+  }
+]
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const provider = new Provider((hre.network.config as any).url);
 
@@ -42,6 +49,10 @@ const wallet = new Wallet(RICH_WALLETS[0].privateKey, provider);
 // TODO(EVM-392): refactor to avoid `any` here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const deployer = new Deployer(hre, wallet as any);
+
+export function createPrecompileContractAtAddress(precompileAddress: string){
+  return new zksync.Contract(precompileAddress, fallbackAbi, wallet);
+}
 
 export async function callFallback(contract: Contract, data: string) {
   // `eth_Call` revert is not parsed by ethers, so we send

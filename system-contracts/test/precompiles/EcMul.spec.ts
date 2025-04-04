@@ -1,13 +1,13 @@
 import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
-import { callFallback, deployContractYul } from "../shared/utils";
+import { callFallback, createPrecompileContractAtAddress } from "../shared/utils";
+import { EC_MUL_ADDRESS } from "../shared/constants";
 
-// FIXME: re-enable once anvil-zksync supports precompiles.
 describe("EcMul tests", function () {
   let ecMul: Contract;
 
   before(async () => {
-    ecMul = await deployContractYul("EcMul", "precompiles");
+    ecMul = await createPrecompileContractAtAddress(EC_MUL_ADDRESS);
   });
 
   describe("Ethereum tests", function () {
