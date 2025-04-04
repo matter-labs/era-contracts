@@ -148,7 +148,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata
     /// @return The derived address of the contract.
-    /// @dev This method also accepts nonce as one of its parameters.
+    /// @dev Although this method accepts salt as one of its parameters.
     /// It is not used anywhere and is needed simply for the consistency for the compiler
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
