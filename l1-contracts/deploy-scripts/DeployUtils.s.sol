@@ -335,9 +335,6 @@ abstract contract DeployUtils is Script {
         FeeParams memory feeParams = getFeeParams();
 
         require(stateTransition.verifier != address(0), "verifier is zero");
-        require(config.contracts.bootloaderHash != bytes32(0), "bootloaderHash is zero");
-        require(config.contracts.defaultAAHash != bytes32(0), "defaultAAHash is zero");
-        require(config.contracts.evmEmulatorHash != bytes32(0), "evmEmulatorHash is zero");
 
         if (!stateTransition.isOnGateway) {
             require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
