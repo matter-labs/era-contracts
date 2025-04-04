@@ -45,7 +45,7 @@ export default {
   },
   zksolc: {
     compilerSource: "binary",
-    version: "1.5.12",
+    version: "1.5.11",
     settings: {
       isSystem: true,
     },

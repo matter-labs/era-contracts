@@ -45,7 +45,7 @@ optimizer = true
 optimizer_runs = 9999999
 [profile.default.zksync] 
 enable_eravm_extensions = true
-zksolc = "1.5.12"
+zksolc = "1.5.11"
 
 [profile.invariant_tests_l1context]
 test = "test"
