@@ -10,9 +10,6 @@ import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openze
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {Verifier} from "contracts/state-transition/Verifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -75,23 +72,26 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-contract EcosystemUpgrade_v27_1 is Script {
+import {DeployL1Script} from "../DeployL1.s.sol";
+
+contract EcosystemUpgrade_v27_1 is Script, DeployL1Script {
     using stdToml for string;
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-
     bytes internal oldEncodedChainCreationParams;
-    address stateTransitionManager;
 
-    function run() public {
-        initializeConfig(vm.envString("UPGRADE_ECOSYSTEM_INPUT"));
+    function run() public override {
+        string memory root = vm.projectRoot();
+
+        initializeConfig(string.concat(root, vm.envString("UPGRADE_ECOSYSTEM_INPUT")));
+        instantiateCreate2Factory();
+        deployBlobVersionedHashRetriever();
 
         ChainCreationParams memory oldChainCreationParams = abi.decode(oldEncodedChainCreationParams, (ChainCreationParams));
         Diamond.DiamondCutData memory oldDiamondCut = oldChainCreationParams.diamondCut;
         DiamondInitializeDataNewChain memory oldInitializeData = abi.decode(oldDiamondCut.initCalldata, (DiamondInitializeDataNewChain));
         
         // We only change blobVerionedHashRetriever
-        oldInitializeData.blobVersionedHashRetriever = ADDRESS_ONE;
+        oldInitializeData.blobVersionedHashRetriever = addresses.blobVersionedHashRetriever;
         Diamond.DiamondCutData memory newDiamondCut = Diamond.DiamondCutData({
             facetCuts: oldDiamondCut.facetCuts,
             initAddress: oldDiamondCut.initAddress,
@@ -108,26 +108,70 @@ contract EcosystemUpgrade_v27_1 is Script {
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: stateTransitionManager,
+            target: addresses.stateTransition.chainTypeManagerProxy,
             data: abi.encodeCall(
-                stateTransitionManager.setChainCreationParams,
+                ChainTypeManager.setChainCreationParams,
                 (newChainCreationParams)
             ),
             value: 0
         });
 
         saveOutput(
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"),
+            string.concat(root, vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")),
             abi.encode(calls),
             abi.encode(newDiamondCut)
         );
     }
 
-    function initializeConfig(string memory configPath) internal {
-        string memory toml = vm.readFile(configPath);
+    function initializeConfig(string memory newConfigPath) internal virtual override {
+        super.initializeConfig(newConfigPath);
+        string memory toml = vm.readFile(newConfigPath);
+
+        addresses.stateTransition.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+
+        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
+
+        setAddressesBasedOnBridgehub();
+
+        addresses.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
+        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
+
+        config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
+
+        addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
 
         oldEncodedChainCreationParams = toml.readBytes("$.v27_chain_creation_params");
-        stateTransitionManager = toml.readBytes("$.state_transition_manager");
+    }
+
+    function setAddressesBasedOnBridgehub() internal virtual {
+        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
+        address ctm = Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+        addresses.stateTransition.chainTypeManagerProxy = ctm;
+        // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
+        addresses.stateTransition.diamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+            config.eraChainId
+        );
+        addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+
+        addresses.vaults.l1NativeTokenVaultProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
+        );
+        addresses.bridges.l1NullifierProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
+        );
+
+        addresses.bridgehub.ctmDeploymentTrackerProxy = address(
+            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
+        );
+
+        addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
+
+        addresses.bridges.erc20BridgeProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
+        );
+
+        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
     function saveOutput(
@@ -137,7 +181,7 @@ contract EcosystemUpgrade_v27_1 is Script {
     ) internal {
         vm.serializeBytes("root", "governance_upgrade_calls", encodedCalls);
 
-        string memory toml = vm.serializeAddress(
+        string memory toml = vm.serializeBytes(
             "root",
             "new_diamond_cut",
             newDiamondCut
@@ -147,5 +191,5 @@ contract EcosystemUpgrade_v27_1 is Script {
     }
 
     // add this to be excluded from coverage report
-    function test() internal {}
+    function test() internal override {}
 }
