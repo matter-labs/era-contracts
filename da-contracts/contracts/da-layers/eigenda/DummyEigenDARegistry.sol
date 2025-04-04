@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-// This is the dummiest possible implementation, where the blobs are always asumed to be verified, 
+// This is the dummiest possible implementation, where the blobs are always assumed to be verified,
 // and you only need to pass the hash of the blob
 // In order to be production ready this contract lacks:
 // - Verification of the inclusion data
