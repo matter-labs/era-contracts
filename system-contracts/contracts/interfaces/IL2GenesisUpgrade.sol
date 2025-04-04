@@ -37,6 +37,8 @@ struct FixedForceDeploymentsData {
     address dangerousTestOnlyForcedBeacon;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 

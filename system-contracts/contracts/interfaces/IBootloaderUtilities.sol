@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 
 import {Transaction} from "../libraries/TransactionHelper.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IBootloaderUtilities {
     function getTransactionHashes(
         Transaction calldata _transaction

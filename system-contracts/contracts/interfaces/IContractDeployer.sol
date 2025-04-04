@@ -16,6 +16,8 @@ struct ForceDeployment {
     bytes input;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IContractDeployer {
     /// @notice Defines the version of the account abstraction protocol
     /// that a contract claims to follow.
