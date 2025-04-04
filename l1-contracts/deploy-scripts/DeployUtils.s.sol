@@ -237,6 +237,10 @@ abstract contract DeployUtils is Script {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit");
     }
 
+    function deployBlobVersionedHashRetriever() internal {
+        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever");
+    }
+
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (FacetCut[] memory facetCuts);
@@ -329,6 +333,12 @@ abstract contract DeployUtils is Script {
         VerifierParams memory verifierParams = getVerifierParams();
 
         FeeParams memory feeParams = getFeeParams();
+
+        require(stateTransition.verifier != address(0), "verifier is zero");
+
+        if (!stateTransition.isOnGateway) {
+            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
+        }
 
         return
             DiamondInitializeDataNewChain({
