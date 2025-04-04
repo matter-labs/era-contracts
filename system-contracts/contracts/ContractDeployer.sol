@@ -23,7 +23,8 @@ import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, E
  */
 contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Information about an account contract.
-    /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
+    /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0,
+    /// which corresponds to `AccountAbstractionVersion.None`.and `AccountNonceOrdering.KeyedSequential`.
     mapping(address => AccountInfo) internal accountInfo;
 
     /// @notice What types of bytecode are allowed to be deployed on this chain.
@@ -307,7 +308,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
             AccountInfo memory newAccountInfo;
             newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
-            // Accounts have sequential nonces by default.
+            // Accounts have keyed sequential nonces by default.
             newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
             _storeAccountInfo(_deployment.newAddress, newAccountInfo);
 
@@ -437,7 +438,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
-        // Accounts have sequential nonces by default.
+        // Accounts have keyed sequential nonces by default.
         newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
@@ -465,7 +466,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     ) internal returns (uint256 constructorReturnEvmGas) {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
-        // Accounts have sequential nonces by default.
+        // Accounts have keyed sequential nonces by default.
         newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
