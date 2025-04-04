@@ -86,10 +86,16 @@ contract EcosystemUpgrade_v27_1 is Script, DeployL1Script {
         instantiateCreate2Factory();
         deployBlobVersionedHashRetriever();
 
-        ChainCreationParams memory oldChainCreationParams = abi.decode(oldEncodedChainCreationParams, (ChainCreationParams));
+        ChainCreationParams memory oldChainCreationParams = abi.decode(
+            oldEncodedChainCreationParams,
+            (ChainCreationParams)
+        );
         Diamond.DiamondCutData memory oldDiamondCut = oldChainCreationParams.diamondCut;
-        DiamondInitializeDataNewChain memory oldInitializeData = abi.decode(oldDiamondCut.initCalldata, (DiamondInitializeDataNewChain));
-        
+        DiamondInitializeDataNewChain memory oldInitializeData = abi.decode(
+            oldDiamondCut.initCalldata,
+            (DiamondInitializeDataNewChain)
+        );
+
         // We only change blobVerionedHashRetriever
         oldInitializeData.blobVersionedHashRetriever = addresses.blobVersionedHashRetriever;
         Diamond.DiamondCutData memory newDiamondCut = Diamond.DiamondCutData({
@@ -109,10 +115,7 @@ contract EcosystemUpgrade_v27_1 is Script, DeployL1Script {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
-            data: abi.encodeCall(
-                ChainTypeManager.setChainCreationParams,
-                (newChainCreationParams)
-            ),
+            data: abi.encodeCall(ChainTypeManager.setChainCreationParams, (newChainCreationParams)),
             value: 0
         });
 
@@ -174,18 +177,10 @@ contract EcosystemUpgrade_v27_1 is Script, DeployL1Script {
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
-    function saveOutput(
-        string memory outputPath,
-        bytes memory encodedCalls,
-        bytes memory newDiamondCut
-    ) internal {
+    function saveOutput(string memory outputPath, bytes memory encodedCalls, bytes memory newDiamondCut) internal {
         vm.serializeBytes("root", "governance_upgrade_calls", encodedCalls);
 
-        string memory toml = vm.serializeBytes(
-            "root",
-            "new_diamond_cut",
-            newDiamondCut
-        );
+        string memory toml = vm.serializeBytes("root", "new_diamond_cut", newDiamondCut);
 
         vm.writeToml(toml, outputPath);
     }
