@@ -26,7 +26,6 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
 contract AcceptAdmin is Script {
@@ -268,12 +267,8 @@ contract AcceptAdmin is Script {
         bytes encodedData;
     }
 
-    function notifyServerMigrationToGateway(
-        address _bridgehub,
-        uint256 _chainId,
-        bool _shouldSend
-    ) public {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId); 
+    function notifyServerMigrationToGateway(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: chainInfo.serverNotifier,
@@ -284,12 +279,8 @@ contract AcceptAdmin is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
-    function notifyServerMigrationFromGateway(
-        address _bridgehub,        
-        uint256 _chainId,
-        bool _shouldSend
-    ) public {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId); 
+    function notifyServerMigrationFromGateway(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: chainInfo.serverNotifier,
@@ -300,12 +291,7 @@ contract AcceptAdmin is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
-    function grantGatewayWhitelist(
-        address _bridgehub,        
-        uint256 _chainId,
-        address _grantee,
-        bool _shouldSend
-    ) public {
+    function grantGatewayWhitelist(address _bridgehub, uint256 _chainId, address _grantee, bool _shouldSend) public {
         ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
@@ -321,12 +307,7 @@ contract AcceptAdmin is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
-    function revokeGatewayWhitelist(
-        address _bridgehub,        
-        uint256 _chainId,
-        address _address,
-        bool _shouldSend
-    ) public {
+    function revokeGatewayWhitelist(address _bridgehub, uint256 _chainId, address _address, bool _shouldSend) public {
         ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
@@ -342,8 +323,7 @@ contract AcceptAdmin is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
-
-    /// We use explicit `_shouldSend` instead of the standard `--broadcast` to ensure stable output 
+    /// We use explicit `_shouldSend` instead of the standard `--broadcast` to ensure stable output
     /// for the calldata
     function setTransactionFilterer(
         address _bridgehub,
@@ -351,7 +331,7 @@ contract AcceptAdmin is Script {
         address _transactionFiltererAddress,
         bool _shouldSend
     ) external {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId); 
+        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -376,46 +356,42 @@ contract AcceptAdmin is Script {
     function _migrateChainToGatewayInner(MigrateChainToGatewayParams memory data) private {
         Call[] memory calls;
 
-        ChainInfo memory gatewayChainInfo = chainInfoFromBridgehubAndChainId(
-            data.bridgehub,
-            data.gatewayChainId
-        );
-        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(
-            data.bridgehub,
-            data.l2ChainId
-        );
+        ChainInfo memory gatewayChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.gatewayChainId);
+        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
 
         bytes32 chainAssetId = Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
 
         uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
         if (currentSettlementLayer == data.gatewayChainId) {
             console.log("Chain already using gateway as its settlement layer");
-            saveOutput(Output({
-                admin: gatewayChainInfo.admin,
-                encodedData: hex""
-            }));
+            saveOutput(Output({admin: gatewayChainInfo.admin, encodedData: hex""}));
             return;
         }
 
         bytes memory bridgehubData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.l2ChainId,
-                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(l2ChainInfo.admin), data._gatewayDiamondCutData),
-                chainData: abi.encode(IZKChain(Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion())
+                ctmData: abi.encode(
+                    AddressAliasHelper.applyL1ToL2Alias(l2ChainInfo.admin),
+                    data._gatewayDiamondCutData
+                ),
+                chainData: abi.encode(
+                    IZKChain(Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
+                )
             })
         );
-        
+
         // TODO: use constant for the 0x01
         bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
 
         calls = Utils.prepareAdminL1L2TwoBridgesTransaction(
-            data.l1GasPrice, 
-            Utils.MAX_PRIORITY_TX_GAS, 
-            data.gatewayChainId, 
-            data.bridgehub, 
-            gatewayChainInfo.l1AssetRouterProxy, 
-            gatewayChainInfo.l1AssetRouterProxy, 
-            0, 
+            data.l1GasPrice,
+            Utils.MAX_PRIORITY_TX_GAS,
+            data.gatewayChainId,
+            data.bridgehub,
+            gatewayChainInfo.l1AssetRouterProxy,
+            gatewayChainInfo.l1AssetRouterProxy,
+            0,
             secondBridgeData
         );
 
@@ -430,26 +406,24 @@ contract AcceptAdmin is Script {
         bytes calldata _gatewayDiamondCutData,
         bool _shouldSend
     ) public {
-        _migrateChainToGatewayInner(MigrateChainToGatewayParams({
-            bridgehub: bridgehub,
-            l1GasPrice: l1GasPrice,
-            l2ChainId: l2ChainId,
-            gatewayChainId: gatewayChainId,
-            _gatewayDiamondCutData: _gatewayDiamondCutData,
-            _shouldSend: _shouldSend
-        }));
+        _migrateChainToGatewayInner(
+            MigrateChainToGatewayParams({
+                bridgehub: bridgehub,
+                l1GasPrice: l1GasPrice,
+                l2ChainId: l2ChainId,
+                gatewayChainId: gatewayChainId,
+                _gatewayDiamondCutData: _gatewayDiamondCutData,
+                _shouldSend: _shouldSend
+            })
+        );
     }
 
-    function saveAndSendAdminTx(
-        address _admin,
-        Call[] memory _calls, 
-        bool _shouldSend
-    ) internal {        
+    function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         bytes memory data = abi.encodeCall(IChainAdmin.multicall, (_calls, true));
 
-        if(_shouldSend) {
+        if (_shouldSend) {
             uint256 totalValue = 0;
-            for(uint256 i = 0; i < _calls.length; i++) {
+            for (uint256 i = 0; i < _calls.length; i++) {
                 totalValue += _calls[i].value;
             }
 
@@ -457,7 +431,7 @@ contract AcceptAdmin is Script {
 
             vm.startBroadcast(owner);
             (bool success, bytes memory returnData) = _admin.call{value: totalValue}(data);
-            vm.stopBroadcast();   
+            vm.stopBroadcast();
 
             if (!success) {
                 assembly {
@@ -466,18 +440,11 @@ contract AcceptAdmin is Script {
             }
         }
 
-        saveOutput(Output({
-            admin: _admin,
-            encodedData: data
-        }));
+        saveOutput(Output({admin: _admin, encodedData: data}));
     }
 
     function saveOutput(Output memory output) internal {
-        vm.serializeAddress(
-            "root",
-            "admin_address",
-            output.admin
-        );
+        vm.serializeAddress("root", "admin_address", output.admin);
         string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-accept-admin.toml");
         vm.writeToml(toml, path);

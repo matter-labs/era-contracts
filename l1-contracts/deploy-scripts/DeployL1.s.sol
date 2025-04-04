@@ -146,7 +146,7 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot"
         );
 
-        // TODO: the below deploys the server notifier whose proxy is owned by the decentralized governance, 
+        // TODO: the below deploys the server notifier whose proxy is owned by the decentralized governance,
         // while server notifier's proxyadmin should be controlled by the ecosystem admin
         (
             addresses.stateTransition.serverNotifierImplementation,

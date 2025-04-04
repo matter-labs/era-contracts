@@ -10,7 +10,7 @@ import {IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract used to depploy only whitelisted bytecodes.
-/// @dev Users are not allowed to deploy generic contracts on Gateway in order to 
+/// @dev Users are not allowed to deploy generic contracts on Gateway in order to
 /// ensure smooth transition in the future for a special-purpose version.
 contract WhitelistedBytecodeFactory is Ownable2Step {
     /// @notice Emitted when an admin is deployed on the L2.
@@ -29,20 +29,16 @@ contract WhitelistedBytecodeFactory is Ownable2Step {
         // todo: event
     }
 
-
     function deployContract(
         bytes32 _salt,
-        bytes32 _bytecodeHash, 
+        bytes32 _bytecodeHash,
         bytes memory _constructorParams
     ) external returns (address addr) {
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
-            abi.encodeCall(
-                IContractDeployer.create2,
-                (_salt, _bytecodeHash, _constructorParams)
-            )
+            abi.encodeCall(IContractDeployer.create2, (_salt, _bytecodeHash, _constructorParams))
         );
 
         // The deployment should be successful and return the address of the proxy

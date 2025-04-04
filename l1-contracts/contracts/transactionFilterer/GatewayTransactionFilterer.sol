@@ -10,9 +10,9 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
-/// @dev We want to ensure that only whitelisted contracts can ever be deployed, 
+/// @dev We want to ensure that only whitelisted contracts can ever be deployed,
 /// while allowing anyone to call any other method. Thus, we disallow calls that can deploy contracts
-/// (i.e. calls to the predeployed Create2Factory or ContractDeployer). 
+/// (i.e. calls to the predeployed Create2Factory or ContractDeployer).
 address constant MIN_ALLOWED_ADDRESS = address(0x20000);
 
 /// @author Matter Labs

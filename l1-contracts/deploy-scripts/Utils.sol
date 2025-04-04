@@ -25,7 +25,6 @@ import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
-
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
     "ExecuteEmergencyUpgradeGuardians(bytes32 id)"
@@ -529,7 +528,7 @@ library Utils {
         bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
     }
 
-    function prepareGovernanceL1L2DirectTransaction( 
+    function prepareGovernanceL1L2DirectTransaction(
         uint256 l1GasPrice,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -554,7 +553,7 @@ library Utils {
                     bridgehubAddress: bridgehubAddress,
                     l1SharedBridgeProxy: l1SharedBridgeProxy
                 })
-        );
+            );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
             IBridgehub(bridgehubAddress),
@@ -570,11 +569,10 @@ library Utils {
             (l2TransactionRequestDirect)
         );
 
-        calls = appendCall(calls, Call({
-            target: bridgehubAddress,
-            value: ethAmountToPass,
-            data: l2TransactionRequestDirectCalldata
-        }));
+        calls = appendCall(
+            calls,
+            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
+        );
     }
 
     function prepareGovernanceL1L2TwoBridgesTransaction(
@@ -616,11 +614,10 @@ library Utils {
             (l2TransactionRequest)
         );
 
-        calls = appendCall(calls, Call({
-            target: bridgehubAddress,
-            value: ethAmountToPass,
-            data: l2TransactionRequestCalldata
-        }));
+        calls = appendCall(
+            calls,
+            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
+        );
     }
 
     // function runGovernanceL1L2DirectTransaction(
@@ -635,7 +632,6 @@ library Utils {
     //     address bridgehubAddress,
     //     address l1SharedBridgeProxy
     // ) internal returns (bytes32 txHash) {
-
 
     //     requiredValueToDeploy = approveBaseTokenGovernance(
     //         IBridgehub(bridgehubAddress),
@@ -732,11 +728,7 @@ library Utils {
             bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
 
             calls = new Call[](1);
-            calls[0] = Call({
-                target: baseTokenAddress,
-                value: 0,
-                data: approvalCalldata
-            });
+            calls[0] = Call({target: baseTokenAddress, value: 0, data: approvalCalldata});
 
             ethAmountToPass = 0;
         } else {
@@ -754,10 +746,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    )
-        internal
-        returns (Call[] memory calls)
-    {
+    ) internal returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestDirect (same logic as before)
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -794,12 +783,8 @@ library Utils {
         );
 
         calls = appendCall(
-            calls, 
-            Call({
-                target: bridgehubAddress,
-                value: ethAmountToPass,
-                data: l2TransactionRequestDirectCalldata
-            })
+            calls,
+            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
         );
 
         return calls;
@@ -814,10 +799,7 @@ library Utils {
         address secondBridgeAddress,
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
-    )
-        internal
-        returns (Call[] memory calls)
-    {
+    ) internal returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestTwoBridges (same logic as before)
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
@@ -851,11 +833,7 @@ library Utils {
 
         calls = appendCall(
             calls,
-            Call({
-                target: bridgehubAddress,
-                value: ethAmountToPass,
-                data: l2TransactionRequestCalldata
-            })
+            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
         );
 
         return calls;
@@ -872,10 +850,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    )
-        internal
-        returns (bytes32 txHash)
-    {
+    ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls (no actual execution done here)
         Call[] memory calls = prepareAdminL1L2DirectTransaction(
             gasPrice,
@@ -917,10 +892,7 @@ library Utils {
         address secondBridgeAddress,
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
-    )
-        internal
-        returns (bytes32 txHash)
-    {
+    ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
         Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction(
             l1GasPrice,
@@ -951,16 +923,12 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-
     function prepareApproveBaseTokenAdminCalls(
         IBridgehub bridgehub,
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
-    ) 
-        internal 
-        returns (uint256 ethAmountToPass, Call[] memory calls) 
-    {
+    ) internal returns (uint256 ethAmountToPass, Call[] memory calls) {
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             // Base token is not ETH, so we need to create an approval call
@@ -968,16 +936,9 @@ library Utils {
 
             // Build approval calldata
             IERC20 baseToken = IERC20(baseTokenAddress);
-            bytes memory approvalCalldata = abi.encodeCall(
-                baseToken.approve,
-                (l1SharedBridgeProxy, amountToApprove)
-            );
+            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
 
-            calls[0] = Call({
-                target: baseTokenAddress,
-                value: 0,
-                data: approvalCalldata
-            });
+            calls[0] = Call({target: baseTokenAddress, value: 0, data: approvalCalldata});
 
             // No ETH needs to be passed, so we return 0
             ethAmountToPass = 0;
@@ -989,8 +950,10 @@ library Utils {
         }
     }
 
-
-    function extractAllPriorityOpFromLogs(address expectedDiamondProxyAddress, Vm.Log[] memory logs) internal pure returns (bytes32[] memory result) {
+    function extractAllPriorityOpFromLogs(
+        address expectedDiamondProxyAddress,
+        Vm.Log[] memory logs
+    ) internal pure returns (bytes32[] memory result) {
         // TODO(EVM-749): cleanup the constant and automate its derivation
         bytes32 topic0 = bytes32(uint256(0x4531cd5795773d7101c17bdeb9f5ab7f47d7056017506f937083be5d6e77a382));
 
@@ -1122,20 +1085,10 @@ library Utils {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
 
-        executeCalls(
-            _governor,
-            _salt,
-            _delay,
-            calls
-        );
+        executeCalls(_governor, _salt, _delay, calls);
     }
 
-    function executeCalls(
-        address _governor,
-        bytes32 _salt,
-        uint256 _delay,
-        Call[] memory calls
-    ) internal {
+    function executeCalls(address _governor, bytes32 _salt, uint256 _delay, Call[] memory calls) internal {
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,
             predecessor: bytes32(0),
@@ -1156,10 +1109,7 @@ library Utils {
         vm.stopBroadcast();
     }
 
-    function encodeChainAdminMulticall(
-        Call[] memory _calls,
-        bool _requireSuccess
-    ) internal returns (bytes memory) {
+    function encodeChainAdminMulticall(Call[] memory _calls, bool _requireSuccess) internal returns (bytes memory) {
         return abi.encodeCall(IChainAdmin.multicall, (_calls, _requireSuccess));
     }
 
@@ -1371,11 +1321,7 @@ library Utils {
         adminExecuteCalls(_admin, _accessControlRestriction, calls);
     }
 
-    function adminExecuteCalls(
-        address _admin,
-        address _accessControlRestriction,
-        Call[] memory calls
-    ) internal {
+    function adminExecuteCalls(address _admin, address _accessControlRestriction, Call[] memory calls) internal {
         // If `_accessControlRestriction` is not provided, we assume that `_admin` is IOwnable
         address adminOwner = _accessControlRestriction == address(0)
             ? IOwnable(_admin).owner()
