@@ -42,10 +42,8 @@ governance_security_council_address = "0xBDFfCC71FE84020238F2990a6D2954e87355De0
 latest_protocol_version = 0x1b00000000
 l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 
-# fixme - previous protocol not released yet
-protocol_upgrade_handler_proxy_address = "0x0000000000000000000000000000000000000000"
-# fixme - previous protocol not released yet
-protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000000"
+protocol_upgrade_handler_proxy_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
+protocol_upgrade_handler_impl_address = "0x0A67f0Fd2f7523057039F14969Fe23a5f620f19A"
 
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
