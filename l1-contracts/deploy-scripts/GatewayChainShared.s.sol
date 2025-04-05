@@ -45,12 +45,15 @@ import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 /// @notice A library that is used to avoid code repetition between local
 /// execution of the gateway governance-related functionality and
 abstract contract GatewayChainShared is Script {
+    using stdToml for string;
+
     // solhint-disable-next-line gas-struct-packing
     struct Config {
         address bridgehub;
@@ -65,30 +68,30 @@ abstract contract GatewayChainShared is Script {
         address ecosystemAdmin;
     }
 
-    Config config;
+    Config internal config;
 
-    function getConfigFromL1(address _bridgehub, address _gatewayChainId) internal view returns (Config memory) {
+    function getConfigFromL1(address _bridgehub, uint256 _gatewayChainId) internal view returns (Config memory) {
         IBridgehub bridgehub = IBridgehub(_bridgehub);
         address gatewayChainAddress = bridgehub.getZKChain(_gatewayChainId);
         address l1AssetRouter = bridgehub.assetRouter();
 
         return
             Config({
-                bridgehub: bridgehub,
+                bridgehub: _bridgehub,
                 ctmDeploymentTracker: address(bridgehub.l1CtmDeployer()),
-                chainTypeManagerProxy: address(bridgehub.chainTypeManager(gatewayChainId)),
+                chainTypeManagerProxy: address(bridgehub.chainTypeManager(_gatewayChainId)),
                 l1AssetRouterProxy: address(bridgehub.assetRouter()),
                 gatewayChainId: _gatewayChainId,
                 governance: Ownable2Step(_bridgehub).owner(),
                 gatewayChainAdmin: IGetters(gatewayChainAddress).getAdmin(),
                 // For now, the script works only with `ChainAdminOwnable`
                 gatewayAccessControlRestriction: address(0),
-                l1NullifierProxy: L1AssetRouter(l1AssetRouter).L1_NULLIFIER(),
+                l1NullifierProxy: address(L1AssetRouter(l1AssetRouter).L1_NULLIFIER()),
                 ecosystemAdmin: bridgehub.admin()
             });
     }
 
-    function initializeConfig(address _bridgehub, address _gatewayChainId) internal virtual {
+    function initializeConfig() internal virtual {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("GATEWAY_CHAIN_SHARED_CONFIG"));
         string memory toml = vm.readFile(path);
@@ -101,7 +104,7 @@ abstract contract GatewayChainShared is Script {
         // the fact that all values are initialized
 
         address bridgehub = toml.readAddress("$.bridgehub_proxy_addr");
-        address gatewayChainId = toml.readUint("$.chain_chain_id");
+        uint256 gatewayChainId = toml.readUint("$.chain_chain_id");
 
         config = getConfigFromL1(bridgehub, gatewayChainId);
     }
@@ -114,23 +117,12 @@ abstract contract GatewayChainShared is Script {
         calls[0] = Call({
             target: config.bridgehub,
             value: 0,
-            data: abi.encodeCall(Bridgehub.registerSettlementLayer, (config.gatewayChainId, true))
+            data: abi.encodeCall(IBridgehub.registerSettlementLayer, (config.gatewayChainId, true))
         });
 
         // Registration of the new chain type manager inside the ZK Gateway chain
         {
             bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (_gatewayCTMAddress));
-
-            bytes32 l2TxHash = Utils.prepareGovernanceL1L2DirectTransaction(
-                _getL1GasPrice(),
-                data,
-                Utils.MAX_PRIORITY_TX_GAS,
-                new bytes[](0),
-                L2_BRIDGEHUB_ADDRESS,
-                config.gatewayChainId,
-                config.bridgehub,
-                config.l1AssetRouterProxy
-            );
 
             calls = Utils.mergeCalls(
                 calls,
@@ -166,7 +158,7 @@ abstract contract GatewayChainShared is Script {
                 calls,
                 Call({
                     target: config.ctmDeploymentTracker,
-                    data: abi.encodeCall(ICTMDeploymentTracker, (config.chainTypeManagerProxy)),
+                    data: abi.encodeCall(ICTMDeploymentTracker.registerCTMAssetOnL1, (config.chainTypeManagerProxy)),
                     value: 0
                 })
             );
@@ -174,9 +166,10 @@ abstract contract GatewayChainShared is Script {
 
         // Confirmed that the L2 Bridgehub should be an asset handler for the assetId for chains.
         {
+            bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(config.gatewayChainId);
             bytes memory secondBridgeData = abi.encodePacked(
                 SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
-                abi.encode(assetId, L2_BRIDGEHUB_ADDRESS)
+                abi.encode(chainAssetId, L2_BRIDGEHUB_ADDRESS)
             );
 
             calls = Utils.mergeCalls(
@@ -204,7 +197,7 @@ abstract contract GatewayChainShared is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.runGovernanceL1L2TwoBridgesTransaction(
+                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
                     _l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     config.gatewayChainId,

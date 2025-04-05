@@ -577,8 +577,6 @@ library Utils {
 
     function prepareGovernanceL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
-        address governor,
-        bytes32 salt,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,

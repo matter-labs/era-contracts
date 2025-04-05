@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-// import {Vm} from "forge-std/Vm.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
@@ -48,6 +48,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {GatewayChainShared} from "./GatewayChainShared.s.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
@@ -63,7 +64,7 @@ contract GatewayPreparation is GatewayChainShared {
         address l2ChainAdminAddress;
         address gatewayTransactionFiltererImplementation;
         address gatewayTransactionFiltererProxy;
-        bytes encodedeCalls;
+        bytes encodedCalls;
     }
 
     function run() public {
@@ -84,7 +85,7 @@ contract GatewayPreparation is GatewayChainShared {
         );
         vm.serializeAddress("root", "gateway_transaction_filterer_proxy", output.gatewayTransactionFiltererProxy);
         vm.serializeAddress("root", "l2_chain_admin_address", output.l2ChainAdminAddress);
-        vm.serializeBytes("root", "encoded_calls", output.encodedeCalls);
+        vm.serializeBytes("root", "encoded_calls", output.encodedCalls);
         string memory toml = vm.serializeBytes32("root", "governance_l2_tx_hash", output.governanceL2TxHash);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-gateway-preparation-l1.toml");
         vm.writeToml(toml, path);
@@ -96,7 +97,7 @@ contract GatewayPreparation is GatewayChainShared {
             l2ChainAdminAddress: l2ChainAdminAddress,
             gatewayTransactionFiltererImplementation: address(0),
             gatewayTransactionFiltererProxy: address(0),
-            encodedeCalls: hex""
+            encodedCalls: hex""
         });
 
         saveOutput(output);
@@ -108,7 +109,7 @@ contract GatewayPreparation is GatewayChainShared {
             l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: address(0),
             gatewayTransactionFiltererProxy: address(0),
-            encodedeCalls: hex""
+            encodedCalls: hex""
         });
 
         saveOutput(output);
@@ -120,7 +121,7 @@ contract GatewayPreparation is GatewayChainShared {
             l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: address(0),
             gatewayTransactionFiltererProxy: address(0),
-            encodedeCalls: encodedCalls
+            encodedCalls: encodedCalls
         });
 
         saveOutput(output);
@@ -164,7 +165,7 @@ contract GatewayPreparation is GatewayChainShared {
             l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: address(0),
             gatewayTransactionFiltererProxy: address(0),
-            encodedeCalls: hex""
+            encodedCalls: hex""
         });
 
         saveOutput(output);
@@ -178,7 +179,8 @@ contract GatewayPreparation is GatewayChainShared {
             governanceL2TxHash: bytes32(0),
             l2ChainAdminAddress: address(0),
             gatewayTransactionFiltererImplementation: gatewayTransactionFiltererImplementation,
-            gatewayTransactionFiltererProxy: gatewayTransactionFiltererProxy
+            gatewayTransactionFiltererProxy: gatewayTransactionFiltererProxy,
+            encodedCalls: hex""
         });
 
         saveOutput(output);
@@ -187,7 +189,9 @@ contract GatewayPreparation is GatewayChainShared {
     function runGatewayGovernanceRegistration(
         address gatewayCTMAddress
     ) public {
-        Call[] memory calls = prepareGatewayGovernanceCalls(
+        initializeConfig();
+
+        Call[] memory calls = _prepareGatewayGovernanceCalls(
             _getL1GasPrice(),
             gatewayCTMAddress
         );
@@ -201,11 +205,11 @@ contract GatewayPreparation is GatewayChainShared {
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        address diamondProxy = Bridgehub(config.bridgehub).getZKChain(config,gatewayChainId);
+        address diamondProxy = IBridgehub(config.bridgehub).getZKChain(config.gatewayChainId);
 
-        bytes32[] allPriorityOps = Utils.extractAllPriorityOpFromLogs(diamondProxy, logs);
+        bytes32[] memory allPriorityOps = Utils.extractAllPriorityOpFromLogs(diamondProxy, logs);
         
-        saveResult(allPriorityOps[allPriorityOps.length - 1]);
+        saveOutput(allPriorityOps[allPriorityOps.length - 1]);
     }
 
     // function deployL2ChainAdmin(uint256 chainId) public {
@@ -332,7 +336,8 @@ contract GatewayPreparation is GatewayChainShared {
     /// @dev Calling this function requires private key to the admin of the chain
     function startMigrateChainFromGateway(
         address accessControlRestriction,
-        uint256 chainId
+        uint256 chainId,
+        bytes memory l1DiamondCutData
     ) public {
         initializeConfig();
         address chainAdmin = _getChainAdmin(chainId);
@@ -348,7 +353,7 @@ contract GatewayPreparation is GatewayChainShared {
         bytes memory bridgehubBurnData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: chainId,
-                ctmData: abi.encode(chainAdmin, config.l1DiamondCutData),
+                ctmData: abi.encode(chainAdmin, l1DiamondCutData),
                 chainData: abi.encode(IChainTypeManager(config.chainTypeManagerProxy).getProtocolVersion(chainId))
             })
         );
@@ -408,7 +413,7 @@ contract GatewayPreparation is GatewayChainShared {
         uint256 chainId,
         address l1DAValidator,
         address l2DAValidator,
-        address chainDiamondProxyOnGateway,
+        address chainDiamondProxyOnGateway
     ) public {
         initializeConfig();
         address chainAdmin = _getChainAdmin(chainId);
@@ -435,7 +440,7 @@ contract GatewayPreparation is GatewayChainShared {
         address accessControlRestriction,
         uint256 chainId,
         address validatorAddress,
-        address gatewayValidatorTimelock,
+        address gatewayValidatorTimelock
     ) public {
         initializeConfig();
         address chainAdmin = _getChainAdmin(chainId);
@@ -484,19 +489,19 @@ contract GatewayPreparation is GatewayChainShared {
     }
 
     /// The caller of this function should have private key of the admin of the *gateway*
-    function deployGatewayTransactionFilterer() public {
+    function deployGatewayTransactionFilterer(address gatewayProxyAdmin) public {
         initializeConfig();
 
         vm.broadcast();
         GatewayTransactionFilterer impl = new GatewayTransactionFilterer(
             IBridgehub(config.bridgehub),
-            config.sharedBridgeProxy
+            config.l1AssetRouterProxy
         );
 
         vm.broadcast();
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
-            config.gatewayChainProxyAdmin,
+            gatewayProxyAdmin,
             abi.encodeCall(GatewayTransactionFilterer.initialize, (config.gatewayChainAdmin))
         );
 

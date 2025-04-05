@@ -265,6 +265,7 @@ contract AcceptAdmin is Script {
     struct Output {
         address admin;
         bytes encodedData;
+        uint256 value;
     }
 
     function notifyServerMigrationToGateway(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
@@ -364,10 +365,9 @@ contract AcceptAdmin is Script {
         uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
         if (currentSettlementLayer == data.gatewayChainId) {
             console.log("Chain already using gateway as its settlement layer");
-            saveOutput(Output({admin: gatewayChainInfo.admin, encodedData: hex""}));
+            saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex"", value: 0}));
             return;
         }
-
         bytes memory bridgehubData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.l2ChainId,
@@ -395,7 +395,7 @@ contract AcceptAdmin is Script {
             secondBridgeData
         );
 
-        saveAndSendAdminTx(gatewayChainInfo.admin, calls, data._shouldSend);
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
     }
 
     function migrateChainToGateway(
@@ -420,13 +420,12 @@ contract AcceptAdmin is Script {
 
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         bytes memory data = abi.encodeCall(IChainAdmin.multicall, (_calls, true));
+        uint256 totalValue = 0;
+        for (uint256 i = 0; i < _calls.length; i++) {
+            totalValue += _calls[i].value;
+        } 
 
         if (_shouldSend) {
-            uint256 totalValue = 0;
-            for (uint256 i = 0; i < _calls.length; i++) {
-                totalValue += _calls[i].value;
-            }
-
             address owner = Ownable2Step(_admin).owner();
 
             vm.startBroadcast(owner);
@@ -440,11 +439,12 @@ contract AcceptAdmin is Script {
             }
         }
 
-        saveOutput(Output({admin: _admin, encodedData: data}));
+        saveOutput(Output({admin: _admin, encodedData: data, value: totalValue}));
     }
 
     function saveOutput(Output memory output) internal {
         vm.serializeAddress("root", "admin_address", output.admin);
+        vm.serializeUint("root", "value", output.value);
         string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-accept-admin.toml");
         vm.writeToml(toml, path);

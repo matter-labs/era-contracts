@@ -115,8 +115,9 @@ contract GatewayCTMFromL1 is Script {
         (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
-        bytes memory whitelistedBytecodesFactory = Utils.readZKFoundryBytecodeL1("WhitelistedBytecodeFactory.sol", "WhitelistedBytecodeFactory");
-        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts, Utils.getL2AddressViaCreate2Factory(gatewayCTMDeployerConfig.salt, L2ContractHelper.hashL2Bytecode(whitelistedBytecodesFactory), constructorArgs););
+        // bytes memory whitelistedBytecodesFactory = Utils.readZKFoundryBytecodeL1("WhitelistedBytecodeFactory.sol", "WhitelistedBytecodeFactory");
+        // address expectedAddr = Utils.getL2AddressViaCreate2Factory(gatewayCTMDeployerConfig.salt, L2ContractHelper.hashL2Bytecode(whitelistedBytecodesFactory), hex"");
+        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts, address(0));
         saveOutput();
     }
 
@@ -154,24 +155,24 @@ contract GatewayCTMFromL1 is Script {
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
-        address whitelistedBytecodesFactory = deployWhitelistedBytecodeFactory();
+        // address whitelistedBytecodesFactory = deployWhitelistedBytecodeFactory();
 
-        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts, whitelistedBytecodesFactory);
+        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts, address(0));
         saveOutput();
     }
 
-    function deployWhitelistedBytecodeFactory() internal returns (address) {
-        return Utils.deployThroughL1Deterministic(
-            Utils.readZKFoundryBytecodeL1("WhitelistedBytecodeFactory.sol", "WhitelistedBytecodeFactory"), 
-            abi.encode(AddressAliasHelper.applyL1ToL2Alias(_admin)), 
-            gatewayCTMDeployerConfig.salt, 
-            72_000_000, 
-            new bytes[](0), 
-            config.chainChainId, 
-            config.bridgehub, 
-            config.sharedBridgeProxy
-        );
-    }
+    // function deployWhitelistedBytecodeFactory() internal returns (address) {
+    //     return Utils.deployThroughL1Deterministic(
+    //         Utils.readZKFoundryBytecodeL1("WhitelistedBytecodeFactory.sol", "WhitelistedBytecodeFactory"), 
+    //         abi.encode(AddressAliasHelper.applyL1ToL2Alias(_admin)), 
+    //         gatewayCTMDeployerConfig.salt, 
+    //         72_000_000, 
+    //         new bytes[](0), 
+    //         config.chainChainId, 
+    //         config.bridgehub, 
+    //         config.sharedBridgeProxy
+    //     );
+    // }
 
     function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts, address _whitelistedBytecodesFactory) internal {
         output = Output({
