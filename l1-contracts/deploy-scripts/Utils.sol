@@ -450,6 +450,7 @@ library Utils {
             l2GasLimit: params.l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             factoryDeps: params.factoryDeps,
+            // FIXME: use correct refund recipient
             refundRecipient: msg.sender
         });
     }

@@ -418,28 +418,124 @@ contract AcceptAdmin is Script {
         );
     }
 
+
+    struct SetDAValidatorPairWithGatewayParams {
+        address bridgehub;
+        uint256 l1GasPrice;
+        uint256 l2ChainId;
+        uint256 gatewayChainId;
+        address l1DAValidator;
+        address l2DAValidator;
+        address chainDiamondProxyOnGateway;
+        bool _shouldSend;
+    }
+
+    // Using struct for input to avoid stack too deep errors
+    // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
+    function _setDAValidatorPairWithGatewayInner(SetDAValidatorPairWithGatewayParams memory data) private {
+        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (data.l1DAValidator, data.l2DAValidator));
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            data.l1GasPrice,
+            callData,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            data.chainDiamondProxyOnGateway,
+            data.gatewayChainId,
+            data.bridgehub,
+            l2ChainInfo.l1AssetRouterProxy
+        );
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
+    }
+
+    function setDAValidatorPairWithGateway(
+        address bridgehub,
+        uint256 l1GasPrice,
+        uint256 l2ChainId,
+        uint256 gatewayChainId,
+        address l1DAValidator,
+        address l2DAValidator,
+        address chainDiamondProxyOnGateway,
+        bool _shouldSend
+    ) public {
+        _setDAValidatorPairWithGatewayInner(
+            SetDAValidatorPairWithGatewayParams({
+                bridgehub: bridgehub,
+                l1GasPrice: l1GasPrice,
+                l2ChainId: l2ChainId,
+                gatewayChainId: gatewayChainId,
+                l1DAValidator: l1DAValidator,
+                l2DAValidator: l2DAValidator,
+                chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
+                _shouldSend: _shouldSend
+            })
+        );
+    }
+
+    // --- New code for enableValidatorViaGateway ---
+
+    struct EnableValidatorViaGatewayParams {
+        address bridgehub;
+        uint256 l1GasPrice;
+        uint256 l2ChainId;
+        uint256 gatewayChainId;
+        address validatorAddress;
+        address gatewayValidatorTimelock;
+        bool _shouldSend;
+    }
+
+    // Using struct for input to avoid stack too deep errors
+    // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
+    function _enableValidatorViaGatewayInner(EnableValidatorViaGatewayParams memory data) private {
+        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidator, (data.l2ChainId, data.validatorAddress));
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            data.l1GasPrice,
+            callData,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            data.gatewayValidatorTimelock,
+            data.gatewayChainId,
+            data.bridgehub,
+            l2ChainInfo.l1AssetRouterProxy
+        );
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
+    }
+
+    function enableValidatorViaGateway(
+        address bridgehub,
+        uint256 l1GasPrice,
+        uint256 l2ChainId,
+        uint256 gatewayChainId,
+        address validatorAddress,
+        address gatewayValidatorTimelock,
+        bool _shouldSend
+    ) public {
+        _enableValidatorViaGatewayInner(
+            EnableValidatorViaGatewayParams({
+                bridgehub: bridgehub,
+                l1GasPrice: l1GasPrice,
+                l2ChainId: l2ChainId,
+                gatewayChainId: gatewayChainId,
+                validatorAddress: validatorAddress,
+                gatewayValidatorTimelock: gatewayValidatorTimelock,
+                _shouldSend: _shouldSend
+            })
+        );
+    }
+
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
-        bytes memory data = abi.encodeCall(IChainAdmin.multicall, (_calls, true));
-        uint256 totalValue = 0;
-        for (uint256 i = 0; i < _calls.length; i++) {
-            totalValue += _calls[i].value;
-        } 
+        bytes memory data = abi.encode(_calls);
+        
 
         if (_shouldSend) {
-            address owner = Ownable2Step(_admin).owner();
-
-            vm.startBroadcast(owner);
-            (bool success, bytes memory returnData) = _admin.call{value: totalValue}(data);
-            vm.stopBroadcast();
-
-            if (!success) {
-                assembly {
-                    revert(add(returnData, 0x20), mload(returnData))
-                }
-            }
+            Utils.adminExecuteCalls(_admin, address(0), _calls);
         }
 
-        saveOutput(Output({admin: _admin, encodedData: data, value: totalValue}));
+        // FIXME: delete totalValue
+        saveOutput(Output({admin: _admin, encodedData: data, value: 0}));
     }
 
     function saveOutput(Output memory output) internal {
