@@ -138,7 +138,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
     }
 
-    function test_startMessageToL3() public {
+    function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
         IBridgehub bridgehub = IBridgehub(bridgehub);
@@ -306,7 +306,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     /// to increase coverage, properly tested in L2GatewayTests
-    function test_forwardToL3OnGateway() public {
+    function test_forwardToL2OnGateway() public {
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
