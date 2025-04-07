@@ -23,12 +23,14 @@ import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, E
  */
 contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Information about an account contract.
-    /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
+    /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0,
+    /// which corresponds to `AccountAbstractionVersion.None`.and `AccountNonceOrdering.KeyedSequential`.
     mapping(address => AccountInfo) internal accountInfo;
 
     /// @notice What types of bytecode are allowed to be deployed on this chain.
     AllowedBytecodeTypes public allowedBytecodeTypesToDeploy;
 
+    /// @dev Restricts `msg.sender` to be this contract itself.
     modifier onlySelf() {
         if (msg.sender != address(this)) {
             revert Unauthorized(msg.sender);
@@ -37,12 +39,16 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Returns information about a certain account.
+    /// @param _address The address of the account.
+    /// @return The information about the account (AA version and nonce ordering).
     function getAccountInfo(address _address) external view returns (AccountInfo memory) {
         return accountInfo[_address];
     }
 
     /// @notice Returns the account abstraction version if `_address` is a deployed contract.
     /// Returns the latest supported account abstraction version if `_address` is an EOA.
+    /// @param _address The address of the account.
+    /// @return The account abstraction version of the account. In particular, `Version1` for EOAs, `None` for non-account contracts. .
     function extendedAccountVersion(address _address) public view returns (AccountAbstractionVersion) {
         AccountInfo memory info = accountInfo[_address];
         if (info.supportedAAVersion != AccountAbstractionVersion.None) {
@@ -61,6 +67,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Stores the new account information
+    /// @param _address The address of the account.
+    /// @param _newInfo The new account information to store.
     function _storeAccountInfo(address _address, AccountInfo memory _newInfo) internal {
         accountInfo[_address] = _newInfo;
     }
@@ -108,6 +116,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Calculates the address of a deployed contract via create
     /// @param _sender The account that deploys the contract.
     /// @param _senderNonce The deploy nonce of the sender's account.
+    /// @return newAddress The derived address of the contract.
     function getNewAddressCreate(
         address _sender,
         uint256 _senderNonce
@@ -125,6 +134,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _salt The CREATE2 salt
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata
+    /// @return The derived address of the contract.
     function create2(
         bytes32 _salt,
         bytes32 _bytecodeHash,
@@ -134,10 +144,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     /// @notice Deploys a contract with similar address derivation rules to the EVM's `CREATE` opcode.
+    /// @param _salt A 32-byte salt.
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata
-    /// @dev This method also accepts nonce as one of its parameters.
-    /// It is not used anywhere and it needed simply for the consistency for the compiler
+    /// @return The derived address of the contract.
+    /// @dev Although this method accepts salt as one of its parameters.
+    /// It is not used anywhere and is needed simply for the consistency for the compiler
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create(
@@ -218,8 +230,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Method used by EVM emulator to deploy contracts.
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _initCode The EVM code to be deployed (initCode).
-    /// Note: only possible revert case should be due to revert in the called constructor.
-    /// Note: this method may be callable only by the EVM emulator.
+    /// @return The amount of EVM gas used.
+    /// @return The address of created contract.
+    /// @dev Only possible revert case should be due to revert in the called constructor.
+    /// @dev This method may be callable only by the EVM emulator.
     function createEvmFromEmulator(
         address _newAddress,
         bytes calldata _initCode
@@ -238,7 +252,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata.
     /// @param _aaVersion The account abstraction version to use.
-    /// Note: this method may be callable only in system mode,
+    /// @return The derived address of the contract.
+    /// @dev this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create2Account(
         bytes32 _salt,
@@ -258,6 +273,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata.
     /// @param _aaVersion The account abstraction version to use.
+    /// @return The derived address of the contract.
     /// @dev This method also accepts salt as one of its parameters.
     /// It is not used anywhere and it needed simply for the consistency for the compiler
     function createAccount(
@@ -307,7 +323,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
             AccountInfo memory newAccountInfo;
             newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
-            // Accounts have sequential nonces by default.
+            // Accounts have keyed sequential nonces by default.
             newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
             _storeAccountInfo(_deployment.newAddress, newAccountInfo);
 
@@ -325,6 +341,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     /// @dev We do not require `onlySystemCall` here, since the method is accessible only
     /// by `FORCE_DEPLOYER`.
+    /// @param _deployments The list of forced deployments to be done.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable override {
         if (
             msg.sender != FORCE_DEPLOYER &&
@@ -368,6 +385,11 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
     }
 
+    /// @notice Deploys a bytecode on the specified address.
+    /// @param _bytecodeHash The correctly formatted hash of the bytecode.
+    /// @param _newAddress The address of the contract to be deployed.
+    /// @param _aaVersion The version of the account abstraction protocol to use.
+    /// @param _input The constructor calldata.
     function _nonSystemDeployOnAddress(
         bytes32 _bytecodeHash,
         address _newAddress,
@@ -398,6 +420,11 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         _performDeployOnAddress(_bytecodeHash, _newAddress, _aaVersion, _input, true);
     }
 
+    /// @notice Deploy an EVM bytecode on the specified address.
+    /// @param _sender The deployer address.
+    /// @param _newAddress The address of the contract to be deployed.
+    /// @param _initCode The constructor calldata.
+    /// @return constructorReturnEvmGas The EVM gas left after constructor execution.
     function _evmDeployOnAddress(
         address _sender,
         address _newAddress,
@@ -437,7 +464,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
-        // Accounts have sequential nonces by default.
+        // Accounts have keyed sequential nonces by default.
         newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
@@ -465,7 +492,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     ) internal returns (uint256 constructorReturnEvmGas) {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
-        // Accounts have sequential nonces by default.
+        // Accounts have keyed sequential nonces by default.
         newAccountInfo.nonceOrdering = AccountNonceOrdering.KeyedSequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
