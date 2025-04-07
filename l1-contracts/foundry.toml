@@ -2,7 +2,7 @@
 allow_paths = ["../l2-contracts/contracts"]
 src = "contracts"
 out = "out"
-libs = ["node_modules", "./lib"]
+libs = ["./lib"]
 cache_path = "cache-forge"
 test = "test/foundry"
 solc_version = "0.8.24"
@@ -16,6 +16,7 @@ fs_permissions = [
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "../l2-contracts/zkout/" },
     { access = "read", path = "../l1-contracts/artifacts-zk/" },
+    { access = "read", path = "../l1-contracts/script-out/" },
     { access = "read", path = "../da-contracts/" },
     { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
@@ -27,6 +28,7 @@ fs_permissions = [
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read", path = "zkout" },
+    { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
@@ -44,3 +46,43 @@ optimizer_runs = 200
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.7"
+
+[profile.invariant_tests_l1context]
+test = "test"
+ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+optimizer = false
+[profile.invariant_tests_l1context.zksync]
+suppressed_warnings = ["txorigin"]
+[profile.invariant_tests_l1context.invariant]
+runs = 10
+depth = 1000
+
+[profile.invariant_tests_l2context]
+test = "test"
+ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+optimizer = false
+[profile.invariant_tests_l2context.zksync]
+suppressed_warnings = ["txorigin"]
+[profile.invariant_tests_l2context.invariant]
+runs = 1
+depth = 100
+
+[profile.invariant_tests_l1context_ci]
+test = "test"
+ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+optimizer = false
+[profile.invariant_tests_l1context_ci.zksync]
+suppressed_warnings = ["txorigin"]
+[profile.invariant_tests_l1context_ci.invariant]
+runs = 10
+depth = 10000
+
+[profile.invariant_tests_l2context_ci]
+test = "test"
+ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+optimizer = false
+[profile.invariant_tests_l2context_ci.zksync]
+suppressed_warnings = ["txorigin"]
+[profile.invariant_tests_l2context_ci.invariant]
+runs = 2
+depth = 1000

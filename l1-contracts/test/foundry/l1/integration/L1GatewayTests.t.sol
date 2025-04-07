@@ -94,8 +94,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _initializeGatewayScript();
 
         vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
-        migratingChain = IZKChain(IBridgehub(bridgehub).getZKChain(migratingChainId));
-        gatewayChain = IZKChain(IBridgehub(bridgehub).getZKChain(gatewayChainId));
+        migratingChain = IZKChain(IBridgehub(addresses.bridgehub).getZKChain(migratingChainId));
+        gatewayChain = IZKChain(IBridgehub(addresses.bridgehub).getZKChain(gatewayChainId));
         vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
@@ -128,7 +128,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-        require(bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
+        require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
@@ -141,7 +141,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-        IBridgehub bridgehub = IBridgehub(bridgehub);
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
@@ -152,7 +152,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             800,
             "0x"
         );
-        bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+        addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
     }
 
     function test_recoverFromFailedChainMigration() public {
@@ -160,17 +160,17 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
 
         // Setup
-        IBridgehub bridgehub = IBridgehub(bridgehub);
-        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
         bytes memory transferData;
 
         {
-            IZKChain chain = IZKChain(bridgehub.getZKChain(migratingChainId));
+            IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
             bytes memory chainData = abi.encode(chain.getProtocolVersion());
             bytes memory ctmData = abi.encode(
                 address(1),
                 msg.sender,
-                chainTypeManager.protocolVersion(),
+                addresses.chainTypeManager.protocolVersion(),
                 ecosystemConfig.contracts.diamondCutData
             );
             BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
@@ -181,8 +181,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             transferData = abi.encode(data);
         }
 
-        address chainAdmin = IZKChain(bridgehub.getZKChain(migratingChainId)).getAdmin();
-        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.sharedBridge()));
+        address chainAdmin = IZKChain(addresses.bridgehub.getZKChain(migratingChainId)).getAdmin();
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(addresses.bridgehub.sharedBridge()));
         bytes32 l2TxHash = keccak256("l2TxHash");
         uint256 l2BatchNumber = 5;
         uint256 l2MessageIndex = 0;
@@ -192,7 +192,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(bridgehub),
+            address(addresses.bridgehub),
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
                 migratingChainId,
@@ -207,7 +207,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         // Set Deposit Happened
-        vm.startBroadcast(address(bridgehub));
+        vm.startBroadcast(address(addresses.bridgehub));
         assetRouter.bridgehubConfirmL2Transaction({
             _chainId: migratingChainId,
             _txDataHash: txDataHash,
@@ -216,7 +216,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         vm.stopBroadcast();
 
         vm.startBroadcast();
-        l1Nullifier.bridgeRecoverFailedTransfer({
+        addresses.l1Nullifier.bridgeRecoverFailedTransfer({
             _chainId: migratingChainId,
             _depositSender: chainAdmin,
             _assetId: assetId,
@@ -237,12 +237,12 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function migrateBackChain() public {
-        IBridgehub bridgehub = IBridgehub(bridgehub);
-        IZKChain migratingChain = IZKChain(bridgehub.getZKChain(migratingChainId));
-        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        IZKChain migratingChain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
+        bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
-        vm.startBroadcast(Ownable(address(bridgehub)).owner());
-        bridgehub.registerSettlementLayer(gatewayChainId, true);
+        vm.startBroadcast(Ownable(address(addresses.bridgehub)).owner());
+        addresses.bridgehub.registerSettlementLayer(gatewayChainId, true);
         vm.stopBroadcast();
 
         bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
@@ -251,22 +251,22 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(bridgehub),
+            address(addresses.bridgehub),
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         vm.mockCall(
-            address(bridgehub),
+            address(addresses.bridgehub),
             abi.encodeWithSelector(IBridgehub.ctmAssetIdFromChainId.selector),
             abi.encode(assetId)
         );
         vm.mockCall(
-            address(chainTypeManager),
+            address(addresses.chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(chainTypeManager.protocolVersion())
+            abi.encode(addresses.chainTypeManager.protocolVersion())
         );
 
-        uint256 protocolVersion = chainTypeManager.getProtocolVersion(migratingChainId);
+        uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
         bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
         bytes memory ctmData = abi.encode(
@@ -300,8 +300,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         vm.chainId(currentChainId);
 
-        assertEq(bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
-        IZKChain migratingChainContract = IZKChain(bridgehub.getZKChain(migratingChainId));
+        assertEq(addresses.bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
+        IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
     }
 
@@ -310,7 +310,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
+        addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
 

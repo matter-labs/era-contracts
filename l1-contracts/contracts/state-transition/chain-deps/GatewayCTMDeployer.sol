@@ -12,9 +12,12 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-import {L2Verifier} from "../L2Verifier.sol";
+import {DualVerifier} from "../verifiers/DualVerifier.sol";
+import {L2VerifierFflonk} from "../verifiers/L2VerifierFflonk.sol";
+import {L2VerifierPlonk} from "../verifiers/L2VerifierPlonk.sol";
+
 import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {L2TestnetVerifier} from "../L2TestnetVerifier.sol";
+import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 
@@ -30,6 +33,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-interfaces/IDiamondInit.sol";
 import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} from "../IChainTypeManager.sol";
+import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 struct GatewayCTMDeployerConfig {
@@ -64,6 +68,8 @@ struct GatewayCTMDeployerConfig {
     bytes32 bootloaderHash;
     /// @notice Hash of the default account bytecode.
     bytes32 defaultAccountHash;
+    /// @notice Hash of the EVM emulator bytecode.
+    bytes32 evmEmulatorHash;
     /// @notice Maximum gas limit for priority transactions.
     uint256 priorityTxMaxGasLimit;
     /// @notice Root hash of the genesis state.
@@ -87,6 +93,10 @@ struct StateTransitionContracts {
     address chainTypeManagerImplementation;
     /// @notice Address of the Verifier contract.
     address verifier;
+    /// @notice Address of the VerifierPlonk contract.
+    address verifierPlonk;
+    /// @notice Address of the VerifierFflonk contract.
+    address verifierFflonk;
     /// @notice Address of the Admin facet contract.
     address adminFacet;
     /// @notice Address of the Mailbox facet contract.
@@ -103,6 +113,10 @@ struct StateTransitionContracts {
     address validatorTimelock;
     /// @notice Address of the ProxyAdmin for ChainTypeManager.
     address chainTypeManagerProxyAdmin;
+    /// @notice Address of the ServerNotifier proxy contract.
+    address serverNotifierProxy;
+    /// @notice Address of the ServerNotifier implementation contract.
+    address serverNotifierImplementation;
 }
 
 /// @notice Addresses of Data Availability (DA) related contracts.
@@ -179,8 +193,17 @@ contract GatewayCTMDeployer {
         ValidatorTimelock timelock = new ValidatorTimelock{salt: salt}(address(this), 0);
         contracts.stateTransition.validatorTimelock = address(timelock);
 
+        _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
+
+        _deployServerNotifier(salt, contracts);
+
         _deployCTM(salt, _config, contracts);
         _setChainTypeManagerInValidatorTimelock(_config.aliasedGovernanceAddress, timelock, contracts);
+        _setChainTypeManagerInServerNotifier(
+            _config.aliasedGovernanceAddress,
+            ServerNotifier(contracts.stateTransition.serverNotifierProxy),
+            contracts
+        );
 
         deployedContracts = contracts;
     }
@@ -222,6 +245,37 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 
+    /// @notice Deploys a ProxyAdmin contract.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _aliasedGovernanceAddress The aliased address of the governnace.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the execution of this function.
+    function _deployProxyAdmin(
+        bytes32 _salt,
+        address _aliasedGovernanceAddress,
+        DeployedContracts memory _deployedContracts
+    ) internal {
+        ProxyAdmin proxyAdmin = new ProxyAdmin{salt: _salt}();
+        proxyAdmin.transferOwnership(_aliasedGovernanceAddress);
+        _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = address(proxyAdmin);
+    }
+
+    /// @notice Deploys a ServerNotifier contract.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the execution of this function.
+    function _deployServerNotifier(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
+        address serverNotifierImplementation = address(new ServerNotifier{salt: _salt}(true));
+        _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
+        _deployedContracts.stateTransition.serverNotifierProxy = address(
+            new TransparentUpgradeableProxy{salt: _salt}(
+                serverNotifierImplementation,
+                address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
+                abi.encodeCall(ServerNotifier.initialize, (address(this)))
+            )
+        );
+    }
+
     /// @notice Deploys verifier.
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
@@ -232,10 +286,18 @@ contract GatewayCTMDeployer {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts
     ) internal {
+        L2VerifierFflonk fflonkVerifier = new L2VerifierFflonk{salt: _salt}();
+        _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
+        L2VerifierPlonk verifierPlonk = new L2VerifierPlonk{salt: _salt}();
+        _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
-            _deployedContracts.stateTransition.verifier = address(new L2TestnetVerifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(
+                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+            );
         } else {
-            _deployedContracts.stateTransition.verifier = address(new L2Verifier{salt: _salt}());
+            _deployedContracts.stateTransition.verifier = address(
+                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+            );
         }
     }
 
@@ -281,9 +343,6 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
             new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
         );
-        ProxyAdmin proxyAdmin = new ProxyAdmin{salt: _salt}();
-        proxyAdmin.transferOwnership(_config.aliasedGovernanceAddress);
-        _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = address(proxyAdmin);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -316,6 +375,7 @@ contract GatewayCTMDeployer {
             verifierParams: _config.verifierParams,
             l2BootloaderBytecodeHash: _config.bootloaderHash,
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
             feeParams: _config.feeParams,
             blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR
@@ -343,13 +403,14 @@ contract GatewayCTMDeployer {
             owner: _config.aliasedGovernanceAddress,
             validatorTimelock: _deployedContracts.stateTransition.validatorTimelock,
             chainCreationParams: chainCreationParams,
-            protocolVersion: _config.protocolVersion
+            protocolVersion: _config.protocolVersion,
+            serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
         _deployedContracts.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
-                address(proxyAdmin),
+                address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
                 abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
             )
         );
@@ -370,5 +431,23 @@ contract GatewayCTMDeployer {
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.
         _timelock.transferOwnership(_aliasedGovernanceAddress);
+    }
+
+    /// @notice Sets the previously deployed CTM inside the ServerNotifier
+    /// @param _aliasedGovernanceAddress The aliased address of the governnace.
+    /// @param _serverNotifier The address of the server notifier
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the execution of this function.
+    function _setChainTypeManagerInServerNotifier(
+        address _aliasedGovernanceAddress,
+        ServerNotifier _serverNotifier,
+        DeployedContracts memory _deployedContracts
+    ) internal {
+        ServerNotifier(_serverNotifier).setChainTypeManager(
+            IChainTypeManager(_deployedContracts.stateTransition.chainTypeManagerProxy)
+        );
+        // Note, that the governance still has to accept it.
+        // It will happen in a separate voting after the deployment is done.
+        _serverNotifier.transferOwnership(_aliasedGovernanceAddress);
     }
 }

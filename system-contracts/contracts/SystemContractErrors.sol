@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
+// 0xbe4bf9e4
+error CallerMustBeEvmContract();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0x4f951510
@@ -28,14 +30,20 @@ error EmptyBytes32();
 error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
 // 0x2bfbfc11
 error EncodedLengthNotFourTimesSmallerThanOriginal();
+// 0x39bae0e6
+error EVMBytecodeHash();
+// 0x536a56c8
+error EVMBytecodeHashUnknown();
+// 0xb9e6e31f
+error EVMEmulationNotSupported();
 // 0xe95a1fbe
 error FailedToChargeGas();
 // 0x1f70c58f
 error FailedToPayOperator();
 // 0x9e4a3c8a
 error HashIsNonZero(bytes32);
-// 0x86302004
-error HashMismatch(bytes32 expected, uint256 actual);
+// 0x0b08d5be
+error HashMismatch(bytes32 expected, bytes32 actual);
 // 0x4e23d035
 error IndexOutOfBounds();
 // 0x122e73e9
@@ -68,8 +76,6 @@ error NonceNotUsed(address account, uint256 nonce);
 error NonEmptyAccount();
 // 0x536ec84b
 error NonEmptyMsgValue();
-// 0xd018e08e
-error NonIncreasingTimestamp();
 // 0x50df6bc3
 error NotAllowedToDeployInKernelSpace();
 // 0x35278d12
@@ -226,5 +232,7 @@ enum BytecodeError {
     NumberOfWords,
     Length,
     WordsMustBeOdd,
-    DictionaryLength
+    DictionaryLength,
+    EvmBytecodeLength,
+    EvmBytecodeLengthTooBig
 }

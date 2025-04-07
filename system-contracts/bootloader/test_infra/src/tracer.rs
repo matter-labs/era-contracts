@@ -3,14 +3,15 @@ use std::sync::Arc;
 use colored::Colorize;
 use once_cell::sync::OnceCell;
 
-use multivm::interface::{
-    dyn_tracers::vm_1_5_0::DynTracer,
-    tracer::{TracerExecutionStatus, TracerExecutionStopReason},
-};
-use multivm::vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState};
-use multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
+use zksync_multivm::tracers::dynamic::vm_1_5_0::DynTracer;
 
-use zksync_state::{StoragePtr, WriteStorage};
+use zksync_multivm::interface::tracer::{TracerExecutionStatus, TracerExecutionStopReason};
+use zksync_multivm::vm_latest::{
+    BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState,
+};
+use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
+
+use zksync_state::interface::{StoragePtr, WriteStorage};
 
 use crate::hook::TestVmHook;
 

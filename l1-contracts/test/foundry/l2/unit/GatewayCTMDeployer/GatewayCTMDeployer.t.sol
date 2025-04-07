@@ -3,10 +3,12 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {GatewayCTMDeployer, GatewayCTMDeployerConfig, DeployedContracts, StateTransitionContracts, DAContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -17,8 +19,10 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
-import {L2Verifier} from "contracts/state-transition/L2Verifier.sol";
-import {L2TestnetVerifier} from "contracts/state-transition/L2TestnetVerifier.sol";
+import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
+import {L2VerifierFflonk} from "contracts/state-transition/verifiers/L2VerifierFflonk.sol";
+import {L2VerifierPlonk} from "contracts/state-transition/verifiers/L2VerifierPlonk.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -70,10 +74,14 @@ contract GatewayCTMDeployerTest is Test {
         new ChainTypeManager(address(0));
         new ProxyAdmin();
 
-        new L2TestnetVerifier();
-        new L2Verifier();
+        new L2VerifierFflonk();
+        new L2VerifierPlonk();
+
+        new TestnetVerifier(L2VerifierFflonk(address(0)), L2VerifierPlonk(address(0)));
+        new DualVerifier(L2VerifierFflonk(address(0)), L2VerifierPlonk(address(0)));
 
         new ValidatorTimelock(address(0), 0);
+        new ServerNotifier(false);
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
         try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}
@@ -108,6 +116,7 @@ contract GatewayCTMDeployerTest is Test {
             }),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
+            evmEmulatorHash: bytes32(uint256(0xdef)),
             priorityTxMaxGasLimit: 100000,
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,
@@ -186,6 +195,7 @@ library DeployedContractsComparator {
         require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
         require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
+        require(a.serverNotifierProxy == b.serverNotifierProxy, "serverNotifier proxy differs");
     }
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {

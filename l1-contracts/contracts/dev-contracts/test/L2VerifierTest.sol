@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {L2Verifier} from "../../state-transition/L2Verifier.sol";
+import {L1VerifierPlonk} from "../../state-transition/verifiers/L1VerifierPlonk.sol";
 
 /// @author Matter Labs
-contract L2VerifierTest is L2Verifier {
+contract L1PlonkVerifierTest is L1VerifierPlonk {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
