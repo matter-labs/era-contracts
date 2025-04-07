@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: [ matterlabs-ci-runner-highmem-long ]
+    runs-on: [matterlabs-ci-runner-highmem-long]
 
     steps:
       - name: Checkout the repository
