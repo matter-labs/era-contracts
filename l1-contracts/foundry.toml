@@ -42,7 +42,7 @@ remappings = [
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 optimizer = true
-optimizer_runs = 9999999
+optimizer_runs = 200
 [profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"
