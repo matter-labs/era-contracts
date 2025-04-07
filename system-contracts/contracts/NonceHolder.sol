@@ -59,7 +59,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @param _key The key of the nonce to return.
     /// @return The current keyed nonce with the given key for this account.
     /// Returns the full nonce (including the provided key), not just the nonce value.
-    function getKeyedNonce(address _address, uint192 _key) public view returns (uint256) {
+    function getKeyedNonce(address _address, uint192 _key) external view returns (uint256) {
         if (_key == 0) {
             return getMinNonce(_address);
         }
@@ -71,7 +71,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @dev It is equal to minNonce + 2^128 * deployment nonce.
     /// @param _address The account to return the raw nonce for
     /// @return The raw nonce for this account.
-    function getRawNonce(address _address) public view returns (uint256) {
+    function getRawNonce(address _address) external view returns (uint256) {
         uint256 addressAsKey = uint256(uint160(_address));
         return rawNonces[addressAsKey];
     }
@@ -79,7 +79,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @notice Increases the minimal nonce for the msg.sender and returns the previous one.
     /// @param _value The number by which to increase the minimal nonce for msg.sender.
     /// @return oldMinNonce The value of the minimal nonce for msg.sender before the increase.
-    function increaseMinNonce(uint256 _value) public onlySystemCall returns (uint256 oldMinNonce) {
+    function increaseMinNonce(uint256 _value) external onlySystemCall returns (uint256 oldMinNonce) {
         if (_value == 0 || _value > MAXIMAL_MIN_NONCE_INCREMENT) {
             revert NonceIncreaseError(1, MAXIMAL_MIN_NONCE_INCREMENT, _value);
         }
@@ -231,7 +231,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// @notice Splits the raw nonce value into the deployment nonce and the minimal nonce.
     /// @param _rawMinNonce The value of the raw minimal nonce (equal to minNonce + deploymentNonce* 2**128).
     /// @return deploymentNonce and minNonce.
-    function _splitRawNonce(uint256 _rawMinNonce) internal pure returns (uint256 deploymentNonce, uint256 minNonce) {
+    function _splitRawNonce(uint256 _rawMinNonce) private pure returns (uint256 deploymentNonce, uint256 minNonce) {
         deploymentNonce = _rawMinNonce / DEPLOY_NONCE_MULTIPLIER;
         minNonce = _rawMinNonce % DEPLOY_NONCE_MULTIPLIER;
     }
