@@ -609,7 +609,6 @@ library Utils {
 
         // We record L2 tx hash only for governance operations
         return bytes32(0);
-
     }
 
     function runGovernanceL1L2DirectTransaction(

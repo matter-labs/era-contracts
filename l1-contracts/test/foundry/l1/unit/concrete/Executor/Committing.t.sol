@@ -426,7 +426,9 @@ contract CommittingTest is ExecutorTest {
             vm.prank(validator);
 
             uint256 allLogsProcessed = uint256(127);
-            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i)));
+            vm.expectRevert(
+                abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i))
+            );
             (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
