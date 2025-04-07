@@ -111,7 +111,8 @@ abstract contract GatewayChainShared is Script {
 
     function _prepareGatewayGovernanceCalls(
         uint256 _l1GasPrice,
-        address _gatewayCTMAddress
+        address _gatewayCTMAddress,
+        address _refundRecipient
     ) internal returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
@@ -134,7 +135,8 @@ abstract contract GatewayChainShared is Script {
                     L2_BRIDGEHUB_ADDRESS,
                     config.gatewayChainId,
                     config.bridgehub,
-                    config.l1AssetRouterProxy
+                    config.l1AssetRouterProxy,
+                    _refundRecipient
                 )
             );
         }
@@ -182,7 +184,8 @@ abstract contract GatewayChainShared is Script {
                     config.l1AssetRouterProxy,
                     config.l1AssetRouterProxy,
                     0,
-                    secondBridgeData
+                    secondBridgeData,
+                    _refundRecipient
                 )
             );
         }
@@ -205,7 +208,8 @@ abstract contract GatewayChainShared is Script {
                     config.l1AssetRouterProxy,
                     config.ctmDeploymentTracker,
                     0,
-                    secondBridgeData
+                    secondBridgeData,
+                    _refundRecipient
                 )
             );
         }

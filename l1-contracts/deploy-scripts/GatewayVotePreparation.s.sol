@@ -66,6 +66,7 @@ contract GatewayVotePreparation is GatewayChainShared {
     address internal serverNotifier;
     address internal create2Factory;
     bytes32 internal create2FactorySalt;
+    address internal refundRecipient;
 
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
@@ -76,6 +77,7 @@ contract GatewayVotePreparation is GatewayChainShared {
     
         oldRollupL2DAValidator = toml.readAddress("$.old_rollup_l2_da_validator");
         create2FactorySalt = toml.readBytes32(".create2_factory_salt");
+        refundRecipient = toml.readAddress("$.refund_recipient");
     }
 
     function deployServerNotifier() internal {

@@ -361,29 +361,33 @@ contract AcceptAdmin is Script {
         ChainInfo memory gatewayChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.gatewayChainId);
         ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
 
-        bytes32 chainAssetId = Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
+        bytes memory secondBridgeData;
+        {
+            bytes32 chainAssetId = Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
 
-        uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
-        if (currentSettlementLayer == data.gatewayChainId) {
-            console.log("Chain already using gateway as its settlement layer");
-            saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex"", value: 0}));
-            return;
+            uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
+            if (currentSettlementLayer == data.gatewayChainId) {
+                console.log("Chain already using gateway as its settlement layer");
+                saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex"", value: 0}));
+                return;
+            }
+
+            bytes memory bridgehubData = abi.encode(
+                BridgehubBurnCTMAssetData({
+                    chainId: data.l2ChainId,
+                    ctmData: abi.encode(
+                        AddressAliasHelper.applyL1ToL2Alias(l2ChainInfo.admin),
+                        data._gatewayDiamondCutData
+                    ),
+                    chainData: abi.encode(
+                        IZKChain(Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
+                    )
+                })
+            );
+
+            // TODO: use constant for the 0x01
+            secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
         }
-        bytes memory bridgehubData = abi.encode(
-            BridgehubBurnCTMAssetData({
-                chainId: data.l2ChainId,
-                ctmData: abi.encode(
-                    AddressAliasHelper.applyL1ToL2Alias(l2ChainInfo.admin),
-                    data._gatewayDiamondCutData
-                ),
-                chainData: abi.encode(
-                    IZKChain(Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
-                )
-            })
-        );
-
-        // TODO: use constant for the 0x01
-        bytes memory secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
 
         calls = Utils.prepareAdminL1L2TwoBridgesTransaction(
             data.l1GasPrice,
@@ -446,6 +450,7 @@ contract AcceptAdmin is Script {
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             data.chainDiamondProxyOnGateway,
+            0,
             data.gatewayChainId,
             data.bridgehub,
             l2ChainInfo.l1AssetRouterProxy,
@@ -505,6 +510,7 @@ contract AcceptAdmin is Script {
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             data.gatewayValidatorTimelock,
+            0,
             data.gatewayChainId,
             data.bridgehub,
             l2ChainInfo.l1AssetRouterProxy,
@@ -538,30 +544,57 @@ contract AcceptAdmin is Script {
         );
     }
 
+    struct AdminL1L2TxParams {
+        address bridgehub;
+        uint256 l1GasPrice;
+        uint256 chainId;
+        address to;
+        uint256 value;
+        bytes data;
+        address refundRecipient;
+        bool _shouldSend;
+    }
+
+    // Using struct for input to avoid stack too deep errors.
+    // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
+    function _adminL1L2TxInner(AdminL1L2TxParams memory params) private {
+        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(params.bridgehub, params.chainId);
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            params.l1GasPrice,
+            params.data,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            params.to,
+            params.value,
+            params.chainId,
+            params.bridgehub,
+            l2ChainInfo.l1AssetRouterProxy,
+            params.refundRecipient
+        );
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, params._shouldSend);
+    }
+
     function adminL1L2Tx(
         address bridgehub,
         uint256 l1GasPrice,
         uint256 chainId,
         address to,
         uint256 value,
-        bytes data,
+        bytes memory data,
         address refundRecipient,
         bool _shouldSend
     ) public {
-        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(bridgehub, chainId);
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
-            l1GasPrice,
-            data,
-            Utils.MAX_PRIORITY_TX_GAS,
-            new bytes[](0),
-            to,
-            chainId,
-            bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
-            refundRecipient
-        );
-
-        saveAndSendAdminTx(l2ChainInfo.admin, calls, _shouldSend);
+        _adminL1L2TxInner(AdminL1L2TxParams({
+            bridgehub: bridgehub,
+            l1GasPrice: l1GasPrice,
+            chainId: chainId,
+            to: to,
+            value: value,
+            data: data,
+            refundRecipient: refundRecipient,
+            _shouldSend: _shouldSend
+        }));
     }
 
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {

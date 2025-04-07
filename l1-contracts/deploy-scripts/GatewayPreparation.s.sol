@@ -193,7 +193,8 @@ contract GatewayPreparation is GatewayChainShared {
 
         Call[] memory calls = _prepareGatewayGovernanceCalls(
             _getL1GasPrice(),
-            gatewayCTMAddress
+            gatewayCTMAddress,
+            msg.sender
         );
 
         vm.recordLogs();
@@ -373,7 +374,8 @@ contract GatewayPreparation is GatewayChainShared {
             L2_ASSET_ROUTER_ADDR,
             config.gatewayChainId,
             config.bridgehub,
-            config.l1AssetRouterProxy
+            config.l1AssetRouterProxy,
+            msg.sender
         );
 
         saveOutput(l2TxHash);
@@ -430,7 +432,8 @@ contract GatewayPreparation is GatewayChainShared {
             chainDiamondProxyOnGateway,
             config.gatewayChainId,
             config.bridgehub,
-            config.l1AssetRouterProxy
+            config.l1AssetRouterProxy,
+            msg.sender
         );
 
         saveOutput(l2TxHash);
@@ -457,7 +460,8 @@ contract GatewayPreparation is GatewayChainShared {
             gatewayValidatorTimelock,
             config.gatewayChainId,
             config.bridgehub,
-            config.l1AssetRouterProxy
+            config.l1AssetRouterProxy,
+            msg.sender
         );
 
         saveOutput(l2TxHash);
