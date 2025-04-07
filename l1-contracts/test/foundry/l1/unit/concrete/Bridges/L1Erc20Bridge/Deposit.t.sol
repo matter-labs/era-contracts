@@ -57,7 +57,8 @@ contract DepositTest is L1Erc20BridgeTest {
             _l1Token: makeAddr("EOA"),
             _amount: 1,
             _l2TxGasLimit: 0,
-            _l2TxGasPerPubdataByte: 0
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
         });
     }
 
@@ -79,7 +80,8 @@ contract DepositTest is L1Erc20BridgeTest {
             _l1Token: address(token),
             _amount: 1,
             _l2TxGasLimit: 0,
-            _l2TxGasPerPubdataByte: 0
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
         });
     }
 
@@ -119,7 +121,8 @@ contract DepositTest is L1Erc20BridgeTest {
             _l1Token: address(feeOnTransferToken),
             _amount: amount,
             _l2TxGasLimit: 0,
-            _l2TxGasPerPubdataByte: 0
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
         });
     }
 

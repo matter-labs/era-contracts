@@ -136,7 +136,7 @@ describe("Gateway", function () {
     // console.log("CTM asset registered in L2 Bridgehub on SL");
   });
 
-  it("Check start message to L3 on L1", async () => {
+  it("Check start message to L2 on L1", async () => {
     const amount = ethers.utils.parseEther("2");
     await bridgehub.requestL2TransactionDirect(
       {
@@ -154,7 +154,7 @@ describe("Gateway", function () {
     );
   });
 
-  it("Check forward message to L3 on SL", async () => {
+  it("Check forward message to L2 on SL", async () => {
     const tx = {
       txType: 255,
       from: ethers.constants.AddressZero,

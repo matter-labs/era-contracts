@@ -28,29 +28,45 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
+import {SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2NativeTokenVaultTestAbstract} from "./L2NativeTokenVaultTestAbstract.t.sol";
-import {SharedL2ContractL1DeployerUtils} from "./_SharedL2ContractL1DeployerUtils.sol";
+import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
-contract L2GatewayL1Test is
-    Test,
-    SharedL2ContractL1DeployerUtils,
-    SharedL2ContractDeployer,
-    L2NativeTokenVaultTestAbstract
-{
-    function test() internal virtual override(DeployUtils, SharedL2ContractL1DeployerUtils) {}
+import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
+import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+
+contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeTokenVaultTestAbstract {
+    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
     function initSystemContracts(
         SystemContractsArgs memory _args
-    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
+    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
         super.initSystemContracts(_args);
     }
 
     function deployL2Contracts(
         uint256 _l1ChainId
-    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1DeployerUtils) {
+    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
         super.deployL2Contracts(_l1ChainId);
+    }
+
+    function getFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (FacetCut[] memory) {
+        return super.getFacetCuts(stateTransition);
+    }
+
+    function getCreationCode(
+        string memory contractName
+    ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
+        return super.getCreationCode(contractName);
+    }
+
+    function getInitializeCalldata(
+        string memory contractName
+    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
+        return super.getInitializeCalldata(contractName);
     }
 }

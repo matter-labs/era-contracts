@@ -24,7 +24,7 @@ contract L2AdminFactory {
     address[] public requiredRestrictions;
 
     constructor(address[] memory _requiredRestrictions) {
-        _validateRestrctions(_requiredRestrictions);
+        _validateRestrictions(_requiredRestrictions);
         requiredRestrictions = _requiredRestrictions;
     }
 
@@ -34,7 +34,7 @@ contract L2AdminFactory {
     function deployAdmin(address[] memory _additionalRestrictions) external returns (address admin) {
         // Even though the chain admin will likely perform similar checks,
         // we keep those here just in case, since it is not expensive, while allowing to fail fast.
-        _validateRestrctions(_additionalRestrictions);
+        _validateRestrictions(_additionalRestrictions);
         uint256 cachedRequired = requiredRestrictions.length;
         uint256 cachedAdditional = _additionalRestrictions.length;
         address[] memory restrictions = new address[](cachedRequired + cachedAdditional);
@@ -60,7 +60,7 @@ contract L2AdminFactory {
     /// @notice Checks that the provided list of restrictions is correct.
     /// @param _restrictions List of the restrictions to check.
     /// @dev In case either of the restrictions is not correct, the function reverts.
-    function _validateRestrctions(address[] memory _restrictions) internal view {
+    function _validateRestrictions(address[] memory _restrictions) internal view {
         unchecked {
             uint256 length = _restrictions.length;
             for (uint256 i = 0; i < length; ++i) {

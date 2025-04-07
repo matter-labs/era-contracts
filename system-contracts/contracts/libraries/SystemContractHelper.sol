@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {MAX_SYSTEM_CONTRACT_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
+import {MAX_SYSTEM_CONTRACT_ADDRESS, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
 import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeployer.sol";
 import {SloadContract} from "../SloadContract.sol";
 
@@ -347,6 +347,13 @@ library SystemContractHelper {
         return uint160(_address) <= uint160(MAX_SYSTEM_CONTRACT_ADDRESS);
     }
 
+    /// @notice Returns whether the current call is a system call from EVM emulator.
+    /// @return `true` or `false` based on whether the current call is a system call from EVM emulator.
+    function isSystemCallFromEvmEmulator() internal view returns (bool) {
+        if (!isSystemCall()) return false;
+        return ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender);
+    }
+
     /// @notice Method used for burning a certain amount of gas.
     /// @param _gasToPay The number of gas to burn.
     /// @param _pubdataToSpend The number of pubdata bytes to burn during the call.
@@ -450,14 +457,9 @@ library SystemContractHelper {
             revert SloadContractBytecodeUnknown();
         }
 
-        bytes32 previoushHash;
-        assembly {
-            previoushHash := extcodehash(_addr)
-        }
+        bytes32 previoushHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
 
         // Just in case, double checking that the previous bytecode is known.
-        // It may be needed since `previoushHash` could be non-zero and unknown if it is
-        // equal to keccak(""). It is the case for used default accounts.
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(previoushHash) == 0) {
             revert PreviousBytecodeUnknown();
         }

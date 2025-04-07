@@ -22,7 +22,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-/// @title State Transition Manager contract
+/// @title Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
@@ -63,6 +63,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev The initial force deployment hash
     bytes32 public initialForceDeploymentHash;
+
+    /// @dev The contract, that notifies server about l1 changes
+    address public serverNotifierAddress;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -137,6 +140,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         protocolVersion = _initializeData.protocolVersion;
         _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
         validatorTimelock = _initializeData.validatorTimelock;
+        serverNotifierAddress = _initializeData.serverNotifier;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
     }
@@ -227,6 +231,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
+    }
+
+    /// @dev set ServerNotifier.
+    /// @param _serverNotifier the new serverNotifier address
+    function setServerNotifier(address _serverNotifier) external onlyOwnerOrAdmin {
+        address oldServerNotifier = serverNotifierAddress;
+        serverNotifierAddress = _serverNotifier;
+        emit NewServerNotifier(oldServerNotifier, _serverNotifier);
     }
 
     /// @dev set New Version with upgrade from old version

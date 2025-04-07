@@ -42,5 +42,6 @@ interface IAvailBridge {
     }
 
     function vectorx() external view returns (IVectorx vectorx);
+
     function verifyBlobLeaf(MerkleProofInput calldata input) external view returns (bool);
 }

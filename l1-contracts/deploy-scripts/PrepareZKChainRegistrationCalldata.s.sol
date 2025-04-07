@@ -14,7 +14,7 @@ import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Utils} from "./Utils.sol";
+import {Utils, ADDRESS_ONE} from "./Utils.sol";
 
 /**
  * @title Prepare ZKChain Registration Calldata
@@ -54,8 +54,6 @@ import {Utils} from "./Utils.sol";
 contract PrepareZKChainRegistrationCalldataScript is Script {
     using stdToml for string;
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-
     struct Config {
         // Admin of the yet-to-be-registered chain (L1-based address)
         address chainAdmin;
@@ -75,6 +73,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         bytes diamondCutData;
         // Address of the L1 ERC20 bridge proxy (required for the L2 bridge deployment)
         address erc20BridgeProxy;
+        // Should be EVM emulator supported or not
+        bool allowEvmEmulator;
     }
 
     // Addresses of the contracts in the L1 ecosystem that are fetched from the chain
@@ -152,6 +152,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.diamondCutData = toml.readBytes("$.chain.diamond_cut_data");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
 
         bytecodes.l2SharedBridgeBytecode = Utils.readHardhatBytecode("/script-config/artifacts/L2SharedBridge.json");
         bytecodes.beaconProxy = Utils.readHardhatBytecode("/script-config/artifacts/BeaconProxy.json");
@@ -179,7 +180,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         console.log("Using base token address:", config.baseToken);
     }
 
-    function prepareRegisterBaseTokenCall() internal view returns (IGovernance.Call memory) {
+    function prepareRegisterBaseTokenCall() internal view returns (Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
         bytes memory data = abi.encodeCall(
@@ -302,10 +303,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     // @dev Prepares a call to schedule a transparent operation on the governance contract
     // `calls` is an array of calls that will be executed in the first stage (add a token to BH, create a new chain)
     // `initChainGovCall` is a call that will be executed in the second stage (register the L2 bridge on the L1 shared bridge)
-    function scheduleTransparentCalldata(
-        IGovernance.Call[] memory calls,
-        IGovernance.Call memory initChainGovCall
-    ) internal {
+    function scheduleTransparentCalldata(Call[] memory calls, IGovernance.Call memory initChainGovCall) internal {
         IGovernance governance = IGovernance(ecosystem.governance);
 
         IGovernance.Operation memory operation = IGovernance.Operation({

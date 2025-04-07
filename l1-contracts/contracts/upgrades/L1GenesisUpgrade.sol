@@ -19,11 +19,11 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {L1GatewayBase} from "./L1GatewayBase.sol";
+import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1GatewayBase {
+contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1FixedForceDeploymentsHelper {
     /// @notice The main function that will be called by the Admin facet.
     /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
     /// @param _chainId the chain id
@@ -87,6 +87,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Gate
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),

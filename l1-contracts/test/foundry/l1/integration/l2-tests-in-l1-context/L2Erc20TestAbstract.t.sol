@@ -28,7 +28,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
+import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -108,7 +108,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
         // Basically we want all L2->L1 transactions to pass
         vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             abi.encodeWithSignature("sendToL1(bytes)"),
             abi.encode(bytes32(uint256(1)))
         );

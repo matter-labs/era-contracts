@@ -7,11 +7,13 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract DiamondInitTest is Test {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function setUp() public virtual {
         facetCuts.push(

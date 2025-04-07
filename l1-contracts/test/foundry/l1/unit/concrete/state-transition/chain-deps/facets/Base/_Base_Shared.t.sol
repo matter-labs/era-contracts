@@ -8,7 +8,9 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract TestBaseFacet is ZKChainBase {
     function functionWithOnlyAdminModifier() external onlyAdmin {}
@@ -20,6 +22,8 @@ contract TestBaseFacet is ZKChainBase {
     function functionWithOnlyBridgehubModifier() external onlyBridgehub {}
 
     function functionWithOnlyAdminOrChainTypeManagerModifier() external onlyAdminOrChainTypeManager {}
+
+    function functionWithOnlyValidatorOrChainTypeManagerModifier() external onlyValidatorOrChainTypeManager {}
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
@@ -35,7 +39,7 @@ bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only
 contract ZKChainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new TestnetVerifier());
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](6);
@@ -44,6 +48,7 @@ contract ZKChainBaseTest is Test {
         selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;
         selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
         selectors[4] = TestBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier.selector;
+        selectors[5] = TestBaseFacet.functionWithOnlyValidatorOrChainTypeManagerModifier.selector;
     }
 
     function setUp() public virtual {

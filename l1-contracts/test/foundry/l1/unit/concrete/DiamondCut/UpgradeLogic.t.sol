@@ -94,6 +94,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             // zkPorterIsAvailable: false,
             l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
             // initialProtocolVersion: 0,
             feeParams: FeeParams({

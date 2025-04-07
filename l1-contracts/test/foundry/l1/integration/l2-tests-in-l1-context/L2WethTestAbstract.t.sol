@@ -26,7 +26,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./_SharedL2ContractL1DeployerUtils.sol";
+import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 

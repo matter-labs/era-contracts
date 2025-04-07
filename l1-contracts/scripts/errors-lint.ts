@@ -4,25 +4,19 @@ import * as path from "path";
 import { ethers } from "ethers";
 
 // Constant arrays
-const FILES_WITH_CUSTOM_ERRORS = [
-  "contracts/common/L1ContractErrors.sol",
-  "contracts/bridge/L1BridgeContractErrors.sol",
-  "contracts/bridgehub/L1BridgehubErrors.sol",
-  "contracts/state-transition/L1StateTransitionErrors.sol",
-  "contracts/upgrades/ZkSyncUpgradeErrors.sol",
-  "deploy-scripts/ZkSyncScriptErrors.sol",
-  "../l2-contracts/contracts/errors/L2ContractErrors.sol",
-  "../system-contracts/contracts/SystemContractErrors.sol",
-  "../da-contracts/contracts/DAContractsErrors.sol",
-]; // Replace with your file paths
-const CONTRACTS_DIRECTORIES = [
-  "contracts",
-  "deploy-scripts",
-  "test/foundry",
-  "../l2-contracts/contracts",
-  "../system-contracts/contracts",
-  "../da-contracts/contracts",
-]; // Replace with your directories
+const CONTRACTS_DIRECTORIES = {
+  contracts: [
+    "common/L1ContractErrors.sol",
+    "bridge/L1BridgeContractErrors.sol",
+    "bridgehub/L1BridgehubErrors.sol",
+    "state-transition/L1StateTransitionErrors.sol",
+    "upgrades/ZkSyncUpgradeErrors.sol",
+  ],
+  "deploy-scripts": ["ZkSyncScriptErrors.sol"],
+  "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
+  "../system-contracts/contracts": ["SystemContractErrors.sol"],
+  "../da-contracts/contracts": ["DAContractsErrors.sol"],
+}; // Replace with your directories
 
 // Function to extract the error signature
 function getErrorSignature(errorString: string): string {
@@ -52,7 +46,7 @@ function getErrorSignature(errorString: string): string {
 }
 
 // Function to process each file
-function processFile(filePath: string, fix: boolean, collectedErrors: Set<string>): boolean {
+function processFile(filePath: string, fix: boolean, collectedErrors: Map<string, [string, string]>): boolean {
   const fileContent = fs.readFileSync(filePath, "utf8");
   const lines = fileContent.split(/\r?\n/);
   let modified = false;
@@ -70,7 +64,12 @@ function processFile(filePath: string, fix: boolean, collectedErrors: Set<string
       const signature = getErrorSignature(errorString);
 
       const errorName = signature.substring(0, signature.indexOf("("));
-      collectedErrors.add(errorName);
+      if (collectedErrors.has(signature)) {
+        throw new Error(
+          `Error ${errorName} is defined twice. Once in ${collectedErrors.get(signature)[1]} and in ${filePath}`
+        );
+      }
+      collectedErrors.set(signature, [errorName, filePath]);
 
       // Calculate the selector
       const hash = ethers.utils.id(signature);
@@ -174,37 +173,37 @@ async function main() {
     console.error("Error: You must provide either --fix or --check, but not both.");
     process.exit(1);
   }
-
-  // Main execution
   let hasErrors = false;
-  const declaredErrors = new Set<string>();
-  const usedErrors = new Set<string>();
+  for (const [contractsPath, errorsPaths] of Object.entries(CONTRACTS_DIRECTORIES)) {
+    const declaredErrors = new Map<string, [string, string]>();
+    const usedErrors = new Set<string>();
 
-  for (const filePath of FILES_WITH_CUSTOM_ERRORS) {
-    const absolutePath = path.resolve(filePath);
-    const result = processFile(absolutePath, options.fix, declaredErrors);
+    for (const customErrorFile of errorsPaths) {
+      const absolutePath = path.resolve(contractsPath + "/" + customErrorFile);
+      const result = processFile(absolutePath, options.fix, declaredErrors);
 
-    if (result && options.check) {
-      hasErrors = true;
-    }
-  }
-
-  if (options.check && hasErrors) {
-    console.error("Some errors were found.");
-    process.exit(1);
-  }
-
-  if (options.check) {
-    collectErrorUsages(CONTRACTS_DIRECTORIES, usedErrors);
-
-    // Find declared errors that are never used
-    const unusedErrors = [...declaredErrors].filter((error) => !usedErrors.has(error));
-
-    if (unusedErrors.length > 0) {
-      for (const error of unusedErrors) {
-        console.error(`Error "${error}" is declared but never used.`);
+      if (result && options.check) {
+        hasErrors = true;
       }
+    }
+
+    if (options.check && hasErrors) {
+      console.error("Some errors were found.");
       process.exit(1);
+    }
+
+    if (options.check) {
+      collectErrorUsages([contractsPath], usedErrors);
+
+      // Find declared errors that are never used
+      const unusedErrors = [...declaredErrors].filter(([, [errorName]]) => !usedErrors.has(errorName));
+
+      if (unusedErrors.length > 0) {
+        for (const [errorSig, errorFile] of unusedErrors) {
+          console.error(`Error "${errorSig}" from ${errorFile} is declared but never used.`);
+        }
+        process.exit(1);
+      }
     }
   }
 

@@ -11,9 +11,6 @@ import {ChainTypeManager} from "../../state-transition/ChainTypeManager.sol";
 contract DummyChainTypeManager is ChainTypeManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
     address zkChain;
 
     /// @notice Constructor
@@ -22,4 +19,7 @@ contract DummyChainTypeManager is ChainTypeManager {
     function setZKChain(uint256 _chainId, address _zkChain) external {
         zkChain = _zkChain;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

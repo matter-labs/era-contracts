@@ -28,7 +28,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {LegacyMethodForNonL1Token, LegacyBridgeNotSet, Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadySet, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {LegacyMethodForNonL1Token, LegacyBridgeNotSet, Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadySet, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress, TokenNotLegacy} from "../common/L1ContractErrors.sol";
 import {WrongL2Sender, NativeTokenVaultAlreadySet, EthTransferFailed, WrongMsgLength} from "./L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
@@ -597,8 +597,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // slither-disable-next-line unused-return
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
-            l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
-            assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
+            assetId = l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
+            bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
+            // This method is only expected to use L1-based tokens.
+            if (assetId != expectedAssetId) {
+                revert TokenNotLegacy();
+            }
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
                 _remoteReceiver: l1Receiver,

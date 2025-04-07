@@ -29,7 +29,7 @@ object "CodeOracle" {
             ////////////////////////////////////////////////////////////////
             //                      HELPER FUNCTIONS
             ////////////////////////////////////////////////////////////////
-            
+
             /// @notice The function that returns whether a certain versioned hash is marked as `known`
             /// @param versionedHash The versioned hash to check
             /// @return Whether the versioned hash is known
@@ -90,7 +90,7 @@ object "CodeOracle" {
                     // Decommitment failed
                     revert(0,0)
                 }
-                
+
                 // The "real" result of the `decommit` operation is a pointer to the memory page where the data was unpacked.
                 // We do not know whether the data was unpacked into the memory of this contract or not.
                 //  
@@ -111,6 +111,19 @@ object "CodeOracle" {
                 return(0, lenInBytes)
             }
 
+            function paddedBytecodeLen(len) -> blobLen {
+                blobLen := len
+    
+                if mod(blobLen, 32) {
+                    blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
+                }
+    
+                // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
+                if iszero(mod(blobLen, 64)) {
+                    blobLen := add(blobLen, 32)
+                }
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -123,15 +136,21 @@ object "CodeOracle" {
             }
 
             let version := shr(248, versionedCodeHash)
-            // Currently, only a single version of the code hash is supported:
+            // Currently, two versions of the code hash is supported:
             // 1. The standard zkEVM bytecode. It has the following format:
             //   - hash[0] -- version (0x01)
             //   - hash[1] -- whether the contract is being constructed
             //   - hash[2..3] -- big endian length of the bytecode in 32-byte words. This number must be odd.
             //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
+            // 2. EVM bytecode. It has the following format:
+            //   - hash[0] -- version (0x02)
+            //   - hash[1] -- whether the contract is being constructed
+            //   - hash[2..3] -- big endian length of the bytecode in bytes. This number can be arbitrary.
+            //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
             // 
-            // Note, that in theory it can represent just some random blob of bytes, while 
-            // in practice it only represents only the corresponding bytecodes.
+            // Note, that in theory both values can represent just some random blob of bytes, while 
+            // in practice they only represent only the corresponding bytecodes.
+
 
             switch version 
             case 1 {
@@ -139,6 +158,12 @@ object "CodeOracle" {
                 // can pass the `isCodeHashKnown` check.
                 let lengthInWords := and(shr(224, versionedCodeHash), 0xffff)
                 decommit(versionedCodeHash, lengthInWords)
+            }
+            case 2 {
+                let lengthInBytes := and(shr(224, versionedCodeHash), 0xffff)
+                let paddedLengthInBytes := paddedBytecodeLen(lengthInBytes)
+
+                decommit(versionedCodeHash, shr(5, paddedLengthInBytes))
             }
             default {
                 // Unsupported
