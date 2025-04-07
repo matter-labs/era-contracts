@@ -9,8 +9,7 @@ import {
 } from "./shared/constants";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 
-// TODO: enable when EVM emulator is added to the test node
-describe.skip("EvmPredeploysManager tests", function () {
+describe("EvmPredeploysManager tests", function () {
   let evmPredeploysManager: EvmPredeploysManager;
 
   before(async () => {
