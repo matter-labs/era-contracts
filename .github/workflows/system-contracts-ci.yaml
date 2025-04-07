@@ -65,37 +65,39 @@ jobs:
 
       - name: Run lint
         run: yarn lint:check
-  test-bootloader:
-    needs: [build, lint]
-    runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
+  # FIXME: recover when used multivm is updated
+  # test-bootloader:
+  #   needs: [build, lint]
+  #   runs-on: ubuntu-latest
 
-      - name: Install rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: nightly-2024-08-01
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@v4
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-system-${{ github.sha }}
-          path: |
-            system-contracts/zkout
-            system-contracts/cache-forge
-            system-contracts/bootloader/build
-            system-contracts/artifacts-zk
-            system-contracts/cache-zk
-            system-contracts/typechain
-            system-contracts/contracts-preprocessed
+  #     - name: Install rust
+  #       uses: actions-rust-lang/setup-rust-toolchain@v1
+  #       with:
+  #         toolchain: nightly-2024-08-01
 
-      - name: Run bootloader tests
-        run: |
-          cd system-contracts/bootloader/test_infra
-          cargo run
+  # - name: Restore artifacts cache
+  #   uses: actions/cache/restore@v3
+  #   with:
+  #     fail-on-cache-miss: true
+  #     key: artifacts-system-${{ github.sha }}
+  #     path: |
+  #       system-contracts/zkout
+  #       system-contracts/cache-forge
+  #       system-contracts/bootloader/build
+  #       system-contracts/artifacts-zk
+  #       system-contracts/cache-zk
+  #       system-contracts/typechain
+  #       system-contracts/contracts-preprocessed
+
+  #     - name: Run bootloader tests
+  #       run: |
+  #         cd system-contracts/bootloader/test_infra
+  #         cargo run
 
   test-contracts:
     needs: [build, lint]
@@ -115,7 +117,7 @@ jobs:
         uses: dutterbutter/anvil-zksync-action@v1.1.0
         with:
           mode: run
-          releaseTag: ccfff38
+          releaseTag: 7d87e25
           protocolVersion: 28
 
       - name: Install dependencies
