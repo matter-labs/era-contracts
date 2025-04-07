@@ -67,6 +67,7 @@ contract CelestiaL1DAValidatorTest is Test {
             bytes memory testCase = vm.parseBytes(testCases[i]);
 
             // first 32 bytes of real-world operator DA input contains state diff hash
+            // new bytes(32) will
             bytes memory operatorDAInput = bytes.concat(new bytes(32), testCase);
             console.log("Parsed input");
 
@@ -82,13 +83,15 @@ contract CelestiaL1DAValidatorTest is Test {
             console.log("eqDataRoot", vm.toString(eqDataRoot));
             console.log("Input data length:", operatorDAInput.length);
 
-            try validator.checkDA(0, 0, eqKeccakHash, operatorDAInput, MAX_BLOBS_SUPPORTED) returns (L1DAValidatorOutput memory output) {
-                console.log("Case", i, "succeeded!");
+            try validator.checkDA(0, 0, keccak256(abi.encodePacked(new bytes(32), eqKeccakHash)), operatorDAInput, MAX_BLOBS_SUPPORTED) returns (L1DAValidatorOutput memory output) {
+                console.log("Case", i, "passed!");
                 console.log("State diff hash:", vm.toString(output.stateDiffHash));
             } catch Error(string memory reason) {
                 console.log("Case", i, "failed with reason:", reason);
-            } catch (bytes memory) {
-                console.log("Case", i, "failed with unknown error");
+                fail();
+            } catch (bytes memory lowLevelData) {
+                console.log("Case", i, "failed with low level error");
+                fail();
             }
         }
     }

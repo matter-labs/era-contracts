@@ -28,10 +28,10 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         uint256 chainId,
         uint256 batchNumber,
         bytes32 l2DAValidatorOutputHash,
-        bytes calldata _operatorDAInput,
+        bytes calldata operatorDAInput,
         uint256 _maxBlobsSupported
     ) external returns (L1DAValidatorOutput memory output) {
-        CelestiaZKStackInput memory input = abi.decode(_operatorDAInput[32:], (CelestiaZKStackInput));
+        CelestiaZKStackInput memory input = abi.decode(operatorDAInput[32:], (CelestiaZKStackInput));
 
         bytes memory publicValues = input.publicValues;  // get reference to bytes
         bytes32 eqKeccakHash;
@@ -55,9 +55,9 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         // can use custom error or whatever matter labs likes the most
         if (!valid) revert InvalidProof();
 
-        output.stateDiffHash = l2DAValidatorOutputHash;
+        output.stateDiffHash = bytes32(operatorDAInput[:32]);
 
-        if (output.stateDiffHash != eqKeccakHash)
+        if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(output.stateDiffHash, eqKeccakHash)))
             revert OperatorDAHashMismatch(eqKeccakHash, output.stateDiffHash);
         if (input.attestationProof.tuple.dataRoot != eqDataRoot)
             revert DataRootMismatch(eqDataRoot, input.attestationProof.tuple.dataRoot);
