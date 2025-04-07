@@ -5,7 +5,7 @@ import { EC_MUL_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
 describe("EcMul tests", function () {
-  for (let environment in ["EraVM, EVM"]) {
+  for (const environment in ["EraVM, EVM"]) {
     describe(`Tests in (${environment})`, function () {
       let ecMul: Contract;
 

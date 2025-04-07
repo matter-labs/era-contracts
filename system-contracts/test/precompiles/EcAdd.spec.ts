@@ -5,7 +5,7 @@ import { EC_ADD_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
 describe("EcAdd tests", function () {
-  for (let environment in ["EraVM, EVM"]) {
+  for (const environment in ["EraVM, EVM"]) {
     describe(`Tests in (${environment})`, function () {
       let ecAdd: Contract;
 

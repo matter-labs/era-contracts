@@ -4,9 +4,8 @@ import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation } f
 import { EC_PAIRING_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
-// FIXME: re-enable once anvil-zksync supports precompiles.
 describe("EcPairing tests", function () {
-  for (let environment in ["EraVM, EVM"]) {
+  for (const environment in ["EraVM, EVM"]) {
     describe(`Tests in (${environment})`, function () {
       let ecPairing: Contract;
 
