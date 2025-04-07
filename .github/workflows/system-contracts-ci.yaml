@@ -113,10 +113,8 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      - name: Use era-test-node for testing
-        uses: dutterbutter/era-test-node-action@v0.1.3
-        with:
-          releaseTag: v0.0.1-vm1.5.0
+      - name: Run anvil-zksync
+        uses: dutterbutter/anvil-zksync-action@v1.1.0
 
       - name: Install dependencies
         run: yarn

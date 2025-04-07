@@ -62,75 +62,79 @@ contract ExecutorTest is Test {
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](12);
-        selectors[0] = admin.setPendingAdmin.selector;
-        selectors[1] = admin.acceptAdmin.selector;
-        selectors[2] = admin.setValidator.selector;
-        selectors[3] = admin.setPorterAvailability.selector;
-        selectors[4] = admin.setPriorityTxMaxGasLimit.selector;
-        selectors[5] = admin.changeFeeParams.selector;
-        selectors[6] = admin.setTokenMultiplier.selector;
-        selectors[7] = admin.upgradeChainFromVersion.selector;
-        selectors[8] = admin.executeUpgrade.selector;
-        selectors[9] = admin.freezeDiamond.selector;
-        selectors[10] = admin.unfreezeDiamond.selector;
-        selectors[11] = admin.setDAValidatorPair.selector;
+        uint256 i = 0;
+        selectors[i++] = admin.setPendingAdmin.selector;
+        selectors[i++] = admin.acceptAdmin.selector;
+        selectors[i++] = admin.setValidator.selector;
+        selectors[i++] = admin.setPorterAvailability.selector;
+        selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = admin.changeFeeParams.selector;
+        selectors[i++] = admin.setTokenMultiplier.selector;
+        selectors[i++] = admin.upgradeChainFromVersion.selector;
+        selectors[i++] = admin.executeUpgrade.selector;
+        selectors[i++] = admin.freezeDiamond.selector;
+        selectors[i++] = admin.unfreezeDiamond.selector;
+        selectors[i++] = admin.setDAValidatorPair.selector;
         return selectors;
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = executor.commitBatchesSharedBridge.selector;
-        selectors[1] = executor.proveBatchesSharedBridge.selector;
-        selectors[2] = executor.executeBatchesSharedBridge.selector;
-        selectors[3] = executor.revertBatchesSharedBridge.selector;
-        selectors[4] = executor.setPriorityTreeStartIndex.selector;
-        selectors[5] = executor.appendPriorityOp.selector;
+        uint256 i = 0;
+        selectors[i++] = executor.commitBatchesSharedBridge.selector;
+        selectors[i++] = executor.proveBatchesSharedBridge.selector;
+        selectors[i++] = executor.executeBatchesSharedBridge.selector;
+        selectors[i++] = executor.revertBatchesSharedBridge.selector;
+        selectors[i++] = executor.setPriorityTreeStartIndex.selector;
+        selectors[i++] = executor.appendPriorityOp.selector;
         return selectors;
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](30);
-        selectors[0] = getters.getVerifier.selector;
-        selectors[1] = getters.getAdmin.selector;
-        selectors[2] = getters.getPendingAdmin.selector;
-        selectors[3] = getters.getTotalBlocksCommitted.selector;
-        selectors[4] = getters.getTotalBlocksVerified.selector;
-        selectors[5] = getters.getTotalBlocksExecuted.selector;
-        selectors[6] = getters.getTotalPriorityTxs.selector;
-        selectors[7] = getters.getFirstUnprocessedPriorityTx.selector;
-        selectors[8] = getters.getPriorityQueueSize.selector;
-        selectors[9] = getters.getTotalBatchesExecuted.selector;
-        selectors[10] = getters.isValidator.selector;
-        selectors[11] = getters.l2LogsRootHash.selector;
-        selectors[12] = getters.storedBatchHash.selector;
-        selectors[13] = getters.getL2BootloaderBytecodeHash.selector;
-        selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = getters.getL2EvmEmulatorBytecodeHash.selector;
-        selectors[16] = getters.getVerifierParams.selector;
-        selectors[17] = getters.isDiamondStorageFrozen.selector;
-        selectors[18] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[19] = getters.isEthWithdrawalFinalized.selector;
-        selectors[20] = getters.facets.selector;
-        selectors[21] = getters.facetFunctionSelectors.selector;
-        selectors[22] = getters.facetAddresses.selector;
-        selectors[23] = getters.facetAddress.selector;
-        selectors[24] = getters.isFunctionFreezable.selector;
-        selectors[25] = getters.isFacetFreezable.selector;
-        selectors[26] = getters.getTotalBatchesCommitted.selector;
-        selectors[27] = getters.getTotalBatchesVerified.selector;
-        selectors[28] = getters.storedBlockHash.selector;
-        selectors[29] = getters.isPriorityQueueActive.selector;
+        uint256 i = 0;
+        selectors[i++] = getters.getVerifier.selector;
+        selectors[i++] = getters.getAdmin.selector;
+        selectors[i++] = getters.getPendingAdmin.selector;
+        selectors[i++] = getters.getTotalBlocksCommitted.selector;
+        selectors[i++] = getters.getTotalBlocksVerified.selector;
+        selectors[i++] = getters.getTotalBlocksExecuted.selector;
+        selectors[i++] = getters.getTotalPriorityTxs.selector;
+        selectors[i++] = getters.getFirstUnprocessedPriorityTx.selector;
+        selectors[i++] = getters.getPriorityQueueSize.selector;
+        selectors[i++] = getters.getTotalBatchesExecuted.selector;
+        selectors[i++] = getters.isValidator.selector;
+        selectors[i++] = getters.l2LogsRootHash.selector;
+        selectors[i++] = getters.storedBatchHash.selector;
+        selectors[i++] = getters.getL2BootloaderBytecodeHash.selector;
+        selectors[i++] = getters.getL2DefaultAccountBytecodeHash.selector;
+        selectors[i++] = getters.getL2EvmEmulatorBytecodeHash.selector;
+        selectors[i++] = getters.getVerifierParams.selector;
+        selectors[i++] = getters.isDiamondStorageFrozen.selector;
+        selectors[i++] = getters.getPriorityTxMaxGasLimit.selector;
+        selectors[i++] = getters.isEthWithdrawalFinalized.selector;
+        selectors[i++] = getters.facets.selector;
+        selectors[i++] = getters.facetFunctionSelectors.selector;
+        selectors[i++] = getters.facetAddresses.selector;
+        selectors[i++] = getters.facetAddress.selector;
+        selectors[i++] = getters.isFunctionFreezable.selector;
+        selectors[i++] = getters.isFacetFreezable.selector;
+        selectors[i++] = getters.getTotalBatchesCommitted.selector;
+        selectors[i++] = getters.getTotalBatchesVerified.selector;
+        selectors[i++] = getters.storedBlockHash.selector;
+        selectors[i++] = getters.isPriorityQueueActive.selector;
         return selectors;
     }
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = mailbox.proveL2MessageInclusion.selector;
-        selectors[1] = mailbox.proveL2LogInclusion.selector;
-        selectors[2] = mailbox.proveL1ToL2TransactionStatus.selector;
-        selectors[3] = mailbox.finalizeEthWithdrawal.selector;
-        selectors[4] = mailbox.requestL2Transaction.selector;
-        selectors[5] = mailbox.l2TransactionBaseCost.selector;
+        uint256 i = 0;
+        selectors[i++] = mailbox.proveL2MessageInclusion.selector;
+        selectors[i++] = mailbox.proveL2LogInclusion.selector;
+        selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
+        selectors[i++] = mailbox.finalizeEthWithdrawal.selector;
+        selectors[i++] = mailbox.requestL2Transaction.selector;
+        selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
     }
 

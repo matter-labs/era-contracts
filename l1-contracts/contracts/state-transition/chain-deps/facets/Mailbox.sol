@@ -11,7 +11,6 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
-import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
@@ -22,15 +21,15 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION, SERVICE_TRANSACTION_SENDER} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SERVICE_TRANSACTION_SENDER} from "../../../common/Config.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
-import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow, InvalidProofLengthForFinalNode} from "../../../common/L1ContractErrors.sol";
-import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../L1StateTransitionErrors.sol";
+import {OnlyEraSupported, BatchNotExecuted, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
+import {NotL1, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -81,7 +80,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
-        return _proveL2LogInclusion(0, _batchNumber, _index, _L2MessageToLog(_message), _proof);
+        return
+            _proveL2LogInclusion({
+                _chainId: 0,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _l2MessageToLog(_message),
+                _proof: _proof
+            });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -91,7 +97,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view returns (bool) {
-        return _proveL2LogInclusion(0, _batchNumber, _index, _log, _proof);
+        return
+            _proveL2LogInclusion({_chainId: 0, _batchNumber: _batchNumber, _index: _index, _log: _log, _proof: _proof});
     }
 
     /// @inheritdoc IMailboxImpl
@@ -121,7 +128,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             key: _l2TxHash,
             value: bytes32(uint256(_status))
         });
-        return _proveL2LogInclusion(0, _l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
+        return
+            _proveL2LogInclusion({
+                _chainId: 0,
+                _batchNumber: _l2BatchNumber,
+                _index: _l2MessageIndex,
+                _log: l2Log,
+                _proof: _merkleProof
+            });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -131,23 +145,31 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external view returns (bool) {
-        return _proveL2LeafInclusion(0, _batchNumber, _leafProofMask, _leaf, _proof);
+        return
+            _proveL2LeafInclusion({
+                _chainId: uint256(0),
+                _batchNumber: _batchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
+            });
     }
 
     function _proveL2LeafInclusion(
-        uint256, // _chainId
+        // solhint-disable-next-line no-unused-vars
+        uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
-            s.chainId,
-            _batchNumber,
-            _leafProofMask,
-            _leaf,
-            _proof
-        );
+        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof({
+            _chainId: s.chainId,
+            _batchNumber: _batchNumber,
+            _leafProofMask: _leafProofMask,
+            _leaf: _leaf,
+            _proof: _proof
+        });
 
         // If the `finalProofNode` is true, then we assume that this is L1 contract of the top-level
         // in the aggregation, i.e. the batch root is stored here on L1.

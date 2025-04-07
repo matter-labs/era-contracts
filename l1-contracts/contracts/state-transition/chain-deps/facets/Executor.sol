@@ -167,14 +167,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     struct ViaIR {
-        uint256 logKey2;
         address logSender2;
+        address logSender3;
+        address logSender4;
+        uint256 logKey2;
         bytes32 logValue2;
         uint256 logKey3;
-        address logSender3;
         bytes32 logValue3;
         uint256 logKey4;
-        address logSender4;
         bytes32 logValue4;
     }
 
@@ -269,8 +269,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 ViaIR memory viaIR;
                 // we are using the fact that msg_root_logs are emitted after each other, starting with the chainId.
                 // Extract the values to be compared to/used such as the log sender, key, and value
-                // slither-disable-next-line unused-return
                 i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE);
+                // slither-disable-next-line unused-return
                 (viaIR.logSender2, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
                 // slither-disable-next-line unused-return
                 (viaIR.logKey2, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
@@ -381,10 +381,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Check that we commit batches after last committed batch
         if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
             // incorrect previous batch data
-            // revert BatchHashMismatch(
-            //     s.storedBatchHashes[s.totalBatchesCommitted],
-            //     _hashStoredBatchInfo(lastCommittedBatchData)
-            // );
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(lastCommittedBatchData)
+            );
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -497,9 +497,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (currentBatchNumber != s.totalBatchesExecuted + _executedBatchIdx + 1) {
             revert NonSequentialBatch();
         }
-        // if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
-        //     revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
-        // }
+        if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
+            revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
+        }
         if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
             revert PriorityOperationsRollingHashMismatch();
         }
@@ -657,17 +657,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Check that the batch passed by the validator is indeed the first unverified batch
         if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            // revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-                // revert BatchHashMismatch(
-                //     s.storedBatchHashes[currentTotalBatchesVerified],
-                //     _hashStoredBatchInfo(committedBatches[i])
-                // );
+                revert BatchHashMismatch(
+                    s.storedBatchHashes[currentTotalBatchesVerified],
+                    _hashStoredBatchInfo(committedBatches[i])
+                );
             }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;

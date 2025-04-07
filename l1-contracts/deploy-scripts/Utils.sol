@@ -546,7 +546,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) internal {
+    ) internal returns (bytes32 txHash) {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
         (
@@ -575,7 +575,17 @@ library Utils {
         }
 
         vm.broadcast();
-        interopCenter.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        vm.recordLogs();
+        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
     }
 
     /// TODO(EVM-748): make that function support non-ETH based chains
@@ -599,6 +609,7 @@ library Utils {
 
         // We record L2 tx hash only for governance operations
         return bytes32(0);
+
     }
 
     function runGovernanceL1L2DirectTransaction(

@@ -57,7 +57,7 @@
   "scripts": {
     "build": "hardhat compile && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
     "build-l1": "hardhat compile",
-    "build:foundry": "forge build --skip contracts/bridgehub/Bridgehub.sol && forge build --optimizer-runs 28000 contracts/bridgehub/Bridgehub.sol && forge build --zksync --skip '*/l1-contracts/test/*'",
+    "build:foundry": "forge build --skip contracts/bridgehub/Bridgehub.sol && forge build --optimizer-runs 27700 contracts/bridgehub/Bridgehub.sol && forge build --zksync --skip '*/l1-contracts/test/*'",
     "clean": "hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean",
     "clean:foundry": "forge clean",
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",

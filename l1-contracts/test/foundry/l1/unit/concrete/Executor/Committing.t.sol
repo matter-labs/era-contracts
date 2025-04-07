@@ -360,7 +360,7 @@ contract CommittingTest is ExecutorTest {
         bytes memory wrongL2Logs = abi.encodePacked(
             Utils.encodePacked(l2Logs),
             // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(bytes2(0x0001), bytes2(0x0000), L2_SYSTEM_CONTEXT_ADDRESS, uint256(119), bytes32(""))
+            abi.encodePacked(bytes2(0x0001), bytes2(0x0000), L2_SYSTEM_CONTEXT_ADDRESS, uint256(1234), bytes32(""))
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
@@ -371,7 +371,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(abi.encodeWithSelector(UnexpectedSystemLog.selector, uint256(119)));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedSystemLog.selector, uint256(1234)));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
@@ -426,7 +426,7 @@ contract CommittingTest is ExecutorTest {
             vm.prank(validator);
 
             uint256 allLogsProcessed = uint256(127);
-            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 127, allLogsProcessed ^ (1 << i)));
+            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i)));
             (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
@@ -504,11 +504,11 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
-        assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
-        assertEq(entries[0].topics[3], expectedBatchCommitment); // commitment
+        assertEq(entries.length, 2);
+        assertEq(entries[1].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[1].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries[1].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
+        assertEq(entries[1].topics[3], expectedBatchCommitment); // commitment
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -544,9 +544,9 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries.length, 2);
+        assertEq(entries[1].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[1].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -613,9 +613,9 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries.length, 2);
+        assertEq(entries[1].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[1].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);

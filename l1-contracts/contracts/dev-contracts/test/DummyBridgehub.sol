@@ -47,4 +47,8 @@ contract DummyBridgehub {
     function setSharedBridge(address addr) external {
         sharedBridge = addr;
     }
+
+    function assetRouter() external view returns (address) {
+        return sharedBridge;
+    }
 }
