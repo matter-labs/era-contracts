@@ -20,6 +20,12 @@ describe("Modexp tests", function () {
 
       describe("Tests", function () {
         // FIXME: add tests
+        it("Empty input", async () => {
+          const returnData = await callFallback(modexp, "0x");
+
+          // TODO: check if this is valid
+          expect(returnData).to.be.equal("0x0000000000000000000000000000000000000000000000000000000000000000");
+        });
       });
     });
   }
