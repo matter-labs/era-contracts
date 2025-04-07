@@ -2953,7 +2953,6 @@ object "Bootloader" {
                 debugLog("Setting message roots", 0)
                 let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
                 let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
-                let rollingHashOfProcessedRoots := 0
                 debugLog("Setting message roots 1", msgRootSlot)
                 for {let i := 0} true {i := add(i, 1)} {
                     debugLog("Setting message roots 2", i)
@@ -3009,7 +3008,7 @@ object "Bootloader" {
             }
 
             function sendMsgRootsRollingHashToL1() {
-                debugLog("Sending message roots", 0)
+                debugLog("Sending message roots to L1", 0)
                 let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
                 let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
                 let rollingHashOfProcessedRoots := 0
@@ -3019,17 +3018,10 @@ object "Bootloader" {
                     let blockNumber := mload(add(messageRootStartSlot, 32))
                     let sidesLength := mload(add(messageRootStartSlot, 64))
 
-                    let msgRootOffset := 64
-                    mstore(msgRootOffset, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
-                    mstore(add(msgRootOffset, 4), chainId)
-                    mstore(add(msgRootOffset, 36), blockNumber)
-                    mstore(add(msgRootOffset, 68), 96)
-                    mstore(add(msgRootOffset, 100), sidesLength)
-                    for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        debugLog("Setting message roots 6", j)
-                        debugLog("Setting message roots 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
-                        mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
-                    }
+                    debugLog("Sending message roots to L1 3", chainId)
+                    debugLog("Sending message roots to L1 4", blockNumber)
+                    debugLog("Sending message roots to L1 5", sidesLength)
+
                     if iszero(sidesLength) {
                         // There are no more logs, sending hash to L1.
                         debugLog("Rolling hash to L1", rollingHashOfProcessedRoots)
@@ -3037,15 +3029,25 @@ object "Bootloader" {
 
                         sendToL1Native(true, messageRootRollingHashLogKey(), rollingHashOfProcessedRoots)
                         break
-                    }// for single messageRoots that are not really sides, we send them to L1 here.
+                    }
+
+                    let msgRootOffset := 64
+                    mstore(msgRootOffset, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
+                    mstore(add(msgRootOffset, 4), chainId)
+                    mstore(add(msgRootOffset, 36), blockNumber)
+                    mstore(add(msgRootOffset, 68), 96)
+                    mstore(add(msgRootOffset, 100), sidesLength)
+                    for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
+                        debugLog("Sending message roots to L1 6", j)
+                        debugLog("Sending message roots to L1 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                    }
+
+                    // for single messageRoots that are not really sides, we send them to L1 here.
                     if lt(sidesLength, 2) {
                         // Calculate keccak256 of all data
                         mstore(36, rollingHashOfProcessedRoots)
                         debugLog("keccak rolling ", mload(36))
-                        debugLog("keccak chainId ", mload(36))
-                        debugLog("keccak rolling ", mload(36))
-                        debugLog("keccak rolling ", mload(36))
-
 
                         rollingHashOfProcessedRoots := keccak256(36, add(32, add(128, mul(sidesLength, 32))))
                         debugLog("keccak rolling out", rollingHashOfProcessedRoots)
